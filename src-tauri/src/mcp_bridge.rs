@@ -1,46 +1,23 @@
-// MCP (Model Context Protocol) bridge — local control channel + the tool
-// REGISTRY that makes DevTool's MCP surface plugin-driven instead of a
-// hardcoded list.
+// MCP (Model Context Protocol) bridge: a loopback HTTP server that lets the
+// standalone MCP stdio server (src/bin/devtool-mcp-server.rs, launched by an
+// MCP client, not by this app) reach tools running in the webview.
 //
-// A standalone MCP stdio server (src/bin/devtool-mcp-server.rs, run by
-// Claude Desktop/Code — NOT by this app) can't reach into the running
-// webview directly, so this module runs a small loopback-only HTTP server
-// the sidecar calls into, exposing two things:
+//   - `GET /tools` lists every currently registered tool. Tools are not
+//     compiled in: each frontend bridge registers its own definitions with
+//     `mcp_register_tools`, keyed by plugin id so re-registering replaces.
+//   - `POST /call` emits an `mcp:call` event; the bridge that owns the tool
+//     answers through `mcp_respond`, using the same code path as the UI.
 //
-//   - `GET /tools` — the tool catalogue: name/description/inputSchema for
-//     every tool CURRENTLY registered. Each tool is bundled with and
-//     registered by its own owner's frontend bridge (e.g.
-//     src/components/tools/apiclient/mcpBridge.ts calls
-//     `mcp_register_tools` once on mount with API Client's own tool defs;
-//     a Tier-B plugin installed from developer-desktop-miniapp —
-//     Redis/RabbitMQ/Container Manager, Kafka Explorer — does the exact
-//     same from ITS OWN mcpBridge.ts). This module has no compiled-in
-//     knowledge of what tools exist — it only stores whatever's been
-//     registered, keyed by the registering plugin's id so a second
-//     registration (re-mount) cleanly replaces the first instead of
-//     duplicating entries.
-//   - `POST /call` — a tool CALL is handed to the frontend as an `mcp:call`
-//     event, answered over the `mcp_respond` command by whichever bridge
-//     owns that tool name — so an MCP tool call runs through the exact
-//     same store/engine the user's own UI uses, and shows up in the UI/
-//     History like any other action, same as before this registry existed.
+// Bound to 127.0.0.1 on an OS-assigned port. `/call` and `/tools` need the
+// random bearer token that is written with the port to
+// `<app_data_dir>/mcp-bridge.json` for the sidecar to read; `/health` does not.
 //
-// Loopback-only (127.0.0.1, OS-assigned port), gated by a random token
-// written alongside the port to `<app_data_dir>/mcp-bridge.json` on
-// startup — the sidecar reads that file to find both. `/call` only emits
-// the event and waits (CALL_TIMEOUT below) — it has no idea whether
-// anything is actually listening for it. By default, a tool call only
-// succeeds while the app is running AND the tool that owns it is the one
-// currently mounted, because that's the only time its frontend bridge is
-// registered (and hence able to answer `mcp:call`). Settings → MCP →
-// "Background MCP bridge" (McpBackgroundBridge.tsx, off by default) mounts
-// every eligible bridge unconditionally instead, so a call succeeds
-// regardless of which tool is on screen — any other case (app closed,
-// both the specific tool AND the background setting are off) just times
-// out with a clear error.
+// A call only succeeds while some bridge for the tool is registered: by
+// default that is while the tool is on screen, or always when Settings → MCP
+// → "Background MCP bridge" is on. Otherwise it times out with an error.
 
 use std::collections::HashMap;
-use std::io::{Error as IoError, ErrorKind};
+use std::io::Error as IoError;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -55,8 +32,9 @@ use tauri::{AppHandle, Emitter, Manager};
 use tokio::sync::oneshot;
 use uuid::Uuid;
 
-// Trùng giá trị với `service_host.rs`'s `CALL_TIMEOUT` một cách có chủ đích,
-// không phải hằng số dùng chung — xem comment ở đó.
+// Must stay below `CALL_TIMEOUT` in bin/devtool-mcp-server.rs (35s), so the
+// client sees this error instead of its own timeout. Equal to
+// `service_host.rs`'s `CALL_TIMEOUT` only by coincidence.
 const CALL_TIMEOUT: Duration = Duration::from_secs(30);
 
 #[derive(Clone, Default)]
@@ -68,20 +46,14 @@ pub struct McpBridgeState {
 struct Inner {
     token: String,
     pending: HashMap<String, oneshot::Sender<CallOutcome>>,
-    /// Registered MCP tools, keyed by the REGISTERING plugin's id (not by
-    /// tool name — a plugin registers its whole list in one call, and a
-    /// re-registration, e.g. its bridge re-mounting, replaces its own
-    /// entry wholesale rather than appending duplicates). Flattened into a
-    /// single list by `GET /tools` — see `list_tools_http` below.
+    /// Registered tools keyed by the registering plugin's id; a plugin's
+    /// re-registration replaces its whole list. Flattened by `GET /tools`.
     tools: HashMap<String, Vec<ToolDef>>,
 }
 
-/// One MCP tool's catalogue entry — name/description/JSON-Schema, no
-/// handler. The actual call still goes through `POST /call` → `mcp:call` →
-/// whichever bridge answers that tool name; this is ONLY what
-/// `devtool-mcp-server.rs` needs to advertise it to an MCP client via
-/// `list_tools`. Matches the shape that process's `fetch_registered_tools()`
-/// expects verbatim (plain fields, no envelope).
+/// One tool's catalogue entry (name, description, JSON Schema), in the shape
+/// `devtool-mcp-server.rs`'s `fetch_registered_tools()` expects. Calls go
+/// through `POST /call`, not through this struct.
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct ToolDef {
     pub name: String,
@@ -120,11 +92,8 @@ struct DiscoveryFile {
     token: String,
 }
 
-/// So sánh KHÔNG rò rỉ thời gian qua độ dài chuỗi khớp trước khi lệch — bản
-/// `==` thường có thể trả lời sớm ngay byte đầu tiên sai. Rủi ro thực tế ở
-/// đây rất thấp (chỉ loopback, token UUID-v4 ngẫu nhiên, không có kẻ tấn công
-/// từ xa nào đo được độ trễ), nhưng đây là đúng điểm kiểm tin cậy nên vẫn
-/// đáng làm cho chắc thay vì dựa vào "khó khai thác trong thực tế".
+/// Constant-time comparison for the bearer token, so response time does not
+/// reveal how many leading bytes matched.
 fn constant_time_eq(a: &str, b: &str) -> bool {
     if a.len() != b.len() {
         return false;
@@ -203,30 +172,21 @@ async fn list_tools_http(State((_app, state)): State<(AppHandle, McpBridgeState)
     (StatusCode::OK, Json(tools)).into_response()
 }
 
-/// Called once by a tool's own frontend bridge when it mounts (e.g.
-/// `apiclient/mcpBridge.ts`, or a Tier-B plugin's own `mcpBridge.ts` —
-/// compiled-in or installed from developer-desktop-miniapp, no
-/// difference to this registry). `plugin_id` scopes the entry so a second
-/// call from the SAME plugin (its bridge re-mounting) replaces its list
-/// wholesale rather than duplicating tool names in `GET /tools`.
+/// Registers a plugin's tools, replacing any list it registered before.
 #[tauri::command]
 pub fn mcp_register_tools(state: tauri::State<'_, McpBridgeState>, plugin_id: String, tools: Vec<ToolDef>) {
     state.inner.lock().unwrap().tools.insert(plugin_id, tools);
 }
 
-/// Called on unmount by a bridge that only wants to answer calls while its
-/// own tool is on screen (the common case — see this module's own doc
-/// comment on the "on screen" default). A bridge that stays registered
-/// unconditionally (Settings → MCP → Background MCP bridge; the platform's
-/// own meta-tools in McpManageBridge.tsx) simply never calls this.
+/// Removes a plugin's tools, typically when its tool leaves the screen.
+/// Bridges that stay registered (background bridge, McpManageBridge.tsx)
+/// never call this.
 #[tauri::command]
 pub fn mcp_unregister_tools(state: tauri::State<'_, McpBridgeState>, plugin_id: String) {
     state.inner.lock().unwrap().tools.remove(&plugin_id);
 }
 
-// Answers a pending `/call` with the result the frontend's handler produced
-// (or an error message) — the other half of the request/response pair the
-// HTTP handler above is blocked waiting on.
+// Completes a pending `/call` with the frontend's result or error.
 #[tauri::command]
 pub fn mcp_respond(
     state: tauri::State<'_, McpBridgeState>,
@@ -239,16 +199,10 @@ pub fn mcp_respond(
     }
 }
 
-// Resolves the absolute path to the bundled `devtool-mcp-server` sidecar next
-// to this app's own executable — where Tauri's `bundle.externalBin` places it
-// on every platform (macOS: Contents/MacOS/, alongside the main binary, not
-// Contents/Resources/; Windows/Linux: the install directory). Used by the
-// API Client Sidebar's "MCP for Claude Code…" dialog to show a
-// ready-to-paste `claude mcp add` command without the user having to hunt
-// for the install path themselves. Returns an error in a
-// dev build (`tauri dev`), where the sidecar isn't bundled next to anything —
-// run it via `cargo run --bin devtool-mcp-server` instead while developing
-// (see the checked-in .mcp.json, which does exactly that).
+// Absolute path of the bundled `devtool-mcp-server` next to the app
+// executable (where `bundle.externalBin` puts it), shown in the "MCP for
+// Claude Code" dialog. Fails in dev builds, where the sidecar is not
+// bundled; use `cargo run --bin devtool-mcp-server` (see .mcp.json).
 #[tauri::command]
 pub fn mcp_sidecar_path() -> Result<String, String> {
     let exe = std::env::current_exe().map_err(|e| e.to_string())?;
@@ -270,24 +224,15 @@ fn write_discovery_file(app: &AppHandle, port: u16, token: &str) -> std::io::Res
     let dir = app
         .path()
         .app_data_dir()
-        .map_err(|e| IoError::new(ErrorKind::Other, e.to_string()))?;
+        .map_err(|e| IoError::other(e.to_string()))?;
     std::fs::create_dir_all(&dir)?;
     let path = dir.join("mcp-bridge.json");
     let json = serde_json::to_string_pretty(&DiscoveryFile { port, token: token.to_string() })?;
-    std::fs::write(&path, json)?;
-    // Best-effort: keep the token file readable only by the current user on
-    // unix. Windows ACLs already default to the owning user.
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let _ = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600));
-    }
-    Ok(())
+    crate::private_file::write(&path, json)
 }
 
-// Starts the loopback control server and writes its port + token to
-// `<app_data_dir>/mcp-bridge.json` for the sidecar to discover. Called once
-// from main.rs's `.setup()`.
+// Starts the bridge and writes its discovery file. Called once from
+// main.rs's `.setup()`.
 pub fn start(app: &AppHandle) {
     let token = Uuid::new_v4().simple().to_string();
     let state = McpBridgeState::default();
@@ -331,7 +276,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn constant_time_eq_dung_nhu_so_sanh_thuong() {
+    fn constant_time_eq_matches_plain_equality() {
         assert!(constant_time_eq("abc", "abc"));
         assert!(constant_time_eq("", ""));
         assert!(!constant_time_eq("abc", "abd"));

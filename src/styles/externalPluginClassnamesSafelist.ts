@@ -11,6 +11,9 @@
  * installs one of these plugins from a URL (docs/plugin-sdk/05-external-install.md)
  * would then see it rendered with half its classes doing nothing.
  *
+ * The last line keeps classes the stylesheet has always shipped only because
+ * app comments mentioned them; installed plugins may rely on them.
+ *
  * This file is never imported — it exists purely as scannable text so those
  * classes stay in the compiled stylesheet. Regenerate by re-running the
  * extraction one-off in the migration PR description if the plugin source
@@ -76,4 +79,5 @@ export const EXTERNAL_PLUGIN_CLASSNAMES_SAFELIST = `
   grid-cols-[auto_1fr_1fr_1fr] group-hover/recent:opacity-100 group-hover:bg-acc/10 group-hover:bg-acc/70 group-hover:opacity-50
   group/recent hover:bg-bg-2/15 hover:border-l-acc/40 kafka-explorer max-w-[9rem] min-w-[9rem]
   mt-auto overflow-x-hidden pb-0.5 pl-3.5 pr-4 pt-px space-y-6 text-acc/80
+  bg-acc/20 ring-acc/35 hover:bg-acc/60 scale-x-90 zoom-in-95 text-[hsl(var(--cat-3-c))]
 `;

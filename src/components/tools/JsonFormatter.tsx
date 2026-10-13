@@ -1,15 +1,18 @@
-import { useDeferredValue, useMemo, useState } from 'react';
+import { useDeferredValue, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { usePluginSdkFor, usePluginState } from '@/platform';
 import { CopyButton } from '@/components/ui/copy-button';
 import { Segmented } from '@/components/ui/segmented';
-import { PaneHeader } from '@/components/ui/tool-layout';
+import { PaneHeader, ToolToolbar } from '@/components/ui/tool-layout';
 import { CodeViewer, JsonSyntaxEditor } from '@/design-system';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   AlertCircle,
+  AlertTriangle,
   CheckCircle2,
+  ChevronDown,
   ChevronRight,
+  ChevronUp,
   Eye,
   EyeOff,
   FileJson,
@@ -18,7 +21,11 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { SearchInput } from '@/components/ui/search-input';
-import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
+import { useQuickPaste, useQuickPasteHint } from '@/hooks/useQuickPaste';
+import { useMessages } from '@/contexts/LocaleContext';
+import COMMON from '@/components/tools/common.messages';
+import MESSAGES from '@/components/tools/JsonFormatter.messages';
+import { useInputHistory } from '@/hooks/useInputHistory';
 import { SplitPane } from '@/components/ui/split-pane';
 
 export type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
@@ -352,8 +359,8 @@ function collectContainerPaths(value: JsonValue, path = '$', acc: string[] = [])
   return acc;
 }
 
-// Cú pháp JSON — tái dùng đúng hue của SQL cho cùng khái niệm (chuỗi/số/kiểu),
-// nên "chuỗi" luôn cùng một xanh lá dù đang ở JSON hay SQL. Xem tokens.css.
+// JSON syntax colors reuse the SQL hues for the same concepts
+// (strings, numbers, types); see tokens.css.
 const TYPE_CLASS: Record<string, string> = {
   string: 'text-[var(--sql-string)]',
   number: 'text-[var(--sql-number)]',
@@ -428,6 +435,14 @@ function flattenJson(root: JsonValue, quote: string, collapsed: Set<string>, for
   return lines;
 }
 
+/** Fixed tree row height (px), matching `h-5 leading-5`. Rows never wrap
+ *  (`whitespace-pre`), so windowing is a single division. */
+const ROW_H = 20;
+/** Non-`Error` failure (rare); translated for display. */
+const INVALID = '\u0000invalid';
+/** Extra rows rendered above and below the viewport for fast scrolling. */
+const OVERSCAN = 30;
+
 function lineMatches(line: FlatLine, lowerQuery: string) {
   if (!lowerQuery) return false;
   if (line.name && line.name.toLowerCase().includes(lowerQuery)) return true;
@@ -437,6 +452,9 @@ function lineMatches(line: FlatLine, lowerQuery: string) {
 
 export function JsonFormatter() {
   const sdk = usePluginSdkFor('json');
+  const m = useMessages(MESSAGES);
+  const c = useMessages(COMMON);
+  const quickPasteHint = useQuickPasteHint();
   const [input, setInput] = usePluginState(sdk, 'json:input', '', { legacyKey: 'devtool:json:input' });
   const [mode, setMode] = usePluginState<Mode>(sdk, 'json:mode', 'beautify', { legacyKey: 'devtool:json:mode' });
   const [indentKey, setIndentKey] = usePluginState(sdk, 'json:indent', '2', { legacyKey: 'devtool:json:indent' });
@@ -449,6 +467,7 @@ export function JsonFormatter() {
   const [hoveredContainer, setHoveredContainer] = useState('');
 
   useQuickPaste((text) => setInput(normalizeSmartQuotes(text)));
+  useInputHistory(input, setInput);
 
   const indent = INDENT_OPTIONS[indentKey] ?? INDENT_OPTIONS['2'];
   const forceExpand = query.trim().length > 0;
@@ -458,12 +477,18 @@ export function JsonFormatter() {
   // every keystroke. Defer the input so the editor stays responsive while
   // parsing a large document; the derived views update at low priority.
   const deferredInput = useDeferredValue(input);
-  const parsed = useMemo<{ value: JsonValue | undefined; error: string }>(() => {
-    if (!deferredInput.trim()) return { value: undefined, error: '' };
+  const parsed = useMemo<{ value: JsonValue | undefined; error: string; strict: boolean }>(() => {
+    if (!deferredInput.trim()) return { value: undefined, error: '', strict: true };
     try {
-      return { value: parseInput(deferredInput), error: '' };
+      const value = parseInput(deferredInput);
+      // The lenient parser also reads trailing commas, unquoted keys,
+      // comments and single quotes. People open a formatter to check JSON,
+      // so "valid" is only claimed when the input itself is strict JSON.
+      let strict = true;
+      try { JSON.parse(deferredInput); } catch { strict = false; }
+      return { value, error: '', strict };
     } catch (err) {
-      return { value: undefined, error: err instanceof Error ? err.message : 'Invalid JSON' };
+      return { value: undefined, error: err instanceof Error ? err.message : INVALID, strict: false };
     }
   }, [deferredInput]);
 
@@ -490,6 +515,87 @@ export function JsonFormatter() {
     [parsed.value, quote]
   );
 
+  // ── Windowing: only visible rows (plus overscan) are rendered ─────────
+  const treeRef = useRef<HTMLDivElement>(null);
+  const [scrollTop, setScrollTop] = useState(0);
+  const [viewportH, setViewportH] = useState(600);
+  useEffect(() => {
+    const el = treeRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setViewportH(el.clientHeight));
+    ro.observe(el);
+    setViewportH(el.clientHeight);
+    return () => ro.disconnect();
+  }, [parsed.value, mode]);
+  const first = Math.max(0, Math.floor(scrollTop / ROW_H) - OVERSCAN);
+  const last = Math.min(lines.length, Math.ceil((scrollTop + viewportH) / ROW_H) + OVERSCAN);
+
+  const scrollToIndex = (i: number) => {
+    const el = treeRef.current;
+    if (!el || i < 0) return;
+    const top = i * ROW_H;
+    if (top < el.scrollTop) el.scrollTop = top;
+    else if (top + ROW_H > el.scrollTop + el.clientHeight) el.scrollTop = top + ROW_H - el.clientHeight;
+  };
+
+  // ── Search: count and jump to matches ──────────────────────────────────
+  const matchIndexes = useMemo(
+    () => (lowerQuery ? lines.flatMap((line, i) => (line.kind !== 'close' && lineMatches(line, lowerQuery) ? [i] : [])) : []),
+    [lines, lowerQuery],
+  );
+  const [matchCursor, setMatchCursor] = useState(0);
+  useEffect(() => setMatchCursor(0), [lowerQuery]);
+  const jumpToMatch = (dir: 1 | -1) => {
+    if (!matchIndexes.length) return;
+    const next = (matchCursor + dir + matchIndexes.length) % matchIndexes.length;
+    setMatchCursor(next);
+    const i = matchIndexes[next];
+    setSelectedPath(lines[i].path);
+    scrollToIndex(i);
+  };
+
+  // ── Keyboard (ARIA tree pattern) ──────────────────────────────────────
+  //   ↑/↓ move · → expand / to child · ← collapse / to parent · Enter toggles
+  const selectable = (i: number) => lines[i] && lines[i].kind !== 'close';
+  const onTreeKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    const cur = lines.findIndex((l) => l.kind !== 'close' && l.path === selectedPath);
+    const go = (i: number) => {
+      if (i < 0 || i >= lines.length) return;
+      e.preventDefault();
+      setSelectedPath(lines[i].path);
+      scrollToIndex(i);
+    };
+    const line = lines[cur];
+    switch (e.key) {
+      case 'ArrowDown': {
+        let i = cur + 1;
+        while (i < lines.length && !selectable(i)) i++;
+        go(i);
+        break;
+      }
+      case 'ArrowUp': {
+        let i = cur < 0 ? lines.length - 1 : cur - 1;
+        while (i >= 0 && !selectable(i)) i--;
+        go(i);
+        break;
+      }
+      case 'ArrowRight':
+        if (line?.kind === 'collapsed' && !forceExpand) { e.preventDefault(); toggle(line.path); }
+        else if (line?.kind === 'open') go(cur + 1);
+        break;
+      case 'ArrowLeft':
+        if (line?.kind === 'open' && line.path !== '$' && !forceExpand) { e.preventDefault(); toggle(line.path); }
+        else if (line) go(lines.findIndex((l) => l.kind !== 'close' && l.path === line.containerPath));
+        break;
+      case 'Enter':
+      case ' ':
+        if (line && (line.kind === 'open' || line.kind === 'collapsed') && !forceExpand) { e.preventDefault(); toggle(line.path); }
+        break;
+      case 'Home': go(0); break;
+      case 'End': go(lines.length - 1); break;
+    }
+  };
+
   const toggle = (path: string) => {
     setCollapsed((prev) => {
       const next = new Set(prev);
@@ -505,7 +611,7 @@ export function JsonFormatter() {
     const comma = !line.isLast && <span className="text-fg-mute">,</span>;
     const badge = (
       <span className="ml-2 text-xs text-fg-mute/70">
-        {line.isArray ? `${line.count} ${line.count === 1 ? 'item' : 'items'}` : `${line.count} ${line.count === 1 ? 'field' : 'fields'}`}
+        {m(line.isArray ? (line.count === 1 ? 'item' : 'items') : (line.count === 1 ? 'field' : 'fields'), { n: line.count ?? 0 })}
       </span>
     );
 
@@ -553,12 +659,13 @@ export function JsonFormatter() {
 
   const inputPanel = (
     <div className="h-full border-b border-line flex flex-col">
-      <PaneHeader label="Input" hint={quickPasteHint} />
+      <PaneHeader label={c('input')} hint={quickPasteHint} />
       <div className="flex flex-1 min-h-0 flex-col overflow-hidden p-2">
         <JsonSyntaxEditor
           value={input}
           onChange={setInput}
           placeholder={'{"key": "value"}  or  "{\\"key\\": \\"value\\"}"'}
+          ariaLabel={c('input')}
         />
       </div>
     </div>
@@ -572,12 +679,17 @@ export function JsonFormatter() {
           {parsed.error ? (
             <div className="flex items-center gap-2 text-sm text-bad">
               <AlertCircle className="h-4 w-4 shrink-0" />
-              <span className="font-mono text-xs">{parsed.error}</span>
+              <span className="font-mono text-xs">{parsed.error === INVALID ? m('invalidJson') : parsed.error}</span>
+            </div>
+          ) : parsed.strict ? (
+            <div className="flex items-center gap-2 text-sm text-fg-mute">
+              <CheckCircle2 className="h-4 w-4 text-ok" />
+              <span className="text-xs">{m('validJson')}</span>
             </div>
           ) : (
             <div className="flex items-center gap-2 text-sm text-fg-mute">
-              <CheckCircle2 className="h-4 w-4 text-ok" />
-              <span className="text-xs">Valid JSON</span>
+              <AlertTriangle className="h-4 w-4 shrink-0 text-warn" />
+              <span className="text-xs">{m('lenientJson')}</span>
             </div>
           )}
         </div>
@@ -590,21 +702,40 @@ export function JsonFormatter() {
             <SearchInput
               value={query}
               onChange={setQuery}
-              placeholder="Find by key, value, or path…"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') { e.preventDefault(); jumpToMatch(e.shiftKey ? -1 : 1); }
+              }}
+              placeholder={m('searchPlaceholder')}
               className="h-ctl text-xs rounded-sm"
               containerClassName="flex-1 min-w-[160px]"
             />
-            <Button variant="outline" size="sm" className="h-ctl rounded-sm" onClick={() => setCollapsed(new Set())} title="Expand all">
+            {lowerQuery && (
+              <div className="flex items-center gap-0.5">
+                <span className="min-w-[3.5rem] text-center font-mono text-xs tabular-nums text-fg-mute" aria-live="polite">
+                  {matchIndexes.length ? `${matchCursor + 1}/${matchIndexes.length}` : '0/0'}
+                </span>
+                <Button variant="ghost" size="icon" className="h-ctl w-ctl" disabled={!matchIndexes.length}
+                  onClick={() => jumpToMatch(-1)} title={m('prevMatch')} aria-label={m('prevMatch')}>
+                  <ChevronUp className="h-3.5 w-3.5" />
+                </Button>
+                <Button variant="ghost" size="icon" className="h-ctl w-ctl" disabled={!matchIndexes.length}
+                  onClick={() => jumpToMatch(1)} title={m('nextMatch')} aria-label={m('nextMatch')}>
+                  <ChevronDown className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            )}
+            <Button variant="outline" size="sm" className="h-ctl rounded-sm" onClick={() => setCollapsed(new Set())} title={m('expandAll')} aria-label={m('expandAll')}>
               <UnfoldVertical className="h-3.5 w-3.5" />
             </Button>
             <Button
               variant="outline" size="sm" className="h-ctl rounded-sm"
               onClick={() => setCollapsed(new Set(containerPaths.filter((path) => path !== '$')))}
-              title="Collapse all"
+              title={m('collapseAll')}
+              aria-label={m('collapseAll')}
             >
               <FoldVertical className="h-3.5 w-3.5" />
             </Button>
-            <CopyButton value={() => beautified} label="Copy" variant="outline" size="sm" className="h-ctl text-xs rounded-sm" iconClassName="h-3.5 w-3.5" />
+            <CopyButton value={() => beautified} label={c('copy')} variant="outline" size="sm" className="h-ctl text-xs rounded-sm" iconClassName="h-3.5 w-3.5" />
           </div>
         </div>
       )}
@@ -613,10 +744,20 @@ export function JsonFormatter() {
       <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
         {parsed.value !== undefined && mode === 'beautify' && (
           <div
-            className="flex-1 min-h-0 overflow-auto py-2 font-mono text-xs leading-relaxed"
+            ref={treeRef}
+            role="tree"
+            aria-label={m('tree')}
+            tabIndex={0}
+            aria-activedescendant={selectedPath ? `json-node-${lines.findIndex((l) => l.kind !== 'close' && l.path === selectedPath)}` : undefined}
+            onKeyDown={onTreeKeyDown}
+            onScroll={(e) => setScrollTop(e.currentTarget.scrollTop)}
+            className="flex-1 min-h-0 overflow-auto font-mono text-xs leading-5 focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-inset focus-visible:ring-focus"
             onMouseLeave={() => setHoveredContainer('')}
           >
-            {lines.map((line) => {
+            <div style={{ height: lines.length * ROW_H, position: 'relative' }}>
+            <div style={{ transform: `translateY(${first * ROW_H}px)` }}>
+            {lines.slice(first, last).map((line, offset) => {
+              const index = first + offset;
               const bracketHighlighted = line.kind !== 'primitive' && line.path === hoveredContainer;
               const bracketClass = cn('text-fg-mute transition-colors duration-fast ease-out-soft', bracketHighlighted && 'text-fg font-semibold');
               const isMatch = lineMatches(line, lowerQuery);
@@ -625,24 +766,22 @@ export function JsonFormatter() {
               return (
                 <div
                   key={`${line.path}:${line.kind}`}
-                  className="flex items-start hover:bg-bg-2/30 transition-colors duration-fast ease-out-soft"
+                  id={line.kind !== 'close' ? `json-node-${index}` : undefined}
+                  role={line.kind !== 'close' ? 'treeitem' : 'none'}
+                  aria-level={line.depth + 1}
+                  aria-selected={line.kind !== 'close' ? isSelected : undefined}
+                  aria-expanded={isToggle ? line.kind === 'open' : undefined}
+                  className="flex h-5 items-start hover:bg-bg-2/30 transition-colors duration-fast ease-out-soft"
                   onMouseEnter={() => setHoveredContainer(line.containerPath)}
                   onClick={() => { setSelectedPath(line.path); if (isToggle && !forceExpand) toggle(line.path); }}
                 >
-                  <span className="w-12 shrink-0 select-none pr-3 text-right text-xs leading-relaxed text-fg-mute/45 tabular-nums">
+                  <span className="w-12 shrink-0 select-none pr-3 text-right text-xs leading-5 text-fg-mute/45 tabular-nums">
                     {line.no}
                   </span>
                   <div className="flex min-w-0 flex-1 items-start pr-3" style={{ paddingLeft: `${line.depth * indent.size}ch` }}>
-                    <span className="mr-0.5 mt-[3px] w-3.5 shrink-0 text-fg-mute">
-                      {/* MỘT icon xoay 90°, không phải tráo giữa hai icon khác nhau.
-                          Bản trước tráo ChevronDown ↔ ChevronRight — hai component
-                          Lucide khác nhau, nên React coi đó là hai node khác nhau
-                          và không có gì để animate: mở/gập BẬT TẮT trong một khung
-                          hình. Đây là hàng dày đặc nhất trong toàn app xét theo tần
-                          suất bấm (mọi node object/array trong cây JSON), nên đúng
-                          chỗ đáng animate nhất lại là chỗ trơ nhất. Cùng công thức
-                          `CollapsibleSection` đã dùng: một ChevronRight, xoay bằng
-                          `--ease-spring` khi mở. */}
+                    <span className="mr-0.5 mt-[3px] w-3.5 shrink-0 text-fg-mute" aria-hidden>
+                      {/* One chevron rotated 90° with `--ease-spring` (as in
+                          CollapsibleSection), not two swapped icons, so it can animate. */}
                       {isToggle && (
                         <ChevronRight
                           className={cn(
@@ -671,14 +810,16 @@ export function JsonFormatter() {
                 </div>
               );
             })}
+            </div>
+            </div>
           </div>
         )}
 
         {parsed.value !== undefined && mode !== 'beautify' && (
           <>
             <PaneHeader
-              label={mode === 'string' ? 'JSON String' : 'Minified'}
-              action={<CopyButton value={() => outputText} label="Copy" variant="ghost" size="sm" className="h-6 px-2 text-xs rounded-lg" iconClassName="h-3 w-3" />}
+              label={mode === 'string' ? m('jsonString') : m('minified')}
+              action={<CopyButton value={() => outputText} label={c('copy')} variant="ghost" size="sm" className="h-6 px-2 text-xs rounded-lg" iconClassName="h-3 w-3" />}
             />
             <div className="flex flex-1 min-h-0 flex-col overflow-hidden p-2">
               <CodeViewer value={outputText} language="json" />
@@ -690,10 +831,10 @@ export function JsonFormatter() {
         {parsed.value === undefined && !parsed.error && (
           <div className="flex-1 flex flex-col items-center justify-center text-center text-fg-mute px-8 gap-3">
             <FileJson className="h-12 w-12 text-fg-mute/30" />
-            <p className="text-sm">Paste JSON to get started</p>
+            <p className="text-sm">{m('getStarted')}</p>
             {!showInput && (
               <Button variant="outline" size="sm" className="h-ctl text-xs rounded-sm" onClick={() => setShowInput(true)}>
-                <Eye className="h-3 w-3 mr-1.5" />Show input
+                <Eye className="h-3 w-3 mr-1.5" />{m('showInput')}
               </Button>
             )}
           </div>
@@ -703,8 +844,8 @@ export function JsonFormatter() {
       {/* Beautify: path breadcrumb */}
       {parsed.value !== undefined && mode === 'beautify' && (
         <div className="shrink-0 border-t border-line flex items-center gap-2 px-4 py-2 bg-bg-2/10 text-xs">
-          <span className="text-fg-mute">Path</span>
-          <code className="flex-1 truncate font-mono text-fg">{selectedPath || '$ (click a node)'}</code>
+          <span className="text-fg-mute">{m('path')}</span>
+          <code className="flex-1 truncate font-mono text-fg">{selectedPath || m('pathHint')}</code>
           {selectedPath && (
             <CopyButton value={selectedPath} variant="ghost" size="sm" className="h-6 px-2" iconClassName="h-3.5 w-3.5" />
           )}
@@ -716,48 +857,48 @@ export function JsonFormatter() {
   return (
     <div className="flex flex-col h-full">
       {/* Toolbar */}
-      <div className="shrink-0 header-chrome px-4 py-2.5">
+      <ToolToolbar>
         <div className="flex flex-wrap items-center gap-3">
           <Segmented
             value={mode}
             onValueChange={setMode}
             options={[
-              { value: 'beautify', label: 'Beautify' },
-              { value: 'string', label: 'JSON String' },
-              { value: 'minify', label: 'Minify' },
+              { value: 'beautify', label: m('beautify') },
+              { value: 'string', label: m('jsonString') },
+              { value: 'minify', label: m('minify') },
             ]}
-            aria-label="JSON mode"
+            aria-label={m('modeLabel')}
           />
 
           <div className="flex items-center gap-1.5">
-            <span className="text-xs text-fg-mute">Indent</span>
+            <span className="text-xs text-fg-mute">{c('indent')}</span>
             <Select value={indentKey} onValueChange={setIndentKey}>
               <SelectTrigger className="h-ctl w-[108px] text-xs rounded-sm"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="2">2 spaces</SelectItem>
-                <SelectItem value="4">4 spaces</SelectItem>
-                <SelectItem value="tab">Tab</SelectItem>
+                <SelectItem value="2">{c('spaces', { n: 2 })}</SelectItem>
+                <SelectItem value="4">{c('spaces', { n: 4 })}</SelectItem>
+                <SelectItem value="tab">{c('tab')}</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           <div className="flex items-center gap-1.5">
-            <span className="text-xs text-fg-mute">Quotes</span>
+            <span className="text-xs text-fg-mute">{m('quotes')}</span>
             <Select value={quote} onValueChange={setQuote}>
               <SelectTrigger className="h-ctl w-[112px] text-xs rounded-sm"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value={'"'}>Double &quot;</SelectItem>
-                <SelectItem value={"'"}>Single &apos;</SelectItem>
+                <SelectItem value={'"'}>{m('doubleQuote')}</SelectItem>
+                <SelectItem value={"'"}>{m('singleQuote')}</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           <Button variant="outline" size="sm" className="ml-auto h-ctl text-xs rounded-sm" onClick={() => setShowInput((v) => !v)}>
             {showInput ? <EyeOff className="h-3 w-3 mr-1.5" /> : <Eye className="h-3 w-3 mr-1.5" />}
-            {showInput ? 'Hide input' : 'Show input'}
+            {showInput ? m('hideInput') : m('showInput')}
           </Button>
         </div>
-      </div>
+      </ToolToolbar>
 
       {/* Input panel (collapsible, resizable) + result view */}
       <div className="flex-1 min-h-0 flex flex-col">

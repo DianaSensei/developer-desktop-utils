@@ -12,7 +12,9 @@ import {
   setSelectedMarketId,
   type Market,
   type MarketPlugin,
+  type MarketPluginVariant,
 } from '@/lib/market';
+import { compareVersions, isPrerelease } from '@/lib/semver';
 import { currentTargetTriple, listInstalledArtifacts, type InstalledArtifactRecord } from '@/platform';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,14 +24,10 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@
 import { ExtensionInstallDialog } from '@/components/ExtensionInstallDialog';
 
 /**
- * "Chợ tiện ích" — chọn một market (nguồn catalog.json), tự tải danh sách
- * plugin nó cung cấp, và cho cài NGAY từ đây.
- *
- * Bấm Install mở thẳng `ExtensionInstallDialog` (URL manifest của plugin +
- * URL service của nó, nếu có) NGAY TẠI TRANG NÀY — không rời sang tab "Cài
- * từ URL" nữa. Vẫn KHÔNG có đường tắt nào bỏ qua bước xem trước/xác nhận
- * trong dialog đó — một market tuỳ ý người dùng tự thêm cũng chỉ đáng tin
- * như một URL dán tay, không hơn; chỉ có CHỖ hiện màn đó thay đổi.
+ * Extension marketplace: pick a market (a catalog.json source), list its
+ * plugins, and install from here. Install opens `ExtensionInstallDialog` on
+ * this page; the preview and confirmation are never skipped, since a custom
+ * market is only as trustworthy as a pasted URL.
  */
 
 export function SettingsMarketplace() {
@@ -46,21 +44,14 @@ export function SettingsMarketplace() {
   const [newLabel, setNewLabel] = useState('');
   const [newUrl, setNewUrl] = useState('');
 
-  // Plugin + kênh đang xem trước/xác nhận cài — `null` khi dialog đóng. Kênh
-  // đi kèm plugin (không phải state riêng) vì `installUrls` bên dưới phải
-  // biết lấy URL từ field phẳng của plugin (stable) hay từ `plugin.beta` —
-  // xem `MarketPluginCard`'s hai nút Install/Switch channel.
-  const [installTarget, setInstallTarget] = useState<{ plugin: MarketPlugin; channel: 'stable' | 'beta' } | null>(
-    null,
-  );
-  // Nhớ lại theo danh tính plugin+kênh, không tính mới mỗi lần render — nếu
-  // không, một re-render bất kỳ trong lúc dialog đang mở (vd
-  // `refreshInstalled` sau khi cài xong) tạo một mảng URL MỚI mỗi lần, khiến
-  // effect fetch bên trong `ExtensionInstallDialog` (khoá theo tham chiếu
-  // `urls`) chạy lại vô ích.
+  // Plugin and channel being previewed for install; `null` when the dialog
+  // is closed. The channel picks the URLs: the plugin's own fields (stable)
+  // or `plugin.beta`.
+  const [installTarget, setInstallTarget] = useState<{ plugin: MarketPlugin; channel: MarketChannel } | null>(null);
+  // Memoized per plugin and channel so re-renders while the dialog is open do
+  // not create a new array and refetch inside `ExtensionInstallDialog`.
   const installUrls = useMemo(() => {
-    if (!installTarget) return [];
-    const variant = installTarget.channel === 'beta' ? installTarget.plugin.beta : installTarget.plugin;
+    const variant = installTarget && channelVariant(installTarget.plugin, installTarget.channel);
     if (!variant) return [];
     return [variant.pluginManifestUrl, variant.serviceManifestUrl].filter((u): u is string => Boolean(u));
   }, [installTarget]);
@@ -78,11 +69,8 @@ export function SettingsMarketplace() {
     setPlugins(null);
     try {
       const result = await fetchMarketCatalog(market.catalogUrl);
-      // Người dùng có thể đã đổi sang market khác trong lúc fetch này còn
-      // đang chạy (đổi Select, hoặc thêm/xoá market khiến `selected` đổi
-      // identity) — một response TỚI SAU không được ghi đè danh sách của
-      // market hiện đang chọn, nếu không Select sẽ hiện một market trong khi
-      // card hiện plugin của market khác, và Install xếp nhầm manifest.
+      // The user may have switched markets while this fetch ran; a late
+      // response must not replace the current market's list.
       if (isStale()) return;
       setPlugins(result);
     } catch (e) {
@@ -94,8 +82,7 @@ export function SettingsMarketplace() {
   }, []);
 
   useEffect(() => {
-    // Bản web chỉ hiện cảnh báo desktop-only (return sớm bên dưới) — không
-    // có gì để tải, không nên tự bắn request catalog.
+    // The web build only shows the desktop-only notice; nothing to load.
     if (!isTauri || !selected) return;
     let stale = false;
     void load(selected, () => stale);
@@ -106,16 +93,12 @@ export function SettingsMarketplace() {
 
   useEffect(() => {
     if (!isTauri) return;
-    // Tuần tự, không Promise.all: hai lời gọi Tauri riêng biệt bắn đồng thời
-    // lúc mount từng gây ra một cuộc đua module y hệt đã ghi ở
-    // `SettingsExtensionInstaller.test.tsx` (lần `import('@tauri-apps/api/core')`
-    // thứ hai có thể không đi qua `vi.mock` trong test). Gọi tuần tự để lời
-    // gọi thứ hai luôn thấy module đã nạp xong từ lời gọi đầu.
+    // Sequential rather than Promise.all: two concurrent first calls raced
+    // the module mock of '@tauri-apps/api/core' in tests.
     void (async () => {
       await refreshInstalled();
-      // Máy này hỗ trợ target nào — dùng để cảnh báo một plugin có sidecar
-      // không có bản cho nền tảng hiện tại, TÍNH Ở RUST giống hệt
-      // SettingsExtensionInstaller (không đoán/tính lại ở webview).
+      // Target triple of this machine (computed by the host), used to warn
+      // about plugins without a build for it.
       setTargetTriple(await currentTargetTriple());
     })();
   }, [refreshInstalled]);
@@ -228,13 +211,9 @@ export function SettingsMarketplace() {
             <MarketPluginCard
               key={p.id}
               plugin={p}
-              // So khớp id + marketId — plugin cùng id cài từ MỘT market khác
-              // không được coi là "đã cài" cho thẻ này (hai bản cài độc lập,
-              // xem InstalledPluginRecord::market_id phía Rust). Một bản ghi
-              // KHÔNG có marketId (cài từ trước tính năng market, hoặc dán
-              // tay) vẫn được coi là khớp — không đủ thông tin để biết nó
-              // "thuộc" market nào, coi như có thể chính là bản của market
-              // này còn hơn hiện "Install" và mời cài chồng thêm một bản nữa.
+              // Match on id and market: the same id from another market is a
+              // separate install. A record without a market (pasted URL or older
+              // install) also counts, rather than inviting a duplicate install.
               installedRecord={installed.find(
                 (r) => r.kind === 'plugin' && r.manifest.id === p.id && (r.marketId === selected?.id || r.marketId === undefined),
               )}
@@ -271,26 +250,20 @@ function MarketPluginCard({
   const installedVersion =
     installedRecord?.kind === 'plugin' ? installedRecord.manifest.version : undefined;
   const hasBeta = !!plugin.beta;
-  // Suy ra kênh ĐANG CÀI từ version đã cài khớp field nào — `installer.ts`
-  // không lưu channel tường minh (một plugin chỉ có MỘT bản ghi cài, dù stable
-  // hay beta, xem doc comment `MarketPlugin.beta`), nên đây là cách duy nhất
-  // biết được mà không cần đổi hình dạng InstalledPluginRecord phía Rust.
-  // Khớp bản beta thì coi là 'beta'; mọi trường hợp khác (khớp stable, hoặc
-  // version cũ không còn trong catalog) mặc định 'stable' — đúng giả định gốc
-  // trước khi có beta: mọi bản cài đều là stable.
-  const installedChannel: 'stable' | 'beta' | undefined =
-    installedVersion === undefined ? undefined : installedVersion === plugin.beta?.version ? 'beta' : 'stable';
-  const upToDateStable = installedVersion === plugin.version;
-  const upToDateBeta = hasBeta && installedVersion === plugin.beta!.version;
-  const upToDateCurrent = installedChannel === 'beta' ? upToDateBeta : installedChannel === 'stable' && upToDateStable;
+  const installedChannel = installedVersion === undefined ? undefined : inferChannel(plugin, installedVersion);
+  // The build this card is about: the installed channel's, or stable before
+  // anything is installed. A beta that left the catalog falls back to stable.
+  const current = channelVariant(plugin, installedChannel ?? 'stable') ?? plugin;
+  const upToDate = installedVersion !== undefined && compareVersions(installedVersion, current.version) >= 0;
   const unsupported =
-    !!plugin.targets && plugin.targets.length > 0 && !!targetTriple && !plugin.targets.includes(targetTriple);
+    !!current.targets && current.targets.length > 0 && !!targetTriple && !current.targets.includes(targetTriple);
+  const actions = cardActions(plugin, installedChannel, upToDate);
 
   return (
     <div
       className={cn(
         'flex h-full flex-col gap-2 rounded-lg border p-3 transition-colors',
-        upToDateCurrent ? 'border-acc/30 bg-acc/5' : 'hover:border-fg-mute/30',
+        upToDate ? 'border-acc/30 bg-acc/5' : 'hover:border-fg-mute/30',
       )}
     >
       <div className="flex items-start gap-2">
@@ -299,14 +272,10 @@ function MarketPluginCard({
           <p className="truncate text-xs font-medium">{plugin.label}</p>
           <p className="flex items-center gap-1.5 truncate font-mono text-[11px] text-fg-mute/60">
             {plugin.id}@{installedVersion ?? plugin.version}
-            {/* Chỉ hiện nhãn kênh khi plugin THẬT SỰ có bản beta — một plugin
-                chưa từng phát hành beta thì "Stable" trên mọi thẻ chỉ là chữ
-                thừa, không giúp phân biệt gì cả. */}
+            {/* The channel label only helps when the plugin has a beta. */}
             {hasBeta && installedChannel && (
               <span className="shrink-0 rounded border px-1 py-0.5 font-sans text-fg-mute/80">
-                {installedChannel === 'beta'
-                  ? t('settings.extensions.marketplace.channelBeta')
-                  : t('settings.extensions.marketplace.channelStable')}
+                {t(`settings.extensions.marketplace.${installedChannel === 'beta' ? 'channelBeta' : 'channelStable'}`)}
               </span>
             )}
           </p>
@@ -329,53 +298,68 @@ function MarketPluginCard({
         <p className="text-[11px] text-warn">{t('settings.extensions.marketplace.unsupportedPlatform')}</p>
       )}
 
-      {/* Cảnh báo, KHÔNG chặn — `targets` chỉ mang tính tham khảo (một market
-          không chính thức có thể thiếu triple dù bản build thật sự có), cùng
-          nguyên tắc SettingsExtensionInstaller đã áp cho cùng field này: xem
-          trước rồi để người dùng tự quyết, không tự ý từ chối thay họ. */}
+      {/* A warning only: `targets` is advisory (an unofficial market may
+          omit a triple that exists), so the user decides. */}
       <div className="flex flex-wrap gap-1.5">
-        {installedChannel === undefined ? (
-          // Chưa cài: hai lựa chọn ngay từ đầu nếu có bản beta — không ép
-          // cài stable rồi mới "chuyển kênh" sau, người dùng biết ngay có
-          // beta để chọn thẳng nếu muốn.
-          <>
-            <Button size="sm" onClick={() => onInstall('stable')}>
-              {t('settings.extensions.marketplace.install')}
-            </Button>
-            {hasBeta && (
-              <Button size="sm" variant="outline" onClick={() => onInstall('beta')}>
-                {t('settings.extensions.marketplace.installBeta')}
-              </Button>
-            )}
-          </>
-        ) : installedChannel === 'beta' ? (
-          <>
-            <Button size="sm" onClick={() => onInstall('beta')} disabled={upToDateBeta}>
-              {upToDateBeta
-                ? t('settings.extensions.marketplace.installed')
-                : t('settings.extensions.marketplace.updateTo', { version: plugin.beta!.version })}
-            </Button>
-            {/* Bản stable (field phẳng của plugin) luôn tồn tại — chuyển về
-                stable lúc nào cũng là một lựa chọn hợp lệ khi đang ở beta. */}
-            <Button size="sm" variant="outline" onClick={() => onInstall('stable')}>
-              {t('settings.extensions.marketplace.switchToStable')}
-            </Button>
-          </>
-        ) : (
-          <>
-            <Button size="sm" onClick={() => onInstall('stable')} disabled={upToDateStable}>
-              {upToDateStable
-                ? t('settings.extensions.marketplace.installed')
-                : t('settings.extensions.marketplace.updateTo', { version: plugin.version })}
-            </Button>
-            {hasBeta && (
-              <Button size="sm" variant="outline" onClick={() => onInstall('beta')}>
-                {t('settings.extensions.marketplace.switchToBeta')}
-              </Button>
-            )}
-          </>
-        )}
+        {actions.map((a) => (
+          <Button
+            key={a.channel}
+            size="sm"
+            variant={a.primary ? undefined : 'outline'}
+            disabled={a.disabled}
+            onClick={() => onInstall(a.channel)}
+          >
+            {t(`settings.extensions.marketplace.${a.labelKey}`, a.version ? { version: a.version } : undefined)}
+          </Button>
+        ))}
       </div>
     </div>
   );
+}
+
+type MarketChannel = 'stable' | 'beta';
+
+function channelVariant(plugin: MarketPlugin, channel: MarketChannel): MarketPluginVariant | undefined {
+  return channel === 'beta' ? plugin.beta : plugin;
+}
+
+/** Which channel an installed version came from. The install record does
+ *  not store the channel, so it is read off the version: an exact match with
+ *  the catalog's stable or beta build wins (stable on a tie), otherwise a
+ *  prerelease tag means an older beta. */
+function inferChannel(plugin: MarketPlugin, installedVersion: string): MarketChannel {
+  if (installedVersion === plugin.version) return 'stable';
+  if (installedVersion === plugin.beta?.version) return 'beta';
+  return isPrerelease(installedVersion) ? 'beta' : 'stable';
+}
+
+interface CardAction {
+  channel: MarketChannel;
+  labelKey: 'install' | 'installBeta' | 'installed' | 'updateTo' | 'switchToStable' | 'switchToBeta';
+  version?: string;
+  primary: boolean;
+  disabled?: boolean;
+}
+
+/** Buttons for a card: install (and install beta) when nothing is
+ *  installed; otherwise update-or-installed for the current channel plus a
+ *  switch to the other channel when it exists. Switching replaces the
+ *  installed build. */
+function cardActions(plugin: MarketPlugin, installed: MarketChannel | undefined, upToDate: boolean): CardAction[] {
+  if (installed === undefined) {
+    const actions: CardAction[] = [{ channel: 'stable', labelKey: 'install', primary: true }];
+    if (plugin.beta) actions.push({ channel: 'beta', labelKey: 'installBeta', primary: false });
+    return actions;
+  }
+  // A beta that left the catalog leaves only stable to update to.
+  const channel: MarketChannel = installed === 'beta' && plugin.beta ? 'beta' : 'stable';
+  const target = channelVariant(plugin, channel) ?? plugin;
+  const actions: CardAction[] = [
+    upToDate
+      ? { channel, labelKey: 'installed', primary: true, disabled: true }
+      : { channel, labelKey: 'updateTo', version: target.version, primary: true },
+  ];
+  if (channel === 'beta') actions.push({ channel: 'stable', labelKey: 'switchToStable', primary: false });
+  else if (plugin.beta) actions.push({ channel: 'beta', labelKey: 'switchToBeta', primary: false });
+  return actions;
 }

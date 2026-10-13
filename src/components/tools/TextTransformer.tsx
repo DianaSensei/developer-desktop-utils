@@ -1,14 +1,16 @@
 import { useMemo } from 'react';
+import { ToggleChip } from '@/components/ui/toggle-chip';
 import { usePluginSdkFor, usePluginState } from '@/platform';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Button } from '@/components/ui/button';
 import { CopyButton } from '@/components/ui/copy-button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ToolToolbar, ToolPanes, ToolPane, PaneHeader } from '@/components/ui/tool-layout';
-import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
+import { useQuickPaste, useQuickPasteHint } from '@/hooks/useQuickPaste';
 import { useInputHistory } from '@/hooks/useInputHistory';
-import { cn } from '@/lib/utils';
+import { useMessages } from '@/contexts/LocaleContext';
+import COMMON from '@/components/tools/common.messages';
+import MESSAGES from '@/components/tools/TextTransformer.messages';
 
 type TransformMode =
   | 'single-line'
@@ -16,8 +18,13 @@ type TransformMode =
   | 'array'
   | 'uppercase'
   | 'lowercase'
+  | 'all-cases'
   | 'camelcase'
+  | 'pascalcase'
   | 'snakecase'
+  | 'constantcase'
+  | 'kebabcase'
+  | 'titlecase'
   | 'vn-phone-new'
   | 'vn-phone-old';
 
@@ -27,8 +34,13 @@ const MODE_OPTIONS: Array<{ value: TransformMode; label: string }> = [
   { value: 'array',          label: 'To Array' },
   { value: 'uppercase',      label: 'To UPPERCASE' },
   { value: 'lowercase',      label: 'To lowercase' },
+  { value: 'all-cases',      label: 'All cases at once' },
   { value: 'camelcase',      label: 'To camelCase' },
+  { value: 'pascalcase',     label: 'To PascalCase' },
   { value: 'snakecase',      label: 'To snake_case' },
+  { value: 'constantcase',   label: 'To CONSTANT_CASE' },
+  { value: 'kebabcase',      label: 'To kebab-case' },
+  { value: 'titlecase',      label: 'To Title Case' },
   { value: 'vn-phone-new',   label: 'VN Phone → New (10-digit)' },
   { value: 'vn-phone-old',   label: 'VN Phone → Old (11-digit)' },
 ];
@@ -108,19 +120,40 @@ function splitWords(text: string) {
     .filter(Boolean);
 }
 
-function toCamelCase(text: string) {
-  return splitWords(text)
-    .map((word, index) =>
-      index === 0
-        ? word.toLowerCase()
-        : word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
-    )
-    .join('');
+const capitalize = (w: string) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+
+/**
+ * Changes case line by line, so a list of identifiers (`user_id⏎first_name`)
+ * stays a list instead of becoming one identifier. Empty lines are kept.
+ */
+function perLine(text: string, fn: (words: string[]) => string) {
+  return text
+    .split('\n')
+    .map((line) => {
+      const words = splitWords(line);
+      return words.length ? fn(words) : line;
+    })
+    .join('\n');
 }
 
-function toSnakeCase(text: string) {
-  return splitWords(text).map((w) => w.toLowerCase()).join('_');
-}
+export const CASE_TRANSFORMS = {
+  camelcase: (t: string) => perLine(t, (w) => w.map((x, i) => (i === 0 ? x.toLowerCase() : capitalize(x))).join('')),
+  pascalcase: (t: string) => perLine(t, (w) => w.map(capitalize).join('')),
+  snakecase: (t: string) => perLine(t, (w) => w.map((x) => x.toLowerCase()).join('_')),
+  constantcase: (t: string) => perLine(t, (w) => w.map((x) => x.toUpperCase()).join('_')),
+  kebabcase: (t: string) => perLine(t, (w) => w.map((x) => x.toLowerCase()).join('-')),
+  titlecase: (t: string) => perLine(t, (w) => w.map(capitalize).join(' ')),
+} as const;
+
+/** Order in "All cases" mode; each label is an example of its case. */
+const ALL_CASES: Array<[keyof typeof CASE_TRANSFORMS, string]> = [
+  ['camelcase', 'camelCase'],
+  ['pascalcase', 'PascalCase'],
+  ['snakecase', 'snake_case'],
+  ['constantcase', 'CONSTANT_CASE'],
+  ['kebabcase', 'kebab-case'],
+  ['titlecase', 'Title Case'],
+];
 
 function toSingleLine(text: string, removeLineWhitespace: boolean, removeChars: string) {
   let result = text;
@@ -157,6 +190,9 @@ function toArray(text: string) {
 
 export function TextTransformer() {
   const sdk = usePluginSdkFor('text-transform');
+  const m = useMessages(MESSAGES);
+  const c = useMessages(COMMON);
+  const quickPasteHint = useQuickPasteHint();
   const [input, setInput] = usePluginState(sdk, 'textTransform:input', '', { legacyKey: 'devtool:textTransform:input' });
   const [mode, setMode] = usePluginState<TransformMode>(sdk, 'textTransform:mode', 'single-line', { legacyKey: 'devtool:textTransform:mode' });
   const [removeLineWhitespace, setRemoveLineWhitespace] = usePluginState(sdk, 'textTransform:removeLineWs', false, { legacyKey: 'devtool:textTransform:removeLineWs' });
@@ -171,8 +207,13 @@ export function TextTransformer() {
       case 'array':          return toArray(input);
       case 'uppercase':      return input.toUpperCase();
       case 'lowercase':      return input.toLowerCase();
-      case 'camelcase':      return toCamelCase(input);
-      case 'snakecase':      return toSnakeCase(input);
+      case 'camelcase':
+      case 'pascalcase':
+      case 'snakecase':
+      case 'constantcase':
+      case 'kebabcase':
+      case 'titlecase':      return CASE_TRANSFORMS[mode](input);
+      case 'all-cases':      return '';
       case 'vn-phone-new':   return convertVnPhones(input, 'toNew');
       case 'vn-phone-old':   return convertVnPhones(input, 'toOld');
       default:               return input;
@@ -184,45 +225,32 @@ export function TextTransformer() {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Options toolbar — chiều cao 32px trên MỌI control ở đây (không phải
-          mức nghỉ 34px mặc định) là chủ ý: đây là toolbar dày đặc (xem lời chú
-          trong button.tsx size="sm"), một hàng nhiều control ngang nhau cần
-          cùng một chiều cao nhỏ hơn mức nghỉ, không phải bỏ sót. */}
+      {/* Options toolbar: 32px controls throughout (dense toolbar size,
+          see button.tsx size="sm"). */}
       <ToolToolbar>
         <div className="flex flex-wrap items-center gap-3">
           <Select value={mode} onValueChange={(v) => setMode(v as TransformMode)}>
             <SelectTrigger className="h-ctl w-52 text-xs rounded-sm">
-              <SelectValue placeholder="Select transform" />
+              <SelectValue placeholder={m('selectTransform')} />
             </SelectTrigger>
             <SelectContent>
               {MODE_OPTIONS.map((o) => (
-                <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                <SelectItem key={o.value} value={o.value}>{m(`mode.${o.value}`)}</SelectItem>
               ))}
             </SelectContent>
           </Select>
 
           {mode === 'single-line' && (
             <>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                aria-pressed={removeLineWhitespace}
-                onClick={() => setRemoveLineWhitespace((v) => !v)}
-                className={cn(
-                  'h-ctl text-xs rounded-sm',
-                  removeLineWhitespace &&
-                    'border-acc/30 bg-acc/10 text-acc hover:bg-acc/15 hover:text-acc'
-                )}
-              >
-                Remove whitespace between lines
-              </Button>
+              <ToggleChip pressed={removeLineWhitespace} onPressedChange={setRemoveLineWhitespace}>
+                {m('removeWhitespace')}
+              </ToggleChip>
               <div className="flex items-center gap-1.5">
-                <span className="text-xs text-fg-mute">Remove chars</span>
+                <span className="text-xs text-fg-mute">{m('removeChars')}</span>
                 <Input
                   value={removeChars}
                   onChange={(e) => setRemoveChars(e.target.value)}
-                  placeholder="e.g. ,.;!?"
+                  placeholder={m('removeCharsExample')}
                   className="h-ctl w-32 font-mono text-xs rounded-sm"
                 />
               </div>
@@ -231,7 +259,7 @@ export function TextTransformer() {
 
           {mode === 'multiple-lines' && (
             <div className="flex items-center gap-1.5">
-              <span className="text-xs text-fg-mute">Split by</span>
+              <span className="text-xs text-fg-mute">{m('splitBy')}</span>
               <Input
                 value={delimiters}
                 onChange={(e) => setDelimiters(e.target.value)}
@@ -245,37 +273,59 @@ export function TextTransformer() {
 
       <ToolPanes>
         <ToolPane>
-          <PaneHeader label="Input" hint={quickPasteHint} />
+          <PaneHeader label={c('input')} hint={quickPasteHint} />
           <Textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Enter text to transform"
+            placeholder={m('inputPlaceholder')}
             className="flex-1 min-h-0 resize-none rounded-none border-0 focus-visible:ring-0 focus-visible:ring-offset-0 font-mono text-sm p-4"
           />
         </ToolPane>
 
-        <ToolPane>
-          <PaneHeader
-            label="Output"
-            action={
-              <CopyButton
-                value={output}
-                label="Copy"
-                size="sm"
-                variant="ghost"
-                disabled={!output}
-                className="h-6 px-2 text-xs rounded-lg"
-                iconClassName="h-3 w-3"
-              />
-            }
-          />
-          <Textarea
-            value={output}
-            readOnly
-            placeholder="Result appears here"
-            className="flex-1 min-h-0 resize-none rounded-none border-0 focus-visible:ring-0 focus-visible:ring-offset-0 font-mono text-sm p-4"
-          />
-        </ToolPane>
+        {mode === 'all-cases' ? (
+          // Show every case at once, each with its own Copy button, so trying them
+          // out doesn't mean reopening a dropdown each time.
+          <ToolPane>
+            <PaneHeader label={m('allCases')} />
+            <div className="flex-1 min-h-0 divide-y divide-line overflow-y-auto">
+              {ALL_CASES.map(([key, label]) => {
+                const value = input ? CASE_TRANSFORMS[key](input) : '';
+                return (
+                  <div key={key} className="flex items-start gap-3 px-4 py-2.5">
+                    <span className="w-28 shrink-0 pt-0.5 font-mono text-xs text-fg-mute">{label}</span>
+                    <pre className="min-w-0 flex-1 whitespace-pre-wrap break-all font-mono text-sm">
+                      {value || <span className="text-fg-mute">—</span>}
+                    </pre>
+                    <CopyButton value={value} disabled={!value} variant="ghost" size="icon" className="h-6 w-6 shrink-0" iconClassName="h-3.5 w-3.5" />
+                  </div>
+                );
+              })}
+            </div>
+          </ToolPane>
+        ) : (
+          <ToolPane>
+            <PaneHeader
+              label={c('output')}
+              action={
+                <CopyButton
+                  value={output}
+                  label={c('copy')}
+                  size="sm"
+                  variant="ghost"
+                  disabled={!output}
+                  className="h-6 px-2 text-xs rounded-lg"
+                  iconClassName="h-3 w-3"
+                />
+              }
+            />
+            <Textarea
+              value={output}
+              readOnly
+              placeholder={m('outputPlaceholder')}
+              className="flex-1 min-h-0 resize-none rounded-none border-0 focus-visible:ring-0 focus-visible:ring-offset-0 font-mono text-sm p-4"
+            />
+          </ToolPane>
+        )}
       </ToolPanes>
     </div>
   );

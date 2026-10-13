@@ -6,18 +6,13 @@ import { migrateLegacyKey } from '@/platform/usePluginState';
 import { storageGet, storageRemove, storageSet } from '@/lib/persistentStore';
 
 /**
- * Bảo đảm cho đợt di trú khoá lưu trữ.
+ * Guards the storage key migration.
  *
- * Việc chuyển tool sang `usePluginState` đổi CHỖ LƯU của gần như mọi thứ người
- * dùng đã lưu: `devtool:redis:selectedConnId` thành
- * `devtool:redis-client:selectedConnId`, và tương tự cho 157 khoá khác. Một cặp
- * khoá khai sai ở bất kỳ đâu là dữ liệu của người dùng biến mất mà không có lỗi
- * nào báo ra — họ chỉ thấy app "tự reset".
- *
- * Bộ test này đọc THẲNG mã nguồn để lấy mọi cặp (key, legacyKey) đang khai, rồi
- * kiểm hai điều trên từng cặp: nó đúng hình dạng, và nó thật sự chuyển được dữ
- * liệu. Đọc mã nguồn thay vì liệt kê tay là có chủ ý — một danh sách chép tay sẽ
- * lạc hậu ngay lần chuyển đổi kế tiếp, mà đó đúng là lúc cần nó nhất.
+ * Moving tools to `usePluginState` changed where saved data lives (e.g.
+ * `devtool:redis:selectedConnId` → `devtool:redis-client:selectedConnId`).
+ * A wrong key pair silently loses user data. These tests read the source to
+ * collect every (key, legacyKey) pair, so the list cannot go stale, and check
+ * each pair's shape and that it really migrates data.
  */
 
 const SRC = resolve(__dirname, '..');
@@ -42,7 +37,7 @@ function collectPairs(): Pair[] {
   const pairs: Pair[] = [];
   for (const file of sourceFiles(join(SRC, 'components', 'tools')).concat(sourceFiles(join(SRC, 'plugins')))) {
     const src = readFileSync(file, 'utf-8');
-    // Một file thuộc đúng một plugin; id lấy từ chính lời gọi lấy SDK của nó.
+    // Each file belongs to one plugin; the id comes from its SDK lookup.
     const owner = /use?PluginSdkFor\('([a-z0-9-]+)'\)|getPluginSdk\('([a-z0-9-]+)'\)/.exec(src);
     const pluginId = owner?.[1] ?? owner?.[2];
     if (!pluginId) continue;
@@ -63,20 +58,16 @@ const PAIRS = collectPairs();
 
 describe('di trú khoá lưu trữ', () => {
   it('quét ra được các cặp khoá, không phải mảng rỗng', () => {
-    // Rào chắn của chính rào chắn: regex hỏng thì mọi ca dưới đây "xanh" vì
-    // không có gì để kiểm — kiểu hỏng tệ nhất, vì nó trông như đã an toàn.
+    // Guard the guard: a broken regex would make every case pass vacuously.
     expect(PAIRS.length).toBeGreaterThan(100);
   });
 
   it('legacyKey phải bắt đầu bằng "devtool:" và KẾT THÚC bằng đúng key', () => {
-    // Hai quy ước cùng tồn tại, và đó là chủ ý: Redis Client bỏ hẳn tiền tố cũ
-    // ('devtool:redis:selectedConnId' → key 'selectedConnId') vì nó chỉ có một
-    // không gian khoá; Encode·Hash·Encrypt thì GIỮ tiền tố phụ
-    // ('devtool:codec:input' → key 'codec:input') vì bốn sub-tool trong cùng
-    // một plugin sẽ giẫm khoá lên nhau nếu bỏ.
-    //
-    // Nên luật chung chỉ có thể là quan hệ hậu tố. Nó vẫn bắt được lỗi hay gặp
-    // nhất — gõ sai phần `key`, thứ quyết định dữ liệu hạ cánh ở đâu.
+    // Two conventions coexist: some plugins drop the old prefix
+    // ('devtool:redis:selectedConnId' → 'selectedConnId'), others keep a
+    // sub-prefix ('devtool:codec:input' → 'codec:input') so sub-tools do not
+    // collide. So the rule is a suffix relation, which still catches typos
+    // in `key`.
     const wrong = PAIRS.filter(
       (p) => !p.legacyKey.startsWith('devtool:') || !p.legacyKey.endsWith(p.key),
     );
@@ -86,9 +77,8 @@ describe('di trú khoá lưu trữ', () => {
   });
 
   it('chấm live seed đúng khoá mà tool thật sự ghi', () => {
-    // Đây là lỗi tôi suýt để lọt: `liveConnections.ts` seed lúc NẠP MODULE, tức
-    // trước khi component nào kịp di trú khoá. Nếu khoá trong seed lệch khỏi
-    // khoá tool thật sự ghi, chấm live sẽ sai — mà không có lỗi nào báo ra.
+    // liveConnections.ts seeds at module load, before any component
+    // migrates its keys, so its keys must match what tools write.
     const src = readFileSync(join(SRC, 'lib', 'liveConnections.ts'), 'utf-8');
     const problems: string[] = [];
 
@@ -133,10 +123,8 @@ describe('di trú khoá lưu trữ', () => {
 
 describe('di trú sang kho bí mật', () => {
   it('mọi khoá trong bảng MIGRATIONS trỏ tới plugin có thật VÀ plugin đó khai quyền "secrets"', () => {
-    // Thiếu quyền `secrets` là lỗi im lặng đắt nhất trong cả đợt: di trú vẫn
-    // chép dữ liệu sang kho (nó gọi thẳng, không qua SDK), nhưng tool đọc lại
-    // bằng `useSecretState` thì bị chặn và hiện ra RỖNG — trông y như mất dữ
-    // liệu, trong khi dữ liệu vẫn nằm đó.
+    // Without the `secrets` permission, migrated data is in the vault but
+    // `useSecretState` is denied and shows nothing, which looks like data loss.
     const src = readFileSync(join(SRC, 'platform', 'secrets.ts'), 'utf-8');
     const problems: string[] = [];
 
@@ -151,7 +139,7 @@ describe('di trú sang kho bí mật', () => {
     }
 
     expect(problems).toEqual([]);
-    // Và bảng không được rỗng: regex hỏng thì ca này cũng "xanh" một cách vô nghĩa.
+    // The table must not be empty either.
     expect([...src.matchAll(/\{ from: '([^']+)', pluginId:/g)].length).toBeGreaterThan(0);
   });
 });

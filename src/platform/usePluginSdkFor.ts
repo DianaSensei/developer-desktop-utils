@@ -6,22 +6,10 @@ import { createPluginSdk, type PluginSdk } from './sdk';
 const cache = new Map<string, PluginSdk>();
 
 /**
- * SDK của một plugin, lấy được NGOÀI React.
- *
- * Cần cho những store sống ở phạm vi module vì đó chính là lý do chúng tồn tại:
- * consumer Kafka/RabbitMQ phải chạy tiếp khi người dùng chuyển sang tool khác,
- * nên chúng không thể là state của component và vì thế không gọi hook được.
- *
- * Kết quả được nhớ theo id: SDK gắn danh tính plugin chứ không mang state gì,
- * nên một instance cho mỗi plugin là đủ — và giữ nguyên một tham chiếu giúp các
- * `useMemo([sdk])` phía trên không bị vô hiệu.
- *
- * Gọi ở MODULE SCOPE (không qua React context) nên chỉ nhận được đúng
- * `pluginId` — không biết, và không cần biết, `group` nào đã cài nó. An toàn
- * vì `installer.ts` chặn cài một plugin nếu `id` của nó đã bị một `group`
- * KHÁC chiếm (bắt gỡ bản cũ trước) — tại một thời điểm chỉ có đúng một bản
- * ghi mang `pluginId` này trong registry, nên `getPlugin(pluginId)` không
- * mập mờ. Xem `PluginManifest.group` cho lý do đầy đủ.
+ * A plugin's SDK outside React, for module-scope stores that must keep
+ * running when the user switches tools. Cached per id so references stay
+ * stable. Lookup by id alone is unambiguous because installer.ts keeps ids
+ * unique across groups.
  */
 export function getPluginSdk(pluginId: string): PluginSdk {
   const existing = cache.get(pluginId);
@@ -40,16 +28,9 @@ export function getPluginSdk(pluginId: string): PluginSdk {
 }
 
 /**
- * SDK của một plugin, lấy được kể cả khi component KHÔNG nằm trong cây mà
- * Platform dựng.
- *
- * Cần vì có code của plugin cố tình sống ngoài route của nó: API Client giữ một
- * instance store duy nhất ở `ApiClientRuntimeProvider`, mount thẳng trong
- * App.tsx để cầu nối MCP vẫn trả lời được khi người dùng đang xem tool khác.
- * Ở đó `usePluginSdk()` sẽ ném, dù đây vẫn đúng là code của plugin đó.
- *
- * Ưu tiên SDK trong context khi có và đúng plugin — giữ nguyên danh tính mà
- * Platform đã cấp; chỉ khi không có mới dựng từ manifest trong registry.
+ * A plugin's SDK for components rendered outside the plugin's route (e.g.
+ * the API Client runtime provider mounted in App.tsx so MCP calls work from
+ * any screen). Prefers the SDK from context when it belongs to this plugin.
  */
 export function usePluginSdkFor(pluginId: string): PluginSdk {
   const fromContext = usePluginSdkOptional();

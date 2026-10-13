@@ -8,15 +8,14 @@ import { envSecretKey } from './envSecrets';
 import type { Environment } from './types';
 
 /**
- * Điểm đáng lo nhất của việc tách bí mật khỏi `environments` không phải là chia
- * đúng, mà là CỬA SỔ trước khi kho đọc xong: ghi vào lúc đó sẽ đẩy một bản đồ
- * rỗng đè lên token thật của người dùng. Phần lớn ca dưới đây canh đúng chỗ đó.
+ * The main risk is the window before the secret store has loaded: writing then
+ * would overwrite the user's real tokens with an empty map.
  */
 
 const ENV_KEY = 'devtool:apiclient:environments';
 const sdk = createPluginSdk(getPlugin('api-client')!);
 
-/** Ghép lại đúng cách store.ts dùng hook: phần lưu trữ thường do nơi gọi giữ. */
+/** Composes the hook the way store.ts does: the caller owns the regular storage. */
 function useSubject() {
   const [stripped, setStripped] = usePersistentState<Environment[]>(ENV_KEY, [], { debounceMs: 300 });
   return useEnvSecrets(sdk, stripped, setStripped);
@@ -52,9 +51,9 @@ describe('useEnvSecrets', () => {
     const { result } = renderHook(() => useSubject());
     await waitFor(() => expect(result.current[2]).toBe(true));
 
-    // Người dùng vẫn thấy đúng giá trị…
+    // The user still sees the value…
     await waitFor(() => expect(result.current[0][0].variables[1].value).toBe('token-that'));
-    // …nhưng store thường không còn giữ nó nữa.
+    // …but the regular store no longer holds it.
     await waitFor(() => expect(storageGet(ENV_KEY)).not.toContain('token-that'));
     expect(storageGet(ENV_KEY)).toContain('https://api.example.com');
 
@@ -85,7 +84,7 @@ describe('useEnvSecrets', () => {
     await waitFor(async () =>
       expect(await secretGet('api-client', 'envSecrets')).toContain('token-moi'),
     );
-    // Và bên ngoài hook vẫn nhìn thấy tài liệu đầy đủ.
+    // Callers still see the complete document.
     expect(result.current[0][0].variables[1].value).toBe('token-moi');
   });
 

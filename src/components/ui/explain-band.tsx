@@ -1,19 +1,12 @@
-// Dải nhuộm — bậc NẶNG NHẤT trong ba bậc trạng thái, dùng khi cần GIẢI THÍCH.
+// Explanation band: the strongest of the three status levels, used when
+// something needs explaining. Unlike <Callout>, it lives inside the panel
+// under the header, so status changes while typing do not shift the layout.
 //
-// Điểm khác biệt so với <Callout>: dải này sống BÊN TRONG panel, ngay dưới thanh
-// tiêu đề, và chỉ hiện khi có gì đáng nói. Callout là một thẻ rời — mỗi lần nó
-// xuất hiện hay biến mất là layout nhảy một nhịp, và trong tool thì trạng thái
-// hợp lệ ↔ lỗi đổi liên tục theo từng ký tự người dùng gõ.
+//   1. The explanation is always visible, never hidden in a tooltip.
+//   2. It teaches as well as reports: tone="ok" explains a valid value,
+//      tone="bad" reports an error.
 //
-// Hai điều bắt buộc, cả hai đều học từ Sony Color Lab:
-//
-//   1. Câu giải thích LUÔN hiện, không giấu sau tooltip.
-//   2. Component này phải dùng được để DẠY (tone="ok") chứ không chỉ để BÁO LỖI
-//      (tone="bad"). Một thứ để học, không phải hai. Ví dụ: cùng dải này giải
-//      thích cron hợp lệ nghĩa là gì, và báo cron sai ở đâu.
-//
-// `examples` là các chip bấm được — cho người dùng sửa ngay tại chỗ thay vì
-// phải tự suy ra cú pháp đúng.
+// `examples` are clickable chips that fix the input in place.
 
 import * as React from 'react';
 import { cn } from '@/lib/utils';
@@ -45,18 +38,18 @@ const TONE: Record<ExplainBandTone, { band: string; title: string; chip: string 
 
 export interface ExplainBandExample {
   label: string;
-  /** Bỏ trống thì chip chỉ để đọc, không bấm được. */
+  /** Without it the chip is read-only. */
   onPick?: () => void;
   title?: string;
 }
 
 export interface ExplainBandProps {
   tone: ExplainBandTone;
-  /** Nhãn ngắn in đậm ở đầu — "Lỗi cú pháp", "Hợp lệ", "Sắp hết hạn". */
+  /** Short bold label: "Syntax error", "Valid", "Expiring soon". */
   title?: React.ReactNode;
-  /** Câu giải thích. Luôn hiện — đây là lý do component này tồn tại. */
+  /** Explanation, always shown. */
   children: React.ReactNode;
-  /** Chip ví dụ, bấm được để áp dụng ngay. */
+  /** Example chips that apply on click. */
   examples?: ExplainBandExample[];
   className?: string;
 }
@@ -66,13 +59,12 @@ export function ExplainBand({ tone, title, children, examples, className }: Expl
   return (
     <div
       className={cn('rounded-md border px-3 py-2.5', t.band, className)}
-      // Lỗi phải được đọc lên ngay; các tông khác chỉ cần thông báo lịch sự.
+      // Errors are announced immediately; other tones politely.
       role={tone === 'bad' ? 'alert' : 'status'}
     >
-      {/* div, không phải p: một số chỗ gọi cần thêm dòng lỗi/cảnh báo phụ bên
-          dưới câu giải thích chính (xem CronGenerator) — nội dung khối bên
-          trong p sẽ bị trình duyệt tự đóng thẻ p sớm, làm rối DOM. */}
-      <div className="text-[13px] leading-relaxed text-fg">
+      {/* A div, not a p: some callers add block content below the main
+          sentence (see CronGenerator), which a p cannot contain. */}
+      <div className="text-dense leading-relaxed text-fg">
         {title && <span className={cn('font-semibold', t.title)}>{title} · </span>}
         {children}
       </div>

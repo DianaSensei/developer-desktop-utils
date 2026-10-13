@@ -10,14 +10,14 @@ import { Check, File as FileIcon, Trash2, Upload, X } from 'lucide-react';
 import { InlineCodeField } from '@/design-system';
 import { type KeyValue, type VarMap, newKeyValue } from './types';
 import { ResolvedValue, showsResolvedColumn } from './ResolvedValue';
+import { t } from './i18n';
 
 interface Props {
   rows: KeyValue[];
   onChange: (rows: KeyValue[]) => void;
-  // Form-data keys and values really are {{var}}-substituted on send (see
-  // request.ts's multipart branch), so this editor gets the same highlight +
-  // autocomplete + Resolved column as every other table. It used to be the
-  // one substituted surface with no sign that substitution happens at all.
+  // Form-data keys and values are {{var}}-substituted on send (see
+  // request.ts), so this editor gets the same highlighting, autocomplete
+  // and Resolved column as the other tables.
   vars?: VarMap;
 }
 
@@ -75,16 +75,14 @@ export function MultipartEditor({ rows, onChange, vars }: Readonly<Props>) {
     // them to unusable slivers.
     <div className="overflow-x-auto overflow-y-hidden rounded-sm border border-line text-xs">
       <div className={showResolved ? 'min-w-[34rem]' : 'min-w-[26rem]'}>
-      {/* Header and grid match KeyValueEditor's: an uppercase muted caption
-          rather than bold title case, "Name" rather than "Key", and a leading
-          2rem toggle column so the Name cell starts at the same x as it does
-          in the Query/Headers/Path tables above. This editor was the one table
-          in the tool that kept the old treatment. */}
+      {/* Header and grid match KeyValueEditor: muted uppercase caption,
+          "Name", and a leading 2rem toggle column so Name lines up with
+          the Query/Headers/Path tables. */}
       <div className={cn('grid border-b border-line bg-chrome text-[11px] font-semibold uppercase tracking-wider text-fg-mute', gridCols)}>
         <div />
-        <div className="border-r px-3 py-1.5">Name</div>
-        <div className="border-r px-3 py-1.5">Value</div>
-        {showResolved && <div className="border-r px-3 py-1.5">Resolved</div>}
+        <div className="border-r px-3 py-1.5">{t('name')}</div>
+        <div className="border-r px-3 py-1.5">{t('value')}</div>
+        {showResolved && <div className="border-r px-3 py-1.5">{t('req.resolved')}</div>}
         <div className="border-r px-3 py-1.5">Content-Type</div>
         <div />
       </div>
@@ -150,10 +148,10 @@ function MultipartRow({
             type="button"
             role="checkbox"
             aria-checked={row.enabled}
-            aria-label={`${row.key || 'Field'} — ${row.enabled ? 'enabled' : 'disabled'}`}
+            aria-label={t(row.enabled ? 'kv.rowEnabled' : 'kv.rowDisabled', { name: row.key || t('kv.field') })}
             onClick={() => onEdit({ enabled: !row.enabled })}
             className="group/toggle flex w-full cursor-pointer items-center justify-center transition-colors hover:bg-bg-2/60 focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-inset focus-visible:ring-focus"
-            title={row.enabled ? 'Disable' : 'Enable'}
+            title={row.enabled ? t('req.disable') : t('req.enable')}
           >
             <span
               className={cn(
@@ -174,7 +172,7 @@ function MultipartRow({
         <Input
           value={row.key}
           onChange={(e) => onEdit({ key: e.target.value })}
-          placeholder="Name"
+          placeholder={t('name')}
           className={cn(inputCls, dim)}
           spellCheck={false}
         />
@@ -186,14 +184,14 @@ function MultipartRow({
           <>
             <FileIcon className="h-3.5 w-3.5 shrink-0 text-fg-mute" />
             <span className="flex-1 truncate" title={row.fileName}>{row.fileName}</span>
-            <button type="button" onClick={onClearFile} title="Remove file" className="rounded p-0.5 text-fg-mute/60 hover:text-bad">
+            <button type="button" onClick={onClearFile} title={t('kv.removeFile')} aria-label={t('kv.removeFile')} className="rounded p-0.5 text-fg-mute/60 hover:text-bad">
               <X className="h-3.5 w-3.5" />
             </button>
           </>
         ) : (
           <>
             <TextValue row={row} vars={vars} dim={dim} onEdit={onEdit} />
-            <button type="button" onClick={onAttachFile} title="Attach file" className="shrink-0 rounded p-0.5 text-fg-mute/60 hover:text-fg">
+            <button type="button" onClick={onAttachFile} title={t('kv.attachFile')} aria-label={t('kv.attachFile')} className="shrink-0 rounded p-0.5 text-fg-mute/60 hover:text-fg">
               <Upload className="h-3.5 w-3.5" />
             </button>
           </>
@@ -212,7 +210,7 @@ function MultipartRow({
         <Input
           value={row.contentType ?? ''}
           onChange={(e) => onEdit({ contentType: e.target.value })}
-          placeholder="Auto"
+          placeholder={t('kv.auto')}
           className={cn(inputCls, dim)}
           spellCheck={false}
         />
@@ -225,7 +223,8 @@ function MultipartRow({
           <button
             type="button"
             onClick={onRemove}
-            title="Remove"
+            title={t('remove')}
+            aria-label={t('remove')}
             className="rounded p-1 text-fg-mute/40 opacity-0 transition-all hover:text-bad group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus"
           >
             <Trash2 className="h-3 w-3" />
@@ -249,7 +248,7 @@ function TextValue({ row, vars, dim, onEdit }: Readonly<{
       <Input
         value={row.value}
         onChange={(e) => onEdit({ value: e.target.value })}
-        placeholder="Value"
+        placeholder={t('value')}
         className={cn(inputCls, dim)}
         spellCheck={false}
       />
@@ -261,7 +260,7 @@ function TextValue({ row, vars, dim, onEdit }: Readonly<{
         value={row.value}
         onChange={(v) => onEdit({ value: v })}
         vars={vars}
-        placeholder="Value"
+        placeholder={t('value')}
       />
     </div>
   );

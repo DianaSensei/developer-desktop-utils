@@ -7,8 +7,13 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Play, Trophy, ArrowDown, ArrowUp, Eraser, Check, Repeat, Timer } from 'lucide-react';
 import { Spinner } from '@/components/ui/spinner';
-import { cn } from '@/lib/utils';
-import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
+import { randomBelow } from '@/lib/secureRandom';
+import { useQuickPaste, useQuickPasteHint } from '@/hooks/useQuickPaste';
+import { useInputHistory } from '@/hooks/useInputHistory';
+import { useMessages } from '@/contexts/LocaleContext';
+import COMMON from '@/components/tools/common.messages';
+import MESSAGES from '@/components/tools/LuckyWheel.messages';
+import { ToggleChip } from '@/components/ui/toggle-chip';
 
 const SIZE = 460; // internal canvas size (device px handled via DPR)
 const PULSE_MS = 1600;
@@ -85,10 +90,15 @@ function drawWheel(
     }
 
     // Label
+    // On the left half the text would read upside down, so turn it a half
+    // turn and anchor it from the other side.
+    const mid = start + seg / 2;
+    const norm = ((mid % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+    const flip = norm > Math.PI / 2 && norm < (Math.PI * 3) / 2;
     ctx.save();
     ctx.translate(cx, cy);
-    ctx.rotate(start + seg / 2);
-    ctx.textAlign = 'right';
+    ctx.rotate(flip ? mid + Math.PI : mid);
+    ctx.textAlign = flip ? 'left' : 'right';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = '#ffffff';
     const fontSize = Math.max(11, Math.min(18, 220 / Math.max(n, 6)));
@@ -96,7 +106,7 @@ function drawWheel(
     const label = choices[i];
     const maxChars = Math.max(6, Math.floor((radius - 28) / (fontSize * 0.55)));
     const text = label.length > maxChars ? `${label.slice(0, maxChars - 1)}…` : label;
-    ctx.fillText(text, radius - 16, 0);
+    ctx.fillText(text, flip ? -(radius - 16) : radius - 16, 0);
     ctx.restore();
   }
 
@@ -123,6 +133,9 @@ function formatTime(ms: number): string {
 }
 
 export function LuckyWheel() {
+  const m = useMessages(MESSAGES);
+  const c = useMessages(COMMON);
+  const quickPasteHint = useQuickPasteHint();
   const sdk = usePluginSdkFor('lucky-wheel');
   const [raw, setRaw] = usePluginState(sdk, 'luckywheel:choices', 'Pizza\nSushi\nBurger\nSalad\nTacos\nNoodles', { legacyKey: 'devtool:luckywheel:choices' });
   const [uniqueOnly, setUniqueOnly] = usePluginState(sdk, 'luckywheel:uniqueOnly', false, { legacyKey: 'devtool:luckywheel:uniqueOnly' });
@@ -144,6 +157,7 @@ export function LuckyWheel() {
   const aliveRef = useRef(true); // false after unmount — stops an in-flight auto run
 
   useQuickPaste(setRaw);
+  useInputHistory(raw, setRaw);
 
   const choices = useMemo(() => {
     const lines = parseLines(raw);
@@ -221,7 +235,7 @@ export function LuckyWheel() {
     // Rotation that puts slice `index` centered under the pointer …
     const base = pointer - index * seg - seg / 2;
     // … then add 5–7 extra full turns beyond the current angle.
-    const turns = 5 + Math.floor(Math.random() * 3);
+    const turns = 5 + randomBelow(3);
     const k = Math.ceil((start + turns * Math.PI * 2 - base) / (Math.PI * 2));
     const target = base + k * Math.PI * 2;
     const dur = Math.max(600, spinSec * 1000);
@@ -264,7 +278,7 @@ export function LuckyWheel() {
     if (spinning || choices.length < 2) return;
     setSpinning(true);
     setWinner(null);
-    const idx = Math.floor(Math.random() * choices.length);
+    const idx = randomBelow(choices.length);
     await spinTo(idx);
     setSpinning(false);
     if (removeOnWin) removeFromRaw(choices[idx]);
@@ -284,8 +298,8 @@ export function LuckyWheel() {
     for (let s = 0; s < count; s++) {
       if (!aliveRef.current) break;
       setAutoLeft(count - s);
-      let idx = Math.floor(Math.random() * n);
-      while (drawn.has(idx)) idx = Math.floor(Math.random() * n);
+      let idx = randomBelow(n);
+      while (drawn.has(idx)) idx = randomBelow(n);
       drawn.add(idx);
       await spinTo(idx);
       if (s < count - 1) await new Promise((r) => setTimeout(r, AUTO_GAP_MS));
@@ -311,57 +325,40 @@ export function LuckyWheel() {
   }, [history, sortDir]);
 
   return (
-    <div className="grid h-full grid-cols-1 divide-y overflow-hidden lg:grid-cols-2 lg:divide-x lg:divide-y-0">
+    // Laid out by the tool pane's own width (container query), not the
+    // window's: the sidebar takes 224px, so `lg:` fired with only ~800px of
+    // room. Narrow: one scrolling column, wheel first so Spin stays in reach.
+    // Wide: two columns that each fill the height.
+    <div className="@container h-full">
+    <div className="flex h-full flex-col divide-y overflow-y-auto @3xl:grid @3xl:grid-cols-2 @3xl:divide-x @3xl:divide-y-0 @3xl:overflow-hidden">
       {/* Options + history */}
-      <div className="flex min-h-0 flex-col gap-3 p-4">
+      <div className="flex min-h-[420px] shrink-0 flex-col gap-3 p-4 @3xl:min-h-0 @3xl:shrink">
         <div className="flex min-h-0 flex-[3] flex-col">
           <div className="mb-1.5 flex items-center justify-between">
-            <Label className="text-xs">Choices <span className="text-fg-mute/60">— one per line · {quickPasteHint}</span></Label>
-            <span className="text-[11px] text-fg-mute">{choices.length} {uniqueOnly ? 'unique' : 'slices'}</span>
+            <Label className="text-xs">{m('choices')} <span className="text-fg-mute">{m('onePerLine', { hint: quickPasteHint })}</span></Label>
+            <span className="text-[11px] text-fg-mute">{m(uniqueOnly ? 'uniqueCount' : 'sliceCount', { n: choices.length })}</span>
           </div>
           <Textarea
             value={raw}
             onChange={(e) => setRaw(e.target.value)}
-            placeholder={'Option 1\nOption 2\nOption 3'}
+            placeholder={m('placeholder')}
             className="min-h-0 flex-1 resize-none font-mono text-sm"
             spellCheck={false}
           />
           <div className="mt-2 flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setUniqueOnly((v) => !v)}
-              title="Collapse duplicate lines so each value gets one slice"
-              aria-pressed={uniqueOnly}
-              className={cn(
-                'flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors',
-                uniqueOnly
-                  ? 'border-acc/30 bg-acc/10 text-acc'
-                  : 'border-line text-fg-mute hover:bg-bg-2 hover:text-fg',
-              )}
-            >
+            <ToggleChip pressed={uniqueOnly} onPressedChange={setUniqueOnly} title={m('uniqueOnlyHint')} className="gap-1.5">
               {uniqueOnly && <Check className="h-3 w-3" />}
-              Unique only
-            </button>
-            <button
-              type="button"
-              onClick={() => setRemoveOnWin((v) => !v)}
-              title="Remove the winning choice from the list after each spin"
-              aria-pressed={removeOnWin}
-              className={cn(
-                'flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors',
-                removeOnWin
-                  ? 'border-acc/30 bg-acc/10 text-acc'
-                  : 'border-line text-fg-mute hover:bg-bg-2 hover:text-fg',
-              )}
-            >
+              {m('uniqueOnly')}
+            </ToggleChip>
+            <ToggleChip pressed={removeOnWin} onPressedChange={setRemoveOnWin} title={m('removeWinnerHint')} className="gap-1.5">
               {removeOnWin && <Check className="h-3 w-3" />}
-              Remove winner
-            </button>
+              {m('removeWinner')}
+            </ToggleChip>
           </div>
 
           <div className="mt-2 flex items-center gap-2 text-xs text-fg-mute">
             <Timer className="h-3.5 w-3.5" />
-            <span>Spin time</span>
+            <span>{m('spinTime')}</span>
             <Select value={String(spinSec)} onValueChange={(v) => setSpinSec(Number(v))}>
               <SelectTrigger className="h-ctl w-[4.5rem] text-xs rounded-sm"><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -375,7 +372,7 @@ export function LuckyWheel() {
         <div className="flex min-h-0 flex-[2] flex-col">
           <div className="mb-1.5 flex items-center justify-between">
             <span className="text-xs font-medium">
-              Spin history <span className="text-fg-mute/60">{history.length}</span>
+              {m('spinHistory')} <span className="text-fg-mute/60">{history.length}</span>
             </span>
             {history.length > 0 && (
               <button
@@ -383,26 +380,26 @@ export function LuckyWheel() {
                 onClick={clearHistory}
                 className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-fg-mute transition-colors hover:bg-bg-2 hover:text-fg"
               >
-                <Eraser className="h-3 w-3" /> Clear
+                <Eraser className="h-3 w-3" /> {c('clear')}
               </button>
             )}
           </div>
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border">
             <div className="grid grid-cols-[2.5rem_1fr_6rem] gap-2 border-b border-line bg-bg-2/30 px-3 py-1.5 text-[11px] font-medium text-fg-mute">
               <span>#</span>
-              <span>Winner</span>
+              <span>{m('winner')}</span>
               <button
                 type="button"
                 onClick={() => setSortDir((d) => (d === 'desc' ? 'asc' : 'desc'))}
                 className="flex items-center gap-1 transition-colors hover:text-fg"
-                title="Sort by spin time"
+                title={m('sortByTime')}
               >
-                Time {sortDir === 'desc' ? <ArrowDown className="h-3 w-3" /> : <ArrowUp className="h-3 w-3" />}
+                {m('time')} {sortDir === 'desc' ? <ArrowDown className="h-3 w-3" /> : <ArrowUp className="h-3 w-3" />}
               </button>
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto">
               {sortedHistory.length === 0 ? (
-                <p className="px-3 py-6 text-center text-xs text-fg-mute">No spins yet — spin the wheel to record a winner.</p>
+                <p className="px-3 py-6 text-center text-xs text-fg-mute">{m('noSpins')}</p>
               ) : (
                 sortedHistory.map((row) => (
                   <div key={`${row.seq}-${row.time}`} className="grid grid-cols-[2.5rem_1fr_6rem] gap-2 border-b px-3 py-1.5 text-xs last:border-0">
@@ -418,7 +415,10 @@ export function LuckyWheel() {
       </div>
 
       {/* Wheel */}
-      <div className="flex min-h-0 flex-col gap-4 p-4">
+      {/* Stacked, this is a flex item that keeps its height (shrink-0): as a
+          grid row it was sized without the canvas (its width is a %), and
+          the wheel spilled over the choices below it. */}
+      <div className="order-first flex shrink-0 flex-col gap-4 p-4 @3xl:order-none @3xl:min-h-0 @3xl:shrink">
         {/* Fixed-height slot so the wheel below never shifts when the banner toggles */}
         <div className="mx-auto h-[60px] w-full max-w-[420px] shrink-0">
           {winner && (
@@ -428,7 +428,7 @@ export function LuckyWheel() {
             >
               <Trophy className="h-5 w-5 shrink-0 text-ok" />
               <div className="min-w-0">
-                <p className="text-[11px] text-fg-mute">Latest winner</p>
+                <p className="text-[11px] text-fg-mute">{m('latestWinner')}</p>
                 <p className="truncate text-base font-semibold">{winner}</p>
               </div>
             </div>
@@ -436,7 +436,7 @@ export function LuckyWheel() {
         </div>
 
         <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4">
-        <div className="relative" style={{ width: 'min(100%, 420px)' }}>
+        <div className="relative" style={{ width: 'min(100%, 420px, 55vh)' }}>
           {/* Pointer */}
           <div className="absolute left-1/2 top-0 z-10 -translate-x-1/2 -translate-y-1">
             <div
@@ -458,7 +458,7 @@ export function LuckyWheel() {
         <div className="flex flex-wrap items-center justify-center gap-2">
           <Button onClick={spin} disabled={spinning || choices.length < 2} size="lg" className="gap-2">
             {spinning && !autoLeft ? <Spinner /> : <Play className="h-4 w-4" />}
-            {spinning && !autoLeft ? 'Spinning…' : 'Spin'}
+            {spinning && !autoLeft ? m('spinning') : m('spin')}
           </Button>
 
           <div className="flex items-center gap-1.5 rounded-lg border border-line bg-card p-1">
@@ -473,7 +473,8 @@ export function LuckyWheel() {
               }}
               disabled={spinning}
               className="h-ctl w-14 text-center text-sm"
-              title="Number of winners to draw"
+              title={m('winnersToDraw')}
+              aria-label={m('winnersToDraw')}
             />
             <Button
               onClick={autoSpin}
@@ -482,17 +483,18 @@ export function LuckyWheel() {
               className="h-ctl gap-1.5"
             >
               {spinning && autoLeft ? <Spinner /> : <Repeat className="h-4 w-4" />}
-              {spinning && autoLeft ? `Auto ${autoLeft} left` : 'Auto-spin'}
+              {spinning && autoLeft ? m('autoLeft', { n: autoLeft }) : m('autoSpin')}
             </Button>
           </div>
         </div>
         {choices.length < 2 ? (
-          <p className="text-xs text-fg-mute">Add at least two choices to spin.</p>
+          <p className="text-xs text-fg-mute">{m('needTwo')}</p>
         ) : (
-          <p className="text-xs text-fg-mute">Auto-spin draws up to {maxAuto} distinct winner{maxAuto === 1 ? '' : 's'}.</p>
+          <p className="text-xs text-fg-mute">{m('autoLimit', { n: maxAuto })}</p>
         )}
         </div>
       </div>
+    </div>
     </div>
   );
 }

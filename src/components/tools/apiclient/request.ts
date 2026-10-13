@@ -13,10 +13,9 @@ import { newKeyValue } from './types';
 import { substituteVars } from './vars';
 import { buildDigestHeader, parseDigestChallenge } from './digest';
 import { type Cookie, cookieHeader } from './cookies';
-// `request.ts` là module thuần, được store/engine gọi tới chứ không phải một
-// component, nên SDK lấy qua `getPluginSdk`. `sdk.http.fetch` tự lo nhánh
-// Tauri/web y như bản cũ và mang theo cả `maxRedirections`/`danger` — hai tuỳ
-// chọn một HTTP workbench không thể thiếu (xem `PluginFetchInit`).
+// A plain module used by the store and engine, so it gets the SDK via
+// `getPluginSdk`. `sdk.http.fetch` handles Tauri/web and supports
+// `maxRedirections`/`danger` (see `PluginFetchInit`).
 type NetFetchInit = PluginFetchInit;
 
 function netFetch(input: string, init: NetFetchInit): Promise<Response> {
@@ -34,10 +33,8 @@ const enabledPairs = (list: KeyValue[]): [string, string][] =>
 
 type Sub = (s: string) => string;
 
-// The API-key auth entry, when placed as a query param, isn't part of
-// `req.params` — buildUrl below folds it into the outgoing query string
-// silently. Exposed so the Params tab can show it as a derived, read-only row
-// instead of leaving it invisible until send time.
+// API-key auth placed in the query is not part of `req.params`; buildUrl
+// adds it. Exposed so the Params tab can show it as a read-only row.
 export function authQueryParam(req: ApiRequest): { key: string; value: string } | null {
   const { auth } = req;
   if (auth.type === 'apikey' && auth.apiKey.placement === 'query' && auth.apiKey.key.trim()) {
@@ -73,12 +70,9 @@ export function buildUrl(req: ApiRequest, sub: Sub): string {
   // the params (dropping the URL's own query) to avoid duplicating them.
   const head = base.split('#')[0].split('?')[0];
 
-  // A table where every row is disabled still governs: the query goes away.
-  // This used to fall through the `!params.length` guard above and return the
-  // URL untouched, so unchecking the *last* enabled param sent it anyway —
-  // reachable on any imported request, whose URL keeps the full raw query
-  // while its params table carries the enabled/disabled flags (see
-  // postman.ts's `rawUrl` + `mapKv(url.query)`).
+  // A table whose rows are all disabled still applies: the query is
+  // removed. Imported requests keep the raw query in the URL while the
+  // table carries the enabled flags (see postman.ts `rawUrl`).
   if (!params.length) return head;
 
   if (req.settings?.encodeUrl === false) {
@@ -255,9 +249,8 @@ async function fetchOAuthToken(o: OAuth2Auth, sub: Sub, signal?: AbortSignal, ve
 
 // ─── response decoding ──────────────────────────────────────────────────────
 
-// Content types whose bytes must not be round-tripped through a text decoder —
-// doing so replaces every invalid UTF-8 sequence with U+FFFD and destroys the
-// payload (previously this silently corrupted image previews and downloads).
+// Content types whose bytes must not go through a text decoder, which
+// would replace invalid UTF-8 with U+FFFD and corrupt the payload.
 const BINARY_CONTENT_TYPE =
   /^(image|audio|video|font)\/|^application\/(octet-stream|pdf|zip|gzip|x-tar|x-7z|x-rar|wasm|vnd\.(ms-|openxmlformats))/i;
 
@@ -565,10 +558,9 @@ export function prettyBody(body: string, contentType: string): string {
   return body;
 }
 
-// Tailwind text color for an HTTP status family.
+// Text class for an HTTP status family, from the kit's status palette:
+// 2xx ok, 3xx warn, 4xx/5xx (and network failure) bad.
 export function statusColor(status: number): string {
-  // 2xx thành công, 3xx "chú ý một chút", 4xx/5xx lỗi — ánh xạ 1-1 sang hệ
-  // trạng thái của kit, không phải bảng màu Tailwind.
   if (status === 0) return 'text-bad';
   if (status < 300) return 'text-ok';
   if (status < 400) return 'text-warn';

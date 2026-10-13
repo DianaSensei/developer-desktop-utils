@@ -12,15 +12,7 @@ interface StatusMessageProps {
   className?: string;
 }
 
-/* `success-state` / `error-state` / `warning-state` KHÔNG TỒN TẠI ở đâu cả —
-   không có trong `design/tokens.css`, `src/design-system/tokens.css`, preset,
-   hay `globals.css`. Chúng là tàn dư của một hệ đặt tên đã bị bỏ, và vì
-   Tailwind lặng lẽ bỏ qua class không khớp gì, ba trong bốn trạng thái của
-   banner này nhiều tháng nay render ra KHÔNG MÀU: cùng `border` xám, cùng chữ
-   xám, chỉ khác cái icon. Nghĩa là báo lỗi và báo thành công trông y hệt nhau.
-
-   Chỉ `info` là đúng, vì nó viết thẳng bằng token. Ba dòng còn lại giờ theo
-   đúng khuôn đó. */
+/* Status colors use design tokens directly. */
 const STATUS_CONFIG: Record<Status, { icon: React.ComponentType<any>; className: string }> = {
   success: {
     icon: CheckCircle2,
@@ -53,9 +45,7 @@ export function StatusMessage({
   return (
     <div
       className={cn(
-        // `animate-slide-up` cũng không tồn tại (xem ghi chú trên) — banner này
-        // vốn dĩ chưa từng có animation vào nào, nó chỉ NHẢY ra giữa layout và
-        // đẩy mọi thứ bên dưới xuống. Thay bằng `pop-in` thật, có trong preset.
+        // Enter with the preset's `pop-in` animation.
         'flex items-start gap-3 rounded-lg border px-4 py-3',
         'motion-safe:animate-pop-in',
         config.className,

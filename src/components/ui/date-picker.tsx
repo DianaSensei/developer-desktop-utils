@@ -8,6 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { cn } from '@/lib/utils';
 import { useDismissable } from '@/hooks/useDismissable';
 import { useAnimatedOpen } from '@/hooks/useAnimatedOpen';
+import { useCurrentLocale, useMessages } from '@/contexts/LocaleContext';
+import UI from '@/components/ui/ui.messages';
 
 // ---------------------------------------------------------------------------
 // Cross-platform date picker — replaces the native <input type="date">.
@@ -15,8 +17,16 @@ import { useAnimatedOpen } from '@/hooks/useAnimatedOpen';
 // Value is an ISO date string (yyyy-MM-dd); identical on every OS.
 // ---------------------------------------------------------------------------
 
-const WEEKDAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
-const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+// Localized weekday names from Intl. 2023-01-01 was a Sunday, so seven
+// days from it give Su…Sa order.
+function weekdayNames(locale: string): string[] {
+  const fmt = new Intl.DateTimeFormat(locale, { weekday: 'narrow' });
+  return Array.from({ length: 7 }, (_, i) => fmt.format(new Date(2023, 0, 1 + i)));
+}
+function monthNames(locale: string): string[] {
+  const fmt = new Intl.DateTimeFormat(locale, { month: 'long' });
+  return Array.from({ length: 12 }, (_, i) => fmt.format(new Date(2023, i, 1)));
+}
 
 export interface DatePickerProps {
   /** ISO date string, e.g. "2026-06-17". Empty string = no selection. */
@@ -31,7 +41,13 @@ export interface DatePickerProps {
   monthYearNav?: boolean;
 }
 
-export function DatePicker({ value, onChange, disabled, className, placeholder = 'Pick a date', inline = false, monthYearNav = false }: DatePickerProps) {
+export function DatePicker({ value, onChange, disabled, className, placeholder, inline = false, monthYearNav = false }: DatePickerProps) {
+  const ui = useMessages(UI);
+  const locale = useCurrentLocale();
+  const WEEKDAYS = React.useMemo(() => weekdayNames(locale), [locale]);
+  const MONTHS = React.useMemo(() => monthNames(locale), [locale]);
+  const monthYear = (d: Date) => new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric' }).format(d);
+  const shortDate = (d: Date) => new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short', year: 'numeric' }).format(d);
   const { open, closing, visible, toggle, close } = useAnimatedOpen();
   const wrapRef = useDismissable<HTMLDivElement>(open, close);
 
@@ -69,7 +85,7 @@ export function DatePicker({ value, onChange, disabled, className, placeholder =
           type="button"
           onClick={() => setViewMonth((m) => addMonths(m, -1))}
           className="shrink-0 rounded-md p-1 text-fg-mute transition-colors hover:bg-bg-2 hover:text-fg"
-          aria-label="Previous month"
+          aria-label={ui('prevMonth')}
         >
           <ChevronLeft className="h-4 w-4" />
         </button>
@@ -89,13 +105,13 @@ export function DatePicker({ value, onChange, disabled, className, placeholder =
             </Select>
           </div>
         ) : (
-          <span className="flex-1 text-center text-sm font-medium">{format(viewMonth, 'MMMM yyyy')}</span>
+          <span className="flex-1 text-center text-sm font-medium">{monthYear(viewMonth)}</span>
         )}
         <button
           type="button"
           onClick={() => setViewMonth((m) => addMonths(m, 1))}
           className="shrink-0 rounded-md p-1 text-fg-mute transition-colors hover:bg-bg-2 hover:text-fg"
-          aria-label="Next month"
+          aria-label={ui('nextMonth')}
         >
           <ChevronRight className="h-4 w-4" />
         </button>
@@ -103,8 +119,8 @@ export function DatePicker({ value, onChange, disabled, className, placeholder =
 
       {/* Weekday header */}
       <div className="grid grid-cols-7 gap-0.5">
-        {WEEKDAYS.map((w) => (
-          <div key={w} className="py-1 text-center text-[11px] font-medium text-fg-mute">{w}</div>
+        {WEEKDAYS.map((w, i) => (
+          <div key={i} className="py-1 text-center text-[11px] font-medium text-fg-mute">{w}</div>
         ))}
       </div>
 
@@ -140,7 +156,7 @@ export function DatePicker({ value, onChange, disabled, className, placeholder =
         onClick={() => { setViewMonth(startOfMonth(today)); pick(today); }}
         className="mt-2 w-full rounded-md border py-1 text-xs text-fg-mute transition-colors hover:bg-bg-2 hover:text-fg"
       >
-        Today
+        {ui('today')}
       </button>
     </>
   );
@@ -164,7 +180,7 @@ export function DatePicker({ value, onChange, disabled, className, placeholder =
       >
         <CalendarIcon className="h-3.5 w-3.5 shrink-0 text-fg-mute" />
         <span className={cn('truncate', !selected && 'text-fg-mute')}>
-          {selected ? format(selected, 'MMM d, yyyy') : placeholder}
+          {selected ? shortDate(selected) : (placeholder ?? ui('pickDate'))}
         </span>
       </button>
 

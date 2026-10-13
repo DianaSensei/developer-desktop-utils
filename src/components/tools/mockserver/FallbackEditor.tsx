@@ -2,6 +2,8 @@ import { Input } from '@/components/ui/input';
 import { ToolLabel, ToolHint } from '@/components/ui/tool-section';
 import { JsonEditor, TextEditor } from '@/design-system';
 import type { MockConfig } from './types';
+import { useMessages } from '@/contexts/LocaleContext';
+import MESSAGES from '@/components/tools/mockserver/MockServer.messages';
 
 interface Props {
   config: MockConfig;
@@ -10,18 +12,19 @@ interface Props {
 
 // Editor for the response returned when no stub matches a request.
 export function FallbackEditor({ config, onChange }: Props) {
+  const m = useMessages(MESSAGES);
   const isJson = /json/i.test(config.notFoundContentType);
 
   return (
     <div className="tool-scrollable space-y-5 p-4">
       <div className="space-y-1">
-        <ToolLabel>No-match response</ToolLabel>
-        <ToolHint>Returned for any request that doesn’t match an enabled stub.</ToolHint>
+        <ToolLabel>{m('noMatchResponse')}</ToolLabel>
+        <ToolHint>{m('fallbackHint')}</ToolHint>
       </div>
 
       <div className="flex flex-wrap items-center gap-4">
         <div className="flex items-center gap-1.5">
-          <span className="text-xs text-fg-mute">Status</span>
+          <span className="text-xs text-fg-mute">{m('status')}</span>
           <Input
             type="number"
             value={config.notFoundStatus}
@@ -41,11 +44,11 @@ export function FallbackEditor({ config, onChange }: Props) {
       </div>
 
       <div className="space-y-1.5">
-        <span className="text-xs text-fg-mute">Body</span>
+        <span className="text-xs text-fg-mute">{m('body')}</span>
         {isJson ? (
-          <JsonEditor value={config.notFoundBody} onChange={(notFoundBody) => onChange({ notFoundBody })} placeholder="Fallback response body" />
+          <JsonEditor value={config.notFoundBody} onChange={(notFoundBody) => onChange({ notFoundBody })} placeholder={m('fallbackBody')} />
         ) : (
-          <TextEditor value={config.notFoundBody} onChange={(notFoundBody) => onChange({ notFoundBody })} placeholder="Fallback response body" />
+          <TextEditor value={config.notFoundBody} onChange={(notFoundBody) => onChange({ notFoundBody })} placeholder={m('fallbackBody')} />
         )}
         <ToolHint>
           Supports the same templates as stub bodies, e.g. <code>{'{{request.path}}'}</code>.

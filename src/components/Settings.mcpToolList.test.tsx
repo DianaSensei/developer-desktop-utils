@@ -2,21 +2,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
 
 /**
- * `MCP_TOOL_IDS` (useMcpToolEnabled.ts) liệt kê Redis Client/Kafka Explorer/
- * RabbitMQ Client/Containers dù bốn tool này giờ là plugin CÀI THÊM, không
- * còn biên dịch sẵn — danh sách đó không tự biết cái nào ĐANG thật sự có mặt.
- * Không lọc theo registry (`TOOL_DEFS`) thì Settings → MCP hiện công tắc
- * bật/tắt cho một tool CHƯA cài, đổi công tắc đó không có tác dụng gì (không
- * có plugin nào để bật/tắt MCP access). Trong test này (không cài plugin nào
- * runtime) `TOOL_DEFS` chỉ chứa 26 tool biên dịch sẵn — đúng kịch bản người
- * dùng "chưa cài tool kafka" báo cáo.
+ * `MCP_TOOL_IDS` includes tools that are now optional plugins. Settings → MCP
+ * must only list tools in the registry (`TOOL_DEFS`); with no plugins
+ * installed here, `TOOL_DEFS` holds only the built-in tools.
  *
- * `isTauri` được đọc MỘT LẦN lúc `@/lib/platform` được nạp (mục MCP chỉ hiện
- * danh sách khi `isTauri` true, không phải bản web) — cùng cái bẫy đã ghi ở
- * `SettingsExtensionInstaller.test.tsx`. `vi.resetModules()` + gán
- * `__TAURI_INTERNALS__` TRƯỚC khi `import('@/components/Settings')` (qua
- * dynamic import, không phải import tĩnh ở đầu file — import tĩnh chạy
- * TRƯỚC cả thân test) là cách duy nhất để test này đọc đúng giá trị cần.
+ * The MCP section only lists tools when `isTauri` is true, and `isTauri` is
+ * read at module load, so Settings is imported dynamically after setting
+ * `__TAURI_INTERNALS__`.
  */
 
 async function renderMcpSection() {
@@ -59,9 +51,8 @@ describe('Settings — MCP — danh sách bật/tắt theo tool CHỈ hiện too
   it('không hiện công tắc cho kafka-explorer/redis-client/rabbit-client/container-manager khi chưa cài', async () => {
     await renderMcpSection();
 
-    // Chưa cài → không có trong TOOL_DEFS → nhãn hiển thị đáng ra sẽ rơi về
-    // bare id (`?? id`) NẾU dòng đó vẫn hiện — khẳng định bare id đó không
-    // xuất hiện ở đâu cả, tức dòng tương ứng không được render.
+    // Not installed, so not in TOOL_DEFS; its row would fall back to the bare
+    // id, which must not appear.
     expect(screen.queryByText('kafka-explorer')).toBeNull();
     expect(screen.queryByText('redis-client')).toBeNull();
     expect(screen.queryByText('rabbit-client')).toBeNull();

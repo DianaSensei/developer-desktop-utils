@@ -13,12 +13,10 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import type { ScriptFinding, ScriptKind } from './collectionScripts';
+import { t } from './i18n';
 
-const KIND_LABEL: Record<ScriptKind, string> = {
-  'pre-request': 'Pre-request',
-  'post-response': 'Post-response',
-  tests: 'Tests',
-};
+const kindLabel = (kind: ScriptKind): string =>
+  kind === 'pre-request' ? t('req.preRequest') : kind === 'post-response' ? t('req.postResponse') : t('review.tests');
 
 interface Props {
   open: boolean;
@@ -47,26 +45,23 @@ export function ImportReviewDialog({
         <DialogHeader className="shrink-0 border-b px-4 py-3">
           <DialogTitle className="flex items-center gap-2 text-sm">
             <AlertTriangle className="h-4 w-4 shrink-0 text-warn" />
-            This collection contains scripts
+            {t('review.title')}
           </DialogTitle>
         </DialogHeader>
 
         <div className="shrink-0 space-y-2 border-b px-4 py-3 text-xs text-fg-mute">
           <p>
-            <span className="font-medium text-fg">{collectionName}</span> ships{' '}
-            {findings.length} script{findings.length === 1 ? '' : 's'} that would run automatically
-            whenever you send one of its requests.
+            <span className="font-medium text-fg">{collectionName}</span>{' '}
+            {t(findings.length === 1 ? 'review.shipsOne' : 'review.ships', { n: findings.length })}
           </p>
           <p>
-            Scripts can read your environment variables — including any tokens stored there — and
-            can make their own network calls. Only keep them if you trust where this file came from.
+            {t('review.risk')}
           </p>
           <p>
-            If this came from real Bruno, its scripts call <code className="rounded bg-bg-2 px-1 font-mono">bru.*</code> —
-            this app's own scripting API is <code className="rounded bg-bg-2 px-1 font-mono">dt.*</code> instead (same
-            methods, different name; no <code className="rounded bg-bg-2 px-1 font-mono">bru</code> alias). A kept-as-is
-            Bruno script needs that rename before it will run here — a Postman script's <code className="rounded bg-bg-2 px-1 font-mono">pm.*</code> calls
-            are unaffected and keep working as imported.
+            {t('review.brunoA')} <code className="rounded bg-bg-2 px-1 font-mono">bru.*</code> {t('review.brunoB')}{' '}
+            <code className="rounded bg-bg-2 px-1 font-mono">dt.*</code> {t('review.brunoC')}{' '}
+            <code className="rounded bg-bg-2 px-1 font-mono">bru</code> {t('review.brunoD')}{' '}
+            <code className="rounded bg-bg-2 px-1 font-mono">pm.*</code> {t('review.brunoE')}
           </p>
         </div>
 
@@ -87,7 +82,7 @@ export function ImportReviewDialog({
                     {f.path || collectionName}
                   </span>
                   <span className="shrink-0 rounded bg-bg-2 px-1.5 py-0.5 text-[11px] text-fg-mute">
-                    {KIND_LABEL[f.kind]}
+                    {kindLabel(f.kind)}
                   </span>
                   <span className="w-16 shrink-0 text-right text-[11px] text-fg-mute">
                     {f.code.split('\n').length} lines
@@ -105,13 +100,13 @@ export function ImportReviewDialog({
 
         <div className="flex shrink-0 items-center gap-2 border-t px-4 py-3">
           <Button onClick={onImportWithoutScripts} className="gap-1.5">
-            <ShieldCheck className="h-4 w-4" /> Import without scripts
+            <ShieldCheck className="h-4 w-4" /> {t('review.withoutScripts')}
           </Button>
           <Button variant="outline" onClick={onImportWithScripts}>
-            Import with scripts
+            {t('review.withScripts')}
           </Button>
           <Button variant="ghost" onClick={onCancel} className={cn('ml-auto text-fg-mute')}>
-            Cancel
+            {t('cancel')}
           </Button>
         </div>
       </DialogContent>

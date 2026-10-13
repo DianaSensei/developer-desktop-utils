@@ -3,18 +3,10 @@ import { render, screen, cleanup, fireEvent, waitFor, within, act } from '@testi
 import { storageRemove } from '@/lib/persistentStore';
 
 /**
- * `isTauri` được đọc MỘT LẦN lúc `@/lib/platform` được nạp — cùng cái bẫy đã
- * ghi ở `installer.test.ts`/`SettingsExtensionInstaller.test.tsx`.
- * `vi.resetModules()` + gán `__TAURI_INTERNALS__` TRƯỚC khi
- * `import('@/components/SettingsInstalledExtensions')` là cách duy nhất để
- * mọi module transitively import `@/lib/platform` đọc đúng giá trị test này
- * cần.
- *
- * `settle()` NGAY SAU `renderInTauri()`: lần `import('@tauri-apps/api/core')`
- * ĐẦU TIÊN (bên trong `invokeCommand`, gọi lúc mount để `listInstalledArtifacts`
- * chạy) là một dynamic import thật, còn đang "in-flight" khi `render()` trả
- * về — xem giải thích đầy đủ ở `SettingsExtensionInstaller.test.tsx`'s bản gốc
- * (trước khi danh sách này tách ra thành component riêng).
+ * `isTauri` is read once at module load, so each test resets modules and
+ * sets `__TAURI_INTERNALS__` before importing the component. `settle()`
+ * follows each render because the first dynamic import of
+ * `@tauri-apps/api/core` (from the mount-time list call) is still in flight.
  */
 async function settle(ms = 20) {
   await act(async () => {
@@ -76,9 +68,8 @@ function installedServiceRaw(overrides: Partial<Record<string, unknown>> = {}) {
 }
 
 /**
- * `resetModules()` + import + render, dùng chung cho MỌI test cần một lần nạp
- * module riêng (isTauri đọc một lần lúc `@/lib/platform` được nạp — xem ghi
- * chú ở đầu file).
+ * Resets modules, imports and renders, for tests that need a fresh module
+ * graph.
  */
 async function renderInstalled(opts?: { tauri?: boolean }) {
   vi.resetModules();
@@ -157,7 +148,7 @@ describe('SettingsInstalledExtensions — service đòi xác nhận trước khi
     const uninstallButton = within(row).getAllByRole('button').at(-1)!;
     fireEvent.click(uninstallButton);
 
-    // Cảnh báo hiện ra, KHÔNG gọi uninstall ngay.
+    // A warning appears; uninstall is not called yet.
     await waitFor(() =>
       expect(
         screen.getByText(/will STOP this sidecar if it is running|sẽ DỪNG sidecar này nếu đang chạy/),
@@ -248,8 +239,7 @@ describe('SettingsInstalledExtensions — plugin + sidecar riêng LIÊN QUAN đ�
     const uninstallButton = within(row).getAllByRole('button').at(-1)!;
     fireEvent.click(uninstallButton);
 
-    // Xác nhận trước, CHƯA gọi uninstall nào — vì gỡ plugin này kéo theo
-    // dừng sidecar của nó.
+    // Confirmation first: removing this plugin also stops its sidecar.
     await waitFor(() => expect(screen.getAllByText(/devtool-svc-demo/).length).toBeGreaterThan(0));
     expect(invokeMock).not.toHaveBeenCalledWith('artifact_installer_uninstall', expect.anything());
 

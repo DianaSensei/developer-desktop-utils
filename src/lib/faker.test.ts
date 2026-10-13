@@ -2,10 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { generateRows, serializeRows, type FieldDef } from '@/lib/faker';
 
 /**
- * Dùng @faker-js/faker THẬT (không mock) — nó đã là dependency thật, chạy
- * nhanh, và giá trị test nằm ở LOGIC BỌC QUANH NÓ (tính quyết định theo seed,
- * kẹp min/max, lọc field rỗng, chuyển định dạng xuất) chứ không phải bản thân
- * thư viện. Chưa có test nào trước đây cho module này.
+ * Uses the real @faker-js/faker; the tests cover the wrapper logic (seeded
+ * determinism, min/max clamping, empty-field filtering, export formats).
  */
 
 describe('generateRows — tính quyết định theo seed', () => {
@@ -52,7 +50,7 @@ describe('generateRows — tính quyết định theo seed', () => {
   it('float: số chữ số thập phân bị kẹp trong [0, 10], không nhận giá trị âm hay quá lớn', async () => {
     const fields: FieldDef[] = [{ id: '1', name: 'f', type: 'float', min: 0, max: 1, decimals: -5 }];
     const [row] = await generateRows(fields, 1, 1);
-    // decimals âm bị Math.max(0, …) kẹp về 0 → số nguyên (không có phần thập phân).
+    // Negative decimals are clamped to 0, giving an integer.
     expect(Number.isInteger(row.f)).toBe(true);
   });
 

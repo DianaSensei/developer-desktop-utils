@@ -1,0 +1,33 @@
+import { defineMessages } from '@/lib/i18n';
+
+export default defineMessages({
+  validJson: { vi: 'JSON hợp lệ', en: 'Valid JSON' },
+  lenientJson: {
+    vi: 'Không phải JSON chuẩn — đã đọc nới lỏng (dấu phẩy thừa, key không ngoặc kép, comment hoặc nháy đơn). Output dùng nháy kép là JSON chuẩn.',
+    en: 'Not strict JSON — read leniently (trailing commas, unquoted keys, comments or single quotes). The output with double quotes is valid JSON.',
+  },
+  invalidJson: { vi: 'JSON không hợp lệ', en: 'Invalid JSON' },
+  searchPlaceholder: { vi: 'Tìm theo key, giá trị hoặc path…', en: 'Find by key, value, or path…' },
+  prevMatch: { vi: 'Kết quả trước (⇧↵)', en: 'Previous match (⇧↵)' },
+  nextMatch: { vi: 'Kết quả sau (↵)', en: 'Next match (↵)' },
+  expandAll: { vi: 'Mở hết', en: 'Expand all' },
+  collapseAll: { vi: 'Gập hết', en: 'Collapse all' },
+  tree: { vi: 'Cây JSON', en: 'JSON tree' },
+  items: { vi: '{{n}} phần tử', en: '{{n}} items' },
+  item: { vi: '{{n}} phần tử', en: '{{n}} item' },
+  fields: { vi: '{{n}} trường', en: '{{n}} fields' },
+  field: { vi: '{{n}} trường', en: '{{n}} field' },
+  modeLabel: { vi: 'Chế độ JSON', en: 'JSON mode' },
+  beautify: { vi: 'Làm đẹp', en: 'Beautify' },
+  jsonString: { vi: 'Chuỗi JSON', en: 'JSON String' },
+  minify: { vi: 'Thu gọn', en: 'Minify' },
+  minified: { vi: 'Đã thu gọn', en: 'Minified' },
+  getStarted: { vi: 'Dán JSON để bắt đầu', en: 'Paste JSON to get started' },
+  showInput: { vi: 'Hiện ô nhập', en: 'Show input' },
+  hideInput: { vi: 'Ẩn ô nhập', en: 'Hide input' },
+  path: { vi: 'Path', en: 'Path' },
+  pathHint: { vi: '$ (bấm vào một node)', en: '$ (click a node)' },
+  quotes: { vi: 'Dấu nháy', en: 'Quotes' },
+  doubleQuote: { vi: 'Nháy kép "', en: 'Double "' },
+  singleQuote: { vi: "Nháy đơn '", en: "Single '" },
+});

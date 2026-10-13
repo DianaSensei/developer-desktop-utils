@@ -46,8 +46,7 @@ beforeEach(() => {
 
 describe('storage', () => {
   it('gắn namespace theo id plugin, giữ nguyên tiền tố `devtool:<id>:` các tool đang dùng', () => {
-    // Đổi tiền tố này là im lặng vứt đi collection/lịch sử/cấu hình người dùng
-    // đã lưu, nên nó được khoá bằng test chứ không chỉ bằng bình luận.
+    // Changing this prefix would orphan users' saved data.
     expect(storageKey('api-client', 'collections')).toBe('devtool:api-client:collections');
 
     const sdk = createPluginSdk(plugin(['storage']));
@@ -80,8 +79,7 @@ describe('secrets', () => {
     await sdk.secrets.set('accounts', 'JBSWY3DPEHPK3PXP');
     expect(await sdk.secrets.get('accounts')).toBe('JBSWY3DPEHPK3PXP');
 
-    // Nhật ký chỉ được nêu TÊN khoá. Một audit log làm rò seed TOTP còn tệ
-    // hơn là không có audit log.
+    // The log names keys only, never values.
     const entries = audit.recent().filter((e) => e.channel === 'secrets');
     expect(entries.length).toBeGreaterThan(0);
     expect(JSON.stringify(entries)).not.toContain('JBSWY3DPEHPK3PXP');
@@ -127,8 +125,7 @@ describe('files', () => {
 
   it('nhật ký chỉ ghi TÊN file, không ghi đường dẫn chứa tên tài khoản', async () => {
     const sdk = createPluginSdk(plugin(['files:read']));
-    // jsdom không có plugin-fs thật; điều cần khẳng định là audit đã ghi TRƯỚC
-    // khi lời gọi thật diễn ra, và ghi đúng thứ.
+    // jsdom has no plugin-fs; check that the audit entry is written first.
     await sdk.files.readText('/Users/nguoi-dung-that/Documents/bi-mat.json').catch(() => {});
 
     const entry = audit.recent().find((e) => e.channel === 'files')!;
@@ -210,8 +207,8 @@ describe('native.invoke', () => {
 
   it('allowlist khớp theo tiền tố', async () => {
     const sdk = createPluginSdk(plugin(['native'], ['redis_']));
-    // Không gọi được Tauri trong jsdom, nên chỉ cần xác nhận nó KHÔNG bị chặn
-    // ở tầng quyền: lỗi thoát ra phải là lỗi nạp module, không phải lỗi quyền.
+    // Tauri is unavailable in jsdom: the error must come from module
+    // loading, not from the permission check.
     await expect(sdk.native.invoke('redis_get_key')).rejects.not.toBeInstanceOf(PluginCommandError);
     const entry = audit.recent().find((e) => e.action === 'redis_get_key')!;
     expect(entry.allowed).toBe(true);
@@ -223,8 +220,7 @@ describe('native.invoke', () => {
     );
 
     const sdk = createPluginSdk(plugin(['native'], ['redis_']));
-    // jsdom không có `__TAURI_INTERNALS__` nên dựng Channel sẽ hỏng; điều cần
-    // khẳng định là nó KHÔNG hỏng ở tầng quyền.
+    // No `__TAURI_INTERNALS__` in jsdom; only the permission layer is checked.
     await sdk.native.channel(() => {}, 'redis-pubsub').catch(() => {});
 
     const entry = audit.recent().find((e) => e.action === 'channel:redis-pubsub')!;

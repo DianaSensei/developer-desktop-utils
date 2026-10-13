@@ -20,19 +20,21 @@ import {
   Minus,
   Square,
   Copy,
-  FlaskConical,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useDesktopChrome } from '@/hooks/useDesktopChrome';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useThemeSync, triggerThemeTransition } from '@/hooks/useThemeSync';
 import { TOOL_DEF_MAP, DEFAULT_TOOL_ORDER } from '@/lib/toolDefs';
 import { allTools, toolPath } from '@/lib/toolRegistry';
-import { buildNavEntries, countFavoriteEntries, GROUP_OF_TOOL, type NavEntry } from '@/lib/toolGroups';
+import { buildNavEntries, countFavoriteEntries, type NavEntry } from '@/lib/toolGroups';
 import { toolMatchesQuery } from '@/lib/toolSearch';
 import { useLiveConnections } from '@/lib/liveConnections';
 import { initDeepLinkHandling } from '@/lib/deepLink';
 import { CommandPalette } from '@/components/CommandPalette';
-import { OpenToolsStrip } from '@/components/OpenToolsStrip';
+import { WorkspaceBar, useWorkspaceBarVisible } from '@/components/WorkspaceBar';
+import { ToolIdentity, GroupTabs, useActiveGroupTabs } from '@/components/ToolIdentity';
+import { WorkspaceProvider } from '@/contexts/WorkspaceContext';
 import { McpBackgroundBridge } from '@/components/McpBackgroundBridge';
 import { McpManageBridge } from '@/components/McpManageBridge';
 import { McpUtilityBridge } from '@/components/McpUtilityBridge';
@@ -58,29 +60,20 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { AppLogo } from '@/components/AppLogo';
 import { isTauri, IS_MAC } from '@/lib/platform';
 
-/** `titleBarStyle: "Overlay"` (tauri.conf.json) chỉ có tác dụng trên macOS —
- *  Windows/Linux giữ nguyên titlebar hệ thống, `decorations` không đổi. Chỉ
- *  khi cả hai đúng thì cửa sổ mới thật sự không còn thanh tiêu đề riêng và
- *  cần chừa chỗ cho ba nút đèn giao thông + vùng kéo cửa sổ. */
+/** macOS with `titleBarStyle: "Overlay"`: no separate titlebar, so the app
+ *  leaves room for the traffic lights and a drag region. */
 const showMacOverlayChrome = isTauri && IS_MAC;
-/** Windows/Linux: `tauri.windows.conf.json` / `tauri.linux.conf.json` tắt hẳn
- *  `decorations` (không có API "overlay giữ nút gốc" như macOS) — nên app tự
- *  vẽ thanh titlebar, kéo cửa sổ, và ba nút minimize/maximize/close. Gộp cả
- *  hai OS vào MỘT kiểu chrome trung tính (không cố bắt chước Fluent Windows
- *  11 lẫn GNOME/KDE riêng biệt — không có máy thật để nhắm cho đúng từng
- *  hệ) thay vì hai style khác nhau khó bảo trì và không kiểm chứng được. */
+/** Windows/Linux turn `decorations` off (tauri.windows/linux.conf.json), so
+ *  the app draws its own titlebar, drag region and window buttons, in one
+ *  neutral style for both. */
 const showCustomChrome = isTauri && !IS_MAC;
-/** Header tool (icon + tablist) đã chuyển hẳn lên titlebar ở CẢ hai kiểu
- *  chrome tự vẽ — dùng để ẩn header gốc trong <main> một lần, không lặp lại
- *  logic ở nhiều chỗ. */
+/** Either custom titlebar: the tool header moves into it. */
 const showMergedTitlebar = showMacOverlayChrome || showCustomChrome;
 
 type TauriResizeDirection = 'North' | 'South' | 'East' | 'West' | 'NorthEast' | 'NorthWest' | 'SouthEast' | 'SouthWest';
 
-/** `@tauri-apps/api/window` chỉ tồn tại trong runtime Tauri thật — import
- *  động để không kéo nó vào bundle web/dev-browser (mọi lệnh dưới đây chỉ gọi
- *  từ nút/hit-zone chỉ render khi `showCustomChrome`, nhưng import tĩnh vẫn
- *  sẽ cố resolve module ngay cả khi nhánh đó không chạy). */
+/** `@tauri-apps/api/window` only exists in Tauri; imported lazily so the
+ *  web bundle does not include it. */
 async function tauriWindow() {
   const { getCurrentWindow } = await import('@tauri-apps/api/window');
   return getCurrentWindow();
@@ -90,14 +83,16 @@ const winToggleMaximize = () => { tauriWindow().then((w) => w.toggleMaximize());
 const winClose = () => { tauriWindow().then((w) => w.close()); };
 const winStartResize = (dir: TauriResizeDirection) => { tauriWindow().then((w) => w.startResizeDragging(dir)); };
 
-/** `decorations:false` (Windows/Linux) xoá luôn viền kéo-giãn của hệ điều
- *  hành — không tự thêm lại thì cửa sổ chỉ resize được bằng cách kéo... không
- *  cách nào cả. Tám vùng mỏng (4 cạnh + 4 góc) phủ mép cửa sổ, gọi
- *  `startResizeDragging` đúng hướng lúc mousedown — cùng cơ chế native, không
- *  phải tự tính toán kích thước bằng tay. */
+/** `decorations: false` also removes the OS resize borders, so thin edge and
+ *  corner zones call `startResizeDragging` in the right direction. They
+ *  sit inside the window, so they stay clear of the caption buttons (the
+ *  top-right corner belongs to Close, as on Windows) and are not rendered
+ *  while the window is maximized. */
 function ResizeHandles() {
   const T = 6; // độ dày vùng cạnh, px
   const C = 12; // độ dài cạnh vùng góc, px
+  const TITLEBAR = 38; // chiều cao titlebar
+  const CAPTION = 128; // 3 nút cửa sổ (3 × 40px) + vạch ngăn
   const edge = (dir: TauriResizeDirection, style: React.CSSProperties) => (
     <div
       key={dir}
@@ -108,16 +103,25 @@ function ResizeHandles() {
   );
   return (
     <>
-      {edge('North', { top: 0, left: C, right: C, height: T, cursor: 'ns-resize' })}
+      {edge('North', { top: 0, left: C, right: CAPTION, height: T, cursor: 'ns-resize' })}
       {edge('South', { bottom: 0, left: C, right: C, height: T, cursor: 'ns-resize' })}
       {edge('West', { top: C, bottom: C, left: 0, width: T, cursor: 'ew-resize' })}
-      {edge('East', { top: C, bottom: C, right: 0, width: T, cursor: 'ew-resize' })}
+      {edge('East', { top: TITLEBAR, bottom: C, right: 0, width: T, cursor: 'ew-resize' })}
       {edge('NorthWest', { top: 0, left: 0, width: C, height: C, cursor: 'nwse-resize' })}
-      {edge('NorthEast', { top: 0, right: 0, width: C, height: C, cursor: 'nesw-resize' })}
       {edge('SouthWest', { bottom: 0, left: 0, width: C, height: C, cursor: 'nesw-resize' })}
       {edge('SouthEast', { bottom: 0, right: 0, width: C, height: C, cursor: 'nwse-resize' })}
     </>
   );
+}
+
+/** Focuses the first editable field of the open tool, else the tool area. */
+function focusToolContent() {
+  const main = document.getElementById('tool-content');
+  if (!main) return;
+  const field = main.querySelector<HTMLElement>(
+    'textarea:not([readonly]), input:not([type="hidden"]):not([readonly]), [contenteditable="true"]',
+  );
+  (field ?? main).focus();
 }
 
 function applySavedOrder<T extends { featureId: string }>(tools: T[], savedOrder: string[]): T[] {
@@ -213,24 +217,22 @@ function NavScrollArea({
 
   return (
     <div className="relative flex-1 min-h-0">
-      <nav ref={navRef} className="h-full overflow-y-auto px-1.5 py-2">
+      <nav ref={navRef} aria-label={t('shell.sidebar.navLabel')} className="h-full overflow-y-auto px-1.5 py-2">
         {navEntries.length === 0 && disabledMatches.length === 0 && query && (
           <p className="px-2 py-4 text-center text-[11px] text-fg-mute">{t('shell.search.noMatch', { query })}</p>
         )}
         <div className="space-y-0.5">
           {navEntries.map((entry, i) => {
             const Icon = entry.icon;
-            // Bấm vào nhóm là vào tool đầu tiên; nhóm sáng lên khi ĐANG ở bất kỳ
-            // thành viên nào, nếu không mở Deduplicate sẽ thấy sidebar không
-            // sáng chỗ nào.
+            // Clicking a group opens its first tool; the group is highlighted
+            // when any member is active.
             const memberPaths = entry.tools.map((t) => toolPath(t.id));
             const path = memberPaths[0];
             const isActive = memberPaths.includes(location.pathname);
             const isLive = entry.tools.some((t) => liveIds.includes(t.id));
             const isExperimental = entry.tools.some((t) => t.experimental);
             const fav = entry.tools.some((t) => isFavorite(t.id));
-            // Nhóm mô tả bằng tên các tool bên trong — hữu ích hơn là cố viết
-            // một câu bao trùm cả ba.
+            // A group's description lists its tools.
             const desc = entry.isGroup
               ? entry.tools.map((t) => t.label).join(' · ')
               : entry.tools[0].description;
@@ -255,9 +257,7 @@ function NavScrollArea({
                     to={path}
                     onClick={onClose}
                     className={cn(
-                      // rounded-md: the app's one semantic shape for "this is
-                      // selected" (design/RULES.md's "Bo góc cho 'đang chọn'"
-                      // rule) — this row IS that state (isActive below).
+                      // rounded-md: the app's "selected" shape (design/RULES.md).
                       'group relative flex w-full items-center rounded-md px-2.5 py-1.5 transition-[color,background-color,box-shadow] duration-base ease-out-soft',
                       isCollapsed ? 'justify-center' : 'gap-2.5',
                       isActive
@@ -268,8 +268,8 @@ function NavScrollArea({
                     <span className="relative shrink-0">
                       <Icon className="h-4 w-4" />
                       {isLive && (
-                        // "Đang kết nối" là TRẠNG THÁI → xanh lá cố định, không
-                        // theo accent. Xem design/RULES.md.
+                        // Live connection is a status, so always green, never the accent
+                        // (design/RULES.md).
                         <span
                           className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-ok ring-2 ring-[hsl(var(--chrome-c))]"
                           title={t('shell.sidebar.connected')}
@@ -279,20 +279,9 @@ function NavScrollArea({
                         <ExperimentalDot title={t('shell.experimental.badge')} />
                       )}
                     </span>
-                    {/* Label is always mounted and fades/collapses with the sidebar
-                        (300ms, matching the aside width animation) so it glides
-                        rather than popping in/out on collapse-expand.
-
-                        `inline-flex` + `min-w-0` on both this row and the label
-                        text below (not just `overflow-hidden` on one shared span)
-                        so a long label truncates with an ellipsis while the group
-                        count / Experimental mark stay `shrink-0` and always render
-                        in full — a long label ("Containers") + the old text badge
-                        together used to exceed max-w-[160px] and squeeze the label
-                        down to a sliver (no ellipsis), reading as the badge
-                        covering the item instead of a trimmed label. Now that the
-                        experimental flag is a bare glyph instead of a padded
-                        uppercase badge, it stays out of the label's way. */}
+                    {/* The label stays mounted and fades with the sidebar's 300ms
+                        width animation. `min-w-0` lets a long label truncate while the
+                        group count and experimental mark (`shrink-0`) stay whole. */}
                     <span
                       className={cn(
                         'inline-flex min-w-0 items-center text-sm transition-[max-width,opacity] duration-slow ease-out-soft motion-reduce:transition-none',
@@ -301,8 +290,7 @@ function NavScrollArea({
                       )}
                     >
                       <span className="min-w-0 flex-1 truncate">{entry.label}</span>
-                      {/* Số tool trong nhóm — cho biết còn gì bên trong trước
-                          khi bấm vào. */}
+                      {/* Number of tools in the group. */}
                       {entry.isGroup && (
                         <span className="ml-1.5 shrink-0 text-[11px] tabular-nums text-fg-mute/60">
                           {entry.tools.length}
@@ -310,17 +298,15 @@ function NavScrollArea({
                       )}
                       {isExperimental && !isCollapsed && <ExperimentalMark className="ml-1.5" />}
                     </span>
-                    {/* Favourite toggle — pins the entry to the top of the list.
-                        Hidden when collapsed (no room); a starred entry shows a
-                        filled star always, others reveal an outline on hover.
-
-                        Trên một NHÓM, ngôi sao thao tác lên cả nhóm: bỏ yêu
-                        thích thì gỡ hết thành viên, thêm thì đánh dấu tool đầu.
-                        Nhờ vậy dữ liệu yêu thích vẫn là id tool như cũ — không
-                        cần di trú gì khi bật tính năng nhóm. */}
+                    {/* Favorite toggle, hidden when collapsed. On a group it acts on
+                        the whole group: unfavoriting removes every member, favoriting
+                        marks the first tool, so favorites remain tool ids. */}
                     {!isCollapsed && (
                       <button
                         type="button"
+                        // Out of the Tab order: it doubled every sidebar stop.
+                        // Keyboard users star tools in Settings → Tools.
+                        tabIndex={-1}
                         aria-label={fav ? t('common.unfavoriteAria', { label: entry.label }) : t('common.favoriteAria', { label: entry.label })}
                         title={fav ? t('common.unfavorite') : t('common.favorite')}
                         onClick={(e) => {
@@ -336,7 +322,7 @@ function NavScrollArea({
                           'ml-auto shrink-0 rounded-xs p-0.5 transition-colors duration-fast ease-out-soft',
                           fav
                             ? 'text-warn opacity-100'
-                            : 'text-fg-mute/50 opacity-0 hover:text-warn group-hover:opacity-100 focus-visible:opacity-100'
+                            : 'text-fg-mute/50 opacity-0 hover:text-warn group-hover:opacity-100 group-focus-visible:opacity-100'
                         )}
                       >
                         <Star className={cn('h-3.5 w-3.5', fav && 'fill-current')} />
@@ -418,6 +404,21 @@ function NavScrollArea({
           </span>
         </div>
       )}
+    </div>
+  );
+}
+
+// With the workspace bar showing tabs, the titlebar no longer has room for
+// the group's sibling tabs (ToolIdentity is only the bar's fallback), so
+// they move to a strip above the tool. Without it, Text Counter or Data
+// Converter would have no visible way in once two tools are open.
+function GroupTabsStrip() {
+  const barVisible = useWorkspaceBarVisible();
+  const { tabs } = useActiveGroupTabs();
+  if (!barVisible || tabs.length === 0) return null;
+  return (
+    <div className="flex shrink-0 items-center border-b border-line bg-chrome px-3 py-1.5">
+      <GroupTabs size="titlebar" />
     </div>
   );
 }
@@ -518,7 +519,7 @@ function Sidebar({
           Always rendered so the fade plays on close too, not just open. */}
       <div
         className={cn(
-          'fixed inset-0 bg-black/30 backdrop-blur-[1px] z-40 lg:hidden transition-opacity duration-slow ease-out-soft',
+          'fixed inset-0 bg-black/30 backdrop-blur-[1px] z-40 md:hidden transition-opacity duration-slow ease-out-soft',
           isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
         )}
         onClick={onClose}
@@ -526,21 +527,14 @@ function Sidebar({
       />
       <aside
         className={cn(
-          'fixed lg:sticky top-0 left-0 z-50 h-full sidebar-chrome transition-[width,transform] duration-slow ease-out-soft flex flex-col',
+          'fixed md:sticky top-0 left-0 z-50 h-full sidebar-chrome transition-[width,transform] duration-slow ease-out-soft flex flex-col',
           isCollapsed ? 'w-14' : 'w-56',
-          isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+          isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
         )}
       >
-        {/* Header — chỉ dựng ở đây khi KHÔNG có titlebar tự vẽ (macOS overlay
-            HOẶC Windows/Linux decorations:false). Khi titlebar tự vẽ bật,
-            logo/"DevTool" đã chuyển lên dải titlebar riêng ở AppContent (span
-            toàn bộ cửa sổ, đứng NGOÀI sidebar) — vì hàng đó giờ chia sẻ chỗ
-            với đèn giao thông/nút Close (mac) hoặc minimize/maximize/close tự
-            vẽ (win/linux), nó phải đứng yên một chỗ, không co giãn theo
-            isCollapsed nữa. Để nó bên trong `<aside>` (đổi rộng theo collapse)
-            là sai chỗ: logo sẽ nhảy vị trí mỗi lần thu gọn/mở rộng dù về mặt
-            hình ảnh nó là một phần của titlebar, không phải một phần của danh
-            sách tool. Xem khối titlebar trong AppContent. */}
+        {/* Header, only when there is no custom titlebar. Otherwise the
+            logo lives in AppContent's titlebar, which does not move when
+            the sidebar collapses. */}
         {!showMergedTitlebar && (
           <div className={cn(
             'flex shrink-0 items-center border-b border-line py-2.5',
@@ -557,7 +551,7 @@ function Sidebar({
                 DevTool
               </h1>
             </div>
-            <Button variant="ghost" size="icon" className="h-ctl w-ctl shrink-0 lg:hidden" onClick={onClose} title={t('shell.sidebar.closeMenu')}>
+            <Button variant="ghost" size="icon" className="h-ctl w-ctl shrink-0 md:hidden" onClick={onClose} title={t('shell.sidebar.closeMenu')}>
               <X className="h-4 w-4" />
             </Button>
           </div>
@@ -616,17 +610,14 @@ function Sidebar({
 
         {/* Pinned bottom bar — always visible, order: Collapse → Dark mode → Settings */}
         <div className="shrink-0 border-t px-1.5 py-2 space-y-0.5">
-          {/* Collapse/expand — desktop only. Tooltip only matters collapsed
-              (expanded already shows the "Collapse" label inline) — bản trước
-              tự chế bằng group-hover:block, không xử lý được bàn phím hay
-              tràn viewport (xem design/RULES.md). Dùng chung `Tooltip` như
-              các dòng nav bên trên. */}
+          {/* Collapse/expand, desktop only. The tooltip only shows when
+              collapsed, since the expanded row already has a label. */}
           <Tooltip side="right" label={isCollapsed ? t('shell.sidebar.expand') : t('shell.sidebar.collapse')} disabled={!isCollapsed} triggerClassName="block w-full">
             <button
               onClick={onToggleCollapse}
               title={isCollapsed ? t('shell.sidebar.expand') : t('shell.sidebar.collapse')}
               className={cn(
-                'group relative hidden lg:flex w-full items-center rounded-sm px-2.5 py-1.5 transition-colors text-fg-mute hover:text-fg hover:bg-bg-2/60',
+                'group relative hidden md:flex w-full items-center rounded-sm px-2.5 py-1.5 transition-colors text-fg-mute hover:text-fg hover:bg-bg-2/60',
                 isCollapsed ? 'justify-center' : 'gap-2.5'
               )}
             >
@@ -672,11 +663,11 @@ function Sidebar({
               onClick={onClose}
               title={t('shell.sidebar.settings')}
               className={cn(
-                // rounded-md: same "đang chọn" shape as the tool nav rows above.
+                // rounded-md: the same "selected" shape as the tool rows above.
                 'group relative flex items-center rounded-md px-2.5 py-1.5 transition-[color,background-color,box-shadow] duration-base ease-out-soft',
                 isCollapsed ? 'justify-center' : 'gap-2.5',
                 isSettingsActive
-                  ? 'bg-acc/10 text-acc font-medium'
+                  ? 'bg-acc-tint text-acc-ink font-medium'
                   : 'text-fg-mute hover:text-fg hover:bg-fg/[0.05]'
               )}
             >
@@ -707,7 +698,6 @@ function AppContent() {
   const location = useLocation();
   const navigate = useNavigate();
   const { isFeatureEnabled, toolOrder } = useFeatures();
-  const liveIds = useLiveConnections();
   const { t } = useLocale();
   useDesktopChrome();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -718,11 +708,8 @@ function AppContent() {
   const [themePreference, setThemePreferenceState] = useState<ThemePreference>(() =>
     getThemePreference()
   );
-  // Nút maximize/restore của titlebar tự vẽ (Windows/Linux) phải đổi ICON theo
-  // đúng trạng thái cửa sổ — Windows thật đổi từ ô vuông đơn (□) sang hai ô
-  // chồng nhau (⧉) khi đã maximize. Không theo dõi việc này thì nút luôn hiện
-  // sai một trong hai trạng thái, lộ ngay ra là chrome tự vẽ chứ không phải hệ
-  // điều hành thật.
+  // The custom maximize button shows □ or ⧉ depending on window state,
+  // as Windows does.
   const [isMaximized, setIsMaximized] = useState(false);
   useEffect(() => {
     if (!showCustomChrome) return;
@@ -746,9 +733,8 @@ function AppContent() {
     storageSet('devtool-sidebar-collapsed', isCollapsed.toString());
   }, [isCollapsed]);
 
-  // `desktop-devtool-app://install?manifest=...` từ trang plugin (starlight-site) — chỉ
-  // gắn một lần cho cả vòng đời app (guard `started` bên trong), nên effect
-  // này an toàn khi chạy lại nếu `navigate` đổi identity.
+  // Install deep links from the plugins web page. Attached once for the
+  // app's lifetime (guarded inside), so re-running the effect is safe.
   useEffect(() => {
     void initDeepLinkHandling(navigate);
   }, [navigate]);
@@ -759,28 +745,27 @@ function AppContent() {
     setThemePreferenceState(value);
   };
 
+  // Below 1024px the sidebar starts collapsed (56px) so the tool keeps its
+  // width, without touching the saved preference: widening the window brings
+  // the user's own choice back. Toggling while narrow only lasts until then.
+  const narrow = useMediaQuery('(max-width: 1023.98px)');
+  const [expandedWhileNarrow, setExpandedWhileNarrow] = useState(false);
+  useEffect(() => { if (!narrow) setExpandedWhileNarrow(false); }, [narrow]);
+  const sidebarCollapsed = narrow ? !expandedWhileNarrow : isCollapsed;
+
   const toggleCollapse = () => {
-    setIsCollapsed(!isCollapsed);
+    if (narrow) setExpandedWhileNarrow((v) => !v);
+    else setIsCollapsed(!isCollapsed);
   };
 
   const enabledTools = allTools.filter((tool) => isFeatureEnabled(tool.featureId));
   const SettingsComponent = allTools.find((t) => t.featureId === 'settings')!.component;
-  // Đích rơi về khi URL hiện tại không khớp route nào — xem <Route path="*">
-  // bên dưới. Theo đúng thứ tự sidebar để "màn hình đầu tiên" của app là tool
-  // người dùng đã kéo lên trên cùng, không phải tool đầu bảng cứng.
+  // Where unmatched URLs go (see <Route path="*">): the first enabled tool
+  // in the user's sidebar order.
   const fallbackPath =
     applySavedOrder(enabledTools, toolOrder).find((t) => t.featureId !== 'settings')?.path
     ?? '/settings';
   const activeTool = allTools.find((tool) => tool.path === location.pathname) ?? allTools[0];
-  const ActiveIcon = activeTool.icon;
-  // Tool đang mở có nằm trong nhóm nhiều tool không? Nếu có, header hiện tên
-  // NHÓM cùng tab con thay vì tên tool — để người dùng thấy được các tool anh em
-  // mà không phải quay lại sidebar.
-  const activeGroup = GROUP_OF_TOOL.get(activeTool.featureId);
-  const activeGroupTabs = (activeGroup?.toolIds ?? [])
-    .filter((id) => isFeatureEnabled(id))
-    .map((id) => TOOL_DEF_MAP.get(id))
-    .filter((def): def is NonNullable<typeof def> => !!def);
   const isFullHeight = !!(activeTool as typeof allTools[0] & { fullHeight?: boolean }).fullHeight;
   const [guideOpen, setGuideOpen] = useState(false);
   const [guideIsWhatsNew, setGuideIsWhatsNew] = useState(false);
@@ -814,7 +799,7 @@ function AppContent() {
   };
 
   const routes = (
-    <ErrorBoundary resetKey={location.pathname}>
+    <ErrorBoundary resetKey={location.pathname} toolId={activeTool.featureId} toolLabel={activeTool.label}>
       <Suspense fallback={<ToolLoading />}>
         <Routes>
           {enabledTools.map((tool) => (
@@ -829,21 +814,17 @@ function AppContent() {
             />
           ))}
           <Route path="/settings" element={<SettingsComponent />} />
-          {/* Không có route nào khớp → về tool đầu tiên đang bật, không để
-              trống. Trường hợp thật hay gặp: '/' thuộc về Cron Generator, tắt
-              tool đó trong Settings rồi mở lại app là rơi thẳng vào một vùng
-              nội dung trắng trơn (header vẫn vẽ tên tool đã tắt). `replace` để
-              URL hỏng không nằm lại trong lịch sử điều hướng. */}
+          {/* No match: go to the first enabled tool instead of a blank page
+              (e.g. '/' belongs to a tool the user disabled). `replace` keeps
+              the bad URL out of history. */}
           <Route path="*" element={<Navigate to={fallbackPath} replace />} />
         </Routes>
       </Suspense>
     </ErrorBoundary>
   );
 
-  // Phần logo/DevTool + icon/tablist tool đang mở — CHUNG cho cả hai kiểu
-  // titlebar tự vẽ (macOS overlay và Windows/Linux decorations:false), chỉ
-  // khác nhau ở phần chrome bao quanh (chừa chỗ đèn giao thông vs nút tự vẽ).
-  // Viết một lần, gọi ở cả hai chỗ — tránh lặp ~70 dòng JSX dễ trôi lệch.
+  // Logo plus the active tool's identity/tabs, shared by both custom
+  // titlebars (macOS overlay and Windows/Linux).
   const titlebarNav = (
     <div className="flex min-w-0 items-center gap-3">
       <div className="flex shrink-0 items-center gap-2">
@@ -851,91 +832,15 @@ function AppContent() {
         <h1 className="whitespace-nowrap text-xs font-semibold leading-none">DevTool</h1>
       </div>
       <span className="h-4 w-px shrink-0 bg-line" />
-      <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 lg:hidden" onClick={() => setSidebarOpen(true)} title={t('shell.titlebar.openMenu')}>
+      <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 md:hidden" onClick={() => setSidebarOpen(true)} title={t('shell.titlebar.openMenu')} aria-label={t('shell.titlebar.openMenu')}>
         <Menu className="h-3.5 w-3.5" />
       </Button>
-      {/* No live dot here: this icon sits outside the switch-tool tablist
-          below (it's a single fixed badge, not one of the clickable tabs),
-          and the selected tab already carries its own live dot — showing it
-          twice for the same tool was redundant. */}
-      <div
-        key={activeTool.path}
-        className="relative flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-acc/15 bg-acc/10 motion-safe:animate-in motion-safe:zoom-in-75 motion-safe:fade-in-0 motion-safe:duration-base motion-safe:ease-spring"
-      >
-        <ActiveIcon className="h-3.5 w-3.5 text-acc" />
-      </div>
-      {activeGroupTabs.length > 1 ? (
-        <div
-          key={`${activeTool.path}-tabs`}
-          role="tablist"
-          aria-label={activeGroup!.label}
-          className="inline-flex h-6 shrink-0 items-center gap-1 overflow-x-auto rounded-md bg-sunk p-0.5 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-base motion-safe:ease-out-soft"
-        >
-          {activeGroupTabs.map((def) => {
-              const p = toolPath(def.id);
-              const on = p === location.pathname;
-              const live = liveIds.includes(def.id);
-              return (
-                <Link
-                  key={def.id}
-                  to={p}
-                  role="tab"
-                  aria-selected={on}
-                  className={cn(
-                    // rounded-md: same "đang chọn" shape used everywhere else.
-                    'inline-flex h-full items-center gap-1.5 whitespace-nowrap rounded-md px-2 text-xs leading-none transition-colors',
-                    'focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus',
-                    on
-                      ? 'bg-acc font-semibold text-acc-fg shadow-soft'
-                      : 'text-fg-mute hover:text-fg',
-                  )}
-                >
-                  {/* Sibling tool tabs (Kafka/RabbitMQ/Redis…) can each be live
-                      independently of which one is currently open — without
-                      this dot, switching away from a connected tool hides any
-                      sign it's still running until you click back into it.
-
-                      The ring only shows on the SELECTED tab: that's the one
-                      sitting on a full-strength `bg-acc` fill, where an
-                      accent tone close to --ok's green hue can nearly swallow
-                      the plain dot. `ring-acc-fg` is the same token the tab
-                      label's own text already leans on for contrast against
-                      that fill, so the ring stays legible for every accent
-                      color instead of just the ones far enough from green. */}
-                  {live && (
-                    <span
-                      className={cn('h-1.5 w-1.5 shrink-0 rounded-full bg-ok', on && 'ring-2 ring-acc-fg/70')}
-                      title={t('shell.titlebar.running')}
-                    />
-                  )}
-                  {def.label}
-                </Link>
-              );
-            })}
-        </div>
-      ) : (
-        <div
-          key={`${activeTool.path}-label`}
-          className="inline-flex h-6 shrink-0 items-center overflow-x-auto rounded-md bg-sunk p-0.5 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-base motion-safe:ease-out-soft"
-        >
-          {/* Chữ thường, không phải viên thuốc accent: `--acc` nghĩa là "cái
-              này tương tác được" hoặc "cái này đang được chọn" (RULES.md).
-              Tên tool đang mở không phải một lựa chọn trong nhóm — không có
-              gì để chọn khác, nó chỉ là nhãn. Tô accent vào đây vừa là ồn
-              nhất màn hình cho một thứ bấm-vào-không-làm-gì, vừa tạo thêm
-              một hình dạng "đang chọn" thứ tư (đã có: sidebar nav, tab
-              titlebar, Tabs pill, Segmented) — xem khối tương đương trong
-              OpenToolsStrip's fallback, nơi đã sửa đúng hướng này trước. */}
-          <h2 className="inline-flex h-full min-w-0 items-center gap-1 whitespace-nowrap px-2 text-xs font-semibold leading-none text-fg">
-            {activeTool.label}
-            {activeTool.experimental && (
-              <span title={t('shell.experimental.badge')} className="inline-flex shrink-0">
-                <FlaskConical className="h-3 w-3 opacity-80" />
-              </span>
-            )}
-          </h2>
-        </div>
-      )}
+      {/* The workspace bar replaces the tool identity when there is
+          something to switch between (2+ tabs or workspaces). */}
+      <WorkspaceBar
+        size="titlebar"
+        fallback={<ToolIdentity size="titlebar" />}
+      />
     </div>
   );
 
@@ -954,50 +859,39 @@ function AppContent() {
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-bg text-fg">
-      {showCustomChrome && <ResizeHandles />}
-      {/* Titlebar riêng — chỉ khi macOS overlay thật sự có hiệu lực. Logo/
-          "DevTool" từng sống TRONG header của sidebar, đổi vị trí theo
-          isCollapsed (co giãn cùng bề rộng sidebar). Từ khi hàng đó chia sẻ
-          chỗ với ba nút đèn giao thông + nút Close, nó không còn là một phần
-          của "danh sách tool có thể thu gọn" nữa — nó là titlebar, phải đứng
-          YÊN một chỗ bất kể sidebar đang mở hay gọn. Nên kéo hẳn ra khỏi
-          `<aside>`, đặt ở đây — span toàn bộ cửa sổ, KHÔNG phụ thuộc
-          isCollapsed. `data-tauri-drag-region="deep"` — lan xuống nhánh con
-          nhưng vẫn chừa nút Close bấm được bình thường.
-
-          `trafficLightPosition: {x:12,y:20}` trong tauri.conf.json TỰ đặt vị
-          trí ba nút đèn giao thông (yêu cầu titleBarStyle: "Overlay" +
-          decorations mặc định true) — không còn phải đoán theo phiên bản
-          macOS như trước. `pl-[…px]` ở đây là khoảng cách từ mép trái tới
-          logo; x=12 + bề rộng cụm nút (~54px) mới chỉ đủ SÁT, không đủ
-          THOÁNG — 78px ban đầu vẫn dính, tăng lên 96px. */}
+      {/* Skip link: without it, keyboard users tab through the titlebar and
+          every sidebar row (~40 stops) before reaching the tool. Hidden until
+          focused; moves focus to the first field of the tool. */}
+      <button
+        type="button"
+        onClick={focusToolContent}
+        className="sr-only focus-visible:not-sr-only focus-visible:fixed focus-visible:left-3 focus-visible:top-3 focus-visible:z-[300] focus-visible:rounded-md focus-visible:bg-card focus-visible:px-3 focus-visible:py-2 focus-visible:text-sm focus-visible:font-medium focus-visible:shadow-lg focus-visible:ring-[3px] focus-visible:ring-focus"
+      >
+        {t('shell.skipToContent')}
+      </button>
+      {showCustomChrome && !isMaximized && <ResizeHandles />}
+      {/* macOS overlay titlebar, spanning the whole window and independent
+          of the sidebar's width. `data-tauri-drag-region="deep"` makes it
+          draggable while buttons stay clickable. The traffic lights are
+          placed by `trafficLightPosition` in tauri.conf.json; the left
+          padding clears them. */}
       {showMacOverlayChrome && (
         <div
           className="flex h-[38px] shrink-0 items-center justify-between border-b border-line bg-chrome pl-[96px] pr-3"
           data-tauri-drag-region="deep"
         >
           {titlebarNav}
-          {/* Vùng trống này ĐÃ kéo được cửa sổ nhờ "deep" trên container cha
-              (click vào khoảng trống không con nào phủ tới thì target chính
-              là container). Vẫn đặt data-tauri-drag-region="deep" lặp lại ở
-              đây cho rõ ràng, tránh phải suy luận ngược khi đọc code — vùng
-              kéo chính giữa hai cụm trái/phải, không lẫn với nút nào. */}
+          {/* Explicit drag region between the left and right groups. */}
           <div className="flex-1" data-tauri-drag-region="deep" />
           <div className="flex shrink-0 items-center gap-1">
             {/* Slot for tool-specific header actions (filled via ToolHeaderActions portal) */}
             <div id="tool-header-actions" className="flex items-center gap-0.5" />
             {titlebarHelpAction}
-            <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 lg:hidden" onClick={() => setSidebarOpen(false)} title={t('shell.sidebar.closeMenu')}>
-              <X className="h-3.5 w-3.5" />
-            </Button>
           </div>
         </div>
       )}
-      {/* Windows/Linux — không có "overlay giữ nút gốc" như macOS, nên
-          `decorations:false` (tauri.windows.conf.json / tauri.linux.conf.json)
-          tắt hẳn titlebar hệ thống và app tự vẽ ba nút minimize/maximize/
-          close ở BÊN PHẢI (đúng quy ước hai OS này, ngược macOS). Không cần
-          chừa lề trái — không có đèn giao thông nào để né. */}
+      {/* Windows/Linux titlebar: the app draws minimize/maximize/close on
+          the right, as those platforms do. */}
       {showCustomChrome && (
         <div
           className="flex h-[38px] shrink-0 items-center justify-between border-b border-line bg-chrome pl-3"
@@ -1005,30 +899,20 @@ function AppContent() {
         >
           {titlebarNav}
           <div className="flex-1" data-tauri-drag-region="deep" />
-          {/* Không pr-* ở đây — nút Close phải chạm THẲNG vào mép phải cửa sổ,
-              y hệt Windows thật. Có padding thì vùng hover đỏ bị "đóng khung",
-              trông như một khối nổi lên thay vì góc vuông sát viền. */}
+          {/* No right padding: Close must touch the window edge, as on Windows. */}
           <div className="flex h-full shrink-0 items-center gap-0.5">
             <div id="tool-header-actions" className="flex items-center gap-0.5" />
             {titlebarHelpAction}
             <span className="mx-1 h-4 w-px shrink-0 bg-line" />
-            {/* Ba nút caption Windows/Linux — cố tình LỆCH khỏi token app (accent/
-                bad) và các hiệu ứng chuẩn của <Button> (bấm lún active:scale,
-                viền focus accent, con trỏ pointer): đây là chrome của HỆ ĐIỀU
-                HÀNH, không phải UI của app — macOS traffic light cũng không theo
-                accent app vì cùng lý do. Bám đúng thông số Fluent của Windows
-                11 để không lộ ra là hàng tự vẽ.
-
-                h-full (không phải h-9 cố định) — hàng titlebar cao 38px, ba nút
-                chạm sát mép trên/dưới titlebar, không có khoảng hở. Cũng tránh
-                trùng ngưỡng mixedControlHeights (h-7/8/9) của guard.test.ts vì
-                đây không phải control kích thước cố định như button thường. */}
+            {/* Window buttons deliberately ignore app tokens and <Button>
+                effects: they are OS chrome, styled after Windows 11. `h-full`
+                makes them fill the 38px titlebar. */}
             <Button
               variant="ghost"
               size="icon"
               className="h-full w-10 shrink-0 cursor-default rounded-none text-fg/90 hover:bg-fg/10 hover:text-fg active:scale-100 active:bg-fg/15 focus-visible:ring-0 focus-visible:ring-offset-0"
               onClick={winMinimize}
-              title={t('shell.titlebar.minimize')}
+              title={t('shell.titlebar.minimize')} aria-label={t('shell.titlebar.minimize')}
             >
               <Minus className="h-3 w-3" strokeWidth={1.5} />
             </Button>
@@ -1037,7 +921,7 @@ function AppContent() {
               size="icon"
               className="h-full w-10 shrink-0 cursor-default rounded-none text-fg/90 hover:bg-fg/10 hover:text-fg active:scale-100 active:bg-fg/15 focus-visible:ring-0 focus-visible:ring-offset-0"
               onClick={winToggleMaximize}
-              title={isMaximized ? t('shell.titlebar.restore') : t('shell.titlebar.maximize')}
+              title={isMaximized ? t('shell.titlebar.restore') : t('shell.titlebar.maximize')} aria-label={isMaximized ? t('shell.titlebar.restore') : t('shell.titlebar.maximize')}
             >
               {isMaximized ? (
                 <Copy className="h-3 w-3 -scale-x-100" strokeWidth={1.5} />
@@ -1050,7 +934,7 @@ function AppContent() {
               size="icon"
               className="h-full w-10 shrink-0 cursor-default rounded-none text-fg/90 hover:bg-[#e81123] hover:text-white active:scale-100 active:bg-[#c42b1c] active:text-white dark:hover:bg-[#c42b1c] dark:active:bg-[#8c2318] focus-visible:ring-0 focus-visible:ring-offset-0"
               onClick={winClose}
-              title={t('shell.titlebar.close')}
+              title={t('shell.titlebar.close')} aria-label={t('shell.titlebar.close')}
             >
               <X className="h-3.5 w-3.5" strokeWidth={1.5} />
             </Button>
@@ -1063,125 +947,26 @@ function AppContent() {
         onClose={() => setSidebarOpen(false)}
         themePreference={themePreference}
         onThemeChange={changeTheme}
-        isCollapsed={isCollapsed}
+        isCollapsed={sidebarCollapsed}
         onToggleCollapse={toggleCollapse}
       />
-      <main className="flex-1 flex flex-col min-h-0 overflow-hidden">
-        {/* Khi titlebar hợp nhất bật (macOS overlay HOẶC custom chrome trên
-            Windows/Linux), icon/tablist/help của tool đã chuyển hẳn lên dải
-            titlebar phía trên (span toàn cửa sổ) — không render lại ở đây,
-            tránh trùng #tool-header-actions (portal target phải là DUY NHẤT
-            trong DOM). */}
+      <main id="tool-content" tabIndex={-1} className="flex-1 flex flex-col min-h-0 overflow-hidden outline-hidden">
+        {/* With a custom titlebar the tool header lives there; not
+            rendering it here keeps #tool-header-actions unique. */}
         {!showMergedTitlebar && (
         <div className="z-30 header-chrome shrink-0">
-          {/* py-2 đưa tổng chiều cao về đúng 50px (2×8 + h-ctl 34) — khớp hàng
-              header sidebar bên trái (2×10 + logo 30 = 50px), để đường viền
-              dưới của cả hai nối thẳng thành một đường ngang liền mạch thay vì
-              lệch bậc. py-2.5 trước đó ra 54px, lệch 4px so với sidebar. */}
+          {/* py-2 gives a 50px row that lines up with the sidebar header. */}
           <div className="flex items-center justify-between px-4 py-2 sm:px-5">
             <div className="flex items-center gap-2.5">
-              <Button variant="ghost" size="icon" className="lg:hidden h-ctl w-ctl" onClick={() => setSidebarOpen(true)}>
+              <Button variant="ghost" size="icon" className="md:hidden h-ctl w-ctl" onClick={() => setSidebarOpen(true)} title={t('shell.titlebar.openMenu')} aria-label={t('shell.titlebar.openMenu')}>
                 <Menu className="h-4 w-4" />
               </Button>
-              {/* Không chấm live ở đây: icon này nằm ngoài tablist switch-tool
-                  bên cạnh (nó là badge cố định, không phải một tab bấm được),
-                  và tab đang chọn trong tablist đã tự có chấm live của nó —
-                  hiện hai chấm cho cùng một tool là thừa. */}
-              {/* ── Vì sao danh tính tool nằm SAU `OpenToolsStrip` ──────────
-                  Trước đây đỉnh cửa sổ có HAI dải chồng nhau nói gần như cùng
-                  một chuyện: hàng header mang icon + tên tool đang mở, và ngay
-                  dưới nó là dải tab liệt kê các tool đang mở — trong đó tab
-                  đang chọn CŨNG là tool đó, cũng có icon, cũng có tên. Hai dải,
-                  114px chiều cao, một thông tin.
-
-                  Giờ strip dựng THẲNG trong hàng này (`inline`), và khối danh
-                  tính bên dưới chỉ là `fallback` — nó hiện đúng khi có ít hơn
-                  hai tab, tức lúc strip không có gì để nói. Một dải, 50px. */}
-              <OpenToolsStrip
-                inline
-                fallback={
-                  <div className="flex min-w-0 items-center gap-2.5">
-              <div
-                key={activeTool.path}
-                className="relative flex h-ctl w-ctl shrink-0 items-center justify-center rounded-md border border-acc/15 bg-acc/10 motion-safe:animate-in motion-safe:zoom-in-75 motion-safe:fade-in-0 motion-safe:duration-base motion-safe:ease-spring"
-              >
-                <ActiveIcon className="h-4 w-4 text-acc" />
-              </div>
-              {/* Tên NHÓM ("Generate") không nói cái gì đang mở — tab con đã liệt
-                  kê đúng thứ đó rồi ("Generator" đang bật). Giữ cả hai là lặp:
-                  một chữ chung chung phía trước, một chữ cụ thể phía sau. Nên
-                  bỏ hẳn <h2> tên nhóm, để tablist tự làm tiêu đề.
-
-                  Tool đứng riêng (không thuộc nhóm, hoặc nhóm chỉ còn 1 tool
-                  bật) vẫn dựng ĐÚNG khung máng lõm + pill này để header không
-                  đổi hình dạng khi chuyển qua lại giữa tool đơn và tool trong
-                  nhóm — chỉ khác là pill đó KHÔNG phải link/tab, vì không có gì
-                  để chuyển tới. Không role="tablist"/"tab" trong trường hợp
-                  này: hứa điều hướng bàn phím cho một mục duy nhất là hứa suông. */}
-              {activeGroupTabs.length > 1 ? (
-                <div
-                  key={`${activeTool.path}-tabs`}
-                  role="tablist"
-                  aria-label={activeGroup!.label}
-                  className="inline-flex h-ctl shrink-0 items-center gap-1 overflow-x-auto rounded-md bg-sunk p-1 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-base motion-safe:ease-out-soft"
-                >
-                  {activeGroupTabs.map((def) => {
-                      const p = toolPath(def.id);
-                      const on = p === location.pathname;
-                      const live = liveIds.includes(def.id);
-                      return (
-                        <Link
-                          key={def.id}
-                          to={p}
-                          role="tab"
-                          aria-selected={on}
-                          className={cn(
-                            'inline-flex h-full items-center gap-1.5 whitespace-nowrap rounded-md px-3.5 text-sm leading-none transition-colors',
-                            'focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus',
-                            on
-                              ? 'bg-acc font-semibold text-acc-fg shadow-soft'
-                              : 'text-fg-mute hover:text-fg',
-                          )}
-                        >
-                          {/* Xem chú thích ở khối titlebarNav phía trên — cùng lý
-                              do: tab anh em (Kafka/RabbitMQ/Redis…) có thể đang
-                              live độc lập với tab đang mở, và cùng cách sửa:
-                              viền ring-acc-fg chỉ khi được chọn, để chấm không
-                              chìm vào nền bg-acc khi accent ngả sắc xanh lá. */}
-                          {live && (
-                            <span
-                              className={cn('h-1.5 w-1.5 shrink-0 rounded-full bg-ok', on && 'ring-2 ring-acc-fg/70')}
-                              title={t('shell.titlebar.running')}
-                            />
-                          )}
-                          {def.label}
-                        </Link>
-                      );
-                    })}
-                </div>
-              ) : (
-                /* Tên tool KHÔNG còn là viên thuốc accent đặc.
-                   `--acc` nghĩa là "cái này tương tác được" hoặc "cái này đang
-                   được chọn" (design/RULES.md). Tên của tool đang mở không phải
-                   một lựa chọn trong nhóm — không có gì để chọn khác, nó chỉ là
-                   nhãn. Tô nó bằng accent làm thứ ồn nhất màn hình lại là thứ
-                   bấm vào không có gì xảy ra, và tạo ra hình dạng "đang chọn"
-                   thứ ba trong vòng 200px chiều dọc (viên thuốc ở đây, tab bo
-                   `rounded-md` bên dưới, toggle trong tool). Giờ nó là chữ. */
-                <h2
-                  key={`${activeTool.path}-label`}
-                  className="inline-flex min-w-0 shrink items-center gap-1.5 truncate text-sm font-semibold leading-none motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-base motion-safe:ease-out-soft"
-                >
-                  <span className="truncate">{activeTool.label}</span>
-                  {activeTool.experimental && (
-                    <span title={t('shell.experimental.badge')} className="inline-flex shrink-0">
-                      <FlaskConical className="h-3.5 w-3.5 text-fg-mute" />
-                    </span>
-                  )}
-                </h2>
-              )}
-                  </div>
-                }
+              {/* No live dot here: the active tab already shows one. The
+                  workspace bar is rendered inline; the identity block is only
+                  its fallback when there are fewer than two tabs. */}
+              <WorkspaceBar
+                size="header"
+                fallback={<ToolIdentity size="header" />}
               />
             </div>
             <div className="flex min-w-0 items-center gap-1">
@@ -1200,22 +985,25 @@ function AppContent() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="lg:hidden h-ctl w-ctl"
+                className="md:hidden h-ctl w-ctl"
                 onClick={() => changeTheme(NEXT_THEME[themePreference])}
                 title={t('shell.titlebar.themeCycleTap', { theme: t(THEME_OPTIONS.find((o) => o.value === themePreference)!.labelKey) })}
               >
+                {/* The current preference, as in the sidebar row (it used to
+                    show the opposite theme here). */}
                 {themePreference === 'system' ? (
                   <Monitor className="h-4 w-4" />
                 ) : isDark ? (
-                  <Sun className="h-4 w-4" />
-                ) : (
                   <Moon className="h-4 w-4" />
+                ) : (
+                  <Sun className="h-4 w-4" />
                 )}
               </Button>
             </div>
           </div>
         </div>
         )}
+        <GroupTabsStrip />
         {isFullHeight ? (
           <div className="flex-1 min-h-0 overflow-hidden">
             {/* key on pathname re-triggers the entrance animation on each tool switch */}
@@ -1260,13 +1048,15 @@ function App() {
                   <ApiClientRuntimeProvider>
                     <MockServerRuntimeProvider>
                       <Router>
-                        <AppContent />
-                        <UpdateDialog />
-                        <OnboardingFlow />
-                        <CommandPalette />
-                        <McpBackgroundBridge />
-                        <McpManageBridge />
-                        <McpUtilityBridge />
+                        <WorkspaceProvider>
+                          <AppContent />
+                          <UpdateDialog />
+                          <OnboardingFlow />
+                          <CommandPalette />
+                          <McpBackgroundBridge />
+                          <McpManageBridge />
+                          <McpUtilityBridge />
+                        </WorkspaceProvider>
                       </Router>
                     </MockServerRuntimeProvider>
                   </ApiClientRuntimeProvider>

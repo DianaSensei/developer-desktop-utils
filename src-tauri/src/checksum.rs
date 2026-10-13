@@ -4,7 +4,7 @@ use std::path::Path;
 use std::time::Instant;
 use tauri::{Emitter, Manager};
 
-// 256 KB per read — constant memory regardless of file size
+// Read size; memory use stays constant regardless of file size.
 const CHUNK: usize = 256 * 1024;
 
 #[tauri::command]
@@ -19,7 +19,7 @@ pub async fn hash_file(
     if !window.state::<DroppedPaths>().is_allowed(&path) {
         return Err(dropped::DENIED.to_string());
     }
-    // spawn_blocking keeps the tokio runtime free; hashing is pure CPU work
+    // Hashing is CPU-bound; keep it off the async runtime.
     tokio::task::spawn_blocking(move || compute(&window, &path, &algo))
         .await
         .map_err(|e| e.to_string())?
@@ -31,7 +31,7 @@ fn compute(window: &tauri::Window, path: &str, algo: &str) -> Result<String, Str
     let size = meta.len();
     let name = p.file_name().and_then(|n| n.to_str()).unwrap_or("unknown");
 
-    // Send file metadata so the UI can display it before hashing starts
+    // Send metadata first so the UI can show it before hashing starts.
     window
         .emit("checksum:file-info", serde_json::json!({ "name": name, "size": size }))
         .ok();
@@ -114,8 +114,7 @@ fn stream<R: Read>(
     Ok(())
 }
 
-// `pub(crate)`: artifact_installer.rs dùng lại đúng hàm này để mã hex checksum
-// của bundle tải về, thay vì viết một bản hex-encode thứ hai trong crate.
+// Also used by artifact_installer.rs.
 pub(crate) fn to_hex(bytes: &[u8]) -> String {
     use std::fmt::Write;
     bytes.iter().fold(String::with_capacity(bytes.len() * 2), |mut s, b| {

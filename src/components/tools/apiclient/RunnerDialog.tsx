@@ -53,6 +53,7 @@ import {
 } from './runnerStats';
 import { type RunReportHead, csvChunks, failureEntries, jsonReportChunks } from './runnerExport';
 import type { ApiRequest, Environment, HttpMethod, VarMap } from './types';
+import { t } from './i18n';
 
 interface Props {
   title: string;
@@ -341,8 +342,7 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
       if (cancelledRef.current) return null;
       const error = (e as Error).message;
       // A request that threw before any response still ran, so it still gets
-      // the built-in check — otherwise the assertion totals would silently
-      // exclude exactly the executions that failed hardest.
+      // the built-in check; otherwise totals would exclude the worst failures.
       const tests = requireHttpOk ? [httpOkTest(0, '', error)] : [];
       record = {
         key: `${iter}:${step}`,
@@ -448,7 +448,7 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
       resetRun();
     } catch (e) {
       setDataFile(null);
-      setDataError((e as Error)?.message || 'Could not load the data file.');
+      setDataError((e as Error)?.message || t('runner.dataLoadFailed'));
     } finally {
       setParsingData(false);
     }
@@ -644,11 +644,11 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
         <DialogHeader className="flex h-14 shrink-0 flex-row items-center border-b px-4">
           <DialogTitle className="flex w-full items-center gap-2 pr-10">
             <Play className="h-4 w-4 shrink-0 text-acc-ink" />
-            <span className="shrink-0 text-sm font-semibold">Runner</span>
+            <span className="shrink-0 text-sm font-semibold">{t('runner.title')}</span>
             <ChevronRight className="h-3.5 w-3.5 shrink-0 text-fg-mute/50" />
             <span className="min-w-0 truncate text-sm font-normal text-fg-mute">{title}</span>
-            <Badge tone="neutral" className="shrink-0" title="Environment used for this run">
-              {envId ? (environments.find((e) => e.id === envId)?.name ?? envId) : 'No Environment'}
+            <Badge tone="neutral" className="shrink-0" title={t('runner.envForRun')}>
+              {envId ? (environments.find((e) => e.id === envId)?.name ?? envId) : t('noEnvironment')}
             </Badge>
             {phase === 'results' && (
               <Button
@@ -656,7 +656,7 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
                 onClick={() => setPhase('setup')}
                 className="ml-auto h-ctl shrink-0 gap-1.5 text-xs"
               >
-                <Settings2 className="h-3.5 w-3.5" /> Configure
+                <Settings2 className="h-3.5 w-3.5" /> {t('runner.configure')}
               </Button>
             )}
           </DialogTitle>
@@ -668,20 +668,20 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
             <div className="flex min-h-0 flex-1">
               {/* config */}
               <div className="w-80 shrink-0 space-y-4 overflow-y-auto border-r p-4">
-                <Field label="Environment" hint="Pinned to this run — unaffected by whichever environment is active elsewhere in the app.">
+                <Field label={t('environment')} hint={t('runner.envHint')}>
                   <Select value={envId ?? 'none'} onValueChange={(v) => setEnvId(v === 'none' ? null : v)}>
-                    <SelectTrigger className="h-ctl text-xs"><SelectValue placeholder="No Environment" /></SelectTrigger>
+                    <SelectTrigger className="h-ctl text-xs"><SelectValue placeholder={t('noEnvironment')} /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="none">No Environment</SelectItem>
+                      <SelectItem value="none">{t('noEnvironment')}</SelectItem>
                       {environments.some((e) => e.collectionId) && (
                         <SelectGroup>
-                          <SelectLabel className="text-[11px] uppercase tracking-wide text-fg-mute">This collection</SelectLabel>
+                          <SelectLabel className="text-[11px] uppercase tracking-wide text-fg-mute">{t('runner.thisCollection')}</SelectLabel>
                           {environments.filter((e) => e.collectionId).map((e) => <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>)}
                         </SelectGroup>
                       )}
                       {environments.some((e) => !e.collectionId) && (
                         <SelectGroup>
-                          <SelectLabel className="text-[11px] uppercase tracking-wide text-fg-mute">Global</SelectLabel>
+                          <SelectLabel className="text-[11px] uppercase tracking-wide text-fg-mute">{t('runner.global')}</SelectLabel>
                           {environments.filter((e) => !e.collectionId).map((e) => <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>)}
                         </SelectGroup>
                       )}
@@ -690,7 +690,7 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
                 </Field>
 
                 <div className="grid grid-cols-2 gap-3">
-                  <Field label="Iterations" htmlFor="runner-iterations">
+                  <Field label={t('runner.iterations')} htmlFor="runner-iterations">
                     <Input
                       id="runner-iterations"
                       value={dataRows ? String(dataRows.length) : iterations}
@@ -700,13 +700,13 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
                       className="h-ctl text-xs disabled:opacity-60"
                     />
                   </Field>
-                  <Field label="Delay (ms)" htmlFor="runner-delay">
+                  <Field label={t('runner.delayMs')} htmlFor="runner-delay">
                     <Input id="runner-delay" value={delay} onChange={(e) => setDelay(e.target.value)} placeholder="0" inputMode="numeric" className="h-ctl text-xs" />
                   </Field>
                 </div>
 
                 <div className="space-y-2">
-                  <SectionLabel>Advanced</SectionLabel>
+                  <SectionLabel>{t('runner.advanced')}</SectionLabel>
                   {/* One bordered surface with hairline dividers, not three
                       separate bordered cards stacked with gaps — three boxes
                       inside a panel that is itself inside a dialog is two
@@ -715,29 +715,29 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
                       the same shape at Settings-page density. */}
                   <div className="overflow-hidden rounded-md border divide-y divide-line-soft">
                     <OptionRow
-                      label="Require HTTP 2xx"
-                      hint="Adds a built-in check to every request, so anything that isn't 2xx — a redirect, a 404, no response at all — counts as failed without writing a test for it."
+                      label={t('runner.require2xx')}
+                      hint={t('runner.require2xxHint')}
                       checked={requireHttpOk}
                       onChange={setRequireHttpOk}
                     />
                     <OptionRow
-                      label="Stop run if an error occurs"
+                      label={t('runner.stopOnError')}
                       checked={stopOnFailure}
                       onChange={setStopOnFailure}
                     />
                     <OptionRow
-                      label="Save responses"
+                      label={t('runner.saveResponses')}
                       hint={
                         (dataRows?.length ?? 0) > LARGE_DATA_ROWS
-                          ? `Off by default for ${dataRows!.length.toLocaleString()} rows — keeping every response in memory risks running out before the run finishes. Stats, pass/fail and the CSV/JSON export still cover every row either way.`
-                          : 'Keep each response so you can open it afterwards.'
+                          ? t('runner.saveOffLarge', { n: dataRows!.length.toLocaleString() })
+                          : t('runner.saveKeep')
                       }
                       checked={saveResponses}
                       onChange={setSaveResponses}
                     />
                     <OptionRow
-                      label="Run in parallel"
-                      hint={parallel ? 'Flow control (setNextRequest) is ignored in parallel runs.' : undefined}
+                      label={t('runner.parallel')}
+                      hint={parallel ? t('runner.parallelHint') : undefined}
                       checked={parallel}
                       onChange={setParallel}
                     />
@@ -745,27 +745,27 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
                 </div>
 
                 <div className="space-y-2">
-                  <SectionLabel>Data file</SectionLabel>
+                  <SectionLabel>{t('runner.dataFile')}</SectionLabel>
                   {dataFile ? (
                     <div className="space-y-2 rounded-md border p-2">
                       <div className="flex items-center gap-2">
                         <FileSpreadsheet className="h-3.5 w-3.5 shrink-0 text-ok" />
                         <span className="min-w-0 flex-1 truncate text-xs font-medium" title={dataFile.name}>{dataFile.name}</span>
-                        <button onClick={() => { setDataFile(null); resetRun(); }} title="Remove" className="rounded p-0.5 text-fg-mute/60 hover:text-bad">
+                        <button onClick={() => { setDataFile(null); resetRun(); }} title={t('remove')} aria-label={t('remove')} className="rounded p-0.5 text-fg-mute/60 hover:text-bad">
                           <X className="h-3.5 w-3.5" />
                         </button>
                       </div>
                       <p className="text-[11px] text-fg-mute">
-                        {dataFile.parsed.rows.length.toLocaleString()} row{dataFile.parsed.rows.length === 1 ? '' : 's'}
-                        {' · '}{dataFile.parsed.columns.length} column{dataFile.parsed.columns.length === 1 ? '' : 's'}
+                        {t(dataFile.parsed.rows.length === 1 ? 'runner.rowsOne' : 'runner.rows', { n: dataFile.parsed.rows.length.toLocaleString() })}
+                        {' · '}{t(dataFile.parsed.columns.length === 1 ? 'runner.columnsOne' : 'runner.columns', { n: dataFile.parsed.columns.length })}
                         {dataFile.parsed.format === 'csv' && dataFile.parsed.delimiter
-                          ? ` · ${DELIMITER_LABEL[dataFile.parsed.delimiter]}-separated`
+                          ? ` · ${t('runner.separated', { sep: DELIMITER_LABEL[dataFile.parsed.delimiter] })}`
                           : ' · JSON'}
                       </p>
                       <ColumnMappingTable mappings={columnMappings} />
                       {missingVars.length > 0 && (
                         <p className="text-[11px] text-warn">
-                          Used by the run but not in this file or your environment:{' '}
+                          {t('runner.missingVars')}{' '}
                           <span className="font-mono">{missingVars.map((v) => `{{${v}}}`).join(', ')}</span>
                         </p>
                       )}
@@ -777,7 +777,7 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
                               checked={rowLimit != null}
                               onCheckedChange={(v) => setRowLimit(v ? Math.min(10, dataFile.parsed.rows.length) : null)}
                             />
-                            Test with only the first
+                            {t('runner.testFirst')}
                           </label>
                           <Input
                             value={rowLimit ?? ''}
@@ -789,12 +789,11 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
                             inputMode="numeric"
                             // The visible label wraps the checkbox, not this
                             // box, so it needs a name of its own.
-                            aria-label="Rows to run"
+                            aria-label={t('runner.rowsToRun')}
                             className="h-6 w-14 text-[11px] disabled:opacity-50"
                           />
                           <span className="text-[11px] text-fg-mute">
-                            row{rowLimit === 1 ? '' : 's'} — verify the mapping before committing to all{' '}
-                            {dataFile.parsed.rows.length.toLocaleString()}.
+                            {t(rowLimit === 1 ? 'runner.verifyMappingOne' : 'runner.verifyMapping', { n: dataFile.parsed.rows.length.toLocaleString() })}
                           </span>
                         </div>
                       )}
@@ -806,21 +805,21 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
                       className="flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed py-2.5 text-xs text-fg-mute transition-colors hover:border-fg/30 hover:text-fg disabled:opacity-60"
                     >
                       {parsingData ? (
-                        <><Spinner size="sm" /> Parsing file…</>
+                        <><Spinner size="sm" /> {t('runner.parsing')}</>
                       ) : (
-                        <><FileSpreadsheet className="h-3.5 w-3.5" /> Select CSV or JSON file</>
+                        <><FileSpreadsheet className="h-3.5 w-3.5" /> {t('runner.selectFile')}</>
                       )}
                     </button>
                   )}
                   {dataError && <p className="text-[11px] text-bad">{dataError}</p>}
-                  {!dataFile && <p className="text-[11px] text-fg-mute">Binds each row's columns to <code className="rounded bg-bg-2 px-1">{'{{var}}'}</code>, one iteration per row. Handles large files (hundreds of thousands of rows) — parsing runs off the main thread so the dialog stays responsive.</p>}
+                  {!dataFile && <p className="text-[11px] text-fg-mute">{t('runner.bindsA')} <code className="rounded bg-bg-2 px-1">{'{{var}}'}</code>{t('runner.bindsB')}</p>}
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
-                  <Field label="Include tags" htmlFor="runner-include-tags">
+                  <Field label={t('runner.includeTags')} htmlFor="runner-include-tags">
                     <Input id="runner-include-tags" value={includeTags} onChange={(e) => setIncludeTags(e.target.value)} placeholder="smoke" className="h-ctl text-xs" />
                   </Field>
-                  <Field label="Exclude tags" htmlFor="runner-exclude-tags">
+                  <Field label={t('runner.excludeTags')} htmlFor="runner-exclude-tags">
                     <Input id="runner-exclude-tags" value={excludeTags} onChange={(e) => setExcludeTags(e.target.value)} placeholder="slow" className="h-ctl text-xs" />
                   </Field>
                 </div>
@@ -829,9 +828,9 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
               {/* request selection */}
               <div className="flex min-w-0 flex-1 flex-col">
                 <div className="flex items-center justify-between border-b px-4 py-2.5 text-xs">
-                  <span className="flex items-center gap-1.5 font-medium"><ListChecks className="h-3.5 w-3.5" /> Requests <span className="text-fg-mute">· {selected.size}/{order.length}</span></span>
+                  <span className="flex items-center gap-1.5 font-medium"><ListChecks className="h-3.5 w-3.5" /> {t('runner.requests')} <span className="text-fg-mute">· {selected.size}/{order.length}</span></span>
                   <button type="button" onClick={toggleAll} className="font-medium text-acc-ink hover:underline">
-                    {allSelected ? 'Deselect all' : 'Select all'}
+                    {allSelected ? t('runner.deselectAll') : t('runner.selectAll')}
                   </button>
                 </div>
                 <div className="min-h-0 flex-1 divide-y overflow-y-auto">
@@ -849,17 +848,16 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
                         className={cn('group flex cursor-pointer items-center gap-2.5 px-3 py-2 text-xs hover:bg-acc/50', !checked && 'opacity-50')}
                       >
                         <GripVertical className="h-3.5 w-3.5 shrink-0 cursor-grab text-fg-mute/30 group-hover:text-fg-mute/60" />
-                        {/* Hàng bao ngoài đã bắt click (`onClick={() => toggle(req.id)}`),
-                            nên ô tick chỉ VẼ trạng thái — `tabIndex={-1}` để nó
-                            không thành một tab-stop thứ hai cho cùng một việc. */}
+                        {/* The row handles the click; the checkbox only shows state and is
+                            not a second tab stop. */}
                         <Checkbox checked={checked} tabIndex={-1} aria-hidden="true" />
                         <span className={cn('w-12 shrink-0 font-bold uppercase', methodColor(req.method))}>{req.method}</span>
                         <span className="min-w-0 flex-1 truncate" title={req.url}>{req.name}</span>
-                        {filteredOut && <span className="shrink-0 rounded bg-bg-2 px-1.5 py-0.5 text-[11px] text-fg-mute">filtered</span>}
+                        {filteredOut && <span className="shrink-0 rounded bg-bg-2 px-1.5 py-0.5 text-[11px] text-fg-mute">{t('runner.filtered')}</span>}
                       </div>
                     );
                   })}
-                  {order.length === 0 && <p className="px-4 py-6 text-center text-xs text-fg-mute">No requests to run.</p>}
+                  {order.length === 0 && <p className="px-4 py-6 text-center text-xs text-fg-mute">{t('runner.noRequests')}</p>}
                 </div>
               </div>
             </div>
@@ -867,10 +865,9 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
             {duplicateNames.length > 0 && (
               <div className="shrink-0 border-t px-4 py-2">
                 <Callout tone="warning" size="sm">
-                  Duplicate request name{duplicateNames.length === 1 ? '' : 's'} in this run:{' '}
-                  <span className="font-mono">{duplicateNames.join(', ')}</span>. A script's{' '}
-                  <code className="rounded bg-bg-2 px-1">setNextRequest(name)</code> always jumps to the
-                  first match — rename one to make a flow-control jump to it unambiguous.
+                  {t('runner.duplicateNames')}{' '}
+                  <span className="font-mono">{duplicateNames.join(', ')}</span>{t('runner.duplicateNamesB')}{' '}
+                  <code className="rounded bg-bg-2 px-1">setNextRequest(name)</code> {t('runner.duplicateNamesC')}
                 </Callout>
               </div>
             )}
@@ -878,14 +875,14 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
             {/* action bar */}
             <div className="flex shrink-0 items-center gap-3 border-t px-4 py-3">
               <Button onClick={run} disabled={plannedCount === 0} className="h-ctl-lg gap-1.5 px-4">
-                <Play className="h-4 w-4" /> Run {plannedCount.toLocaleString()} request{plannedCount === 1 ? '' : 's'}
+                <Play className="h-4 w-4" /> {t(plannedCount === 1 ? 'runner.runOne' : 'runner.run', { n: plannedCount.toLocaleString() })}
               </Button>
               <span className="text-xs text-fg-mute">
-                {effective.length} selected × {iters.toLocaleString()} iteration{iters === 1 ? '' : 's'}
-                {rowLimit != null && ` (of ${dataFile?.parsed.rows.length.toLocaleString()} rows)`}
+                {t(iters === 1 ? 'runner.selectedTimesOne' : 'runner.selectedTimes', { n: effective.length, iters: iters.toLocaleString() })}
+                {rowLimit != null && t('runner.ofRows', { n: dataFile?.parsed.rows.length.toLocaleString() ?? '' })}
               </span>
               <button onClick={resetAll} className="ml-auto flex items-center gap-1 text-xs font-medium text-fg-mute hover:text-fg">
-                <RotateCcw className="h-3.5 w-3.5" /> Reset
+                <RotateCcw className="h-3.5 w-3.5" /> {t('runner.reset')}
               </button>
             </div>
           </div>
@@ -894,26 +891,26 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
           <div className="flex min-h-0 flex-1 flex-col">
             {/* summary dashboard */}
             <div className="flex shrink-0 flex-wrap items-stretch gap-2 border-b p-3">
-              <RunStat label="Requests" value={`${totalRun}${running ? ` / ${plannedCount}` : ''}`} />
-              <RunStat label="Passed" value={passedRun} tone="success" />
-              <RunStat label="Failed" value={failedCount} tone={failedCount ? 'danger' : 'muted'} />
+              <RunStat label={t('runner.requests')} value={`${totalRun}${running ? ` / ${plannedCount}` : ''}`} />
+              <RunStat label={t('runner.passed')} value={passedRun} tone="success" />
+              <RunStat label={t('runner.failed')} value={failedCount} tone={failedCount ? 'danger' : 'muted'} />
               {/* HTTP success on its own terms: a run can be 2xx everywhere
                   and still fail assertions, so this answers "is the endpoint
                   up" where Passed/Failed answers "is the response right". */}
               <RunStat
                 label="HTTP 2xx"
                 value={totalRun ? `${stats.http2xx}/${totalRun}` : '—'}
-                sub={httpFailed ? `${httpFailed.toLocaleString()} not 2xx` : undefined}
+                sub={httpFailed ? t('runner.not2xx', { n: httpFailed.toLocaleString() }) : undefined}
                 tone={countTone(httpFailed, totalRun)}
               />
-              <RunStat label="Assertions" value={`${assertPass}/${assertTotal}`} tone={assertTotal && assertPass < assertTotal ? 'danger' : assertTotal ? 'success' : 'muted'} />
-              <RunStat label="Duration" value={formatDuration(elapsed)} icon={<Clock className="h-3 w-3" />} />
-              <RunStat label="Avg time" value={stats.total ? `${stats.avgMs} ms` : '—'} />
-              <RunStat label="Data" value={formatBytes(stats.totalBytes)} />
+              <RunStat label={t('runner.assertions')} value={`${assertPass}/${assertTotal}`} tone={assertTotal && assertPass < assertTotal ? 'danger' : assertTotal ? 'success' : 'muted'} />
+              <RunStat label={t('runner.duration')} value={formatDuration(elapsed)} icon={<Clock className="h-3 w-3" />} />
+              <RunStat label={t('runner.avgTime')} value={stats.total ? `${stats.avgMs} ms` : '—'} />
+              <RunStat label={t('runner.data')} value={formatBytes(stats.totalBytes)} />
               <div className="ml-auto flex items-center gap-2">
                 {running ? (
                   <Button onClick={stop} variant="destructive" size="sm" className="h-ctl gap-1.5">
-                    <Square className="h-3.5 w-3.5" /> Stop
+                    <Square className="h-3.5 w-3.5" /> {t('runner.stop')}
                   </Button>
                 ) : (
                   <>
@@ -923,36 +920,36 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
                         className="flex h-ctl items-center gap-1.5 rounded-sm border px-2.5 text-xs font-medium transition-colors hover:bg-acc/50 disabled:pointer-events-none disabled:opacity-50"
                       >
                         {exporting
-                          ? <><Spinner size="sm" /> Exporting {exporting}…</>
-                          : <><Download className="h-3.5 w-3.5" /> Export</>}
+                          ? <><Spinner size="sm" /> {t('runner.exporting', { format: exporting })}</>
+                          : <><Download className="h-3.5 w-3.5" /> {t('export')}</>}
                       </DropdownMenuTrigger>
                       {/* Each item names its own format: two rows reading
                           "All 3 requests" would be indistinguishable to a
                           screen reader, whatever heading sits above them. */}
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={() => runExport('CSV', () => exportResultsCsv('all'))}>
-                          CSV — all {totalRun.toLocaleString()} requests
+                          {t('runner.allRequests', { format: 'CSV', n: totalRun.toLocaleString() })}
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           disabled={failedCount === 0}
                           onClick={() => runExport('CSV', () => exportResultsCsv('failed'))}
                         >
-                          CSV — failures only ({failedCount.toLocaleString()})
+                          {t('runner.failuresOnly', { format: 'CSV', n: failedCount.toLocaleString() })}
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem onClick={() => runExport('JSON', () => exportResults('all'))}>
-                          JSON — all {totalRun.toLocaleString()} requests
+                          {t('runner.allRequests', { format: 'JSON', n: totalRun.toLocaleString() })}
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           disabled={failedCount === 0}
                           onClick={() => runExport('JSON', () => exportResults('failed'))}
                         >
-                          JSON — failures only ({failedCount.toLocaleString()})
+                          {t('runner.failuresOnly', { format: 'JSON', n: failedCount.toLocaleString() })}
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                     <Button onClick={run} size="sm" className="h-ctl gap-1.5">
-                      <RotateCcw className="h-3.5 w-3.5" /> Run again
+                      <RotateCcw className="h-3.5 w-3.5" /> {t('runner.runAgain')}
                     </Button>
                   </>
                 )}
@@ -962,7 +959,7 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
             {exportError && (
               <div className="shrink-0 border-b px-3 py-2">
                 <Callout tone="error" size="sm" actions={
-                  <button onClick={() => setExportError(null)} className="text-[11px] font-medium hover:underline">Dismiss</button>
+                  <button onClick={() => setExportError(null)} className="text-[11px] font-medium hover:underline">{t('dismiss')}</button>
                 }>
                   {exportError}
                 </Callout>
@@ -973,31 +970,31 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
             {totalRun > 0 && (
               <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 border-b px-3 py-1.5 text-[11px] text-fg-mute">
                 <span className="flex flex-wrap items-center gap-x-2">
-                  <span className="font-medium text-fg/70">Status</span>
+                  <span className="font-medium text-fg/70">{t('status')}</span>
                   <StatusChips byStatus={stats.byStatus} samples={stats.statusSamples} onJump={jumpToStatus} />
                 </span>
                 <span>
-                  <span className="font-medium text-fg/70">Response time</span>{' '}
-                  min {stats.minMs} ms · avg {stats.avgMs} ms · max {stats.maxMs} ms
+                  <span className="font-medium text-fg/70">{t('runner.responseTime')}</span>{' '}
+                  {t('runner.timeStats', { min: stats.minMs, avg: stats.avgMs, max: stats.maxMs })}
                 </span>
                 <span>
-                  <span className="font-medium text-fg/70">Iterations</span>{' '}
+                  <span className="font-medium text-fg/70">{t('runner.iterations')}</span>{' '}
                   {ranIters.toLocaleString()}/{iters.toLocaleString()}
                 </span>
                 {running && ranIters > 0 && elapsed > 0 && (
                   <span>
-                    <span className="font-medium text-fg/70">Rate</span>{' '}
+                    <span className="font-medium text-fg/70">{t('runner.rate')}</span>{' '}
                     {(ranIters / (elapsed / 1000)).toFixed(1)} iter/s
-                    {ranIters < iters && ` · ~${formatDuration(((iters - ranIters) / (ranIters / elapsed)))} left`}
+                    {ranIters < iters && t('runner.left', { t: formatDuration(((iters - ranIters) / (ranIters / elapsed))) })}
                   </span>
                 )}
                 <Segmented
                   value={resultView}
                   onValueChange={setResultView}
                   size="sm"
-                  aria-label="Results grouping"
+                  aria-label={t('runner.grouping')}
                   className="ml-auto"
-                  options={[{ value: 'sequence', label: 'Iterations' }, { value: 'requests', label: 'By request' }]}
+                  options={[{ value: 'sequence', label: t('runner.iterations') }, { value: 'requests', label: t('runner.byRequest') }]}
                 />
               </div>
             )}
@@ -1034,7 +1031,7 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
                   <>
                     {dataRow && Object.keys(dataRow).length > 0 && (
                       <div className="flex flex-wrap items-center gap-1.5 border-b bg-bg-2/20 px-3 py-2">
-                        <SectionLabel>Data</SectionLabel>
+                        <SectionLabel>{t('runner.data')}</SectionLabel>
                         {Object.entries(dataRow).map(([k, v]) => (
                           <span key={k} className="rounded bg-bg-2 px-1.5 py-0.5 font-mono text-[11px]"><span className="text-fg-mute">{k}=</span>{v}</span>
                         ))}
@@ -1047,14 +1044,14 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
                           <button
                             key={f}
                             onClick={() => setFilter(f)}
-                            className={cn('rounded px-2 py-0.5 text-[11px] font-medium capitalize transition-colors',
+                            className={cn('rounded px-2 py-0.5 text-[11px] font-medium transition-colors first-letter:uppercase',
                               filter === f ? 'bg-acc text-fg' : 'text-fg-mute hover:text-fg')}
                           >
-                            {f}
+                            {t(`runner.filter.${f}`)}
                           </button>
                         ))}
                         <span className="ml-auto text-[11px] text-fg-mute">
-                          {shown.length} of {iterRecords.length}
+                          {t('runner.shownOf', { shown: shown.length, total: iterRecords.length })}
                         </span>
                       </div>
                     )}
@@ -1071,10 +1068,10 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
                         </div>
                       )}
                       {iterRecords.length === 0 && !running && (
-                        <p className="px-4 py-6 text-center text-xs text-fg-mute">No requests ran.</p>
+                        <p className="px-4 py-6 text-center text-xs text-fg-mute">{t('runner.noneRan')}</p>
                       )}
                       {iterRecords.length > 0 && shown.length === 0 && (
-                        <p className="px-4 py-6 text-center text-xs text-fg-mute">Nothing matches this filter.</p>
+                        <p className="px-4 py-6 text-center text-xs text-fg-mute">{t('runner.nothingMatches')}</p>
                       )}
                       {cappedIters.has(viewIter) && (
                         <p className="px-3 py-2 text-[11px] text-bad">
@@ -1139,22 +1136,21 @@ function ByRequestView({ stats, onJumpToStatus }: Readonly<{
   onJumpToStatus: (code: string, samples: number[] | undefined) => void;
 }>) {
   if (stats.byRequest.length === 0) {
-    return <div className="flex min-w-0 flex-1 items-center justify-center p-6 text-xs text-fg-mute">No requests ran.</div>;
+    return <div className="flex min-w-0 flex-1 items-center justify-center p-6 text-xs text-fg-mute">{t('runner.noneRan')}</div>;
   }
   return (
     <div className="min-h-0 min-w-0 flex-1 overflow-auto p-3">
       <DataTable density="compact">
         <Thead sticky>
           <Tr>
-            <Th sub="method · name" subTone="string">Request</Th>
-            <Th align="right" sub="count" subTone="number">Runs</Th>
+            <Th sub="method · name" subTone="string">{t('request')}</Th>
+            <Th align="right" sub="count" subTone="number">{t('runner.runs')}</Th>
             <Th align="right" sub="ok/total" subTone="number">HTTP 2xx</Th>
-            <Th align="right" sub="assertions" subTone="number">Passed</Th>
-            <Th align="right" sub="assertions" subTone="number">Failed</Th>
-            <Th sub="status" subTone="number">Response codes</Th>
-            {/* Ba cột này trước đây chỉ ghi Avg/Min/Max — không có đơn vị thì
-                `1240` là mili-giây hay micro-giây là phải đoán. */}
-            <Th align="right" sub="ms" subTone="number">Avg</Th>
+            <Th align="right" sub="assertions" subTone="number">{t('runner.passed')}</Th>
+            <Th align="right" sub="assertions" subTone="number">{t('runner.failed')}</Th>
+            <Th sub="status" subTone="number">{t('runner.responseCodes')}</Th>
+            {/* Units under Avg/Min/Max. */}
+            <Th align="right" sub="ms" subTone="number">{t('runner.avg')}</Th>
             <Th align="right" sub="ms" subTone="number">Min</Th>
             <Th align="right" sub="ms" subTone="number">Max</Th>
           </Tr>
@@ -1185,7 +1181,7 @@ function ByRequestView({ stats, onJumpToStatus }: Readonly<{
         </Tbody>
       </DataTable>
       <p className="mt-2 text-[11px] text-fg-mute">
-        Click a response code to jump to an iteration that returned it.
+        {t('runner.clickCode')}
       </p>
     </div>
   );
@@ -1262,7 +1258,7 @@ function VirtualIterRail({ count, viewIter, onSelect, iterStats, dataRows }: Rea
             className="h-6 flex-1 text-[11px]"
           />
           <button onClick={jump} className="shrink-0 rounded px-1.5 py-1 text-[11px] font-medium text-fg-mute hover:bg-acc hover:text-fg">
-            Go
+            {t('runner.go')}
           </button>
         </div>
       )}
@@ -1330,10 +1326,10 @@ function RecordRow({ record: r, onOpen }: { record: RunRecord; onOpen: () => voi
           r.jump.missing ? 'text-bad' : 'text-fg-mute')}>
           <CornerDownRight className="h-3 w-3 shrink-0" />
           {r.jump.to === null
-            ? 'Script ended the iteration here.'
+            ? t('runner.scriptEnded')
             : r.jump.missing
-              ? `Script asked for "${r.jump.to}", which isn't in this run — continued in order.`
-              : `Script jumped to "${r.jump.to}".`}
+              ? t('runner.scriptMissing', { name: r.jump.to })
+              : t('runner.scriptJumped', { name: r.jump.to })}
         </p>
       )}
     </div>
@@ -1371,7 +1367,7 @@ function DataPreview({ rows, columns }: { rows: DataRow[]; columns: string[] }) 
           ))}
         </tbody>
       </table>
-      {rows.length > shown.length && <p className="px-1.5 py-1 text-[11px] text-fg-mute">+{rows.length - shown.length} more…</p>}
+      {rows.length > shown.length && <p className="px-1.5 py-1 text-[11px] text-fg-mute">{t('runner.moreRows', { n: rows.length - shown.length })}</p>}
     </div>
   );
 }
@@ -1405,8 +1401,8 @@ function RunDetailView({ entry, onBack }: { entry: RunDetail; onBack: () => void
             value={tab}
             onValueChange={setTab}
             size="sm"
-            aria-label="Request or response"
-            options={[{ value: 'request', label: 'Request' }, { value: 'response', label: 'Response' }]}
+            aria-label={t('runner.requestOrResponse')}
+            options={[{ value: 'request', label: t('request') }, { value: 'response', label: t('response') }]}
           />
         </div>
       </div>
@@ -1440,7 +1436,7 @@ function RequestDetail({ request, sentUrl, dataVars }: { request: ApiRequest; se
     <div className="min-h-0 flex-1 space-y-4 overflow-auto p-3 text-xs">
       {dataVars && Object.keys(dataVars).length > 0 && (
         <div>
-          <p className="mb-1 font-semibold text-fg-mute">Iteration data</p>
+          <p className="mb-1 font-semibold text-fg-mute">{t('runner.iterationData')}</p>
           <div className="flex flex-wrap gap-1.5">
             {Object.entries(dataVars).map(([k, v]) => (
               <span key={k} className="rounded bg-bg-2 px-1.5 py-0.5 font-mono text-[11px]"><span className="text-fg-mute">{k}=</span>{v}</span>
@@ -1453,8 +1449,8 @@ function RequestDetail({ request, sentUrl, dataVars }: { request: ApiRequest; se
         <p className="break-all font-mono">{sentUrl || sub(request.url) || '—'}</p>
       </div>
       <div>
-        <p className="mb-1 font-semibold text-fg-mute">Headers</p>
-        {headers.length === 0 ? <p className="text-fg-mute">No headers.</p> : (
+        <p className="mb-1 font-semibold text-fg-mute">{t('headers')}</p>
+        {headers.length === 0 ? <p className="text-fg-mute">{t('runner.noHeaders')}</p> : (
           <div className="space-y-0.5 font-mono">
             {headers.map((h) => (
               <p key={h.id} className="break-all"><span className="text-fg-mute">{sub(h.key)}:</span> {sub(h.value)}</p>
@@ -1463,8 +1459,8 @@ function RequestDetail({ request, sentUrl, dataVars }: { request: ApiRequest; se
         )}
       </div>
       <div>
-        <p className="mb-1 font-semibold text-fg-mute">Body <span className="font-normal">({body.mode})</span></p>
-        {bodyText ? <pre className="whitespace-pre-wrap break-all rounded bg-bg-2/40 p-2 font-mono">{sub(bodyText)}</pre> : <p className="text-fg-mute">No body.</p>}
+        <p className="mb-1 font-semibold text-fg-mute">{t('body')} <span className="font-normal">({body.mode})</span></p>
+        {bodyText ? <pre className="whitespace-pre-wrap break-all rounded bg-bg-2/40 p-2 font-mono">{sub(bodyText)}</pre> : <p className="text-fg-mute">{t('runner.noBody')}</p>}
       </div>
     </div>
   );
@@ -1480,8 +1476,8 @@ function countTone(bad: number, total: number): StatProps['tone'] {
 /** Tooltip for a status chip, or undefined when the chip isn't a jump target. */
 function jumpTitle(code: string, samples: number[] | undefined): string | undefined {
   if (!samples?.length) return undefined;
-  const base = `Go to an iteration that returned ${code} — click again for the next one`;
-  return samples.length >= STATUS_SAMPLE_CAP ? `${base} (first ${STATUS_SAMPLE_CAP} tracked)` : base;
+  const base = t('runner.jumpTo', { code });
+  return samples.length >= STATUS_SAMPLE_CAP ? `${base}${t('runner.firstTracked', { n: STATUS_SAMPLE_CAP })}` : base;
 }
 
 /** Runner summary tile — the shared compact Stat, used for the whole strip. */
@@ -1507,13 +1503,13 @@ function OptionRow({ label, hint, checked, onChange }: {
 // will be substituted and whether anything in the run actually uses it.
 function ColumnMappingTable({ mappings }: { mappings: ColumnMapping[] }) {
   if (mappings.length === 0) {
-    return <p className="text-[11px] text-bad">No columns found — is the header row present?</p>;
+    return <p className="text-[11px] text-bad">{t('runner.noColumns')}</p>;
   }
   return (
     <div className="overflow-hidden rounded border">
       <div className="grid grid-cols-[1fr_1fr_auto] gap-x-2 border-b bg-bg-2/40 px-1.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-fg-mute">
-        <span>Column</span>
-        <span>Variable</span>
+        <span>{t('runner.column')}</span>
+        <span>{t('runner.variable')}</span>
         <span />
       </div>
       <div className="max-h-44 overflow-y-auto">
@@ -1523,14 +1519,14 @@ function ColumnMappingTable({ mappings }: { mappings: ColumnMapping[] }) {
             <span className="min-w-0">
               <span className="block truncate font-mono text-ok" title={m.token}>{m.token}</span>
               {m.sample && (
-                <span className="block truncate text-fg-mute" title={m.sample}>e.g. {m.sample}</span>
+                <span className="block truncate text-fg-mute" title={m.sample}>{t('runner.example', { v: m.sample })}</span>
               )}
             </span>
             {m.used ? (
-              <Check className="h-3 w-3 shrink-0 text-ok" aria-label="Used by the run" />
+              <Check className="h-3 w-3 shrink-0 text-ok" aria-label={t('runner.usedByRun')} />
             ) : (
-              <span className="shrink-0 rounded bg-bg-2 px-1 text-[11px] text-fg-mute" title="No selected request references this variable">
-                unused
+              <span className="shrink-0 rounded bg-bg-2 px-1 text-[11px] text-fg-mute" title={t('runner.notReferenced')}>
+                {t('runner.unused')}
               </span>
             )}
           </div>

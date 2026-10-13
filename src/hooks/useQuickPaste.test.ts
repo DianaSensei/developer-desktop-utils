@@ -2,8 +2,8 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useQuickPaste, isMac, quickPasteHint } from '@/hooks/useQuickPaste';
 
-/** Chưa có test nào — đường ⌘V "dán nhanh" thay toàn bộ nội dung một ô, dùng
- *  bởi nhiều tool nhận input dạng dán-để-xử-lý (JSON, Base64, mã hoá…). */
+/** Quick paste: ⌘V outside an input replaces a field's whole content, used
+ *  by paste-to-process tools (JSON, Base64, encoding...). */
 
 function keydownV(target: EventTarget, init: Partial<KeyboardEventInit> = {}) {
   const evt = new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'v', metaKey: true, ...init });
@@ -58,6 +58,21 @@ describe('useQuickPaste', () => {
     await expect(act(async () => { keydownV(document.body); await Promise.resolve(); await Promise.resolve(); }))
       .resolves.not.toThrow();
     expect(onPaste).not.toHaveBeenCalled();
+  });
+
+  it('⌘V khi focus ở ô output chỉ-đọc vẫn dán nhanh vào input của tool', async () => {
+    readText.mockResolvedValue('pasted content');
+    const onPaste = vi.fn();
+    renderHook(() => useQuickPaste(onPaste));
+    const output = document.createElement('textarea');
+    output.readOnly = true;
+    document.body.appendChild(output);
+    output.focus();
+    const evt = keydownV(output);
+    await act(async () => { await Promise.resolve(); });
+    expect(evt.defaultPrevented).toBe(true);
+    expect(onPaste).toHaveBeenCalledWith('pasted content');
+    output.remove();
   });
 
   it('⌘V bên TRONG input/textarea bị bỏ qua — không chặn dán bình thường vào ô', async () => {

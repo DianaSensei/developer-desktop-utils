@@ -3,10 +3,8 @@ import { renderHook, cleanup } from '@testing-library/react';
 import { useDesktopChrome } from '@/hooks/useDesktopChrome';
 
 /**
- * Chặn các phím tắt kiểu trình duyệt (⌘R tải lại mất state, ⌘W đóng cửa sổ,
- * Backspace lùi trang…) — sai một nhánh ở đây thì người dùng gõ Backspace
- * trong ô input bình thường lại bị chặn, hoặc tệ hơn, ⌘R vẫn lọt qua và xoá
- * sạch state đang làm dở. Chưa có test nào trước đây.
+ * Browser-style shortcuts (⌘R reload, ⌘W close, Backspace back) are blocked,
+ * while Backspace in inputs keeps working.
  */
 
 function keydown(target: EventTarget, init: KeyboardEventInit) {
@@ -25,6 +23,19 @@ describe('useDesktopChrome', () => {
     expect(evt.defaultPrevented).toBe(true);
   });
 
+  it('menu chuột phải trong ô nhập liệu vẫn mở (Cắt/Chép/Dán, gợi ý chính tả)', () => {
+    renderHook(() => useDesktopChrome());
+    const input = document.createElement('input');
+    const textarea = document.createElement('textarea');
+    document.body.append(input, textarea);
+    for (const el of [input, textarea]) {
+      const evt = new MouseEvent('contextmenu', { cancelable: true, bubbles: true });
+      el.dispatchEvent(evt);
+      expect(evt.defaultPrevented).toBe(false);
+    }
+    input.remove(); textarea.remove();
+  });
+
   it('Backspace/Delete NGOÀI ô nhập liệu bị chặn (không cho lùi trang)', () => {
     renderHook(() => useDesktopChrome());
     expect(keydown(document.body, { key: 'Backspace' }).defaultPrevented).toBe(true);
@@ -32,11 +43,8 @@ describe('useDesktopChrome', () => {
   });
 
   it('Backspace/Delete BÊN TRONG input/textarea vẫn hoạt động bình thường', () => {
-    // Nhánh `el.isContentEditable` của `isEditable()` không test được ở đây —
-    // jsdom không cài đặt getter đó (luôn `undefined`, kể cả khi đã đặt
-    // `contenteditable="true"` bằng tay); đây là giới hạn của jsdom, không
-    // phải lỗi nguồn. Hai nhánh INPUT/TEXTAREA (phần chính của isEditable)
-    // vẫn kiểm được đầy đủ.
+    // jsdom has no `isContentEditable` getter, so only the INPUT/TEXTAREA
+    // branches of isEditable() are covered.
     renderHook(() => useDesktopChrome());
     const input = document.createElement('input');
     const textarea = document.createElement('textarea');

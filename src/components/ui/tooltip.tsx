@@ -48,14 +48,9 @@ export function Tooltip({
 
   React.useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
 
-  /** Đo vị trí từ rect của trigger, rồi KẸP lại trong viewport.
-   *
-   *  Bản trước chỉ cộng `gap` vào một cạnh của trigger và đặt `position: fixed`
-   *  ở đó. Với hàng nav cuối trong sidebar (side="right", gần đáy màn hình) hay
-   *  một trigger sát mép phải, bong bóng tràn ra ngoài viewport và bị cắt cụt —
-   *  đúng thứ mà comment trong App.tsx nói là đã xử lý khi bỏ tooltip tự chế.
-   *  `MAX_W`/`EST_H` khớp với `maxWidth: 13rem` và chiều cao thực tế (1–2 dòng)
-   *  của bong bóng; ước lượng là đủ vì chỉ dùng để kẹp, không để căn chính xác. */
+  /** Positions from the trigger's rect, clamped to the viewport so bubbles
+   *  near an edge are not cut off. `MAX_W`/`EST_H` approximate the bubble
+   *  (max 13rem, 1–2 lines); estimates are enough for clamping. */
   const place = () => {
     const el = wrapRef.current;
     if (!el) return;
@@ -72,8 +67,8 @@ export function Tooltip({
       top: { top: r.top - gap, left: r.left + r.width / 2 },
       bottom: { top: r.bottom + gap, left: r.left + r.width / 2 },
     }[side];
-    // `transform` dịch bong bóng theo từng side (xem `transform` bên dưới), nên
-    // biên hợp lệ của điểm neo cũng khác nhau theo side.
+    // The bubble is offset per side (see `transform` below), so the
+    // valid anchor range differs per side too.
     const clampX = {
       right: [M, vw - MAX_W - M],
       left: [MAX_W + M, vw - M],
@@ -98,8 +93,7 @@ export function Tooltip({
     timer.current = setTimeout(place, delay);
   };
 
-  /** Bàn phím: hiện ngay, không chờ `delay` — người dùng tab tới một mục là đã
-   *  chủ động yêu cầu thông tin về nó, không phải lướt chuột ngang qua. */
+  /** Keyboard focus shows the tooltip immediately, without `delay`. */
   const showNow = () => {
     if (disabled) return;
     if (timer.current) clearTimeout(timer.current);
@@ -126,12 +120,9 @@ export function Tooltip({
   }[side];
 
   return (
-    /* Focus/blur: tooltip trước đây CHỈ phản ứng với chuột, nên mọi gợi ý trong
-       sidebar (nhãn tool khi thu gọn, "Collapse", "Settings"…) là vô hình với
-       người dùng bàn phím và trình đọc màn hình. `focusin`/`focusout` nổi bọt
-       từ nút con lên span bọc ngoài này (khác `focus`/`blur` thuần DOM), nên
-       một handler ở đây phủ được mọi kiểu trigger mà không phải clone children
-       để gắn prop. React ánh xạ onFocus/onBlur sang đúng cặp nổi bọt đó. */
+    /* focusin/focusout bubble from the trigger to this wrapper (React maps
+       onFocus/onBlur to them), so keyboard and screen reader users get the
+       tooltip for any trigger without cloning children. */
     <span
       ref={wrapRef}
       onMouseEnter={show}

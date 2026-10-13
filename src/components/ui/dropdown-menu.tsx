@@ -1,21 +1,11 @@
-// Dependency-free popover menu — the single foundation for every "▾ button
-// that opens a small list of actions" pattern in the app. Before this existed,
-// each tool hand-rolled its own `open` state + useDismissable + absolutely
-// positioned panel (API Client's Sidebar, RequestPanel, ResponsePanel, and
-// ResponsiveTabBar each had a slightly different copy). Use this instead of
-// reinventing it.
+// Dependency-free popover menu for every "▾ button that opens a short list of
+// actions" in the app.
 //
-// Not a Radix primitive — the app has no dropdown-menu/popover dependency.
-// `DropdownMenuContent` portals to `document.body` and positions itself with
-// a `fixed`-position rect computed from the trigger, flipping above the
-// trigger when there isn't room below (e.g. a table row near the bottom of a
-// scrolled viewport) — an `absolute`, non-portaled panel would get clipped by
-// any scrollable/`overflow`-non-visible ancestor (the table's own
-// `overflow-x-auto` wrapper, the view's scroll container, a Dialog's
-// transformed wrapper) instead of escaping it. Because the panel is no
-// longer a DOM descendant of the trigger once portaled, outside-click
-// dismissal is hand-rolled here (checking both the trigger and the portaled
-// panel) rather than reusing the single-ref `useDismissable` hook.
+// `DropdownMenuContent` portals to `document.body` and positions itself
+// (`fixed`) from the trigger's rect, flipping above it when there is no room
+// below, so scrolling or `overflow` ancestors cannot clip it. Because the
+// portaled panel is not a DOM descendant of the trigger, outside-click
+// dismissal checks both elements here instead of using `useDismissable`.
 
 import * as React from 'react';
 import { createPortal } from 'react-dom';
@@ -116,18 +106,12 @@ const GUTTER = 4;
 export function DropdownMenuContent({ align = 'start', className, children }: DropdownMenuContentProps) {
   const { open, setOpen, anchorRef, contentRef } = useDropdownMenuContext('DropdownMenuContent');
   const [pos, setPos] = React.useState<{ top: number; left?: number; right?: number } | null>(null);
-  // `true` khi menu bị lật lên trên vì dưới hết chỗ — dùng để đặt gốc biến đổi.
+  // True when flipped above the trigger; sets the transform origin.
   const [flipped, setFlipped] = React.useState(false);
 
-  /* ── Vì sao menu phải sống thêm một nhịp sau khi đóng ────────────────────
-     Bản trước `if (!open) return null` — menu VÀO thì có fade + zoom, mà RA
-     thì biến mất trong một khung hình. Nửa nọ nửa kia như vậy còn tệ hơn là
-     không có animation nào: mắt vừa học được rằng menu này "mọc ra", rồi lần
-     đóng đầu tiên phá vỡ đúng cái quy tắc đó.
-
-     `exiting` giữ panel trong DOM đúng `--dur-exit` để nó thu lại rồi mới bị
-     gỡ. `pointer-events-none` bật ngay từ đầu nhịp đó: panel đang biến mất
-     không được ăn cú click tiếp theo của người dùng. */
+  /* `exiting` keeps the panel mounted for `--dur-exit` so it can animate out
+     instead of vanishing in one frame. It ignores pointer events meanwhile,
+     so it cannot catch the user's next click. */
   const [exiting, setExiting] = React.useState(false);
   const mountedOnce = React.useRef(false);
 
@@ -135,10 +119,8 @@ export function DropdownMenuContent({ align = 'start', className, children }: Dr
     if (open) { mountedOnce.current = true; setExiting(false); return; }
     if (!mountedOnce.current) return;   // chưa từng mở thì không có gì để đóng
     setExiting(true);
-    // 130ms = `--dur-exit`. Đọc từ CSS lúc chạy thì đúng hơn về nguyên tắc,
-    // nhưng nó chỉ quyết định lúc nào GỠ khỏi DOM (animation đã xong từ
-    // trước), nên lệch vài ms là vô hại — không đáng một lần getComputedStyle
-    // mỗi lần đóng menu.
+    // 130ms = `--dur-exit`; only decides when to unmount, so a few ms of
+    // drift is harmless.
     const t = setTimeout(() => setExiting(false), 130);
     return () => clearTimeout(t);
   }, [open]);
@@ -208,11 +190,8 @@ export function DropdownMenuContent({ align = 'start', className, children }: Dr
         top: pos.top,
         left: pos.left,
         right: pos.right,
-        /* Gốc biến đổi bám vào GÓC NEO VÀO NÚT BẤM, nên panel nở ra TỪ nút
-           thay vì phình ra từ tâm chính nó. Menu neo bên phải thì mọc từ
-           phải, menu bị lật lên trên thì mọc từ dưới lên. Đây là chi tiết
-           quyết định menu đọc ra là "cái nút này mở ra thứ này" hay chỉ là
-           "một hộp vừa hiện lên đâu đó". */
+        /* Grow from the corner attached to the trigger (right when
+           end-aligned, bottom when flipped). */
         transformOrigin: `${align === 'end' ? 'right' : 'left'} ${flipped ? 'bottom' : 'top'}`,
       }}
       className={cn(
@@ -252,7 +231,7 @@ export const DropdownMenuItem = React.forwardRef<HTMLButtonElement, DropdownMenu
         className={cn(
           'flex w-full items-center gap-2.5 rounded px-2 py-1.5 text-left text-xs',
           'transition-colors duration-press ease-out-soft hover:bg-acc',
-          active && 'bg-acc/10 text-acc',
+          active && 'bg-acc/10 text-acc-ink',
           danger && 'text-bad hover:bg-bad/10',
           className,
         )}

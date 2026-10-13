@@ -3,13 +3,8 @@ import { TOOL_ROUTES, allTools, TOOL_PATHS, toolPath } from '@/lib/toolRegistry'
 import { TOOL_DEFS } from '@/lib/toolDefs';
 
 /**
- * `TOOL_ROUTES` là bảng khai báo tay, RIÊNG BIỆT với `TOOL_DEFS` (nguồn sự
- * thật của danh sách tool trong sidebar). `allTools` ráp hai bảng lại bằng
- * `...TOOL_ROUTES[def.id]` — spread một `undefined` (khi id không khớp) là
- * hợp lệ về cú pháp JS và KHÔNG throw, nên một tool bị thiếu route sẽ lặng lẽ
- * mất `path`/`component` thay vì báo lỗi ngay lúc build. Test này đối chiếu
- * tính toàn vẹn giữa hai bảng — việc TypeScript không tự làm được vì
- * `TOOL_ROUTES` gõ theo `Record<string, …>` chứ không theo union id thật.
+ * Every tool in TOOL_DEFS must have a route and component in `allTools`,
+ * and the derived maps must agree.
  */
 
 describe('TOOL_ROUTES ↔ TOOL_DEFS — toàn vẹn dữ liệu', () => {

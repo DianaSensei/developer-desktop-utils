@@ -13,6 +13,8 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
+import { useMessages } from '@/contexts/LocaleContext';
+import UI from '@/components/ui/ui.messages';
 
 export type SplitPaneDirection = 'horizontal' | 'vertical';
 
@@ -39,6 +41,7 @@ export function SplitPane({
   initialPercent = DEFAULT_PERCENT, minPercent = 20, maxPercent = 80, minPanePx = 360,
   className,
 }: SplitPaneProps) {
+  const ui = useMessages(UI);
   const [dragging, setDragging] = useState(false);
   const [uncontrolled, setUncontrolled] = useState(initialPercent);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -132,7 +135,7 @@ export function SplitPane({
         onDoubleClick={() => setPercent(DEFAULT_PERCENT)}
         role="separator"
         aria-orientation={horizontal ? 'vertical' : 'horizontal'}
-        title="Drag to resize · double-click to reset"
+        title={ui('resize')}
         className={cn(
           'group relative shrink-0 bg-line transition-colors hover:bg-acc/40',
           horizontal ? 'w-px cursor-col-resize' : 'h-px cursor-row-resize',

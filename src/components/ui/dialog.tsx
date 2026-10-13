@@ -2,6 +2,8 @@ import * as React from 'react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useMessages } from '@/contexts/LocaleContext';
+import UI from '@/components/ui/ui.messages';
 
 const Dialog = DialogPrimitive.Root;
 const DialogTrigger = DialogPrimitive.Trigger;
@@ -25,17 +27,10 @@ DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
 
 export type DialogSize = 'sm' | 'md' | 'lg' | 'xl' | '2xl' | 'full' | 'viewport';
 
-// A width scale for every dialog in the app, replacing ad-hoc per-call-site
-// max-w-* values that had drifted with no shared reasoning (sm through 5xl).
-// `md` matches the previous unstated default, so a dialog that omits `size`
-// looks exactly as it did before this scale existed.
-//
-// Every tier up to `full` is a fixed rem width: a dialog that is mostly prose
-// or form fields gets *harder* to read as it widens, so those deliberately
-// stop growing. `viewport` is the exception for content that genuinely wants
-// the room it can get — a generated code snippet, where every line the width
-// forces to wrap is a line harder to follow. On a 1920px window `full`
-// (max-w-5xl, 1024px) left nearly half the screen unused.
+// Width scale for dialogs. `md` is the default. Tiers up to `full` are
+// fixed widths because prose and forms get harder to read when wider;
+// `viewport` is for content that benefits from all the room (generated
+// code snippets).
 const SIZE_CLASS: Record<DialogSize, string> = {
   sm: 'max-w-sm',
   md: 'max-w-md',
@@ -50,20 +45,13 @@ const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & {
     hideClose?: boolean;
-    /** Width tier — see `SIZE_CLASS`. Default `md` (the previous fixed size). */
+    /** Width tier (see `SIZE_CLASS`). Default `md`. */
     size?: DialogSize;
     /**
-     * A multi-section dialog (its own header/tabs/footer, not the default
-     * centered-text-with-buttons shape) that manages its own internal
-     * scrolling panes. Caps the dialog at 85% of the viewport height instead
-     * of letting it grow past the screen on a short window — every complex
-     * dialog in the app used to pick its own ad-hoc vh value (70/80/82…), and
-     * several picked none at all, which could push content off-screen with
-     * no way to reach it on a small laptop. Also resets the default
-     * `gap-4 p-6` to `gap-0 p-0`, since a dialog like this lays out its own
-     * header border and section padding rather than using Dialog's own.
-     * Render `flex flex-col` content and let each pane inside scroll on its
-     * own (`overflow-y-auto`).
+     * For a multi-section dialog that lays out its own header, tabs, footer
+     * and scrolling panes: caps the height at 85% of the viewport and drops
+     * the default `gap-4 p-6`. Render `flex flex-col` content and let each
+     * pane scroll on its own (`overflow-y-auto`).
      */
     scrollable?: boolean;
   }
@@ -84,13 +72,19 @@ const DialogContent = React.forwardRef<
       {!hideClose && (
         <DialogPrimitive.Close className="absolute right-4 top-4 rounded-md p-1 text-fg-mute opacity-70 transition-opacity hover:opacity-100 hover:bg-bg-2 focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus disabled:pointer-events-none">
           <X className="h-4 w-4" />
-          <span className="sr-only">Close</span>
+          <span className="sr-only"><CloseText /></span>
         </DialogPrimitive.Close>
       )}
     </DialogPrimitive.Content>
   </DialogPortal>
 ));
 DialogContent.displayName = DialogPrimitive.Content.displayName;
+
+/** Screen-reader "Close" text; a component because DialogContent's
+ *  forwardRef body cannot call hooks directly. */
+function CloseText() {
+  return <>{useMessages(UI)('close')}</>;
+}
 
 function DialogHeader({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
   return <div className={cn('flex flex-col space-y-1.5 text-left', className)} {...props} />;

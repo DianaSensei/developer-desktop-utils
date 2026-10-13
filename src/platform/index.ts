@@ -1,9 +1,6 @@
 /**
- * Bề mặt import DUY NHẤT của Platform — plugin chỉ import từ '@/platform'.
- *
- * Giữ một cửa ngõ như vậy để sau này đổi cách nạp plugin (chuyển sang nạp runtime
- * từ repo riêng, hay chạy trong webview tách biệt) mà không phải sửa từng plugin:
- * chúng chỉ thấy hợp đồng ở đây, không thấy cách registry hiện thực nó.
+ * The platform's single import surface: plugins import only from
+ * '@/platform', so the loading mechanism can change without touching them.
  */
 export { definePlugin, hostAllowed, satisfiesSdk, validateManifest } from './manifest';
 export { SDK_VERSION } from './types';
@@ -85,10 +82,7 @@ export type {
   ServiceSubscription,
 } from './service';
 export { PluginProvider, usePluginSdk, usePluginSdkOptional, withPluginSdk } from './context';
-// Kiểu `Channel` của Tauri đi qua cửa của Platform luôn: tool cần nó để khai
-// tham số của một lệnh nhận stream, và bắt chúng import type thẳng từ
-// '@tauri-apps/api/core' chỉ vì một cái tên kiểu là thứ duy nhất còn buộc chúng
-// chạm vào Tauri trực tiếp.
+// Re-exported so tools can type stream parameters without importing Tauri.
 export type { Channel } from '@tauri-apps/api/core';
 export * as pluginAudit from './audit';
 export type { AuditChannel, AuditEntry } from './audit';

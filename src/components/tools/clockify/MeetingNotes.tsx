@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { usePluginSdkFor, usePluginState } from '@/platform';
-import ReactMarkdown from 'react-markdown';
+import { MarkdownView } from '@/components/ui/markdown-view';
 import { Segmented } from '@/components/ui/segmented';
 import { Button } from '@/components/ui/button';
 import { CopyButton } from '@/components/ui/copy-button';
@@ -15,6 +15,9 @@ import {
   type Meeting,
 } from '@/lib/meetings';
 import { MeetingFields } from '@/components/meetings/MeetingFields';
+import { useMessages } from '@/contexts/LocaleContext';
+import MESSAGES from '@/components/tools/clockify/TimeTracker.messages';
+import { ConfirmButton } from '@/components/tools/clockify/ui';
 
 type ViewMode = 'edit' | 'markdown' | 'preview';
 
@@ -29,6 +32,7 @@ function whenLabel(m: Meeting): string {
 }
 
 export function MeetingNotes() {
+  const tr = useMessages(MESSAGES);
   const sdk = usePluginSdkFor('task-tracker');
   const { meetings, addMeeting, updateMeeting, deleteMeeting, getMeeting } = useMeetings();
   const [selectedId, setSelectedId] = usePluginState<string | null>(sdk, 'meeting:selected', null, { legacyKey: 'devtool:meeting:selected' });
@@ -65,12 +69,12 @@ export function MeetingNotes() {
           <Button onClick={createNew} size="sm" className="w-full gap-1.5">
             <Plus className="h-4 w-4" /> New note
           </Button>
-          <SearchInput value={query} onChange={setQuery} placeholder="Search notes…" className="h-ctl text-xs" />
+          <SearchInput value={query} onChange={setQuery} placeholder={tr('searchNotes')} className="h-ctl text-xs" />
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto p-1.5">
           {filtered.length === 0 ? (
             <p className="px-2 py-6 text-center text-xs text-fg-mute">
-              {meetings.length === 0 ? 'No meeting notes yet.' : 'No notes match your search.'}
+              {meetings.length === 0 ? tr('noNotes') : tr('noNotesMatch')}
             </p>
           ) : (
             <div className="space-y-0.5">
@@ -84,21 +88,20 @@ export function MeetingNotes() {
                   )}
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">{m.title.trim() || 'Untitled meeting'}</p>
+                    <p className="truncate text-sm font-medium">{m.title.trim() || tr('untitledMeeting')}</p>
                     <p className="mt-0.5 flex items-center gap-1.5 text-[11px] text-fg-mute">
                       <Clock className="h-3 w-3" />
                       {whenLabel(m)} · {formatDuration(meetingDurationMs(m))}
                     </p>
                   </div>
-                  <span
-                    role="button"
-                    tabIndex={-1}
-                    onClick={(e) => { e.stopPropagation(); remove(m.id); }}
-                    className="mt-0.5 shrink-0 text-fg-mute opacity-0 transition-opacity hover:text-bad group-hover:opacity-100"
-                    title="Delete note"
+                  {/* Deleting meeting notes loses content, so it takes two clicks (ConfirmButton). */}
+                  <ConfirmButton
+                    onConfirm={() => remove(m.id)}
+                    title={tr('deleteNote')}
+                    className="mt-0.5 shrink-0 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
-                  </span>
+                  </ConfirmButton>
                 </button>
               ))}
             </div>
@@ -114,29 +117,28 @@ export function MeetingNotes() {
               value={mode}
               onValueChange={setMode}
               options={[
-                { value: 'edit', label: 'Edit' },
-                { value: 'markdown', label: 'Markdown' },
-                { value: 'preview', label: 'Preview' },
+                { value: 'edit', label: tr('edit') },
+                { value: 'markdown', label: tr('markdown') },
+                { value: 'preview', label: tr('preview') },
               ]}
-              aria-label="Note view"
+              aria-label={tr('noteView')}
             />
             <div className="flex items-center gap-1.5">
               <CopyButton
                 value={() => markdown}
-                label="Copy markdown"
+                label={tr('copyMarkdown')}
                 variant="outline"
                 size="sm"
                 className="h-auto rounded-lg px-2.5 py-1.5 text-xs text-fg-mute"
                 iconClassName="h-3.5 w-3.5"
               />
-              <button
-                type="button"
-                onClick={() => remove(selected.id)}
-                className="flex items-center gap-1.5 rounded-sm px-2 py-1.5 text-xs text-fg-mute transition-colors hover:bg-bad/10 hover:text-bad"
-                title="Delete note"
+              <ConfirmButton
+                onConfirm={() => remove(selected.id)}
+                title={tr('deleteNote')}
+                className="flex items-center gap-1.5 rounded-sm px-2 py-1.5 text-xs hover:bg-bad/10"
               >
                 <Trash2 className="h-3.5 w-3.5" />
-              </button>
+              </ConfirmButton>
             </div>
           </div>
 
@@ -148,9 +150,9 @@ export function MeetingNotes() {
             ) : mode === 'markdown' ? (
               <pre className="mx-auto max-w-3xl whitespace-pre-wrap break-words p-5 font-mono text-sm">{markdown}</pre>
             ) : (
-              <div className="prose prose-sm dark:prose-invert mx-auto max-w-3xl p-5">
-                <ReactMarkdown>{markdown}</ReactMarkdown>
-              </div>
+              <MarkdownView className="mx-auto max-w-3xl p-5" onOpenLink={(url) => void sdk.openExternal(url)}>
+                {markdown}
+              </MarkdownView>
             )}
           </div>
         </div>
@@ -160,7 +162,7 @@ export function MeetingNotes() {
             <NotebookPen className="h-6 w-6 text-fg-mute/40" />
           </div>
           <p className="max-w-xs text-sm text-fg-mute">
-            Select a note to view and edit, or create a new one. Notes with a time appear in the Time Tracker calendar.
+            {tr('selectNote')}
           </p>
           <Button onClick={createNew} size="sm" className="gap-1.5">
             <Plus className="h-4 w-4" /> New note

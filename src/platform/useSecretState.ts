@@ -2,14 +2,12 @@ import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateA
 import type { PluginSdk } from './sdk';
 
 /**
- * `usePersistentState` cho dữ liệu nhạy cảm: giá trị nằm trong kho bí mật riêng
- * (xem `secrets.ts`) thay vì mặt phẳng khoá dùng chung.
+ * `usePersistentState` for sensitive values, backed by the secret vault
+ * (secrets.ts).
  *
- * Khác biệt quan trọng so với bản đồng bộ: kho là bất đồng bộ, nên lần render
- * đầu KHÔNG có dữ liệu. Hook trả về cờ `ready`, và **không ghi gì cho tới khi
- * đọc xong** — thiếu chốt đó, effect ghi của lần render đầu sẽ đẩy giá trị khởi
- * tạo (thường là mảng rỗng) đè lên dữ liệu thật vừa kịp đọc lên: người dùng mở
- * app ra là mất sạch tài khoản.
+ * The vault is asynchronous, so the first render has no data. The hook
+ * returns a `ready` flag and writes nothing until the read finishes;
+ * otherwise the initial value would overwrite the stored data.
  */
 export function useSecretState<T>(
   sdk: PluginSdk,
@@ -32,16 +30,15 @@ export function useSecretState<T>(
           try {
             setState(JSON.parse(raw) as T);
           } catch {
-            // Blob hỏng: giữ lại nguyên văn dưới một khoá khác TRƯỚC khi cho
-            // phép ghi đè. Người dùng còn cơ hội khôi phục thủ công, thay vì
-            // mất dữ liệu vì một lần ghi hỏng ở phiên trước.
+            // Keep the unreadable value under another key before it can be
+            // overwritten, so it can still be recovered by hand.
             await sdk.secrets.set(`${key}.corrupt`, raw);
             sdk.log('secret-corrupt', key);
           }
         }
       } catch {
-        // Thiếu quyền hoặc kho không mở được — để nguyên giá trị khởi tạo.
-        // `ensure()` của SDK đã ghi audit nên lỗi không biến mất im lặng.
+        // Missing permission or vault unavailable: keep the initial value.
+        // The SDK has already recorded it in the audit log.
       } finally {
         if (!cancelled) setReady(true);
       }
@@ -54,7 +51,7 @@ export function useSecretState<T>(
   useEffect(() => {
     if (!ready) return;
     void sdk.secrets.set(key, JSON.stringify(stateRef.current)).catch(() => {
-      // Đã ghi audit ở tầng SDK.
+      // Already recorded in the audit log by the SDK.
     });
   }, [state, ready, sdk, key]);
 

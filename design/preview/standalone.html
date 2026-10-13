@@ -3,44 +3,37 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <!-- Token dùng CHUNG với app. Sửa giá trị ở design/tokens.css, không sửa ở đây. -->
 <style>
-/* ↓↓↓ Nội tuyến từ design/tokens.css — KHÔNG sửa ở đây ↓↓↓ */
+/* ↓↓↓ Inlined from design/tokens.css — do not edit here ↓↓↓ */
 /* ============================================================================
-   DevTool Design Kit — TOKENS (nguồn sự thật duy nhất)
+   DevTool Design Kit — TOKENS (single source of truth)
    ----------------------------------------------------------------------------
-   CSS THUẦN. Không @layer, không @apply, không cú pháp Tailwind.
-   Vì vậy file này dùng được ở CẢ HAI nơi:
+   Plain CSS (no @layer, @apply or Tailwind syntax), so it is used by both:
 
-     1. Trang mẫu tĩnh   →  <link rel="stylesheet" href="design/tokens.css">
-     2. App qua Tailwind →  @import "../../design/tokens.css";  (đầu tokens.css của app)
+     1. The static preview  →  <link rel="stylesheet" href="design/tokens.css">
+     2. The app (Tailwind)  →  @import "../../design/tokens.css";  (top of src/design-system/tokens.css)
 
-   Đó là điều khiến trang mẫu KHÔNG THỂ trôi lệch khỏi app: cả hai đọc chung
-   một bộ giá trị. Sửa màu, bo góc, chiều cao control → sửa ở đây, chỉ ở đây.
+   Both read the same values, so the preview cannot drift from the app.
 
-   ── Nguyên tắc kiến trúc quan trọng nhất ──────────────────────────────────
-   Accent khai báo bằng BA BIẾN RỜI (--a-h / --a-s / --a-l), không phải một mã
-   hex. Mọi biến thể accent — sáng hơn, nhuộm nhạt, mực đậm, viền, vòng focus —
-   đều tính ra bằng hsl(). Thêm một tone mới = thêm ba con số, không sửa gì khác.
-
-   Đổi lại, có một luật không được phá: MÀU TRẠNG THÁI LÀ HỆ RIÊNG, cố định,
-   không dẫn xuất từ accent. Nếu "hợp lệ" mà dùng accent thì khi đổi tone sang
-   đỏ, thẻ báo thành công sẽ hoá đỏ. Xem design/RULES.md.
+   The accent is three separate variables (--a-h / --a-s / --a-l); every
+   accent variant is derived with hsl(), so a new tone is three numbers.
+   Status colours are a separate, fixed system that never derives from the
+   accent (see design/RULES.md).
    ========================================================================== */
 
 :root {
-  /* ── Accent: ba kênh rời — mặc định azure ─────────────────────────────── */
+  /* ── Accent: three channels, default azure ─────────────────────────────── */
   --a-h: 218;
   --a-s: 76%;
   --a-l: 48%;
 
-  /* ── Biến KÊNH (không có hsl() bọc ngoài) ─────────────────────────────
-     Vì sao cần: Tailwind chỉ chèn được `<alpha-value>` vào màu dạng kênh.
-     Nếu token là màu hoàn chỉnh thì `bg-acc/20` mất tác dụng — mà repo dùng
-     bổ ngữ alpha rất nhiều. Nên mỗi màu có hai dạng:
+  /* ── Channel variables (no hsl() wrapper) ──────────────────────────────
+     Tailwind can only inject `<alpha-value>` into channel-form colours, so
+     each colour has two forms:
 
-        --acc-c  = "218 76% 48%"          → cho preset Tailwind (có alpha)
-        --acc    = hsl(var(--acc-c))      → cho CSS thuần (tiện đọc)
+        --acc-c  = "218 76% 48%"          → Tailwind preset (supports alpha)
+        --acc    = hsl(var(--acc-c))      → plain CSS
 
-     Bản tối định nghĩa lại `-c`, nên cả hai dạng tự đúng theo theme. */
+     Dark mode redefines the `-c` forms (plus rings, edges and shadows). */
   --acc-c:        var(--a-h) var(--a-s) var(--a-l);
   --acc-hi-c:     var(--a-h) var(--a-s) calc(var(--a-l) + 7%);
   --acc-tint-c:   var(--a-h) calc(var(--a-s) - 8%) 95%;
@@ -58,14 +51,16 @@
   --acc-fg-c:   0 0% 100%;
   --acc-fg:     hsl(var(--acc-fg-c));
 
-  /* ── Nền: xám NGẢ SẮC accent, không xám trung tính ────────────────────
-     Xám trung tính là thứ làm giao diện trông rẻ. Mọi bề mặt ở đây đều mang
-     một chút sắc của accent, nên khi đổi tone cả trang đổi theo, kể cả nền. */
-  --bg-c:     var(--a-h) 22% 96%;
-  --bg-2-c:   var(--a-h) 18% 92%;
+  /* ── Surfaces: accent-tinted greys, lightness steps ~5% apart ────────
+       card   100%  ← working surface (what users read or type into)
+       chrome  97%  ← controls: toolbars, pane headers, sidebar
+       bg      95%  ← app background, gutters between panels
+       bg-2    91%  ← recessed: segmented track, sunken inputs, disabled */
+  --bg-c:     var(--a-h) 20% 95%;
+  --bg-2-c:   var(--a-h) 18% 91%;
   --card-c:   0 0% 100%;
-  --sunk-c:   var(--a-h) 24% 97%;
-  --chrome-c: var(--a-h) 26% 98.5%;
+  --sunk-c:   var(--a-h) 22% 96.5%;
+  --chrome-c: var(--a-h) 24% 97%;
 
   --bg:     hsl(var(--bg-c));
   --bg-2:   hsl(var(--bg-2-c));
@@ -85,7 +80,7 @@
   --line:      hsl(var(--line-c));
   --line-soft: hsl(var(--line-soft-c));
 
-  /* ── Trạng thái: HỆ RIÊNG, độc lập accent, KHÔNG đổi khi swap tone ──── */
+  /* ── Status: separate system, independent of the accent ─────────────── */
   --ok-c: 154.5 69.2% 28.0%;        --ok-tint-c: 145.7 38.9% 92.9%;   --ok-edge-c: 147.1 38.2% 78.4%;
   --warn-c: 36.4 79.2% 30.2%;       --warn-tint-c: 40.0 78.9% 92.5%;  --warn-edge-c: 38.3 61.0% 76.9%;
   --bad-c: 2.7 60.5% 43.7%;         --bad-tint-c: 3.5 73.9% 95.5%;    --bad-edge-c: 3.5 63.0% 84.1%;
@@ -96,123 +91,121 @@
   --bad:  hsl(var(--bad-c));   --bad-tint:  hsl(var(--bad-tint-c));   --bad-edge:  hsl(var(--bad-edge-c));
   --info: hsl(var(--info-c));  --info-tint: hsl(var(--info-tint-c));  --info-edge: hsl(var(--info-edge-c));
 
-  /* ── Bảng màu PHÂN LOẠI ───────────────────────────────────────────────
-     Dùng khi cần phân biệt các mục CÙNG LOẠI cạnh nhau mà thứ tự/danh tính
-     không mang nghĩa tốt-xấu: các match liền nhau trong Regex Tester, các
-     series trong biểu đồ. Đây là lần duy nhất màu xoay vòng được phép —
-     nếu hai match liền kề cùng màu thì không nhìn ra ranh giới.
-
-     Cố ý KHÔNG có đỏ và KHÔNG có xanh lá đúng hue của --ok/--bad: một dải
-     highlight xanh lá cạnh một chip "lỗi" đỏ sẽ đọc như trạng thái, không
-     phải như phân loại. Năm hue này cách xa cả hai. */
+  /* ── Categorical palette ──────────────────────────────────────────────
+     For telling adjacent items of the same kind apart (regex matches, chart
+     series); the only place rotating colours are allowed. Deliberately avoids
+     the --ok/--bad hues so a highlight never reads as a status. */
   --cat-1-c:  45 92% 52%;   /* amber   */
   --cat-2-c: 210 88% 56%;   /* azure   */
   --cat-3-c: 275 70% 62%;   /* violet  */
   --cat-4-c: 178 65% 42%;   /* teal    */
   --cat-5-c: 320 68% 58%;   /* magenta */
 
-  /* Bản bọc sẵn cho khi KHÔNG cần alpha — `text-[var(--cat-3)]` đọc dễ hơn
-     `text-[hsl(var(--cat-3-c))]`. Dạng kênh ở trên dành cho nền có alpha. */
+  /* Wrapped forms for use without alpha, e.g. `text-[var(--cat-3)]`. */
   --cat-1: hsl(var(--cat-1-c));
   --cat-2: hsl(var(--cat-2-c));
   --cat-3: hsl(var(--cat-3-c));
   --cat-4: hsl(var(--cat-4-c));
   --cat-5: hsl(var(--cat-5-c));
 
-  /* ── Bóng: ngả sắc accent, không phải đen thuần ───────────────────────
-     Chỉ ba bậc. Một tầng nổi dùng --sh; lồng sâu hơn dùng viền, không bóng. */
+  /* ── Solidity ─────────────────────────────────────────────────────────
+     `--line-strong`: panel frames and major dividers (`--line` is for rows).
+     `--edge-lite` / `--edge-dark`: 1px inset highlight on top and shade at
+     the bottom of solid controls (not a gradient).
+     `--sh-btn-press`: pressed state, the shadow moves inside. */
+  --line-strong-c: var(--a-h) 20% 79%;
+  --line-strong:   hsl(var(--line-strong-c));
+
+  --edge-lite: inset 0 1px 0 hsl(0 0% 100% / .16);
+  --edge-dark: inset 0 -1px 0 hsl(var(--a-h) 34% 14% / .14);
+
+  /* ── Data types: fixed meaning per value type ──────────────────────────
+     Lets `0`, `"0"`, empty and NULL look different in data views. Not
+     `--cat-N` (rotating, no fixed meaning) and not the accent (would change
+     with the user's tone). */
+  --type-string-c:  152 45% 34%;   /* string */
+  --type-number-c:  214 72% 45%;   /* integer, float */
+  --type-bool-c:     26 78% 42%;   /* true / false */
+  --type-date-c:    275 52% 50%;   /* date/time */
+  --type-null-c:    var(--a-h) 10% 55%;  /* NULL / no value: grey, fainter than body text */
+  --type-binary-c:    2 55% 47%;   /* blob, bytes */
+  --type-object-c:  322 50% 46%;   /* object, array, json */
+
+  --type-string: hsl(var(--type-string-c));
+  --type-number: hsl(var(--type-number-c));
+  --type-bool:   hsl(var(--type-bool-c));
+  --type-date:   hsl(var(--type-date-c));
+  --type-null:   hsl(var(--type-null-c));
+  --type-binary: hsl(var(--type-binary-c));
+  --type-object: hsl(var(--type-object-c));
+
+  /* ── Shadows: accent-tinted, three levels only. A raised layer uses --sh;
+     deeper nesting uses borders, not more shadow. */
   --sh-sm: 0 1px 2px hsl(var(--a-h) 30% 20% / .06);
   --sh:    0 1px 2px hsl(var(--a-h) 30% 20% / .06), 0 8px 20px -12px hsl(var(--a-h) 30% 20% / .22);
   --sh-lg: 0 2px 4px hsl(var(--a-h) 30% 20% / .07), 0 18px 36px -18px hsl(var(--a-h) 30% 20% / .30);
 
-  /* ── Bo góc: thang RỜI NHAU ───────────────────────────────────────────
-     Thang cũ (--radius: 1rem → sm/md/lg = 12/14/16px) có ba bậc mà mắt không
-     phân biệt được, nên vô dụng. Thang này cách nhau đủ xa để có ý nghĩa. */
-  /* Bậc nhỏ nhất, đứng dưới --r-xs: ô tick 16px, keycap, viền trong của một
-     control nhỏ — chỗ mà 6px đã đọc ra là tròn.
+  /* Solid button shadow: edges + small shadow as one token. */
+  --sh-btn:       var(--edge-lite), var(--edge-dark), var(--sh-sm);
+  --sh-btn-press: inset 0 1px 2px hsl(var(--a-h) 34% 14% / .20);
 
-     Đây cũng là giá trị của `rounded` trần: 151 chỗ trong repo dùng nó, và nếu
-     không khai báo thì Tailwind trả 0.25rem CỨNG, nằm ngoài thang token, nên
-     preset bo góc bên dưới không với tới được. Trỏ `borderRadius.DEFAULT` vào
-     token này (xem tailwind-preset.cjs) là cách 151 chỗ đó đi theo preset mà
-     không phải sửa chỗ nào — 4px bằng đúng 0.25rem nên không gì đổi hình. */
+  /* ── Radius scale: steps far enough apart to be distinguishable ───── */
+  /* Smallest step (checkboxes, keycaps). Also Tailwind's bare `rounded`
+     (`borderRadius.DEFAULT` in tailwind-preset.cjs), so it follows the
+     corner preset; 4px equals Tailwind's default 0.25rem. */
   --r-default: 4px;
-  --r-xs:   6px;   /* chip, keycap, nút nhỏ */
-  --r-sm:  10px;   /* input, nút, ô nhỏ trong thẻ */
-  --r-md:  14px;   /* thẻ thường, dải nhuộm */
-  --r-lg:  18px;   /* panel, khung tool */
-  --r-xl:  24px;   /* modal, sheet */
+  --r-xs:   5px;   /* chip, keycap, small button */
+  --r-sm:   6px;   /* input, button, small cell in a card */
+  --r-md:   8px;   /* card, tinted band */
+  --r-lg:  10px;   /* panel, khung tool */
+  --r-xl:  14px;   /* modal, sheet */
   --r-full: 999px;
 
-  /* ── Chiều cao control: MỘT giá trị, không ba ─────────────────────────
-     Repo hiện trộn h-7 (28px) / h-8 (32px) / h-9 (36px) → mọi hàng control
-     đều lệch nhau vài pixel. Chỉ còn hai bậc. */
-  --h:    34px;
-  --h-lg: 40px;
+  /* ── Control heights: two steps ────────────────────────────────────── */
+  --h:    32px;
+  --h-lg: 38px;
 
-  /* ── Mặt chữ ──────────────────────────────────────────────────────────
-     `mono` chưa từng được khai báo trong preset Tailwind của repo, dù
-     `font-mono` dùng 356 lần → rơi về Courier New trên Windows/Linux.
-     Danh sách dự phòng ở đây đảm bảo có chữ đơn cách thật trên cả ba nền.
-
-     Be Vietnam Pro chỉ có bản TĨNH trên fontsource (không có bản variable),
-     nên app nạp ba trọng lượng rời: 400 / 500 / 600, subset latin + vietnamese. */
+  /* ── Typefaces ────────────────────────────────────────────────────────
+     The mono fallback list guarantees a real monospace font on all three
+     platforms. Be Vietnam Pro ships static weights only (400/500/600,
+     latin + vietnamese subsets). */
   --sans: "Be Vietnam Pro", system-ui, -apple-system,
           "Segoe UI Variable Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo,
           Consolas, "Liberation Mono", monospace;
 
-  /* ── Chuyển động: một nhịp duy nhất ───────────────────────────────────
-     Rê chuột đổi nền/viền — KHÔNG đổi vị trí. Không hover-lift.
+  /* ── Motion ───────────────────────────────────────────────────────────
+     Hover changes background/border, never position.
 
-     BỐN LUẬT, áp cho mọi component. Ba luật đầu là thứ phân biệt một giao
-     diện được CHỈNH với một giao diện chỉ "có gắn transition":
-
-     1. VÀO CHẬM, RA NHANH. Một panel mở ra là thông tin mới — mắt cần thời
-        gian bắt lấy nó, nên vào bằng `--dur-base` + `--ease-out-soft`. Cũng
-        panel đó đóng lại thì người dùng đã quyết định xong rồi, đứng đợi nó
-        bay ra là bực — nên ra bằng `--dur-exit` + `--ease-in-soft`, nhanh
-        hơn gần một nửa. Vào và ra CÙNG một thời lượng là dấu hiệu số một của
-        chuyển động chưa ai ngồi chỉnh.
-
-     2. CÀNG NHỎ CÀNG NHANH. Một cái tick 14px và một hộp thoại toàn màn hình
-        không thể cùng 220ms — cái tick sẽ lờ đờ, hộp thoại sẽ giật. Chọn
-        theo quãng đường phần tử đi, không theo thói quen:
-          `--dur-press` 90ms  → phản hồi dưới ngón tay (nhấn, tick, hover dày đặc)
-          `--dur-fast`  150ms → đổi màu, đổi icon, chip
-          `--dur-base`  220ms → menu, popover, con trượt tab/segmented
-          `--dur-slow`  340ms → bề mặt lớn: dialog, sheet, overlay toàn màn
-
-     3. PHẢN HỒI NHẤN LÀ TỨC THÌ. Lún xuống trong `--dur-press`, nhả ra trong
-        `--dur-fast`. Nhấn mà chờ 200ms mới thấy gì thì nút đọc ra là "hỏng",
-        không phải "mượt".
-
-     4. MỘT CHUYỂN ĐỘNG PHẢI TRẢ LỜI ĐƯỢC "ĐỂ LÀM GÌ". Phản hồi, thứ bậc,
-        hay chuyển trạng thái — nếu không nói được thì cắt. Đây là app công
-        cụ, không phải trang giới thiệu. */
+     1. Enter slower than exit: enter with `--dur-base` + `--ease-out-soft`,
+        exit with `--dur-exit` + `--ease-in-soft`.
+     2. Smaller elements move faster:
+          `--dur-press` 90ms  → press, tick, dense hover
+          `--dur-fast`  150ms → colour/icon change, chip
+          `--dur-base`  220ms → menu, popover, tab/segmented thumb
+          `--dur-slow`  340ms → dialog, sheet, full-screen overlay
+     3. Press feedback is immediate: down in `--dur-press`, up in `--dur-fast`.
+     4. Every animation must serve feedback, hierarchy or a state change. */
   --ease-out-soft: cubic-bezier(.22, 1, .36, 1);
   --ease-spring:   cubic-bezier(.34, 1.45, .64, 1);
-  /* Đường cong RA: bắt đầu chậm rồi vọt đi. Ngược hẳn với out-soft, và đó là
-     ý đồ — phần tử biến mất phải dứt khoát, không "trôi" ra. */
+  /* Exit curve: starts slow then accelerates, so elements leave decisively. */
   --ease-in-soft:  cubic-bezier(.4, 0, .9, .3);
   --dur-press: 90ms;
   --dur-fast: 150ms;
   --dur-base: 220ms;
   --dur-slow: 340ms;
-  /* Thời lượng RA dùng chung, để luật 1 chỉ nằm ở một chỗ. */
+  /* Shared exit duration (rule 1). */
   --dur-exit: 130ms;
 
   color-scheme: light;
 }
 
 /* ============================================================================
-   TỐI — `.dark` khớp với darkMode: ['class'] của Tailwind.
-   Chỉ định nghĩa lại token, không định nghĩa lại component.
-   Chú ý: màu trạng thái ở đây là bản sáng hơn cho nền tối, nhưng vẫn giữ
-   ĐÚNG tông nghĩa (ok vẫn xanh lá, bad vẫn đỏ) — không ngả về accent.
+   DARK — `.dark` matches Tailwind's darkMode: ['class']. Redefines tokens
+   only; status colours are lighter here but keep their hue meaning.
    ========================================================================== */
 .dark {
-  /* Chỉ định nghĩa lại biến KÊNH — dạng hsl() ở :root tự đúng theo. */
+  /* Only channel variables are redefined; the hsl() forms in :root follow. */
   --acc-c:        var(--a-h) calc(var(--a-s) - 8%) 68%;
   --acc-hi-c:     var(--a-h) calc(var(--a-s) - 8%) 74%;
   --acc-tint-c:   var(--a-h) 40% 22%;
@@ -234,111 +227,96 @@
   --line-c:      var(--a-h) 14% 24%;
   --line-soft-c: var(--a-h) 14% 19%;
 
-  /* Bản tối KHÔNG phải bản sáng đảo ngược — mỗi tông chọn lại cho nền tối,
-     nhưng giữ ĐÚNG hue nghĩa (ok vẫn xanh lá, bad vẫn đỏ). */
+  /* Re-chosen for dark backgrounds (not inverted); hues keep their meaning. */
 --ok-c: 148.4 42.2% 55.9%;        --ok-tint-c: 151.3 39.0% 11.6%;   --ok-edge-c: 152.5 38.7% 24.3%;
   --warn-c: 36.3 60.4% 61.4%;       --warn-tint-c: 37.5 38.7% 12.2%;  --warn-edge-c: 38.9 44.9% 24.9%;
   --bad-c: 4.0 59.5% 70.0%;         --bad-tint-c: 5.5 32.4% 13.3%;    --bad-edge-c: 4.7 37.2% 26.9%;
   --info-c: 212.1 73.1% 69.4%;      --info-tint-c: 214.6 39.4% 12.9%;  --info-edge-c: 211.2 37.7% 27.1%;
 
-  /* Phân loại ở nền tối: sáng hơn và bớt bão hoà, để dải highlight vẫn tách
-     khỏi nền mà không chói. */
+  /* Categorical: lighter and less saturated so highlights stand out without glare. */
   --cat-1-c:  45 80% 62%;
   --cat-2-c: 210 78% 66%;
   --cat-3-c: 275 62% 70%;
   --cat-4-c: 178 55% 55%;
   --cat-5-c: 320 60% 68%;
 
+  --line-strong-c: var(--a-h) 14% 32%;
+
+  /* Dark: much subtler top highlight, stronger bottom shade. */
+  --edge-lite: inset 0 1px 0 hsl(0 0% 100% / .07);
+  --edge-dark: inset 0 -1px 0 rgb(0 0 0 / .28);
+
+  /* Data types: lighter and less saturated for legibility on dark. */
+  --type-string-c:  150 45% 62%;
+  --type-number-c:  212 78% 70%;
+  --type-bool-c:     28 75% 65%;
+  --type-date-c:    274 58% 74%;
+  --type-null-c:    var(--a-h) 10% 48%;
+  --type-binary-c:    4 62% 68%;
+  --type-object-c:  322 55% 70%;
+
   --sh-sm: 0 1px 2px rgb(0 0 0 / .45);
   --sh:    0 1px 2px rgb(0 0 0 / .45), 0 10px 24px -14px rgb(0 0 0 / .8);
   --sh-lg: 0 2px 6px rgb(0 0 0 / .5),  0 20px 40px -20px rgb(0 0 0 / .9);
+  --sh-btn-press: inset 0 1px 2px rgb(0 0 0 / .40);
 
   color-scheme: dark;
 }
 
 /* ============================================================================
-   PRESET TONE — thêm tone mới = thêm BA CON SỐ, không sửa gì khác.
-   Đặt data-accent trên <html> (hoặc bất kỳ container nào).
+   ACCENT PRESETS — a new tone is three numbers. Set data-accent on the `html` element
+   (or any container).
    ========================================================================== */
 [data-accent="azure"]   { --a-h: 218; --a-s: 76%; --a-l: 48%; }
-/* Bản đầu (l36) đo tương phản chữ trắng trên nền accent chỉ 4.29:1 — dưới
-   ngưỡng AA 4.5:1 cho chữ thường. Chưa lộ ra vì Segmented cũ dùng nền
-   accent-tint chứ không phải nền đặc; SubTab và Segmented (đã sửa) đều dùng
-   nền đặc + chữ trắng nên phải hạ `--a-l` để đạt ngưỡng. Đo bằng Chromium
-   thật, xem `design/preview/index.html` mục Segmented. */
+/* Lightness chosen so white text on a solid accent meets WCAG AA (4.5:1),
+   measured in Chromium (see design/preview/index.html, Segmented). */
 [data-accent="teal"]    { --a-h: 196; --a-s: 65%; --a-l: 32%; }
-/* Thay cho petrol/moss/oxblood (bản G3): ba tone đó đạt AA nhưng phải hạ
-   `--a-l` khá sâu để qua ngưỡng, nên nhìn xỉn/tối so với azure — bốn tone
-   còn lại (đo bằng Chromium thật) đều đạt AA ở mức sáng, sống động hơn hẳn:
-   azure 5.57:1, teal 6.04:1, iris 5.77:1, amber 4.94:1. teal cách --ok 58
-   đơn vị RGB và cách --bad 184 đơn vị (ngưỡng tối thiểu 45 — xem
-   designKit.test.ts), nên không lẫn với chip "hợp lệ" hay "lỗi". */
+/* Measured contrast (white on accent): azure 5.57:1, teal 6.04:1, iris
+   5.77:1, amber 4.94:1. Teal stays far enough from --ok/--bad (min 45 RGB
+   units, see designKit.test.ts) not to read as a status chip. */
 [data-accent="iris"]    { --a-h: 258; --a-s: 62%; --a-l: 56%; }
-/* amber là tone SÁNG NHẤT trong bốn tone — dễ hỏng chữ trắng nhất. Bản đầu
-   (l44) chỉ đạt 3.31:1, không đạt cả ngưỡng phi văn bản 3:1 lẫn văn bản
-   4.5:1. l35 đạt 4.94:1, còn dư biên so với 4.5. */
+/* Amber is the lightest tone; l35 is needed to reach 4.94:1. */
 [data-accent="amber"]   { --a-h:  34; --a-s: 78%; --a-l: 35%; }
 
 /* ============================================================================
-   PRESET BO GÓC — cùng cơ chế với accent: thang bán kính là SÁU CON SỐ, đổi
-   preset là đổi cả sáu, không sửa component nào. Đặt data-corner trên <html>.
+   CORNER PRESETS — swap all radius steps at once. Set data-corner on the `html` element.
 
-   Vì sao có: bo góc là thứ gu người dùng chia rẽ mạnh nhất trong app công cụ —
-   người quen IDE (VS Code, JetBrains) thấy thang 14–24px "mềm quá", người quen
-   app hiện đại thấy thang 2–4px "thô". Tham khảo DBX: nó cho chọn
-   `none / small / large` ngay trong Settings và đó là một trong số ít tuỳ chọn
-   giao diện người dùng thật sự đụng tới. Xem `design/reference/ANALYSIS-DBX.md`.
-
-   Điều kiện để làm được: MỌI bán kính trong app phải đọc từ `--r-*`. Một chỗ
-   viết cứng `rounded-[12px]` là một chỗ không đổi theo preset — nhìn ra ngay vì
-   nó lệch với hàng xóm. `guard.test.ts` canh việc này.
-
-   `--r-full` KHÔNG nằm trong preset: pill vẫn là pill ở cả ba lựa chọn. Bán
-   kính đầy không phải một bậc trên thang, nó là một HÌNH DẠNG khác.
+   Works only because every radius in the app reads `--r-*`; guard.test.ts
+   rejects hard-coded values like `rounded-[12px]`. `--r-full` is not part of
+   the presets: a pill stays a pill.
    ========================================================================== */
 [data-corner="default"] { --r-default: 4px; --r-xs:  6px; --r-sm: 10px; --r-md: 14px; --r-lg: 18px; --r-xl: 24px; }
-/* Dáng IDE: đủ bo để không cắt vào mắt, không đủ để đọc ra là "app tiêu dùng". */
+/* IDE look. */
 [data-corner="sharp"]   { --r-default: 2px; --r-xs:  2px; --r-sm:  3px; --r-md:  4px; --r-lg:  6px; --r-xl:  8px; }
-/* Mềm hơn mặc định một bậc rưỡi. Kiểm lại luật "bán kính trong = ngoài − đệm":
-   thẻ --r-lg 26px với đệm 8px thì ô trong dùng --r-md 20px — vẫn khớp. */
+/* Softer; inner radius = outer − padding still holds
+   (--r-lg 26px with 8px padding → --r-md 20px). */
 [data-corner="round"]   { --r-default: 6px; --r-xs:  8px; --r-sm: 14px; --r-md: 20px; --r-lg: 26px; --r-xl: 32px; }
 
 /* ============================================================================
-   PRESET FONT — chỉ đổi lại `--sans` (mặt chữ UI chung); `--mono` không đổi
-   theo lựa chọn này vì nó phục vụ mục đích riêng (đọc mã/số liệu chính xác
-   theo cột), không phải gu đọc chung. Đặt data-font trên <html>.
-
-   Bốn lựa chọn — không phải font THẬT tải về (không @font-face nào khác
-   ngoài Be Vietnam Pro/IBM Plex Mono đã bundle sẵn), mà là stack CSS generic
-   trỏ vào mặt chữ HỆ THỐNG đã cài sẵn trên máy người dùng — đúng yêu cầu
-   "chọn font từ hệ thống" mà không cần enumerate font thật (Tauri chạy trên
-   WebView riêng từng OS, không có API liệt kê font hệ thống dùng chung được).
+   UI FONT PRESETS — change `--sans` only; `--mono` has its own preset.
+   Set data-font on the `html` element. Besides the bundled Be Vietnam Pro these are
+   generic stacks pointing at installed system fonts (webviews have no
+   portable font enumeration API).
    ========================================================================== */
 [data-font="default"] {
   --sans: "Be Vietnam Pro", system-ui, -apple-system,
           "Segoe UI Variable Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
-/* Mặt chữ UI mặc định của hệ điều hành — San Francisco (macOS), Segoe UI
-   (Windows), Ubuntu/Cantarell (Linux GNOME) — không có Be Vietnam Pro. */
+/* The OS UI font: San Francisco, Segoe UI, Ubuntu/Cantarell. */
 [data-font="system"] {
   --sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 [data-font="serif"] {
   --sans: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
 }
-/* Sans hình học cổ điển — khác hẳn dáng nhân văn (humanist) bo tròn của
-   Be Vietnam Pro, cho người thích nhìn "gọn, thẳng" hơn. */
+/* Neo-grotesque alternative to the rounded humanist Be Vietnam Pro. */
 [data-font="classic"] {
   --sans: Helvetica, Arial, "Liberation Sans", sans-serif;
 }
 
 /* ============================================================================
-   PRESET MONO FONT — riêng khỏi bốn preset --sans ở trên: đây là lựa chọn có
-   chủ đích cho việc ĐỌC MÃ (ligature, độ rộng ký tự đều), người dùng có gu
-   khác nhau về việc có muốn ligature (=>, !=, >=…) hay không, nên không còn
-   "một chuẩn cố định" nữa. Cả hai đều là font THẬT tự host (bundle sẵn như
-   Be Vietnam Pro, không phải stack hệ thống) nên hiện giống hệt nhau trên mọi
-   nền. Đặt data-mono-font trên <html>. */
+   MONO FONT PRESETS — both are bundled, self-hosted fonts (Fira Code has
+   ligatures). Set data-mono-font on the `html` element. */
 [data-mono-font="ibm-plex-mono"] {
   --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo,
           Consolas, "Liberation Mono", monospace;
@@ -349,9 +327,8 @@
 }
 
 /* ============================================================================
-   NỀN MÔI TRƯỜNG — gradient pastel.
-   Đây là chỗ DUY NHẤT gradient được phép. Không bao giờ trên nút, không bao
-   giờ sau chữ cần đọc. Đặt class .dk-bg lên phần tử nền toàn trang.
+   AMBIENT BACKGROUND — pastel gradient. The only place gradients are
+   allowed: never on buttons or behind text. Add .env-bg to the page root.
    ========================================================================== */
 .env-bg { position: relative; }
 .env-bg::before {
@@ -369,7 +346,7 @@
 .env-bg.dark::before { opacity: .16; }
 
 /* ============================================================================
-   Tôn trọng "giảm chuyển động" của hệ điều hành.
+   Respect the OS "reduce motion" setting.
    ========================================================================== */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

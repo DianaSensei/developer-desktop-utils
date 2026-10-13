@@ -10,21 +10,31 @@ const SelectValue = SelectPrimitive.Value;
 const SelectTrigger = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Trigger>,
   React.ComponentPropsWithoutRef<typeof SelectPrimitive.Trigger>
->(({ className, children, ...props }, ref) => (
+>(({ className, children, ...props }, ref) => {
+  // role="combobox" does not take its name from its content, so a trigger
+  // without aria-label/aria-labelledby was announced as a nameless
+  // combobox. Fall back to the current value ("Base64, combobox"), via a
+  // wrapper around the children. Call sites with a visible label should
+  // still pass aria-label.
+  const valueId = React.useId();
+  const named = !!(props['aria-label'] || props['aria-labelledby']);
+  return (
   <SelectPrimitive.Trigger
     ref={ref}
+    aria-labelledby={named ? props['aria-labelledby'] : valueId}
     className={cn(
       'flex h-ctl w-full items-center justify-between rounded-sm border border-line bg-card px-3 py-1.5 text-sm shadow-soft transition-[color,border-color,box-shadow] duration-fast ease-out-soft placeholder:text-fg-mute hover:border-acc-edge focus-visible:outline-hidden focus-visible:border-acc focus-visible:ring-[3px] focus-visible:ring-focus disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1',
       className
     )}
     {...props}
   >
-    {children}
+    <span id={valueId}>{children}</span>
     <SelectPrimitive.Icon asChild>
       <ChevronDown className="h-4 w-4 opacity-70" />
     </SelectPrimitive.Icon>
   </SelectPrimitive.Trigger>
-));
+  );
+});
 SelectTrigger.displayName = SelectPrimitive.Trigger.displayName;
 
 const SelectScrollUpButton = React.forwardRef<

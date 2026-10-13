@@ -1,16 +1,11 @@
 import { storageGet, storageSet } from '@/lib/persistentStore';
 
 /**
- * Mặt chữ UI chung (`--sans`) — bốn preset khai báo trong `design/tokens.css`
- * dưới dạng `[data-font="…"]`. Áp dụng bằng cách gán
- * `document.documentElement.dataset.font`; mọi chỗ dùng `font-sans`/`var(--sans)`
- * tự đổi theo qua CSS, không cần JS tính lại từng nơi.
+ * UI font (`--sans`): four presets in design/tokens.css (`[data-font="…"]`),
+ * applied through `document.documentElement.dataset.font`. Does not affect
+ * `--mono` (see monoFontPreference.ts).
  *
- * Chỉ đổi mặt chữ UI, không đổi `--mono` (đọc mã/số liệu cần một chuẩn cố
- * định, không phải gu đọc chung) — xem comment trong tokens.css.
- *
- * Danh sách này PHẢI khớp đúng các khối `[data-font="…"]` trong tokens.css —
- * `fontPreference.test.ts` đối chiếu cả hai để không lệch nhau.
+ * Must match tokens.css (checked by fontPreference.test.ts).
  */
 export type FontPreference = 'default' | 'system' | 'serif' | 'classic';
 
@@ -32,7 +27,7 @@ export function setFontPreference(pref: FontPreference): void {
   storageSet(FONT_KEY, pref);
 }
 
-/** Ghi lựa chọn lên `<html data-font>` — nguồn CSS mà `--sans` đọc. */
+/** Sets `<html data-font>`, which `--sans` reads. */
 export function applyFontToDocument(pref: FontPreference): void {
   document.documentElement.dataset.font = pref;
 }

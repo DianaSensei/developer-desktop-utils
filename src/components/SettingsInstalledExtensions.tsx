@@ -19,35 +19,24 @@ import {
 } from '@/platform';
 
 /**
- * Danh sách tiện ích ĐÃ CÀI (cả plugin lẫn service, bất kể cài qua Chợ tiện
- * ích hay dán URL tay) — cập nhật/gỡ tại đây, một chỗ DUY NHẤT, không phụ
- * thuộc vào việc người dùng đã cài nó bằng đường nào. Tách khỏi
- * `SettingsExtensionInstaller.tsx` (chỉ còn form "dán URL cài mới") thành tab
- * riêng của `SettingsExtensions.tsx` — trước đây danh sách này BỊ CHÔN dưới
- * tab "Cài từ URL", nên một người chỉ dùng tab "Chợ tiện ích" để cài sẽ không
- * bao giờ tìm ra chỗ để gỡ.
- *
- * Cùng lý do "không áp dụng ngay lập tức" đã ghi ở SettingsExtensionInstaller:
- * mọi thao tác ở đây kết thúc bằng cờ "cần khởi động lại", không phải cập
- * nhật UI tại chỗ ngay.
+ * Installed extensions (plugins and services, from a market or a URL), with
+ * update and uninstall in one place. Changes apply after a restart, so every
+ * action ends by setting the "restart needed" flag.
  */
 
-/** id/bin THẬT gửi xuống Rust (`artifact_installer_uninstall`'s `key`) —
- *  khác `recordKey` (dùng làm khoá React/UI) khi record có `marketId`: xem
- *  giải thích đầy đủ ở bản gốc trong SettingsExtensionInstaller.tsx. */
+/** The bare id or bin sent to `artifact_installer_uninstall`, unlike
+ *  `recordKey`, which prefixes the market id for UI keys. */
 function rawArtifactId(record: InstalledArtifactRecord): string {
   return record.kind === 'plugin' ? record.manifest.id : record.manifest.bin;
 }
 
-/** Tên hiển thị ngắn gọn cho bản ghi PHÍA BÊN KIA của một cặp liên quan
- *  (`findCoupledRecord`) — dùng trong lời cảnh báo trước khi gỡ, để người
- *  dùng biết CHÍNH XÁC cái gì sẽ bị gỡ theo, không chỉ "một thứ liên quan". */
+/** Short name of the other half of a coupled pair (`findCoupledRecord`),
+ *  shown in the uninstall warning. */
 function coupledLabel(record: InstalledArtifactRecord): string {
   return record.kind === 'plugin' ? record.manifest.label : record.manifest.bin;
 }
 
-/** Hành động đang chờ người dùng xác nhận cho một dòng `kind=service` — chỉ
- *  service mới cần bước xác nhận thêm này. */
+/** Action awaiting confirmation on a service row. */
 type PendingServiceAction = 'update' | 'uninstall';
 
 export function SettingsInstalledExtensions() {
@@ -86,12 +75,8 @@ export function SettingsInstalledExtensions() {
   }
 
   /**
-   * Gỡ MỘT bản ghi — cùng lúc gỡ theo bản ghi LIÊN QUAN đến nó, nếu có
-   * (`findCoupledRecord`: một plugin Tier B và sidecar riêng của nó, khi
-   * không ai khác dùng chung sidecar đó). Bỏ lại phần kia sẽ để một sidecar
-   * mồ côi (không tool nào gọi tới) hoặc một plugin gọi vào một bin đã biến
-   * mất — hai phần ĐỘC LẬP (sidecar dùng chung, hoặc không ai phụ thuộc) thì
-   * không bị kéo theo, `coupled` khi đó là `undefined`.
+   * Uninstalls a record together with its coupled record, if any (a tier-B
+   * plugin and a sidecar nobody else uses), so neither is left orphaned.
    */
   const performUninstall = async (record: InstalledArtifactRecord) => {
     const key = recordKey(record);
@@ -139,10 +124,9 @@ export function SettingsInstalledExtensions() {
     }
   };
 
-  /** Plugin KHÔNG có sidecar liên quan: thực hiện ngay (không có tiến trình
-   *  nào bị dừng). Service, hoặc một plugin CÓ sidecar liên quan (gỡ nó kéo
-   *  theo dừng sidecar đó): bước đầu chỉ HIỆN cảnh báo, hành động thật chỉ
-   *  chạy sau khi người dùng bấm "Xác nhận" ở `handleConfirmServiceAction`. */
+  /** A plugin without a coupled sidecar is removed immediately. A service, or
+   *  a plugin whose removal stops a sidecar, first shows a warning and runs
+   *  after `handleConfirmServiceAction`. */
   const handleUninstallClick = (record: InstalledArtifactRecord) => {
     const coupled = findCoupledRecord(record, installed);
     if (record.kind === 'plugin' && !coupled) {

@@ -164,10 +164,8 @@ export const isBrunoFile = (name: string): boolean => /\.bru$/i.test(name);
 
 const METHOD_BLOCK_NAMES = new Set(HTTP_METHODS.map((m) => m.toLowerCase()));
 
-// Wraps the single parsed request in a fresh one-item Collection so it can go
-// through the same `store.importCollection()` / script-review flow as a
-// Postman or OpenAPI import — Sidebar.tsx doesn't need a separate code path
-// for "add one request" vs. "import a collection".
+// Wraps the parsed request in a one-item Collection so it goes through the
+// same import/script-review flow as Postman and OpenAPI imports.
 export function importBru(text: string, fileName: string): BrunoImport {
   const warnings: string[] = [];
   const warn = (msg: string) => warnings.push(msg);

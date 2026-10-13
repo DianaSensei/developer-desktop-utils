@@ -472,15 +472,8 @@ fn build_engine() -> Engine {
     engine
 }
 
-// Một Engine DÙNG CHUNG cho mọi request script-mode, dựng đúng một lần —
-// trước đây `run_script` tự gọi `build_engine()` mỗi lần được gọi, tức mỗi
-// HTTP request tới một stub script-mode phải trả phí cấu hình 6 giới hạn lại
-// từ đầu, đúng loại chi phí per-request mà comment ở đầu module này (`Arc`
-// rule-set clone, batched log flush, cached `REGEX_CACHE`) đã chủ ý tránh ở
-// mọi chỗ khác. `Engine` bản thân stateless/immutable sau khi cấu hình xong
-// (mọi state của một lần chạy nằm ở `Scope`, tạo mới cho mỗi request) nên
-// dùng chung an toàn — cần feature "sync" của rhai (Cargo.toml) để `Engine`
-// là `Send + Sync`, truy cập được từ nhiều task/thread của server async.
+// One engine shared by all script stubs. It holds no per-run state (that
+// lives in `Scope`), and rhai's "sync" feature makes it `Send + Sync`.
 static ENGINE: OnceLock<Engine> = OnceLock::new();
 
 fn req_to_rhai(ctx: &RequestCtx, params: &HashMap<String, String>) -> RhaiMap {
@@ -840,7 +833,6 @@ async fn handle(State(hs): State<HandlerState>, req: Request) -> Response {
         buf.push_back(entry);
     }
 
-    // Build the axum response.
     let mut builder = Response::builder()
         .status(StatusCode::from_u16(resolved.status).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR));
     let mut has_ct = false;
@@ -1080,6 +1072,24 @@ mod tests {
         }
     }
 
+    fn stub(id: &str, method: &str, path: &str) -> Stub {
+        Stub {
+            id: id.into(),
+            enabled: true,
+            method: method.into(),
+            path: path.into(),
+            matchers: vec![],
+            mode: "static".into(),
+            status: 200,
+            headers: vec![],
+            body: String::new(),
+            body_type: "text".into(),
+            file_name: String::new(),
+            script: String::new(),
+            delay_ms: 0,
+        }
+    }
+
     #[test]
     fn path_literal_and_params() {
         assert!(match_path("/health", "/health").is_some());
@@ -1107,21 +1117,7 @@ mod tests {
 
     #[test]
     fn method_matching() {
-        let stub = Stub {
-            id: "1".into(),
-            enabled: true,
-            method: "ANY".into(),
-            path: "/".into(),
-            matchers: vec![],
-            mode: "static".into(),
-            status: 200,
-            headers: vec![],
-            body: String::new(),
-            body_type: "text".into(),
-            file_name: String::new(),
-            script: String::new(),
-            delay_ms: 0,
-        };
+        let stub = stub("1", "ANY", "/");
         assert!(method_matches(&stub, "DELETE"));
         let mut s2 = stub.clone();
         s2.method = "post".into();
@@ -1172,21 +1168,7 @@ mod tests {
 
     #[test]
     fn first_match_wins() {
-        let mk = |id: &str, path: &str| Stub {
-            id: id.into(),
-            enabled: true,
-            method: "GET".into(),
-            path: path.into(),
-            matchers: vec![],
-            mode: "static".into(),
-            status: 200,
-            headers: vec![],
-            body: String::new(),
-            body_type: "text".into(),
-            file_name: String::new(),
-            script: String::new(),
-            delay_ms: 0,
-        };
+        let mk = |id: &str, path: &str| stub(id, "GET", path);
         let cfg = MockConfig {
             stubs: vec![mk("a", "/users/:id"), mk("b", "/users/42")],
             ..Default::default()
@@ -1199,19 +1181,8 @@ mod tests {
     #[test]
     fn disabled_stub_is_skipped() {
         let mut s = Stub {
-            id: "a".into(),
             enabled: false,
-            method: "GET".into(),
-            path: "/users/:id".into(),
-            matchers: vec![],
-            mode: "static".into(),
-            status: 200,
-            headers: vec![],
-            body: String::new(),
-            body_type: "text".into(),
-            file_name: String::new(),
-            script: String::new(),
-            delay_ms: 0,
+            ..stub("a", "GET", "/users/:id")
         };
         let cfg = MockConfig {
             stubs: vec![s.clone()],
@@ -1266,7 +1237,7 @@ mod tests {
 
     #[test]
     fn base64_decode_roundtrips() {
-        // "Hello, mock!" base64-encoded, with embedded whitespace + data URL prefix.
+        // Whitespace, missing padding and a data URL prefix are tolerated.
         assert_eq!(base64_decode("aGVsbG8=").unwrap(), b"hello");
         assert_eq!(base64_decode("aGVs\nbG8").unwrap(), b"hello"); // no padding + newline
         assert_eq!(
@@ -1279,19 +1250,10 @@ mod tests {
     #[test]
     fn base64_body_resolves_to_bytes_with_disposition() {
         let mut s = Stub {
-            id: "f".into(),
-            enabled: true,
-            method: "GET".into(),
-            path: "/file".into(),
-            matchers: vec![],
-            mode: "static".into(),
-            status: 200,
-            headers: vec![],
             body: "aGVsbG8=".into(),
             body_type: "base64".into(),
             file_name: "greeting.txt".into(),
-            script: String::new(),
-            delay_ms: 0,
+            ..stub("f", "GET", "/file")
         };
         let r = resolve(&s, &ctx(), &HashMap::new());
         assert_eq!(r.body, b"hello");

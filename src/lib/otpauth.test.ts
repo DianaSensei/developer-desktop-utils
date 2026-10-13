@@ -2,16 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { base32Decode, base32Encode, parseOtpImport } from '@/lib/otpauth';
 
 /**
- * Secret 2FA gần như luôn được COPY từ trang cấu hình của dịch vụ, nên nó tới
- * tay tool ở đủ mọi hình dạng: chia nhóm 4 ký tự bằng dấu cách, viết thường,
- * kèm padding '=', và thường dính thêm khoảng trắng thừa ở hai đầu. Bộ test này
- * khoá lại việc mọi biến thể đó cùng giải ra một khoá — sai ở đây nghĩa là
- * người dùng thấy "Invalid character" cho một secret hoàn toàn hợp lệ.
- *
- * Mở rộng thêm phần trình đọc protobuf tối giản đứng sau việc import mã 2FA từ
- * Google Authenticator / 2FAS / Aegis / Authy... — logic BẢO MẬT: đọc sai
- * secret hoặc sai counter thì mã OTP sinh ra sai mà người dùng không có cách
- * nào tự phát hiện, ngoài việc đăng nhập thất bại.
+ * 2FA secrets are pasted from service settings pages in many shapes (grouped
+ * by spaces, lowercase, padded, with stray whitespace); all must decode to the
+ * same key. Also covers the minimal protobuf reader used to import Google
+ * Authenticator exports: a misread secret or counter yields wrong codes the
+ * user cannot detect.
  */
 
 const bytes = (...b: number[]) => new Uint8Array(b);
@@ -30,7 +25,7 @@ describe('base32Decode', () => {
   });
 
   it('bỏ padding "=" kể cả khi sau nó còn khoảng trắng', () => {
-    // Thứ tự strip sai (cắt '=' trước khi bỏ khoảng trắng) làm chuỗi này ném lỗi.
+    // Stripping '=' before whitespace would make this throw.
     const canonical = hex(base32Decode('JBSWY3DP'));
     expect(hex(base32Decode('JBSWY3DP===='))).toBe(canonical);
     expect(hex(base32Decode('JBSWY3DP====  '))).toBe(canonical);
@@ -53,9 +48,9 @@ describe('base32Encode', () => {
   });
 });
 
-// ─── Bộ dựng protobuf tối giản, khớp với field layout mà otpauth.ts đọc ────
-// (1=secret bytes, 2=name, 3=issuer, 4=algorithm, 5=digits, 6=type, 7=counter;
-// bọc trong field 1 lặp lại của message di trú Google Authenticator.)
+// ─── Minimal protobuf builder matching otpauth.ts's field layout ────────
+// (1=secret, 2=name, 3=issuer, 4=algorithm, 5=digits, 6=type, 7=counter,
+// wrapped in repeated field 1 of the Google Authenticator migration message.)
 function varint(n: number): number[] {
   const out: number[] = [];
   while (n > 0x7f) { out.push((n & 0x7f) | 0x80); n = Math.floor(n / 128); }
@@ -131,11 +126,8 @@ describe('parseOtpImport — otpauth:// (chuẩn, dùng bởi 2FAS/Aegis/Authy/1
   });
 
   it('digits=0 rơi về mặc định 6 (không phải kẹp về 1) — `parseInt(\'0\') || 6` coi 0 là "chưa có"', () => {
-    // Đây là hành vi THẬT của code, không phải điều tôi muốn nó làm: chuỗi
-    // "0" hợp lệ về cú pháp, nhưng `0 || 6` trong nguồn coi số 0 là falsy nên
-    // rơi về mặc định — giống hệt như không truyền digits. Ghi lại ranh giới
-    // này để không ai "sửa" nó thành 1 rồi phá vỡ trường hợp digits thật sự
-    // vắng mặt (cũng đi qua đúng nhánh `|| 6` đó).
+    // Documents current behavior: `parseInt('0') || 6` treats 0 as unset,
+    // the same path as a missing `digits`.
     const uri = 'otpauth://totp/X?secret=JBSWY3DPEHPK3PXP&digits=0';
     expect(parseOtpImport(uri)[0]?.digits).toBe(6);
   });
@@ -162,7 +154,7 @@ describe('parseOtpImport — otpauth:// (chuẩn, dùng bởi 2FAS/Aegis/Authy/1
 
   it('secret có khoảng trắng bị gộp lại và viết hoa', () => {
     const uri = 'otpauth://totp/X?secret=jbsw%20y3dp%20ehpk%203pxp';
-    // %20 đã decode bởi URLSearchParams thành khoảng trắng thật trước khi lọc.
+    // URLSearchParams decodes %20 to spaces before filtering.
     const [otp] = parseOtpImport(uri);
     expect(otp?.secret).toBe('JBSWY3DPEHPK3PXP');
   });

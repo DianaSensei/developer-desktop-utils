@@ -1,12 +1,17 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { usePluginConfig, usePluginSdkFor, usePluginState } from '@/platform';
 import { Input } from '@/components/ui/input';
 import { CopyButton } from '@/components/ui/copy-button';
 import { Segmented } from '@/components/ui/segmented';
 import { RefreshCw } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import { v4 as uuidv4 } from 'uuid';
 import { randomInt, randomString, randomUnitFloat } from '@/lib/secureRandom';
+import { useMessages } from '@/contexts/LocaleContext';
+import MESSAGES from '@/components/tools/Generator.messages';
+import COMMON from '@/components/tools/common.messages';
+import { ToggleChip } from '@/components/ui/toggle-chip';
+import { Button } from '@/components/ui/button';
+import { ToolToolbar } from '@/components/ui/tool-layout';
 
 type Mode = 'uuid' | 'number' | 'text';
 
@@ -28,15 +33,17 @@ function randomNumber(min: number, max: number, decimals: number): string {
 }
 
 function ResultList({ items }: { items: string[] }) {
+  const m = useMessages(MESSAGES);
+  const c = useMessages(COMMON);
   if (!items.length) return null;
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between">
-        <span className="text-xs text-fg-mute">{items.length} result{items.length !== 1 ? 's' : ''}</span>
+        <span className="text-xs text-fg-mute">{m(items.length === 1 ? 'result' : 'results', { n: items.length })}</span>
         {items.length > 1 && (
           <CopyButton
             value={() => items.join('\n')}
-            label="Copy all"
+            label={c('copyAll')}
             variant="ghost"
             size="sm"
             className="h-6 px-1.5 text-[11px] text-fg-mute hover:text-fg"
@@ -62,6 +69,8 @@ function ResultList({ items }: { items: string[] }) {
 }
 
 export function RandomGenerator() {
+  const m = useMessages(MESSAGES);
+  const c = useMessages(COMMON);
   const sdk = usePluginSdkFor('generator');
   const config = usePluginConfig();
   const { maxNumberCount, maxTextCount, maxTextLength } = config.generator;
@@ -108,26 +117,34 @@ export function RandomGenerator() {
     else generateText();
   };
 
+  // A first batch on open and on each mode switch, instead of an empty pane
+  // that waits for Generate. Option changes still need Generate, so a value
+  // the user is copying does not change under them.
+  useEffect(() => {
+    handleGenerate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode]);
+
   return (
     <div className="flex flex-col h-full">
       {/* Toolbar */}
-      <div className="shrink-0 header-chrome px-4 py-2.5 flex items-center gap-3">
+      <ToolToolbar className="flex items-center gap-3">
         <Segmented
           value={mode}
           onValueChange={setMode}
           options={[
             { value: 'uuid', label: 'UUID' },
-            { value: 'number', label: 'Number' },
-            { value: 'text', label: 'Text' },
+            { value: 'number', label: m('number') },
+            { value: 'text', label: m('text') },
           ]}
-          aria-label="Generator mode"
+          aria-label={m('modeLabel')}
         />
 
         {mode === 'uuid' && (
           <div className="flex items-center gap-1.5">
-            <span className="text-xs text-fg-mute">Count</span>
-            <Input type="number" min={1} max={100} value={count}
-              onChange={(e) => setCount(clamp(parseInt(e.target.value) || 1, 1, 100))}
+            <span className="text-xs text-fg-mute">{m('count')}</span>
+            <Input type="number" aria-label={m('count')} min={1} max={100} value={count}
+              onChange={(e) => setCount(clamp(Number.parseInt(e.target.value, 10) || 1, 1, 100))}
               className="h-ctl text-xs w-20 rounded-sm" />
           </div>
         )}
@@ -135,20 +152,20 @@ export function RandomGenerator() {
         {mode === 'number' && (
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1">
-              <span className="text-xs text-fg-mute">Min</span>
+              <span className="text-xs text-fg-mute">{m('min')}</span>
               <Input type="number" value={numMin} onChange={(e) => setNumMin(parseFloat(e.target.value) || 0)} className="h-ctl text-xs w-20 rounded-sm" />
             </div>
             <div className="flex items-center gap-1">
-              <span className="text-xs text-fg-mute">Max</span>
+              <span className="text-xs text-fg-mute">{m('max')}</span>
               <Input type="number" value={numMax} onChange={(e) => setNumMax(parseFloat(e.target.value) || 0)} className="h-ctl text-xs w-20 rounded-sm" />
             </div>
             <div className="flex items-center gap-1">
-              <span className="text-xs text-fg-mute">Decimals</span>
+              <span className="text-xs text-fg-mute">{m('decimals')}</span>
               <Input type="number" min={0} max={10} value={decimals} onChange={(e) => setDecimals(clamp(parseInt(e.target.value) || 0, 0, 10))} className="h-ctl text-xs w-16 rounded-sm" />
             </div>
             <div className="flex items-center gap-1">
-              <span className="text-xs text-fg-mute">Count</span>
-              <Input type="number" min={1} max={maxNumberCount} value={count} onChange={(e) => setCount(clamp(parseInt(e.target.value) || 1, 1, maxNumberCount))} className="h-ctl text-xs w-20 rounded-sm" />
+              <span className="text-xs text-fg-mute">{m('count')}</span>
+              <Input type="number" aria-label={m('count')} min={1} max={maxNumberCount} value={count} onChange={(e) => setCount(clamp(Number.parseInt(e.target.value, 10) || 1, 1, maxNumberCount))} className="h-ctl text-xs w-20 rounded-sm" />
             </div>
           </div>
         )}
@@ -156,40 +173,35 @@ export function RandomGenerator() {
         {mode === 'text' && (
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-1">
-              <span className="text-xs text-fg-mute">Length</span>
-              <Input type="number" min={1} max={maxTextLength} value={textLen} onChange={(e) => setTextLen(clamp(parseInt(e.target.value) || 1, 1, maxTextLength))} className="h-ctl text-xs w-20 rounded-sm" />
+              <span className="text-xs text-fg-mute">{m('length')}</span>
+              <Input type="number" min={1} max={maxTextLength} value={textLen} onChange={(e) => setTextLen(clamp(Number.parseInt(e.target.value, 10) || 1, 1, maxTextLength))} className="h-ctl text-xs w-20 rounded-sm" />
             </div>
             <div className="flex items-center gap-1">
-              <span className="text-xs text-fg-mute">Count</span>
-              <Input type="number" min={1} max={maxTextCount} value={count} onChange={(e) => setCount(clamp(parseInt(e.target.value) || 1, 1, maxTextCount))} className="h-ctl text-xs w-20 rounded-sm" />
+              <span className="text-xs text-fg-mute">{m('count')}</span>
+              <Input type="number" aria-label={m('count')} min={1} max={maxTextCount} value={count} onChange={(e) => setCount(clamp(Number.parseInt(e.target.value, 10) || 1, 1, maxTextCount))} className="h-ctl text-xs w-20 rounded-sm" />
             </div>
             <div className="flex gap-1.5">
               {(Object.keys(CHARSETS) as CharsetKey[]).map((k) => (
-                <button key={k} onClick={() => toggleCharset(k)}
-                  className={cn('rounded-lg border px-2 py-0.5 text-xs font-medium transition-colors',
-                    charsets[k] ? 'bg-acc/10 text-acc border-acc/30' : 'text-fg-mute hover:text-fg')}>
+                <ToggleChip key={k} pressed={charsets[k]} onPressedChange={() => toggleCharset(k)} className="px-2 font-mono">
                   {k === 'lower' ? 'a–z' : k === 'upper' ? 'A–Z' : k === 'digits' ? '0–9' : '!@#'}
-                </button>
+                </ToggleChip>
               ))}
             </div>
-            <Input value={customChars} onChange={(e) => setCustomChars(e.target.value)} placeholder="Custom chars" className="h-ctl text-xs w-28 font-mono rounded-sm" />
+            <Input value={customChars} onChange={(e) => setCustomChars(e.target.value)} placeholder={m('customChars')} className="h-ctl text-xs w-28 font-mono rounded-sm" />
           </div>
         )}
 
-        <button
-          onClick={handleGenerate}
-          className="ml-auto flex items-center gap-1.5 rounded-lg bg-acc px-3 py-1.5 text-xs font-medium text-acc-fg hover:bg-acc/90 transition-colors shrink-0"
-        >
-          <RefreshCw className="h-3 w-3" />Generate
-        </button>
-      </div>
+        <Button size="sm" onClick={handleGenerate} className="ml-auto h-ctl shrink-0 gap-1.5 rounded-sm text-xs">
+          <RefreshCw className="h-3 w-3" />{c('generate')}
+        </Button>
+      </ToolToolbar>
 
       {/* Results */}
       <div className="flex-1 min-h-0 overflow-y-auto p-4">
         <ResultList items={results} />
         {!results.length && (
           <div className="flex items-center justify-center h-full text-fg-mute text-sm">
-            Configure options above and click Generate
+            {m('configureHint')}
           </div>
         )}
       </div>

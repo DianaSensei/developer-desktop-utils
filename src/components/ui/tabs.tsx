@@ -1,25 +1,16 @@
-// A horizontal tab strip that progressively collapses trailing tabs into a »
-// overflow menu as it runs out of room — using measured widths so the active tab
-// is never clipped. An optional `right` node is pinned to the right edge and the
-// tabs yield space to it (e.g. a status readout or toolbar controls).
+// Horizontal tab strip that moves trailing tabs into a » overflow menu as it
+// runs out of room, using measured widths so the active tab is never
+// clipped. An optional `right` node is pinned to the right edge.
 //
-// Shared foundation: originally built for API Client's request/response panel
-// tabs; promoted here so any tool with a horizontal tab strip (Kafka topic
-// views, RabbitMQ queue/exchange views) gets the same collapse-to-overflow
-// behavior instead of a plain non-responsive tab row that clips at narrow
-// widths.
-//
-// Active tab is a rounded-md filled pill — the app's one semantic shape for
-// "this is selected" (see design/RULES.md's "Bo góc cho trạng thái đang chọn"
-// rule). This used to be an opt-in `variant` (a sliding-underline strip was
-// the default, kept for compatibility with the tools that hadn't been moved
-// over yet); every consumer has since moved to the pill, so the underline
-// path and the `variant` prop are gone — one shape, not two to keep in sync.
+// The active tab is a rounded-md filled pill, the app's shape for "selected"
+// (design/RULES.md).
 
 import { forwardRef, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ChevronsRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useDismissable } from '@/hooks/useDismissable';
+import { useMessages } from '@/contexts/LocaleContext';
+import UI from '@/components/ui/ui.messages';
 
 export interface TabDef {
   id: string;
@@ -204,13 +195,14 @@ const TabBtn = forwardRef<HTMLButtonElement, {
 TabBtn.displayName = 'TabBtn';
 
 function TabOverflow({ tabs, onSelect }: { tabs: TabDef[]; onSelect: (id: string) => void }) {
+  const ui = useMessages(UI);
   const [open, setOpen] = useState(false);
   // Click-outside + Escape, instead of a full-screen invisible backdrop that
   // swallowed hover and scroll events over the rest of the panel.
   const ref = useDismissable<HTMLDivElement>(open, () => setOpen(false));
   return (
     <div ref={ref} className="relative ml-3 shrink-0">
-      <button onClick={() => setOpen((o) => !o)} title="More tabs" className="rounded-md p-1.5 text-fg-mute transition-colors hover:bg-bg-2/50 hover:text-fg">
+      <button onClick={() => setOpen((o) => !o)} title={ui('moreTabs')} aria-label={ui('moreTabs')} className="rounded-md p-1.5 text-fg-mute transition-colors hover:bg-bg-2/50 hover:text-fg">
         <ChevronsRight className="h-4 w-4" />
       </button>
       {open && (

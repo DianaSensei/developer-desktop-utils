@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { Switch } from '@/components/ui/switch';
 import { createPortal } from 'react-dom';
 import { Check, ChevronDown, ChevronUp, Clock, Minus, Plus, Tag as TagIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -7,6 +8,8 @@ import { Input } from '@/components/ui/input';
 import { ModalShell } from '@/components/ui/modal-shell';
 import { useClockify } from './store';
 import { fmtHM, pad, parseDuration } from './time';
+import { useMessages } from '@/contexts/LocaleContext';
+import MESSAGES from '@/components/tools/clockify/TimeTracker.messages';
 
 // ---------------------------------------------------------------------------
 // NumberStepper — themed −/＋ stepper (replaces native number-input arrows,
@@ -125,6 +128,7 @@ export function TimeStepperField({
   step?: number;
   className?: string;
 }) {
+  const tr = useMessages(MESSAGES);
   const [draft, setDraft] = useState<string | null>(null);
   const fmt = (h: number, m: number) => `${pad(h)}:${pad(m)}`;
 
@@ -197,8 +201,8 @@ export function TimeStepperField({
         className="w-full min-w-0 bg-transparent px-1.5 text-center font-mono text-sm tabular-nums focus:outline-hidden"
       />
       <div className="flex flex-col border-l border-line">
-        {stepBtn(1, ChevronUp, 'Later')}
-        {stepBtn(-1, ChevronDown, 'Earlier', 'border-t border-line')}
+        {stepBtn(1, ChevronUp, tr('later'))}
+        {stepBtn(-1, ChevronDown, tr('earlier'), 'border-t border-line')}
       </div>
     </div>
   );
@@ -329,29 +333,12 @@ export function Popover({
 }
 
 // ---------------------------------------------------------------------------
-// Toggle — pill switch
+// Toggle — kit Switch with an inline label
 // ---------------------------------------------------------------------------
 
 export function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label?: string }) {
-  const btn = (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      onClick={() => onChange(!checked)}
-      className={cn(
-        'relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus',
-        checked ? 'bg-acc' : 'bg-fg-mute/25'
-      )}
-    >
-      <span
-        className={cn(
-          'inline-block h-3.5 w-3.5 rounded-full bg-white shadow-sm transition-transform',
-          checked ? 'translate-x-[18px]' : 'translate-x-[3px]'
-        )}
-      />
-    </button>
-  );
+  // Kit Switch (green when on, RULES.md), like every other switch.
+  const btn = <Switch checked={checked} onCheckedChange={onChange} aria-label={label} />;
   if (!label) return btn;
   return (
     <label className="flex cursor-pointer items-center justify-between gap-3 text-xs">
@@ -389,6 +376,7 @@ export function ConfirmButton({
   className?: string;
   title?: string;
 }) {
+  const tr = useMessages(MESSAGES);
   const [armed, setArmed] = useState(false);
   useEffect(() => {
     if (!armed) return;
@@ -397,7 +385,11 @@ export function ConfirmButton({
   }, [armed]);
   return (
     <button
-      title={title}
+      type="button"
+      // The first click arms; the title says a second click deletes, for
+      // screen readers too.
+      title={armed ? tr('clickAgainToConfirm') : title}
+      aria-label={armed ? tr('clickAgainToConfirm') : title}
       onClick={(e) => {
         e.stopPropagation();
         if (armed) {
@@ -431,6 +423,7 @@ export function ProjectPicker({
   onChange: (projectId: string | null, taskId: string | null) => void;
   compact?: boolean;
 }) {
+  const tr = useMessages(MESSAGES);
   const { projects, tasks, projectById, taskById, addProject, addTask } = useClockify();
   const [creating, setCreating] = useState('');
   const project = projectById(value);
@@ -451,7 +444,7 @@ export function ProjectPicker({
         >
           <ColorDot color={project?.color} />
           <span className={cn('truncate', !project && 'text-fg-mute')}>
-            {project ? project.name : 'No project'}
+            {project ? project.name : tr('noProject')}
             {task ? ` · ${task.name}` : ''}
           </span>
           <ChevronDown className="h-3.5 w-3.5 opacity-60" />
@@ -501,13 +494,15 @@ export function ProjectPicker({
                   close();
                 }
               }}
-              placeholder="New project…"
+              placeholder={tr('newProject')}
               className="h-ctl text-xs"
             />
             <Button
               size="icon"
               variant="ghost"
               className="h-ctl w-ctl shrink-0"
+              aria-label={tr('createProject')}
+              title={tr('createProject')}
               onClick={() => {
                 if (!creating.trim()) return;
                 const p = addProject(creating.trim());
@@ -535,6 +530,7 @@ export function ProjectPicker({
 }
 
 function CreateTaskRow({ onCreate }: { onCreate: (name: string) => void }) {
+  const tr = useMessages(MESSAGES);
   const [name, setName] = useState('');
   return (
     <div className="flex items-center gap-1 pt-1">
@@ -547,7 +543,7 @@ function CreateTaskRow({ onCreate }: { onCreate: (name: string) => void }) {
             setName('');
           }
         }}
-        placeholder="New task in project…"
+        placeholder={tr('newTaskInProject')}
         className="h-ctl pl-7 text-xs"
       />
     </div>
@@ -559,6 +555,7 @@ function CreateTaskRow({ onCreate }: { onCreate: (name: string) => void }) {
 // ---------------------------------------------------------------------------
 
 export function TagPicker({ value, onChange, compact }: { value: string[]; onChange: (ids: string[]) => void; compact?: boolean }) {
+  const tr = useMessages(MESSAGES);
   const { tags, addTag } = useClockify();
   const [creating, setCreating] = useState('');
   const selected = tags.filter((t) => value.includes(t.id));
@@ -575,14 +572,14 @@ export function TagPicker({ value, onChange, compact }: { value: string[]; onCha
         >
           <TagIcon className="h-3.5 w-3.5 opacity-60" />
           <span className={cn('truncate', !selected.length && 'text-fg-mute')}>
-            {selected.length ? selected.map((t) => t.name).join(', ') : 'Tags'}
+            {selected.length ? selected.map((t) => t.name).join(', ') : tr('tags')}
           </span>
         </button>
       )}
     >
       {() => (
         <div className="max-h-72 w-52 overflow-y-auto">
-          {tags.length === 0 && <p className="px-2 py-1.5 text-xs text-fg-mute">No tags yet</p>}
+          {tags.length === 0 && <p className="px-2 py-1.5 text-xs text-fg-mute">{tr('noTags')}</p>}
           {tags.map((t) => (
             <button key={t.id} onClick={() => toggle(t.id)} className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-bg-2">
               <span className={cn('flex h-3.5 w-3.5 items-center justify-center rounded border', value.includes(t.id) ? 'border-acc bg-acc text-acc-fg' : 'border-fg-mute/40')}>
@@ -602,7 +599,7 @@ export function TagPicker({ value, onChange, compact }: { value: string[]; onCha
                   setCreating('');
                 }
               }}
-              placeholder="New tag…"
+              placeholder={tr('newTag')}
               className="h-ctl text-xs"
             />
           </div>

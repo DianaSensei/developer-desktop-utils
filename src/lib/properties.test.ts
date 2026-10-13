@@ -2,9 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { parseProperties, stringifyProperties } from '@/lib/properties';
 
 /**
- * Parser/serializer .properties tự viết tay (không dùng thư viện) — đúng loại
- * code dễ sai nhất trong cả app: escape ký tự, nối dòng bằng `\`, đường dẫn
- * key có chấm/ngoặc vuông, suy luận kiểu số/bool. Chưa có test nào trước đây.
+ * The hand-written .properties parser/serializer: escapes, line
+ * continuations, dotted/bracketed key paths, and number/boolean inference.
  */
 
 describe('parseProperties', () => {
@@ -35,8 +34,8 @@ describe('parseProperties', () => {
   });
 
   it('một số CHẴN dấu \\\\ ở cuối dòng thì KHÔNG nối — đó là escape một dấu \\\\ thật', () => {
-    // 'path=C:\\\\' trong text .properties gốc là `path=C:\\` — hai backslash =
-    // một backslash thật, không phải dấu nối dòng.
+    // 'path=C:\\\\' in the file is `path=C:\\`: an escaped backslash, not a
+    // line continuation.
     const text = 'path=C:\\\\\nnext=ok';
     expect(parseProperties(text)).toEqual({ path: 'C:\\', next: 'ok' });
   });
@@ -125,11 +124,9 @@ describe('round-trip parse ∘ stringify', () => {
   });
 
   it('CHUỖI SỐ bị suy luận thành number khi đọc lại — hành vi có chủ đích, không phải bug', () => {
-    // Ghi "07000" (zip code) làm value CHUỖI, nhưng chỉ khi nó có số 0 dẫn đầu
-    // thì đọc lại mới còn là chuỗi — value chuỗi "2024" bình thường sẽ ĐỌC LẠI
-    // thành number 2024, vì .properties không có kiểu dữ liệu, chỉ có suy luận
-    // theo hình dạng. Test này ghi lại ranh giới đó thay vì để ai đó "sửa" nó
-    // thành round-trip hoàn hảo rồi phá vỡ suy luận kiểu ở nơi khác.
+    // .properties has no types, so values are inferred from their shape:
+    // "2024" reads back as a number, while "07000" (leading zero) stays a
+    // string. Documented here so a "fix" does not break inference.
     const original = { year: '2024' };
     const reparsed = parseProperties(stringifyProperties(original)) as { year: unknown };
     expect(reparsed.year).toBe(2024);

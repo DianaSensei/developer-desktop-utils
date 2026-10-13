@@ -2,42 +2,35 @@ import { isTauri } from '@/lib/platform';
 import { storageGet, storageRemove } from '@/lib/persistentStore';
 
 /**
- * Kho bí mật — TÁCH HẲN khỏi store dùng chung của app.
+ * Secret storage, separate from the app's shared settings store.
  *
- * Vì sao phải tách: `persistentStore` nạp TOÀN BỘ `app-settings.json` vào một
- * cache đồng bộ trong RAM lúc khởi động, và `storageGet(bấtKỳKhoáNào)` đọc được
- * mọi thứ trong đó. Khi seed TOTP, token API và mật khẩu broker cùng nằm trên
- * mặt phẳng khoá ấy thì bất kỳ đoạn code nào trong webview — kể cả một
- * dependency npm bị chiếm trong bundle của một plugin — cũng đọc được tất cả
- * bằng đúng một lời gọi. Đây là điều kiện tiên quyết trước khi nghĩ tới việc
- * nạp plugin lúc chạy.
+ * `persistentStore` loads all of `app-settings.json` into an in-memory cache
+ * and writes it to disk in plaintext, so TOTP seeds, tokens and passwords
+ * must not live there.
  *
- * Hai đường lưu, cố ý khác nhau:
+ * - In Tauri: the encrypted Rust vault (`src-tauri/src/secrets_vault.rs`),
+ *   AES-256-GCM with the key in the OS keychain. Per-plugin separation is
+ *   enforced only by sdk.ts: any webview code can call `secret_vault_*`
+ *   directly. Without a keychain the key file lives in app data, which the
+ *   webview's fs scope can read.
+ * - On the web (`npm run dev`): `sessionStorage`, not `localStorage`, because
+ *   the web build mirrors `localStorage` into the shared cache. Secrets last
+ *   for the session only; the web build is for development.
  *
- * - **Trong Tauri**: kho MÃ HOÁ phía Rust (`src-tauri/src/secrets_vault.rs`) —
- *   AES-256-GCM, khoá nằm trong keychain của OS chứ không cạnh dữ liệu. Webview
- *   không bao giờ chạm tới khoá.
- * - **Trên web (`npm run dev`)**: `sessionStorage`, KHÔNG phải `localStorage` —
- *   vì `initPersistentStore()` ở bản web hút nguyên `localStorage` vào cache
- *   chung, nên lưu bí mật ở đó sẽ đưa chúng trở lại đúng mặt phẳng khoá ta vừa
- *   dọn. Đổi lại, bản web chỉ giữ bí mật trong một phiên; đó là bản dành cho
- *   dev, sản phẩm thật luôn là Tauri.
- *
- * Trên máy Linux không có Secret Service, khoá rơi về file 0600 cạnh dữ liệu —
- * yếu hơn hẳn, nên chế độ đang dùng được trả ra qua `vaultStatus()` để Settings
- * hiển thị thay vì giấu đi. Xem phần đầu `secrets_vault.rs` cho đánh đổi đầy đủ.
+ * Without a keychain the vault key falls back to a 0600 file; `vaultStatus()`
+ * reports which mode is active so Settings can show it.
  */
 
 const LEGACY_STORE_FILE = 'secrets.json';
 const WEB_PREFIX = 'devtool-secret:';
 
-/** Khoá đến từ đâu — xem `KeyMode` ở secrets_vault.rs. */
+/** Where the key comes from; see `KeyMode` in secrets_vault.rs. */
 export type VaultKeyMode = 'keychain' | 'file';
 
 export interface VaultStatus {
   encrypted: boolean;
   keyMode: VaultKeyMode;
-  /** `false` khi có dữ liệu trên đĩa nhưng khoá hiện tại không mở được nó. */
+  /** `false` when data exists but the current key cannot decrypt it. */
   readable: boolean;
 }
 
@@ -46,8 +39,8 @@ async function call<T>(command: string, args?: Record<string, unknown>): Promise
   return invoke<T>(command, args);
 }
 
-/** Khoá trong kho: `<pluginId>/<key>`. Không dùng chung tiền tố `devtool:` của
- *  store chung, để một khoá bị chép nhầm giữa hai kho là lỗi nhìn thấy ngay. */
+/** Vault key `<pluginId>/<key>`. Deliberately unlike the shared store's
+ *  `devtool:` prefix, so a key copied to the wrong store stands out. */
 export function vaultKey(pluginId: string, key: string): string {
   return `${pluginId}/${key}`;
 }
@@ -76,7 +69,7 @@ export async function secretDelete(pluginId: string, key: string): Promise<void>
   await call<void>('secret_vault_delete', { key: k });
 }
 
-/** Tên khoá (đã bỏ tiền tố plugin) mà plugin này đang giữ trong kho. */
+/** Key names (without the plugin prefix) this plugin holds. */
 export async function secretKeys(pluginId: string): Promise<string[]> {
   const prefix = `${pluginId}/`;
   const all = isTauri
@@ -90,7 +83,7 @@ export async function secretKeys(pluginId: string): Promise<string[]> {
     .sort();
 }
 
-/** Chế độ khoá hiện tại, để Settings nói đúng mức bảo vệ đang áp dụng. */
+/** Current key mode, so Settings can state the protection in effect. */
 export async function vaultStatus(): Promise<VaultStatus | null> {
   if (!isTauri) return null;
   const raw = await call<{ encrypted: boolean; key_mode: VaultKeyMode; readable: boolean }>(
@@ -99,14 +92,12 @@ export async function vaultStatus(): Promise<VaultStatus | null> {
   return { encrypted: raw.encrypted, keyMode: raw.key_mode, readable: raw.readable };
 }
 
-/** Kho phía Rust ghi thẳng xuống đĩa trong từng lệnh, không có gì để flush.
- *  Giữ hàm này vì nó là điểm gọi đã có ở luồng di trú — và để nếu sau này kho
- *  chuyển sang ghi trễ thì chỗ cần sửa đã nằm sẵn đúng một nơi. */
+/** No-op: the vault writes to disk on every command. Kept as the call site
+ *  used by the migration flow. */
 export async function flushSecrets(): Promise<void> {}
 
-/** Xoá sạch kho. Dùng bởi nhánh DEV của main.tsx, song song với
- *  `clearPersistentStore()` — nếu không, `tauri:dev` sẽ dọn store chung nhưng
- *  để lại bí mật cũ, và "chạy từ trạng thái sạch" hoá ra không sạch. */
+/** Empties the vault. Used by main.tsx's dev reset alongside
+ *  `clearPersistentStore()`. */
 export async function clearSecrets(): Promise<void> {
   if (!isTauri) {
     for (const k of Object.keys(sessionStorage)) {
@@ -118,42 +109,34 @@ export async function clearSecrets(): Promise<void> {
 }
 
 /**
- * Khoá từng nằm trong store chung mà thực chất là bí mật, và chỗ chúng thuộc về.
- *
- * Danh sách tường minh, không đoán theo tên khoá: một heuristic kiểu "khoá nào
- * có chữ 'secret' thì chuyển" sẽ vừa bỏ sót (`devtool:apiclient:environments`)
- * vừa bắt nhầm (`devtool:base64:secretInput` — là ô nhập của người dùng, không
- * phải credential).
+ * Shared-store keys that actually hold secrets, and where they belong.
+ * Listed explicitly: matching on names like "secret" would miss some keys
+ * and catch user input fields.
  */
 const MIGRATIONS: ReadonlyArray<{ from: string; pluginId: string; key: string }> = [
-  // Seed TOTP/HOTP — bí mật rõ ràng nhất trong app: đủ để sinh mã đăng nhập
-  // của người dùng ở mọi dịch vụ họ đã thêm.
+  // TOTP/HOTP seeds: enough to generate the user's login codes.
   { from: 'devtool:2fa:accounts', pluginId: '2fa', key: 'accounts' },
-  // JWT dán vào debugger: thường là bearer token thật của người dùng, không
-  // phải chuỗi ví dụ. Giữ nó ở store chung nghĩa là mọi module trong webview
-  // đọc được token phiên làm việc của họ.
+  // Tokens pasted into the JWT debugger are usually real bearer tokens.
   { from: 'devtool:jwt:token', pluginId: 'jwt', key: 'token' },
-  // "Vault" của API Client: toàn bộ nội dung là bí mật theo đúng định nghĩa của
-  // nó — nó tồn tại chính vì người dùng không muốn những giá trị này nằm trong
-  // environments xuất/nhập được.
+  // The API Client vault exists to hold values kept out of environments.
   { from: 'devtool:apiclient:vault', pluginId: 'api-client', key: 'vault' },
+  // HMAC and AES keys typed into Encode·Hash·Encrypt. The pre-namespace key
+  // comes first so the newer namespaced value wins when both exist.
+  { from: 'devtool:hash:hmacKey', pluginId: 'base64', key: 'hmac-key' },
+  { from: 'devtool:base64:hash:hmacKey', pluginId: 'base64', key: 'hmac-key' },
+  { from: 'devtool:hash:key', pluginId: 'base64', key: 'aes-key' },
+  { from: 'devtool:base64:hash:key', pluginId: 'base64', key: 'aes-key' },
 ];
 
 /**
- * Chuyển bí mật từ store chung sang kho, một lần, lúc khởi động.
- *
- * Không dùng cờ "đã migrate": nguồn bị XOÁ sau khi chép thành công, nên chạy
- * lại là no-op, còn nếu tiến trình chết giữa chừng thì lần khởi động sau tự
- * thử lại. Một cờ đặt sai thời điểm sẽ biến sự cố giữa chừng thành mất dữ liệu.
+ * Moves secrets from the shared store into the vault at startup. The source
+ * is deleted after each successful copy, so re-running is a no-op and an
+ * interrupted run resumes next time; no "migrated" flag is needed.
  */
 export async function migrateSecretsFromSharedStore(): Promise<string[]> {
-  // KHÔNG di trú ở bản web. Kho của bản web là `sessionStorage`, nên "chuyển"
-  // ở đây thực chất là bê dữ liệu từ nơi lưu được sang nơi mất khi đóng tab,
-  // rồi xoá bản gốc — tức là XOÁ dữ liệu người dùng chứ không phải di trú.
-  //
-  // Để nguyên thì bản web hiển thị rỗng (đọc kho session trống) nhưng dữ liệu
-  // vẫn còn nguyên chỗ cũ và sẽ được di trú đúng cách khi họ mở bản desktop.
-  // Hiển thị rỗng là phiền; xoá mất là không sửa được.
+  // Not on the web: the web vault is sessionStorage, so "moving" would
+  // delete persistent data. It stays in place until the desktop app
+  // migrates it.
   if (!isTauri) return [];
 
   const moved: string[] = [];
@@ -169,17 +152,12 @@ export async function migrateSecretsFromSharedStore(): Promise<string[]> {
 }
 
 /**
- * Chuyển kho TRẦN của bản trước (`secrets.json`, do tauri-plugin-store ghi) sang
- * kho mã hoá.
- *
- * Chỉ tồn tại vì đã có một bản trung gian tách mặt phẳng khoá nhưng chưa mã hoá.
- * Người cài mới không có file này và hàm là no-op. Sau khi chép xong, store cũ
- * được DỌN SẠCH — để lại bản trần bên cạnh bản mã hoá thì việc mã hoá chẳng còn
- * ý nghĩa gì.
+ * Moves secrets from the earlier unencrypted `secrets.json` (tauri-plugin-
+ * store) into the encrypted vault, then clears the old store. A no-op for
+ * new installs.
  */
 export async function migrateSecretsFromPlainStore(): Promise<number> {
-  // Cùng lý do như `migrateSecretsFromSharedStore`: bản web không có kho bền
-  // để chuyển sang, và store trần này cũng chỉ tồn tại ở bản Tauri.
+  // Same reason as above; the plain store only existed in Tauri builds.
   if (!isTauri) return 0;
   let moved = 0;
   try {
@@ -196,11 +174,10 @@ export async function migrateSecretsFromPlainStore(): Promise<number> {
       await legacy.save();
     }
   } catch {
-    // Không có file cũ, hoặc plugin store không mở được: không có gì để chuyển.
+    // No legacy file, or the store plugin failed to open it: nothing to move.
   }
   return moved;
 }
 
-/** Chỉ dùng trong test — không còn state cục bộ nào để dọn, nhưng giữ điểm gọi
- *  để test không phải biết chi tiết hiện thực. */
+/** Test hook; there is no module state left to reset. */
 export function __resetSecretsForTest(): void {}

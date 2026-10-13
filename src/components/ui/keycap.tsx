@@ -1,27 +1,17 @@
-// Phím tắt. Hai chỗ dùng:
-//
-//   1. Đứng một mình trong danh sách / command palette — <Keycap>⌘K</Keycap>
-//   2. Nội tuyến trong nút, ngăn bằng một VẠCH MẢNH chứ không phải dấu ngoặc:
-//      <Button sc="⌘⏎">Chạy</Button>  →  [ Chạy │ ⌘⏎ ]
-//
-// Dấu ngoặc "(⌘⏎)" đọc như chú thích và làm nhãn nút dài ra; vạch mảnh nói đúng
-// điều cần nói — đây là một phần của nút, tách khỏi nhãn.
-//
-// `mod` tự đổi ⌘ ↔ Ctrl theo hệ điều hành, để không phải viết hai nhánh ở mọi
-// chỗ gọi.
+// Keyboard shortcut, used standalone (<Keycap>⌘K</Keycap>) or inline in a
+// button after a thin divider: <Button sc="⌘⏎">Run</Button> → [ Run │ ⌘⏎ ].
+// `mod` picks ⌘ or Ctrl for the OS.
 
 import * as React from 'react';
 import { cn } from '@/lib/utils';
-// Re-export để không phải sửa hai chỗ gọi cũ (App.tsx, design-system/index.ts)
-// — định nghĩa thật nay sống ở src/lib/platform.ts, nguồn dùng chung cho cả
-// app thay vì chỉ riêng Keycap.
+// Re-exported for existing callers; defined in src/lib/platform.ts.
 import { IS_MAC, MOD_KEY } from '@/lib/platform';
 export { IS_MAC, MOD_KEY };
 
 export interface KeycapProps extends React.HTMLAttributes<HTMLElement> {
-  /** Chèn phím lệnh của hệ điều hành vào trước — `<Keycap mod>K</Keycap>` → ⌘K / CtrlK. */
+  /** Prefixes the OS modifier key: `<Keycap mod>K</Keycap>` → ⌘K / CtrlK. */
   mod?: boolean;
-  /** Bản nội tuyến trong nút: thừa hưởng màu chữ, không có nền riêng. */
+  /** Inline variant for buttons: inherits text color, no background. */
   inline?: boolean;
   children: React.ReactNode;
 }
@@ -42,11 +32,11 @@ export function Keycap({ mod, inline, className, children, ...props }: KeycapPro
       className={cn(
         'inline-flex shrink-0 items-center justify-center font-mono text-[11px] leading-none',
         inline
-          ? // Trong nút: chỉ một vạch ngăn. `border-current` để cả vạch lẫn chữ
-            // thừa hưởng màu của nút, nên nó đúng ở mọi biến thể (đặc / nhuộm /
-            // viền / ghost) mà không cần bảng màu riêng. Độ mờ đặt trên cả phần
-            // tử — currentColor không nhận bổ ngữ alpha ở Tailwind 3.
-            'ml-2 border-l border-current pl-2 opacity-60'
+          ? // Inside a button: just a divider in the button's own color
+            // (border-current), dimmed on the element because currentColor
+            // takes no alpha modifier. 90%, not 60%: white at 60% on the
+            // accent measured 3.0:1.
+            'ml-2 border-l border-current pl-2 opacity-90'
           : 'rounded-xs border border-line bg-bg-2/60 px-1.5 py-1 text-fg-mute',
         className,
       )}

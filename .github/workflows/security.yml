@@ -54,7 +54,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable branch
         with:
           toolchain: stable
-      - uses: taiki-e/install-action@3f74d7c16a4242f1c95561e98edc25d36adb4375 # v2
+      - uses: taiki-e/install-action@4076c08d76dba979c11a7285295b0716c1d67908 # v2
         with:
           tool: cargo-audit
       # `cargo audit` fails on vulnerabilities; unmaintained/unsound/yanked
@@ -90,7 +90,7 @@ jobs:
           # the scheduled deep-history scan silently never happened.
           fetch-depth: ${{ github.event_name == 'schedule' && '0' || '1' }}
       - name: TruffleHog (verified secrets only)
-        uses: trufflesecurity/trufflehog@363923b901c911a9164f50b6c423f47c15372b1c # v3.97.4
+        uses: trufflesecurity/trufflehog@f714bf454f350590f4a24c3ddb1aef02c35bf5b6 # v3.97.5
         with:
           path: ./
           extra_args: --results=verified

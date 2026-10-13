@@ -352,17 +352,27 @@ cho sidecar của bạn — không đọc/ghi ra ngoài nó, không đoán một
 
 ## Đăng ký sidecar vào app
 
-Ba chỗ cần sửa — thiếu một trong ba thì sidecar build được, test được, nhưng
-KHÔNG chạy được từ app thật:
+**Sidecar chỉ cài qua URL (phần lớn plugin bên ngoài) KHÔNG cần sửa gì trong
+app.** Tên bin chỉ cần có dạng `devtool-svc-<kebab-case>`. Lần đầu plugin gọi
+nó, app hiện một hộp thoại native với đường dẫn + SHA-256 của file sắp chạy và
+hỏi người dùng có cho phép không (xem "Sự đồng ý của người dùng" ở
+01-architecture.md). Đồng ý được nhớ trong keychain, gắn với mã băm: cập nhật
+binary sang bản khác thì hỏi lại.
 
-1. **`src-tauri/src/service_host.rs`** — thêm tên bin vào `ALLOWED_SERVICES`
-   (hằng số Rust, ranh giới tin cậy thật — xem 01-architecture.md).
+Ba chỗ dưới đây chỉ dành cho sidecar do chính DevTool đóng gói sẵn, chạy
+không hỏi — thiếu một trong ba thì sidecar build được, test được, nhưng KHÔNG
+chạy được từ app thật:
+
+1. **`src-tauri/src/service_host.rs`** — thêm tên bin vào `BUNDLED_SERVICES`
+   (hằng số Rust, ranh giới tin cậy thật — xem 01-architecture.md). Chỉ bản
+   nằm cạnh file chạy của app được miễn hỏi; bản cài qua URL trùng tên vẫn
+   bị hỏi.
 2. **`src-tauri/tauri.conf.json`** — thêm `"binaries/<ten-bin>"` vào
    `bundle.externalBin`.
 3. **`scripts/prepare-service-sidecars.mjs`** — thêm tên bin vào
    `SERVICE_SIDECARS` (build trước `tauri build`, chạy tay lúc dev).
 
-`service_host.rs`'s test `allowlist_khop_voi_external_bin` khoá chiều (1)
+`service_host.rs`'s test `bundled_services_are_listed_in_external_bin` khoá chiều (1)
 ↔ (2) khớp nhau — không khoá được (3) vì Rust/Node không chia sẻ hằng số
 qua ranh giới ngôn ngữ; thiếu (3) chỉ lộ ra lúc build release thật, không
 lộ lúc `cargo test`.

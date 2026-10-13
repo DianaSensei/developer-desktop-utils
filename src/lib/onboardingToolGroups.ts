@@ -1,12 +1,13 @@
 import { Send, FileJson, CaseSensitive, CalendarClock, Pipette, ShieldCheck, Disc3 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import type { TranslationKey } from '@/lib/i18n';
 
 // Coarse groupings over TOOL_DEFS, used only by the onboarding tool-picker step
 // to let a new user select by area of interest instead of scanning 24 tools
 // one by one. Not a general "category" concept — TOOL_DEFS itself stays flat.
 export interface OnboardingToolGroup {
   id: string;
-  label: string;
+  labelKey: TranslationKey;
   icon: LucideIcon;
   toolIds: string[];
 }
@@ -14,43 +15,43 @@ export interface OnboardingToolGroup {
 export const ONBOARDING_TOOL_GROUPS: OnboardingToolGroup[] = [
   {
     id: 'api-messaging',
-    label: 'API & Messaging',
+    labelKey: 'onboarding.group.api-messaging',
     icon: Send,
     toolIds: ['api-client', 'mock-server'],
   },
   {
     id: 'data-format',
-    label: 'Data & Formatters',
+    labelKey: 'onboarding.group.data-format',
     icon: FileJson,
     toolIds: ['json', 'data-converter', 'sql-formatter', 'diff', 'deduplicate'],
   },
   {
     id: 'text-encoding',
-    label: 'Text & Encoding',
+    labelKey: 'onboarding.group.text-encoding',
     icon: CaseSensitive,
     toolIds: ['text-transform', 'text-counter', 'base64', 'regex', 'markdown'],
   },
   {
     id: 'time-productivity',
-    label: 'Time & Productivity',
+    labelKey: 'onboarding.group.time-productivity',
     icon: CalendarClock,
     toolIds: ['task-tracker', 'cron-generator', 'unix-time', 'generator'],
   },
   {
     id: 'design-media',
-    label: 'Design & Media',
+    labelKey: 'onboarding.group.design-media',
     icon: Pipette,
     toolIds: ['color-picker', 'qrcode'],
   },
   {
     id: 'network-security',
-    label: 'Network & Security',
+    labelKey: 'onboarding.group.network-security',
     icon: ShieldCheck,
     toolIds: ['network', 'jwt', '2fa'],
   },
   {
     id: 'fun',
-    label: 'Fun',
+    labelKey: 'onboarding.group.fun',
     icon: Disc3,
     toolIds: ['lucky-wheel'],
   },

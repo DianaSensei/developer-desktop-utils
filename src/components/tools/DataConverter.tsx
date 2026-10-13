@@ -5,6 +5,7 @@
 // tool works fully offline.
 
 import { useEffect, useState } from 'react';
+import { ToggleChip } from '@/components/ui/toggle-chip';
 import { ArrowLeftRight, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { CopyButton } from '@/components/ui/copy-button';
@@ -16,6 +17,10 @@ import { usePluginSdkFor, usePluginState } from '@/platform';
 import { useQuickPaste } from '@/hooks/useQuickPaste';
 import { useInputHistory } from '@/hooks/useInputHistory';
 import { parseProperties, stringifyProperties } from '@/lib/properties';
+import { useMessages } from '@/contexts/LocaleContext';
+import COMMON from '@/components/tools/common.messages';
+import MESSAGES from '@/components/tools/DataConverter.messages';
+import { ToolToolbar, PaneHeader } from '@/components/ui/tool-layout';
 
 type Format = 'json' | 'yaml' | 'toml' | 'xml' | 'properties';
 
@@ -75,7 +80,7 @@ async function serializeOutput(fmt: Format, value: unknown, opts: Options): Prom
     }
     case 'toml': {
       if (value === null || typeof value !== 'object' || Array.isArray(value)) {
-        throw new Error('TOML output needs a top-level table — your data is an array or scalar at the root. Wrap it in an object first.');
+        throw new Error(TOML_NEEDS_TABLE);
       }
       const { stringify } = await import('smol-toml');
       return stringify(value as Record<string, unknown>);
@@ -98,6 +103,9 @@ async function serializeOutput(fmt: Format, value: unknown, opts: Options): Prom
   }
 }
 
+/** The tool's own error (not the parser's); translated at render time. */
+const TOML_NEEDS_TABLE = '\u0000tomlNeedsTable';
+
 function errMessage(e: unknown): string {
   const msg = e instanceof Error ? e.message : String(e);
   return msg.replace(/^Error:\s*/, '');
@@ -105,6 +113,8 @@ function errMessage(e: unknown): string {
 
 export function DataConverter() {
   const sdk = usePluginSdkFor('data-converter');
+  const m = useMessages(MESSAGES);
+  const c = useMessages(COMMON);
   const [from, setFrom] = usePluginState<Format>(sdk, 'dataConverter:from', 'json', { legacyKey: 'devtool:dataConverter:from' });
   const [to, setTo] = usePluginState<Format>(sdk, 'dataConverter:to', 'yaml', { legacyKey: 'devtool:dataConverter:to' });
   const [input, setInput] = usePluginState(sdk, 'dataConverter:input', '', { legacyKey: 'devtool:dataConverter:input' });
@@ -167,7 +177,7 @@ export function DataConverter() {
   return (
     <div className="flex flex-col h-full">
       {/* Toolbar */}
-      <div className="shrink-0 header-chrome px-4 py-2.5">
+      <ToolToolbar>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           {/* From → To */}
           <div className="flex items-center gap-2">
@@ -181,7 +191,8 @@ export function DataConverter() {
               variant="ghost"
               size="icon"
               onClick={handleSwap}
-              title="Swap directions"
+              title={m('swapDirections')}
+              aria-label={m('swapDirections')}
               className="h-ctl w-ctl shrink-0 rounded-sm text-fg-mute hover:text-fg"
             >
               <ArrowLeftRight className="h-4 w-4" />
@@ -198,79 +209,72 @@ export function DataConverter() {
 
           {/* Indent */}
           <div className="flex items-center gap-1.5">
-            <span className="text-xs text-fg-mute">Indent</span>
+            <span className="text-xs text-fg-mute">{c('indent')}</span>
             <Select value={indent} onValueChange={(v) => setIndent(v as '2' | '4')}>
               <SelectTrigger className="h-ctl w-[88px] text-xs rounded-sm"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="2">2 spaces</SelectItem>
-                <SelectItem value="4">4 spaces</SelectItem>
+                <SelectItem value="2">{c('spaces', { n: 2 })}</SelectItem>
+                <SelectItem value="4">{c('spaces', { n: 4 })}</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           {showXmlOpts && (
-            <button
-              type="button"
-              onClick={() => setXmlPretty(!xmlPretty)}
-              className={
-                'rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors select-none ' +
-                (xmlPretty
-                  ? 'border-acc/50 bg-acc/10 text-acc'
-                  : 'border-line bg-transparent text-fg-mute hover:bg-bg-2 hover:text-fg')
-              }
-            >
-              Pretty XML
-            </button>
+            <ToggleChip pressed={xmlPretty} onPressedChange={setXmlPretty}>
+              {m('prettyXml')}
+            </ToggleChip>
           )}
         </div>
-      </div>
+      </ToolToolbar>
 
       {/* Editors — source | result */}
       <div className="flex flex-1 min-h-0 divide-x divide-line">
         {/* Source */}
         <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
-          <div className="flex shrink-0 items-center justify-between px-3 py-1.5 text-[11px] text-fg-mute">
-            <span>Source · {FORMATS.find((f) => f.value === from)?.label}</span>
-          </div>
-          <div className="flex flex-col flex-1 min-h-0 overflow-hidden px-3 pb-3">
+          <PaneHeader label={m('source', { format: FORMATS.find((f) => f.value === from)?.label ?? '' })} />
+          <div className="flex flex-col flex-1 min-h-0 overflow-hidden p-2">
             <SourceEditor
               value={input}
               onChange={setInput}
               placeholder={PLACEHOLDERS[from]}
+              ariaLabel={m('source', { format: FORMATS.find((f) => f.value === from)?.label ?? '' })}
             />
           </div>
         </div>
 
         {/* Result */}
         <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
-          <div className="flex shrink-0 items-center justify-between px-3 py-1.5 text-[11px] text-fg-mute">
-            <span>Result · {FORMATS.find((f) => f.value === to)?.label}</span>
+          <PaneHeader
+            label={m('result', { format: FORMATS.find((f) => f.value === to)?.label ?? '' })}
+            action={
             <div className="flex items-center gap-1">
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={handleDownload}
                 disabled={!output}
-                title="Download result"
+                title={m('downloadResult')}
+                aria-label={m('downloadResult')}
                 className="h-6 w-6 rounded text-fg-mute hover:text-fg"
               >
                 <Download className="h-3.5 w-3.5" />
               </Button>
               <CopyButton value={() => output} iconClassName="h-3.5 w-3.5" disabled={!output} />
             </div>
-          </div>
-          <div className="flex flex-col flex-1 min-h-0 overflow-hidden px-3 pb-3">
+            }
+          />
+          <div className="flex flex-col flex-1 min-h-0 overflow-hidden p-2">
             {error ? (
               <div className="flex-1 overflow-auto">
-                <ExplainBand tone="bad" title="Conversion error" className="font-mono">
-                  {error}
+                <ExplainBand tone="bad" title={m('conversionError')} className="font-mono">
+                  {error === TOML_NEEDS_TABLE ? m('tomlNeedsTable') : error}
                 </ExplainBand>
               </div>
             ) : (
               <CodeViewer
                 value={output}
                 language={to === 'json' ? 'json' : 'text'}
-                placeholder="Converted output appears here…"
+                placeholder={m('outputPlaceholder')}
               />
             )}
           </div>

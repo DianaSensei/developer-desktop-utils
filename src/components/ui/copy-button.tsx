@@ -4,6 +4,8 @@ import { Button, type ButtonProps } from '@/components/ui/button';
 import { copyToClipboard } from '@/lib/clipboard';
 import { useAppConfig } from '@/contexts/AppConfigContext';
 import { cn } from '@/lib/utils';
+import { useMessages } from '@/contexts/LocaleContext';
+import UI from '@/components/ui/ui.messages';
 
 export interface CopyButtonProps extends Omit<ButtonProps, 'onClick' | 'children' | 'value'> {
   /** Text to copy, or a (possibly async) getter resolved at click time. */
@@ -27,13 +29,8 @@ export interface CopyButtonProps extends Omit<ButtonProps, 'onClick' | 'children
 }
 
 /**
- * Single source of truth for "copy to clipboard" buttons across the app.
- *
- * Gives every copy action the same affordance: a smooth cross-fade from the
- * Copy icon to a green Check (no hard icon swap), with the confirmation held
- * for the user-configurable `editor.copyFeedbackMs` duration. Previously each
- * tool either re-implemented this (with differing timings) or — more often —
- * gave no feedback at all, leaving users unsure the copy had happened.
+ * The app's copy-to-clipboard button: the Copy icon cross-fades to a green
+ * Check, held for the configurable `editor.copyFeedbackMs`.
  */
 export const CopyButton = React.forwardRef<HTMLButtonElement, CopyButtonProps>(
   (
@@ -41,7 +38,7 @@ export const CopyButton = React.forwardRef<HTMLButtonElement, CopyButtonProps>(
       value,
       copyAction,
       label,
-      copiedLabel = 'Copied',
+      copiedLabel,
       iconClassName = 'h-3.5 w-3.5',
       icon: Icon = Copy,
       onCopied,
@@ -54,6 +51,7 @@ export const CopyButton = React.forwardRef<HTMLButtonElement, CopyButtonProps>(
     },
     ref
   ) => {
+    const ui = useMessages(UI);
     const { config } = useAppConfig();
     const [copied, setCopied] = React.useState(false);
     const timer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -86,24 +84,17 @@ export const CopyButton = React.forwardRef<HTMLButtonElement, CopyButtonProps>(
         size={size}
         disabled={disabled}
         onClick={handleCopy}
-        title={title ?? (copied ? 'Copied' : 'Copy')}
-        aria-label={typeof label === 'string' ? label : 'Copy'}
+        title={title ?? (copied ? ui('copied') : ui('copy'))}
+        aria-label={typeof label === 'string' ? label : ui('copy')}
         className={className}
         {...props}
       >
-        {/* Hai icon chung một hộp và mờ chéo nhau, nên cú tráo là trượt chứ
-            không phải nhấp.
-
-            Hai đường cong KHÁC NHAU, cố ý: icon Copy đi ra bằng `ease-in-soft`
-            (dứt khoát, nó đã xong việc), cái Check đi vào bằng `ease-spring`
-            (vọt qua một chút rồi lắc về, đọc ra là "xong rồi!"). Bản trước
-            dùng chung `duration-200 ease-out` cho cả hai chiều, nên khoảnh khắc
-            DUY NHẤT mà app xác nhận với người dùng rằng thao tác đã thành công
-            lại là khoảnh khắc phẳng nhất trong toàn bộ giao diện. */}
+        {/* Both icons share one box and cross-fade. Copy leaves with
+            `ease-in-soft`; Check enters with `ease-spring` so success reads
+            clearly. */}
         <span className={cn('relative inline-flex items-center justify-center', iconClassName)}>
-          {/* Vòng sáng lan ra một lần ngay lúc copy xong. Nó không thay thế cái
-              Check — nó bắt lấy ánh mắt đang ở CHỖ KHÁC (người dùng vừa bấm
-              copy thì thường đang nhìn vùng văn bản, không nhìn cái nút). */}
+          {/* A one-time ring at the moment of copy, to catch eyes that are on
+              the text rather than the button. */}
           {copied && (
             <span
               aria-hidden="true"
@@ -126,7 +117,7 @@ export const CopyButton = React.forwardRef<HTMLButtonElement, CopyButtonProps>(
           />
         </span>
         {label != null && (
-          <span className="ml-1.5 whitespace-nowrap">{copied ? copiedLabel : label}</span>
+          <span className="ml-1.5 whitespace-nowrap">{copied ? (copiedLabel ?? ui('copied')) : label}</span>
         )}
       </Button>
     );

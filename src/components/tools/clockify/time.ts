@@ -7,10 +7,8 @@ export const MS_MIN = 60_000;
 export const MS_HOUR = 3_600_000;
 export const MS_DAY = 86_400_000;
 
-// `crypto.randomUUID` không có ở vài webview cũ hơn — `crypto.getRandomValues`
-// (chuẩn Web Crypto có mặt rộng hơn nhiều) là phương án dự phòng, thay vì
-// `Math.random()` (PRNG không an toàn, bị các máy quét tĩnh như SonarCloud
-// gắn cờ bất kể ngữ cảnh dùng).
+// `crypto.randomUUID` is missing in some older webviews; fall back to
+// `crypto.getRandomValues` rather than `Math.random()`.
 export const uid = (): string => {
   if (crypto.randomUUID) return crypto.randomUUID();
   const bytes = crypto.getRandomValues(new Uint8Array(8));

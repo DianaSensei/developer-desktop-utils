@@ -31,6 +31,8 @@ export interface CodeViewerProps {
   // Shown in place of the empty state when `value` is empty (e.g. "Converted
   // output appears here…"). Omit where an empty value is never expected.
   placeholder?: string;
+  // Accessible name for the read-only text (defaults to the placeholder).
+  ariaLabel?: string;
 }
 
 export interface CodeViewerHandle {
@@ -42,8 +44,9 @@ export interface CodeViewerHandle {
 }
 
 export const CodeViewer = forwardRef<CodeViewerHandle, CodeViewerProps>(function CodeViewer(
-  { value, language, plain, placeholder }, ref,
+  { value, language, plain, placeholder, ariaLabel }, ref,
 ) {
+  const label = ariaLabel ?? placeholder;
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   // Read-only: no active-line tint, and the gutter sits flush on the pane
@@ -63,6 +66,7 @@ export const CodeViewer = forwardRef<CodeViewerHandle, CodeViewerProps>(function
         theme.extension,
         EditorState.readOnly.of(true),
         EditorView.editable.of(false),
+        ...(label ? [EditorView.contentAttributes.of({ 'aria-label': label })] : []),
       ]
     : [
         basicSetup,
@@ -72,9 +76,10 @@ export const CodeViewer = forwardRef<CodeViewerHandle, CodeViewerProps>(function
         ...(language === 'json' ? [jsonFoldCount] : []),
         theme.extension,
         EditorView.lineWrapping,
+        ...(label ? [EditorView.contentAttributes.of({ 'aria-label': label })] : []),
         EditorState.readOnly.of(true),
         EditorView.editable.of(false),
-      ]), [langExt, language, plain, theme.extension]);
+      ]), [langExt, language, plain, theme.extension, label]);
 
   // Recreate the view when the language changes so the parser swaps cleanly.
   useEffect(() => {

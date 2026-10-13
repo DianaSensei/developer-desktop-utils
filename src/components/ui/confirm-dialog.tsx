@@ -1,8 +1,6 @@
-// Shared confirm modal for destructive/irreversible actions (Delete, Remove,
-// Purge, Disconnect-and-lose-state...). Promoted from RabbitMQ's local copy —
-// every tool with a destructive action should use this instead of acting
-// immediately or writing its own dialog, per the design system's "confirm
-// destructive actions" rule.
+// Shared confirmation modal for destructive or irreversible actions (Delete,
+// Remove, Purge...). Use it rather than acting immediately or writing a
+// custom dialog.
 
 import { useState } from 'react';
 import {
@@ -10,6 +8,8 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Callout } from '@/components/ui/callout';
+import { useMessages } from '@/contexts/LocaleContext';
+import UI from '@/components/ui/ui.messages';
 
 export interface ConfirmDialogProps {
   open: boolean;
@@ -23,8 +23,9 @@ export interface ConfirmDialogProps {
 }
 
 export function ConfirmDialog({
-  open, onOpenChange, title, description, confirmLabel = 'Confirm', destructive = true, onConfirm,
+  open, onOpenChange, title, description, confirmLabel, destructive = true, onConfirm,
 }: ConfirmDialogProps) {
+  const ui = useMessages(UI);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -35,18 +36,15 @@ export function ConfirmDialog({
       await onConfirm();
       onOpenChange(false);
     } catch (e) {
-      // Trước đây lỗi từ `onConfirm` không được bắt: hộp thoại đứng nguyên, nút
-      // quay về trạng thái bấm được, và người dùng không có cách nào biết thao
-      // tác đã hỏng (lời hứa bị từ chối chỉ hiện ở console như unhandled
-      // rejection). Xoá queue / xoá key / ngắt kết nối hỏng vì mất mạng là
-      // đúng kịch bản này. Giữ hộp thoại mở CÓ CHỦ Ý — để còn bấm thử lại.
+      // Show the error and keep the dialog open so the user can retry
+      // (e.g. a delete that failed because the network dropped).
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
     }
   };
 
-  // Mỗi lần đóng/mở lại thì bỏ lỗi cũ, không để nó dính sang lần xác nhận sau.
+  // Clear a previous error when the dialog closes or reopens.
   const handleOpenChange = (o: boolean) => {
     if (busy) return;
     if (!o) setError(null);
@@ -63,10 +61,10 @@ export function ConfirmDialog({
         {error && <Callout tone="error" size="sm">{error}</Callout>}
         <DialogFooter>
           <Button variant="outline" onClick={() => handleOpenChange(false)} disabled={busy}>
-            Cancel
+            {ui('cancel')}
           </Button>
           <Button variant={destructive ? 'destructive' : 'default'} onClick={handleConfirm} disabled={busy}>
-            {busy ? 'Working…' : error ? 'Retry' : confirmLabel}
+            {busy ? ui('working') : error ? ui('retry') : (confirmLabel ?? ui('confirm'))}
           </Button>
         </DialogFooter>
       </DialogContent>

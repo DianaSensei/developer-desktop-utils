@@ -18,8 +18,12 @@ import { Button } from '@/components/ui/button';
 import { CopyButton } from '@/components/ui/copy-button';
 import { Segmented } from '@/components/ui/segmented';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { cn } from '@/lib/utils';
+import { ToggleChip } from '@/components/ui/toggle-chip';
 import { useQuickPaste } from '@/hooks/useQuickPaste';
+import { useMessages } from '@/contexts/LocaleContext';
+import COMMON from '@/components/tools/common.messages';
+import MESSAGES from '@/components/tools/SqlFormatter.messages';
+import { ToolToolbar } from '@/components/ui/tool-layout';
 
 // ─── SQL formatter ───────────────────────────────────────────────────────────
 
@@ -349,30 +353,11 @@ const jsLangWithMongo = [
 
 type Mode = 'sql' | 'mongo';
 
-function ToggleChip({ active, onClick, children }: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        'rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors select-none',
-        active
-          ? 'border-acc/50 bg-acc/10 text-acc'
-          : 'border-line bg-transparent text-fg-mute hover:bg-bg-2 hover:text-fg'
-      )}
-    >
-      {children}
-    </button>
-  );
-}
-
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export function SqlFormatter() {
+  const m = useMessages(MESSAGES);
+  const c = useMessages(COMMON);
   const sdk = usePluginSdkFor('sql-formatter');
   const [mode, setMode]               = usePluginState<Mode>(sdk, 'sql:mode', 'sql', { legacyKey: 'devtool:sql:mode' });
   const [sqlInput, setSqlInput]       = usePluginState(sdk, 'sql:input', '', { legacyKey: 'devtool:sql:input' });
@@ -414,7 +399,7 @@ export function SqlFormatter() {
           syntaxErrorLinter(),
           lintGutter(),
           // Keep typed quotes straight (no macOS smart-quote substitution).
-          EditorView.contentAttributes.of({ autocorrect: 'off', autocapitalize: 'off', spellcheck: 'false' }),
+          EditorView.contentAttributes.of({ autocorrect: 'off', autocapitalize: 'off', spellcheck: 'false', 'aria-label': 'SQL' }),
           langConfRef.current.of(modeRef.current === 'sql' ? sqlLang : jsLangWithMongo),
           theme.extension,
           EditorView.lineWrapping,
@@ -500,7 +485,7 @@ export function SqlFormatter() {
   return (
     <div className="flex flex-col h-full">
       {/* Toolbar */}
-      <div className="shrink-0 header-chrome px-4 py-2.5">
+      <ToolToolbar>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           {/* Mode switcher */}
           <Segmented
@@ -510,7 +495,7 @@ export function SqlFormatter() {
               { value: 'sql', label: 'SQL' },
               { value: 'mongo', label: 'MongoDB' },
             ]}
-            aria-label="Formatter mode"
+            aria-label={m('modeLabel')}
             className="shrink-0"
           />
 
@@ -518,14 +503,14 @@ export function SqlFormatter() {
 
           {/* Indent size */}
           <div className="flex items-center gap-1.5">
-            <span className="text-xs text-fg-mute">Indent</span>
+            <span className="text-xs text-fg-mute">{c('indent')}</span>
             <Select value={indentSize} onValueChange={(v) => setIndentSize(v as '2' | '4')}>
               <SelectTrigger className="h-ctl w-[88px] text-xs rounded-sm">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="2">2 spaces</SelectItem>
-                <SelectItem value="4">4 spaces</SelectItem>
+                <SelectItem value="2">{c('spaces', { n: 2 })}</SelectItem>
+                <SelectItem value="4">{c('spaces', { n: 4 })}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -533,19 +518,19 @@ export function SqlFormatter() {
           {/* SQL-only options */}
           {mode === 'sql' && (
             <>
-              <ToggleChip active={uppercaseKw} onClick={() => setUppercaseKw(!uppercaseKw)}>
-                Uppercase keywords
+              <ToggleChip pressed={uppercaseKw} onPressedChange={setUppercaseKw}>
+                {m('uppercaseKeywords')}
               </ToggleChip>
-              <ToggleChip active={collapseSpaces} onClick={() => setCollapseSpaces(!collapseSpaces)}>
-                Collapse spaces
+              <ToggleChip pressed={collapseSpaces} onPressedChange={setCollapseSpaces}>
+                {m('collapseSpaces')}
               </ToggleChip>
-              <ToggleChip active={lineBreaks} onClick={() => setLineBreaks(!lineBreaks)}>
-                Line breaks
+              <ToggleChip pressed={lineBreaks} onPressedChange={setLineBreaks}>
+                {m('lineBreaks')}
               </ToggleChip>
             </>
           )}
         </div>
-      </div>
+      </ToolToolbar>
 
       {/* Editor — fills remaining height. overflow-hidden on the mount container
           is required for CodeMirror's flex layout to resolve on WebKitGTK (Linux)
@@ -567,12 +552,12 @@ export function SqlFormatter() {
           className="h-ctl gap-1.5 px-2 text-xs text-fg-mute hover:text-fg rounded-sm"
         >
           <Trash2 className="h-3 w-3" />
-          Clear
+          {c('clear')}
         </Button>
         <div className="flex items-center gap-2">
           <CopyButton
             value={() => viewRef.current?.state.doc.toString() ?? ''}
-            label="Copy"
+            label={c('copy')}
             variant="outline"
             size="sm"
             className="h-ctl gap-1.5 text-xs rounded-sm"
@@ -580,7 +565,7 @@ export function SqlFormatter() {
           />
           <Button size="sm" onClick={handleFormat} className="h-ctl gap-1.5 text-xs rounded-sm">
             <Wand2 className="h-3 w-3" />
-            Format
+            {m('format')}
           </Button>
         </div>
       </div>

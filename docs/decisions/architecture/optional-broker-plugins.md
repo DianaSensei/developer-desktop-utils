@@ -65,8 +65,13 @@ Redis/Rabbit/Container cần `sdk.storage`, `sdk.service` (gọi sidecar),
   vĩnh viễn — xem comment tại chỗ khai hằng số đó.
 - `BUNDLED_SERVICES` (hằng số MỚI, tách khỏi `ALLOWED_SERVICES`) mới là tập
   con thực sự đóng gói sẵn (`devtool-svc-echo`) — test
-  `allowlist_khop_voi_external_bin` giờ chỉ khoá tập con này khớp
+  `bundled_services_are_listed_in_external_bin` giờ chỉ khoá tập con này khớp
   `bundle.externalBin`, không khoá toàn bộ allowlist như trước.
+- *(Cập nhật 2026-10: `ALLOWED_SERVICES` đã bị bỏ. Tin theo TÊN cho phép một
+  manifest https bất kỳ khai `bin: "devtool-svc-redis"` để chạy mã native mà
+  không hỏi. Giờ chỉ bản `BUNDLED_SERVICES` nằm cạnh file chạy của app được
+  miễn hỏi; bốn sidecar broker cài qua URL được hỏi đồng ý một lần cho mỗi
+  phiên bản binary. Xem docs/AUDIT.md.)*
 
 ## Hệ quả chấp nhận được
 

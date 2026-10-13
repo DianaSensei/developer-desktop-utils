@@ -1,26 +1,24 @@
 /**
- * DevTool Design Kit — preset Tailwind.
+ * DevTool Design Kit — Tailwind preset.
  *
- * Ánh xạ token trong `design/tokens.css` thành utility. Preset này KHÔNG định
- * nghĩa giá trị màu nào — nó chỉ trỏ vào biến CSS, nên đổi theme và đổi tone
- * hoạt động hoàn toàn qua biến, không cần Tailwind build lại.
+ * Maps the tokens in `design/tokens.css` to utilities. It defines no colour
+ * values, only CSS variable references, so theme and tone switches need no
+ * Tailwind rebuild.
  *
- * Cách dùng:
+ * Usage:
  *   // tailwind.config.js
  *   presets: [require('./design/tailwind-preset.cjs')]
  *
- *   // global CSS, TRƯỚC các @tailwind
+ *   // global CSS, before the @tailwind directives
  *   @import "../../design/tokens.css";
  *
- * ── Vì sao màu trỏ vào biến `-c` chứ không phải biến màu hoàn chỉnh ──────
- * Tailwind chỉ chèn được `<alpha-value>` vào màu dạng kênh ("218 76% 48%").
- * Nếu trỏ vào `var(--acc)` (đã bọc hsl) thì `bg-acc/20` mất tác dụng.
- * Xem phần "Biến KÊNH" trong tokens.css.
+ * Colours reference the `-c` channel variables because Tailwind can only
+ * inject `<alpha-value>` into channel form ("218 76% 48%").
  *
  * @type {import('tailwindcss').Config}
  */
 
-/** Màu dạng kênh → hàm màu Tailwind có hỗ trợ alpha. */
+/** Channel-form colour → Tailwind colour function with alpha support. */
 const ch = (name) => `hsl(var(--${name}-c) / <alpha-value>)`;
 
 module.exports = {
@@ -28,24 +26,21 @@ module.exports = {
   theme: {
     container: { center: true, padding: '2rem', screens: { '2xl': '1400px' } },
     extend: {
+      // Between `text-xs` (12px) and `text-sm` (14px), for dense panel text.
+      fontSize: {
+        dense: ['13px', { lineHeight: '1.45' }],
+      },
       fontFamily: {
         sans: ['var(--sans)'],
-        // Lần đầu tiên `mono` được khai báo. Trước đây `font-mono` dùng 356 lần
-        // mà không có khai báo → rơi về Courier New trên Windows/Linux.
+        // Without this `font-mono` falls back to Courier New on Windows/Linux.
         mono: ['var(--mono)'],
       },
 
       colors: {
-        /* ── Accent: đổi được. KHÔNG BAO GIỜ mang nghĩa trạng thái. ──────── */
-        /* Màu vòng focus — MỘT màu duy nhất cho cả app.
-           Không dùng `ch()` vì `--acc-ring` đã là màu hoàn chỉnh (accent + alpha
-           sẵn), không phải biến kênh; nghĩa là KHÔNG viết `ring-focus/50`, alpha
-           đã nằm trong token rồi.
-
-           Vì sao phải đặt tên tường minh: Tailwind v4 bỏ màu ring mặc định của
-           v3, `ring-<width>` giờ chỉ đặt bề rộng còn màu rơi về `currentcolor`.
-           Không có class này thì vòng focus mang MÀU CHỮ của phần tử — trắng
-           trên nút accent, đen trên input. */
+        /* ── Accent: user-selectable, never carries status meaning ──────── */
+        /* Focus ring colour, one for the whole app. Not `ch()`: `--acc-ring`
+           already includes alpha, so don't write `ring-focus/50`. Needed because
+           Tailwind v4 `ring-<width>` otherwise uses `currentcolor`. */
         focus: 'var(--acc-ring)',
 
         acc: {
@@ -58,35 +53,34 @@ module.exports = {
           fg: ch('acc-fg'),
         },
 
-        /* ── Bề mặt ──────────────────────────────────────────────────────── */
+        /* ── Surfaces ───────────────────────────────────────────────────── */
         bg: { DEFAULT: ch('bg'), 2: ch('bg-2') },
         card: ch('card'),
         sunk: ch('sunk'),
         chrome: ch('chrome'),
 
-        /* ── Chữ & đường kẻ ──────────────────────────────────────────────── */
+        /* ── Text & lines ───────────────────────────────────────────────── */
         fg: { DEFAULT: ch('fg'), mute: ch('fg-mute'), faint: ch('fg-faint') },
         line: { DEFAULT: ch('line'), soft: ch('line-soft'), strong: ch('line-strong') },
 
-        /* ── Kiểu DỮ LIỆU: nghĩa cố định, độc lập accent. Xem tokens.css. ── */
+        /* ── Data types: fixed meaning, independent of the accent ─────────── */
         type: {
           string: ch('type-string'), number: ch('type-number'), bool: ch('type-bool'),
           date: ch('type-date'), null: ch('type-null'), binary: ch('type-binary'),
           object: ch('type-object'),
         },
 
-        /* ── Trạng thái: nghĩa CỐ ĐỊNH, không đổi khi swap tone ──────────── */
+        /* ── Status: fixed meaning, unaffected by the accent tone ─────────── */
         ok:   { DEFAULT: ch('ok'),   tint: ch('ok-tint'),   edge: ch('ok-edge') },
         warn: { DEFAULT: ch('warn'), tint: ch('warn-tint'), edge: ch('warn-edge') },
         bad:  { DEFAULT: ch('bad'),  tint: ch('bad-tint'),  edge: ch('bad-edge') },
         info: { DEFAULT: ch('info'), tint: ch('info-tint'), edge: ch('info-edge') },
       },
 
-      /* Thang rời nhau — mỗi bậc mang một nghĩa. Xem TOKENS.md. */
+      /* Distinct radius steps, see TOKENS.md. */
       borderRadius: {
-        /* `rounded` trần. Không khai báo thì Tailwind giữ 0.25rem cứng và 151
-           chỗ dùng nó đứng ngoài preset [data-corner] — xem --r-default trong
-           tokens.css. Token mặc định bằng đúng 0.25rem nên không đổi hình. */
+        /* Bare `rounded`, so it follows the [data-corner] presets
+           (see --r-default in tokens.css). */
         DEFAULT: 'var(--r-default)',
         xs: 'var(--r-xs)',
         sm: 'var(--r-sm)',
@@ -96,10 +90,9 @@ module.exports = {
         full: 'var(--r-full)',
       },
 
-      /* Chỉ ba bậc bóng. Lồng sâu hơn dùng viền, không bóng.
-         `btn` / `btn-press` KHÔNG phải bậc thứ tư: chúng là `--sh-sm` cộng hai
-         mép 1px (xem --sh-btn trong tokens.css), dành riêng cho bề mặt ĐẶC
-         bấm được. Đừng dùng cho thẻ hay panel. */
+      /* Three shadow levels; deeper nesting uses borders. `btn` / `btn-press`
+         are `--sh-sm` plus 1px edges (see --sh-btn), for solid clickable
+         surfaces only, not cards or panels. */
       boxShadow: {
         soft: 'var(--sh-sm)',
         DEFAULT: 'var(--sh)',
@@ -109,16 +102,14 @@ module.exports = {
         none: 'none',
       },
 
-      /* Chiều cao control — chỉ hai. `width` đi kèm cho nút icon vuông. */
+      /* Control heights (two only); `width` is for square icon buttons. */
       height: { ctl: 'var(--h)', 'ctl-lg': 'var(--h-lg)' },
       minHeight: { ctl: 'var(--h)', 'ctl-lg': 'var(--h-lg)' },
       width: { ctl: 'var(--h)', 'ctl-lg': 'var(--h-lg)' },
       minWidth: { ctl: 'var(--h)', 'ctl-lg': 'var(--h-lg)' },
 
-      /* `ringColor` là khoá của Tailwind v3 và KHÔNG bắc cầu sang v4 — đã thử,
-         `ring-focus` không sinh ra class nào. Màu vòng focus vì vậy nằm trong
-         `colors` bên trên (`focus`), là khoá đã chứng minh là bắc cầu được.
-         Giữ `DEFAULT` ở đây thì vô hại nhưng cũng vô dụng, nên bỏ luôn. */
+      /* No `ringColor`: it does not carry over to Tailwind v4. The focus ring
+         colour is `colors.focus` above. */
 
       transitionTimingFunction: {
         'out-soft': 'var(--ease-out-soft)',
@@ -136,18 +127,15 @@ module.exports = {
       keyframes: {
         'accordion-down': { from: { height: 0 }, to: { height: 'var(--radix-accordion-content-height)' } },
         'accordion-up': { from: { height: 'var(--radix-accordion-content-height)' }, to: { height: 0 } },
-        // Vệt trượt cho thanh tiến trình không xác định (việc chưa biết dài bao lâu).
+        // Sweep for an indeterminate progress bar.
         'progress-indeterminate': {
           '0%': { transform: 'translateX(-100%)' },
           '100%': { transform: 'translateX(400%)' },
         },
 
-        /* ── Bật ra / thu vào ────────────────────────────────────────────
-           Cho menu, popover, chip trạng thái. Đi kèm `transform-origin` do
-           call site đặt, nên cùng một keyframe phục vụ được cả menu neo ở
-           trên lẫn neo ở dưới — nó "mọc ra" từ nút bấm chứ không nở ra từ
-           giữa chính nó. Vào 96% (không phải 95%): ở kích thước menu thật,
-           95% đã đủ lớn để đọc ra là "giật một cái". */
+        /* ── Pop in / out ────────────────────────────────────────────────
+           Menus, popovers, status chips. The call site sets `transform-origin`
+           so the surface grows from its trigger. Starts at 96%: 95% reads as a jump. */
         'pop-in': {
           from: { opacity: 0, transform: 'scale(.96)' },
           to: { opacity: 1, transform: 'scale(1)' },
@@ -157,23 +145,19 @@ module.exports = {
           to: { opacity: 0, transform: 'scale(.97)' },
         },
 
-        /* Nét tick tự vẽ. `stroke-dasharray` đặt ở component; ở đây chỉ kéo
-           dashoffset về 0. Vì sao không fade: một cái tick fade vào trông
-           như nó vốn ở đó rồi, còn nét vẽ đọc ra là "vừa mới xong" — đúng
-           nghĩa của hành động người dùng vừa làm. */
+        /* Self-drawing tick; the component sets `stroke-dasharray`, this animates
+           dashoffset to 0. Drawn rather than faded so it reads as "just done". */
         'tick-draw': {
           from: { strokeDashoffset: 'var(--tick-len, 22)' },
           to: { strokeDashoffset: '0' },
         },
 
-        /* Vệt sáng quét qua khối chờ (skeleton). Không phải trang trí: nó là
-           thứ phân biệt "đang tải" với "tải xong và rỗng". */
+        /* Skeleton shimmer: tells "loading" apart from "loaded and empty". */
         shimmer: {
           '100%': { transform: 'translateX(100%)' },
         },
 
-        /* Vòng sáng lan ra một lần khi một việc THÀNH CÔNG (copy, lưu, gửi).
-           Một lần, rồi hết — không lặp. */
+        /* One-shot ring when an action succeeds (copy, save, send). */
         'ring-ping': {
           from: { opacity: '.5', transform: 'scale(.9)' },
           to: { opacity: 0, transform: 'scale(1.5)' },
@@ -189,8 +173,7 @@ module.exports = {
         // linear-ish loop is a deliberate pace unrelated to the UI tempo scale.
         'progress-indeterminate': 'progress-indeterminate 1.1s ease-in-out infinite',
 
-        // Vào/ra bất đối xứng — luật 1 trong `tokens.css`. Cùng một cặp cho
-        // mọi bề mặt bật ra, nên menu, popover và chip nhả ra cùng một nhịp.
+        // Asymmetric enter/exit (rule 1 in tokens.css), shared by every pop-up surface.
         'pop-in': 'pop-in var(--dur-base) var(--ease-out-soft)',
         'pop-out': 'pop-out var(--dur-exit) var(--ease-in-soft) forwards',
         'tick-draw': 'tick-draw var(--dur-fast) var(--ease-out-soft) forwards',

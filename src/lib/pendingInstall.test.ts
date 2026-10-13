@@ -27,9 +27,8 @@ describe('pendingInstall', () => {
 
   it('enqueue thay thế hàng đợi cũ, không nối vào cuối — link mới thắng link cũ chưa xử lý xong', async () => {
     const { pendingInstall } = await import('@/lib/pendingInstall');
-    // Mô phỏng: link cài plugin A tới trước (2 URL: plugin + service), người
-    // dùng chưa xác nhận xong bước cài plugin thì link cài plugin B tới —
-    // B phải được xử lý ngay, không phải xếp sau phần còn treo của A.
+    // Link A (plugin + service) is still pending when link B arrives; B
+    // must be handled next, not queued behind A.
     pendingInstall.enqueue(['https://a/plugin.json', 'https://a/service.json']);
     pendingInstall.enqueue(['https://b/plugin.json']);
     expect(pendingInstall.dequeue()).toEqual({ url: 'https://b/plugin.json', marketId: undefined });

@@ -1,35 +1,29 @@
-// Khung ô nhập — hiện thực QUY TẮC TỐI ĐA HAI PHỤ KIỆN.
+// Input frame that allows at most two accessories inside the field:
 //
 //   ┌──────────────────────────────────────────────┐
-//   │ [máng] │ nội dung gõ                [chỉ số] │
+//   │ [gutter] │ typed content             [meter] │
 //   └──────────────────────────────────────────────┘
-//     [chip] [chip]          ← mọi thứ khác xuống đây
+//     [chip] [chip]          ← everything else goes here
 //
-// Không có quy tắc này, ô nhập của DevTool sẽ mọc dần: nhãn định dạng, đếm ký
-// tự, nút copy, nút xoá, chỉ báo hợp lệ — cho tới khi chỗ gõ chữ còn 40%. Đó là
-// hiện trạng ở vài tool.
+//   gutter: data type label on the left ("JSON", "cron", "hex")
+//   meter:  one metric on the right (characters, lines, time)
 //
-// Nên khung này chỉ nhận ĐÚNG HAI khe:
-//   gutter — nhãn kiểu dữ liệu bên trái ("JSON", "cron", "hex")
-//   meter  — MỘT chỉ số bên phải (số ký tự, số dòng, thời gian)
-//
-// Cái thứ ba không có khe. Nó xuống `chips` bên dưới ô, nơi có chỗ thở.
-//
-// TypeScript ép luôn: `meter` là ReactNode đơn, không phải mảng.
+// Anything more goes in `chips` below, so the typing area stays wide.
+// `meter` is a single ReactNode, not an array.
 
 import * as React from 'react';
 import { cn } from '@/lib/utils';
 
 export interface FieldShellProps {
-  /** Nhãn kiểu dữ liệu bên trái, trong ô. Ngắn — 3–6 ký tự. */
+  /** Data type label inside the field, left. Short: 3–6 characters. */
   gutter?: React.ReactNode;
-  /** MỘT chỉ số bên phải, trong ô. Cần cái thứ hai thì cho xuống `chips`. */
+  /** One metric inside the field, right. A second one goes in `chips`. */
   meter?: React.ReactNode;
-  /** Chip dưới ô — trạng thái, gợi ý, hành động phụ. Không giới hạn. */
+  /** Chips below the field: status, hints, secondary actions. */
   chips?: React.ReactNode;
-  /** Viền theo trạng thái. `undefined` = trung tính. */
+  /** Border tone; `undefined` is neutral. */
   tone?: 'ok' | 'warn' | 'bad';
-  /** Ô nhập thật (<Input>, <Textarea>, <InlineCodeField>…). */
+  /** The actual input (<Input>, <Textarea>, <InlineCodeField>...). */
   children: React.ReactNode;
   className?: string;
 }
@@ -68,8 +62,8 @@ export function FieldShell({
           </span>
         )}
 
-        {/* Ô nhập bên trong bỏ viền/bo góc/ring của chính nó — khung ngoài lo
-            hết, nếu không sẽ có hai viền lồng nhau và hai vòng focus. */}
+        {/* The inner input drops its own border, radius and ring; the frame
+            draws them, so there is one border and one focus ring. */}
         <div
           className={cn(
             'min-w-0 flex-1',

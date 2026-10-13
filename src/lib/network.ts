@@ -54,18 +54,14 @@ export interface DohProvider {
 const q = (s: string) => encodeURIComponent(s.trim());
 
 
-/** Hàm fetch mà các hàm dưới đây dùng. Network tool truyền `sdk.http.fetch` vào
- *  để lời gọi đi qua điểm thắt của Platform: kiểm allowlist host khai trong
- *  manifest, rồi ghi audit. */
+/** Fetch function used below. The Network tool passes `sdk.http.fetch` so
+ *  calls go through the platform's host allowlist and audit. */
 export type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 
-// Fetch wrapper: in the Tauri desktop app, route through the HTTP plugin so the
-// request is made from Rust (no browser `Origin` header, no CORS). Some public
-// services (e.g. ipwho.is) reject the WebView's Origin with HTTP 403 — this
-// bypasses that. On the web build, fall back to the standard `fetch`.
-//
-// `impl` có thì dùng luôn: đó là đường đã qua kiểm quyền. Đường mặc định bên
-// dưới giữ nguyên cho test và cho những chỗ gọi chưa chuyển.
+// In the desktop app, route through the HTTP plugin so the request is made
+// from Rust without the webview's Origin header (some services, e.g.
+// ipwho.is, return 403 for it). The web build uses `fetch`. A provided
+// `impl` (the SDK fetch) is used as is.
 async function netFetch(input: string, init?: RequestInit, impl?: FetchLike): Promise<Response> {
   if (impl) return impl(input, init);
   if (isTauri) {
@@ -261,7 +257,7 @@ export interface NetInterface {
   name: string;
   ip: string;
   family: string; // "IPv4" | "IPv6"
-  internal: boolean; // loopback / link-local — not a routable LAN address
+  internal: boolean; // loopback / link-local, not a routable LAN address
 }
 
 export interface LocalNetworkInfo {
@@ -381,32 +377,6 @@ const IP_PROVIDERS: IpProvider[] = [
     },
   },
 ];
-
-// ─── Local network info (desktop only) ──────────────────────────────────────
-
-// The machine's own LAN-side view: hostname, primary local addresses, and
-// per-interface IPs. Read locally by the Rust backend — nothing is sent out.
-// Only available in the Tauri desktop build; the web build can't read the LAN.
-
-export interface NetInterface {
-  name: string;
-  ip: string;
-  family: string; // IPv4 / IPv6
-  internal: boolean; // loopback / link-local
-}
-
-export interface LocalNetworkInfo {
-  hostname: string;
-  primaryIpv4: string | null;
-  primaryIpv6: string | null;
-  interfaces: NetInterface[];
-}
-
-export async function localNetworkInfo(): Promise<LocalNetworkInfo | null> {
-  if (!isTauri) return null; // web build can't enumerate local interfaces
-  const { invoke } = await import('@tauri-apps/api/core');
-  return invoke<LocalNetworkInfo>('local_network_info');
-}
 
 // `ip` empty → returns the caller's own public IP and geo. Falls back across
 // providers so a single service being down or rate-limiting (e.g. HTTP 403/429)

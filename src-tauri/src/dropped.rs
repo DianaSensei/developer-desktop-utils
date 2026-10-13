@@ -94,7 +94,7 @@ mod tests {
         let paths = DroppedPaths::default();
         assert!(!paths.is_allowed(&dropped), "nothing is allowed before a drag");
 
-        paths.remember(&[dropped.clone()]);
+        paths.remember(std::slice::from_ref(&dropped));
         assert!(paths.is_allowed(&dropped));
         // The whole point: a sibling the user never dragged stays unreadable.
         assert!(!paths.is_allowed(&other));
@@ -109,7 +109,7 @@ mod tests {
         fs::write(&other, b"y").unwrap();
 
         let paths = DroppedPaths::default();
-        paths.remember(&[dropped.clone()]);
+        paths.remember(std::slice::from_ref(&dropped));
 
         // Same file by a noisier route is still the same file: allowed.
         let noisy = dir.join("..").join(dir.file_name().unwrap()).join("dropped.png");
@@ -134,7 +134,7 @@ mod tests {
 
         let paths = DroppedPaths::default();
         for _ in 0..(MAX_REMEMBERED + 8) {
-            paths.remember(&[f.clone()]);
+            paths.remember(std::slice::from_ref(&f));
         }
         // One distinct path, so the cap is never reached and it stays allowed.
         assert!(paths.is_allowed(&f));

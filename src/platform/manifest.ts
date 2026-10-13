@@ -1,10 +1,8 @@
 import { SDK_VERSION, type PluginManifest, type PluginPermission } from './types';
 
 /**
- * Khai báo một plugin. Thuần tuý là hàm định danh — nó tồn tại để TypeScript
- * suy ra đúng kiểu tại chỗ khai báo (báo lỗi ngay trong file plugin thay vì ở
- * chỗ registry gom lại), và để `import.meta.glob` có một hình dạng export cố
- * định mà bám vào.
+ * Declares a plugin. An identity function that gives type errors at the
+ * declaration site and a fixed export shape for `import.meta.glob`.
  */
 export function definePlugin(manifest: PluginManifest): PluginManifest {
   return manifest;
@@ -13,14 +11,14 @@ export function definePlugin(manifest: PluginManifest): PluginManifest {
 const ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const HOST_PATTERN = /^(?:\*\.)?[a-z0-9]([a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/i;
 
-/** `*`, `example.com`, `*.example.com`. Cố tình KHÔNG nhận `*abc.com` hay
- *  `a.*.com`: wildcard nửa vời rất dễ khớp rộng hơn người viết tưởng. */
+/** `*`, `example.com` or `*.example.com`. Partial wildcards (`*abc.com`,
+ *  `a.*.com`) are rejected because they match more than intended. */
 function isHostPattern(value: unknown): boolean {
   if (typeof value !== 'string') return false;
   return value === '*' || HOST_PATTERN.test(value);
 }
 
-/** Host của `url` có nằm trong allowlist không. Dùng bởi SDK lúc chạy. */
+/** Whether `url`'s host is in the allowlist. Used by the SDK at runtime. */
 export function hostAllowed(hosts: readonly string[], url: string): boolean {
   let hostname: string;
   try {
@@ -52,12 +50,9 @@ const VALID_PERMISSIONS: PluginPermission[] = [
 ];
 
 /**
- * Kiểm `range` dạng `^M.m.p` với version SDK hiện tại.
- *
- * Chỉ hỗ trợ caret, cố ý: đó là dải duy nhất manifest được phép khai, nên kéo
- * cả một thư viện semver vào bundle của app chỉ để so ba con số là không đáng.
- * Quy ước caret chuẩn — major phải bằng nhau, minor.patch của SDK phải ≥ của
- * range — cộng thêm luật 0.x: khi major = 0 thì minor cũng phải bằng nhau.
+ * Checks a `^M.m.p` range against the SDK version. Caret ranges only: major
+ * must match and minor.patch must be at least the range's; for 0.x the
+ * minor must match too.
  */
 export function satisfiesSdk(range: string, version: string = SDK_VERSION): boolean {
   const m = /^\^(\d+)\.(\d+)\.(\d+)$/.exec(range.trim());
@@ -74,9 +69,8 @@ export function satisfiesSdk(range: string, version: string = SDK_VERSION): bool
 }
 
 /**
- * Kiểm một manifest. Trả về danh sách lý do hỏng (rỗng = hợp lệ) thay vì ném:
- * registry cần loại đúng plugin hỏng và vẫn dựng được app với phần còn lại —
- * một manifest sai chính tả không đáng làm trắng cả cửa sổ.
+ * Validates a manifest and returns the problems (empty when valid), so the
+ * registry can drop one bad plugin and still start.
  */
 export function validateManifest(input: unknown): string[] {
   const errors: string[] = [];
@@ -112,8 +106,7 @@ export function validateManifest(input: unknown): string[] {
     errors.push('có quyền "native" nhưng không khai commands — quyền native luôn phải kèm allowlist');
   }
 
-  // Cùng luật với 'native': quyền mạng không kèm allowlist host là quyền gọi
-  // đi bất cứ đâu, và đó chính là thứ cần nhìn thấy được.
+  // Like 'native': network access without a host allowlist must be visible.
   const hasHttp = (m.permissions ?? []).includes('http');
   if (hasHttp !== ((m.hosts?.length ?? 0) > 0)) {
     errors.push(
@@ -126,8 +119,7 @@ export function validateManifest(input: unknown): string[] {
     if (!isHostPattern(h)) errors.push(`host "${h}" không hợp lệ — dùng "example.com", "*.example.com" hoặc "*"`);
   }
 
-  // Cùng một luật "quyền phải đi kèm allowlist" như 'native', vì lý do giống
-  // hệt: một sidecar không giới hạn method là một quyền mở vô hạn.
+  // Like 'native': a sidecar without a method allowlist is unrestricted.
   const hasService = (m.permissions ?? []).includes('service');
   if (hasService !== (m.service !== undefined)) {
     errors.push(

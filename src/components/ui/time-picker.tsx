@@ -3,6 +3,8 @@ import { Clock, ChevronUp, ChevronDown } from 'lucide-react';
 import { cn, pad2 } from '@/lib/utils';
 import { useDismissable } from '@/hooks/useDismissable';
 import { useAnimatedOpen } from '@/hooks/useAnimatedOpen';
+import { useMessages } from '@/contexts/LocaleContext';
+import UI from '@/components/ui/ui.messages';
 
 // ---------------------------------------------------------------------------
 // Cross-platform time picker — replaces free-text / native <input type="time">.
@@ -77,6 +79,7 @@ function Column({
 }
 
 export function TimePicker({ value, onChange, disabled, className, minuteStep = 1, showSeconds = false, inline = false }: TimePickerProps) {
+  const ui = useMessages(UI);
   const { open, closing, visible, toggle, close } = useAnimatedOpen();
   // Inline mode has no popover to dismiss, so only arm it when open && !inline.
   const wrapRef = useDismissable<HTMLDivElement>(open && !inline, close);
@@ -119,13 +122,13 @@ export function TimePicker({ value, onChange, disabled, className, minuteStep = 
   const columns = (
     <>
       <div className={cn('flex justify-center gap-1', inline ? 'min-h-0 flex-1 items-stretch' : 'items-start')}>
-        <Column label="Hr" count={24} selected={h} onPick={(n) => emit(n, m, s)} onStep={stepHour} selRef={hourRef} listClass={listClass} fill={inline} />
+        <Column label={ui('hour')} count={24} selected={h} onPick={(n) => emit(n, m, s)} onStep={stepHour} selRef={hourRef} listClass={listClass} fill={inline} />
         {sep}
-        <Column label="Min" count={60} selected={m} onPick={(n) => emit(h, n, s)} onStep={stepMin} selRef={minRef} listClass={listClass} fill={inline} />
+        <Column label={ui('minute')} count={60} selected={m} onPick={(n) => emit(h, n, s)} onStep={stepMin} selRef={minRef} listClass={listClass} fill={inline} />
         {showSeconds && (
           <>
             {sep}
-            <Column label="Sec" count={60} selected={s} onPick={(n) => emit(h, m, n)} onStep={stepSec} selRef={secRef} listClass={listClass} fill={inline} />
+            <Column label={ui('second')} count={60} selected={s} onPick={(n) => emit(h, m, n)} onStep={stepSec} selRef={secRef} listClass={listClass} fill={inline} />
           </>
         )}
       </div>
@@ -134,7 +137,7 @@ export function TimePicker({ value, onChange, disabled, className, minuteStep = 
         onClick={() => { const d = new Date(); pendingScroll.current = true; emit(d.getHours(), d.getMinutes(), d.getSeconds()); }}
         className="mt-2 w-full rounded-md border py-1 text-xs text-fg-mute transition-colors hover:bg-bg-2 hover:text-fg"
       >
-        Now
+        {ui('now')}
       </button>
     </>
   );

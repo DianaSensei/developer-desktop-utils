@@ -1,55 +1,47 @@
 /* ============================================================================
-   DevTool — lớp app của design system
+   DevTool — app layer of the design system
    ----------------------------------------------------------------------------
-   Giá trị KHÔNG nằm ở đây. Nguồn sự thật là `design/tokens.css` (CSS thuần,
-   dùng chung với trang mẫu `design/preview/index.html`). File này chỉ làm hai việc:
+   Values live in `design/tokens.css` (plain CSS shared with the preview page
+   `design/preview/index.html`). This file only:
 
-     1. @import kit
-     2. Base reset + utility cần Tailwind xử lý (@layer / @apply)
+     1. imports the kit, and
+     2. adds the base reset and utilities that need Tailwind (@layer/@apply).
 
-   Muốn đổi màu, bo góc, chiều cao control → sửa `design/tokens.css`, không sửa đây.
-
-   Cách dùng ở dự án khác: xem `design/README.md`.
+   Change colors, radii or control heights in `design/tokens.css`.
+   Using it in another project: see `design/README.md`.
    ========================================================================== */
 
 @import "../../design/tokens.css";
 
 @layer base {
-  /* ── Bảng màu cú pháp editor ────────────────────────────────────────────
-     Hệ RIÊNG, không thuộc kit và không theo accent: màu token trong SQL/JS
-     mang nghĩa cú pháp, đổi tone không được làm keyword đổi màu. Giữ nguyên. */
+  /* ── Editor syntax colors ───────────────────────────────────────────────
+     A separate system that ignores the accent: token colors carry syntax
+     meaning, so changing the tone must not recolor keywords. Light values
+     are ≥4.5:1 on the editor background (#f0f2f5, the darkest surface they
+     sit on); several used to be 2.9–4.1:1. */
   :root {
     --sql-keyword: hsl(216 90% 46%);
-    --sql-string: hsl(130 50% 35%);
-    --sql-comment: hsl(0 0% 50%);
-    --sql-number: hsl(25 90% 42%);
-    --sql-operator: hsl(0 0% 45%);
-    --sql-function: hsl(185 75% 33%);
+    --sql-string: hsl(130 50% 31%);
+    --sql-comment: hsl(0 0% 42%);
+    --sql-number: hsl(25 90% 35%);
+    --sql-operator: hsl(0 0% 42%);
+    --sql-function: hsl(185 75% 28%);
     --sql-type: hsl(270 55% 45%);
-    --js-property: hsl(32 90% 44%);
+    --js-property: hsl(32 90% 33%);
     --js-method: hsl(270 60% 52%);
-    /* JSON tree view (JsonFormatter) — chuỗi/số/boolean tái dùng đúng hue của
-       SQL cho cùng khái niệm (chuỗi vẫn xanh lá, số vẫn cam, kiểu vẫn tím ở
-       mọi nơi trong app); chỉ key và null cần hue riêng vì SQL không có gì
-       tương đương. */
-    --json-key: hsl(202 88% 38%);
+    /* JSON tree view (JsonFormatter): strings, numbers and booleans reuse the
+       SQL hues; only keys and null get their own. */
+    --json-key: hsl(202 88% 35%);
     --json-null: hsl(350 68% 46%);
 
-    /* ── Màu HTTP method ─────────────────────────────────────────────────
-       Cùng loại với màu cú pháp: QUY ƯỚC NGÀNH, không phải trang trí.
-       Postman, Insomnia, Bruno đều dùng xanh-GET / cam-POST / đỏ-DELETE;
-       đổi đi là bắt người dùng học lại một thứ họ đã biết.
-
-       Đây là ngoại lệ DUY NHẤT được phép trùng hue với --ok/--bad. Lý do
-       chấp nhận được: method nằm ở cột bên trái mỗi request, còn status
-       code nằm ở panel kết quả — chúng không bao giờ đứng cạnh nhau trên
-       cùng một dòng để bị đọc nhầm thành một tín hiệu. Đừng nới ngoại lệ
-       này ra chỗ khác.
-
-       Dạng kênh vì badge cần nền có alpha. */
-    --method-get-c:    152 55% 34%;
-    --method-post-c:    32 85% 40%;
-    --method-put-c:    214 80% 46%;
+    /* ── HTTP method colors ─────────────────────────────────────────────
+       Industry convention (Postman, Insomnia, Bruno): green GET, orange
+       POST, red DELETE. The only allowed overlap with --ok/--bad hues,
+       because methods and status codes never sit side by side. Channel
+       form so badges can use alpha. */
+    --method-get-c:    152 55% 26%;
+    --method-post-c:    32 85% 32%;
+    --method-put-c:    214 80% 42%;
     --method-patch-c:  272 60% 50%;
     --method-delete-c:   2 65% 46%;
 
@@ -59,11 +51,10 @@
     --method-patch:  hsl(var(--method-patch-c));
     --method-delete: hsl(var(--method-delete-c));
 
-    /* ── "Đang ghi / đang chạy" ──────────────────────────────────────────
-       Cũng là quy ước: nút ghi, badge live, vạch giờ hiện tại đều đỏ ở mọi
-       phần mềm. KHÔNG dùng --bad cho việc này — nếu dùng, đồng hồ đang chạy
-       và một lỗi thật sẽ cùng màu, và đỏ mất nghĩa "có gì đó sai".
-       Hơi ngả cam so với --bad để phân biệt được khi đứng gần nhau. */
+    /* ── Recording / running ─────────────────────────────────────────────
+       Conventionally red (record buttons, live badges, current-time line),
+       but not --bad, so a running timer never looks like an error. Slightly
+       more orange to tell them apart. */
     --live-c: 8 78% 50%;
     --live: hsl(var(--live-c));
   }
@@ -81,7 +72,7 @@
     --json-key: hsl(202 85% 68%);
     --json-null: hsl(350 75% 72%);
 
-    /* Chỉ định nghĩa lại KÊNH — bản bọc hsl() ở :root tự đúng theo. */
+    /* Only the channels change; the hsl() wrappers in :root follow. */
     --method-get-c:    150 48% 58%;
     --method-post-c:    34 78% 62%;
     --method-put-c:    212 82% 68%;
@@ -157,53 +148,36 @@
     display: none;
   }
 
-  /* `.shadow-primary` / `.shadow-primary-lg` (quầng sáng ngả accent dưới hành
-     động chính) đã BỊ XOÁ. Hai lý do, cả hai đều là luật đã có sẵn:
-
-     1. `design/RULES.md` — "không hover-lift, không glow". Đó là một quầng sáng
-        MÀU, và nó phình từ 8px lên 20px khi rê chuột. Nút chuẩn của kit
-        (`design/preview/standalone.html`, `.btn.solid`) chỉ có `--sh-sm` và khi
-        hover thì đổi nền sang `--acc-hi`, không đụng tới bóng.
-
-     2. `design/RULES.md` — "hai hệ shadow song song". Hai utility này ghi THẲNG
-        `box-shadow`, trong khi `shadow-soft` và mọi `ring-*` của Tailwind ghi
-        qua chuỗi biến `--tw-shadow` / `--tw-ring-shadow`. Cùng thuộc tính, cùng
-        độ cụ thể, nên thứ tự trong bundle quyết định chứ không phải ý đồ: vòng
-        focus xoá sạch cái bóng, hoặc ngược lại, tuỳ tổ hợp. Xem ghi chú đầy đủ
-        trong `ui/button.tsx`.
-
-     Cần nhấn mạnh hành động chính thì dùng NỀN ĐẶC màu accent — nó đã là thứ
-     nổi nhất trên màn rồi. */
+  /* No accent glow shadows (`.shadow-primary` was removed): RULES.md allows
+     no hover lift or glow, and a second shadow system clashed with
+     Tailwind's ring/shadow variables. Emphasize primary actions with a
+     solid accent background. */
 
   /* ── Micro-interaction ────────────────────────────────────────────────
-     Rê chuột đổi NỀN/VIỀN, không đổi VỊ TRÍ — `design/RULES.md`. Bản cũ của
-     .hover-elevate dịch phần tử lên 2px khi rê; đã bỏ vì nó làm layout nhảy
-     dưới con trỏ. */
+     /* ── Micro-interaction ────────────────────────────────────────────────
+        Hover changes background/border, never position (design/RULES.md). */
   .hover-elevate {
     @apply transition-[box-shadow,border-color,background-color] duration-base ease-out-soft
            hover:shadow hover:border-line
            active:shadow-sm;
   }
-  /* Lún khi nhấn cho các control tự dựng (thẻ, hàng danh sách bấm được) —
-     `Button`/`IconButton` đã có sẵn bên trong. Nhấn trong `--dur-press`, nhả
-     trong `--dur-fast`: nhanh xuống, thong thả lên. Xem luật 3 trong
-     `design/tokens.css`. */
+  /* Press feedback for custom controls (cards, clickable rows);
+     Button/IconButton have it built in. Fast press, slower release
+     (rule 3 in design/tokens.css). */
   .press {
     @apply transition-transform duration-fast ease-out-soft
            motion-safe:active:scale-[0.97] motion-safe:active:duration-press;
   }
-  /* Vào của một khối nội dung. 340ms + 10px là quãng của một BỀ MẶT LỚN; dùng
-     cho một thẻ hay một hàng thì nó lê thê, nên hạ về nhịp `--dur-base` và
-     6px. Quãng đường ngắn hơn cũng có nghĩa là nội dung bên dưới bớt bị đẩy. */
+  /* Content block entrance, scaled down to `--dur-base` and 6px for cards
+     and rows. */
   .animate-fade-in-up {
     animation: fadeInUp var(--dur-base) var(--ease-out-soft);
   }
   .animate-scale-in {
     animation: scaleIn var(--dur-base) var(--ease-out-soft);
   }
-  /* Vào theo tầng cho danh sách. Mắt đọc ra một luồng thay vì tám thứ nảy lên
-     cùng lúc; 40ms/mục và chốt ở mục thứ 8 — quá 8 thì mục cuối chờ lâu đến
-     mức đọc ra là app chậm, chứ không phải app mượt. */
+  /* Staggered list entrance: 40ms per item, capped at the 8th so the last
+     item does not wait long. */
   .stagger-in > * {
     animation: fadeInUp var(--dur-base) var(--ease-out-soft) backwards;
   }
@@ -234,26 +208,10 @@
   .text-caption { @apply text-xs leading-relaxed text-fg-mute; }
 
   /* ── App chrome ───────────────────────────────────────────────────── */
-  /* ── Vì sao chrome KHÔNG còn là kính mờ ───────────────────────────────
-     Cũ: `glass-chrome` = nền `--chrome` ở 86% độ đục + `backdrop-blur(26px)
-     saturate(185%)`, viền `--line/70`.
-
-     Ba vấn đề, và cái thứ nhất là gốc:
-
-     1. KHÔNG CÓ GÌ Ở PHÍA SAU ĐỂ NHÌN XUYÊN QUA. `.env-bg` (nền gradient) chỉ
-        dùng ở trang mẫu, không dùng trong app — sidebar và header nằm thẳng
-        trên `--bg` phẳng. Nên 26px blur mỗi khung hình chỉ để trộn `--chrome`
-        với `--bg` ra một tông lưng chừng. Trả giá đúng bằng một hiệu ứng mà
-        không ai nhìn thấy.
-     2. `saturate(185%)` kéo lệch sắc mọi thứ NẰM DƯỚI dải chrome khi cuộn qua.
-     3. Viền ở 70% độ đục trên `--line` (88%) ra ≈ 91.6% — gần như biến mất.
-        Đó chính là "cái khung mong manh": vùng nào ra vùng đó không còn ranh
-        giới nào nói lên.
-
-     Mới: bề mặt ĐẶC, viền đủ mạnh. Đây là mô hình của IDE (VS Code, DBX):
-     chrome tối hơn vùng làm việc một bậc, ngăn bằng một đường 1px thật.
-     Kính mờ vẫn giữ cho bề mặt BAY (dialog, menu, tooltip) — ở đó mới thật
-     sự có nội dung phía sau để nhìn xuyên qua. */
+  /* Chrome surfaces are solid, a step darker than the workspace and
+     separated by a real 1px line, as in IDEs. Frosted glass is kept for
+     floating surfaces (dialogs, menus, tooltips), which have content
+     behind them. */
   .sidebar-chrome {
     @apply bg-chrome border-r border-line;
   }
@@ -265,20 +223,12 @@
   }
 }
 
-/* ── Reduce motion (chốt chặn toàn cục) ──────────────────────────────────────
-   `design-system/README.md` hứa "mọi animation biến đổi transform đều nằm sau
-   `motion-safe:` và một chốt chặn `prefers-reduced-motion` toàn cục". Phần
-   `motion-safe:` thì các call site đã làm; chốt chặn toàn cục thì trước đây
-   không tồn tại — nên các animation Radix gắn sẵn trong `ui/dialog.tsx`,
-   `dropdown-menu.tsx`, `context-menu.tsx` (zoom-in-95, slide-in-from-*) vẫn
-   chạy đủ với người đã bật giảm chuyển động trong hệ điều hành. Đây là chốt đó.
-
-   Nằm ngoài `@layer` để không bị Tailwind sắp xếp lại thứ tự, và dùng
-   `!important` vì phải thắng cả utility lẫn style inline.
-
-   Hai ngoại lệ được giữ nguyên bên dưới: chúng là CHỈ BÁO TRẠNG THÁI, không
-   phải trang trí — đứng im thì mất luôn thông tin (xem ghi chú đầu
-   `ui/spinner.tsx`). */
+/* ── Reduce motion (global stop) ─────────────────────────────────────────────
+   Stops animations, including Radix's built-in ones in ui/dialog.tsx,
+   dropdown-menu.tsx and context-menu.tsx, for users who prefer reduced
+   motion. Outside `@layer` so Tailwind does not reorder it; `!important` to
+   beat utilities and inline styles. Status indicators below keep moving,
+   since stopping them loses information (see ui/spinner.tsx). */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -291,7 +241,7 @@
     scroll-behavior: auto !important;
   }
 
-  /* Spinner "đang bận" và chấm nhịp của kết nối live vẫn phải nhúc nhích. */
+  /* The busy spinner and the live-connection pulse keep moving. */
   .animate-spin {
     animation-duration: 1s !important;
     animation-iteration-count: infinite !important;

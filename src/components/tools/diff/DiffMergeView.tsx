@@ -152,7 +152,7 @@ export function DiffMergeView({
         doc: original,
         extensions: [
           ...baseExtensions(language, compA.current, dark),
-          ...(originalPlaceholder ? [placeholderExt(originalPlaceholder)] : []),
+          ...(originalPlaceholder ? [placeholderExt(originalPlaceholder), EditorView.contentAttributes.of({ 'aria-label': originalPlaceholder })] : []),
           EditorView.domEventHandlers({
             focus: () => { onFocusSideRef.current?.('a'); return false; },
             blur: () => { onOriginalBlurRef.current?.(view.a.state.doc.toString()); return false; },
@@ -171,7 +171,7 @@ export function DiffMergeView({
         doc: modified,
         extensions: [
           ...baseExtensions(language, compB.current, dark),
-          ...(modifiedPlaceholder ? [placeholderExt(modifiedPlaceholder)] : []),
+          ...(modifiedPlaceholder ? [placeholderExt(modifiedPlaceholder), EditorView.contentAttributes.of({ 'aria-label': modifiedPlaceholder })] : []),
           EditorView.domEventHandlers({
             focus: () => { onFocusSideRef.current?.('b'); return false; },
             blur: () => { onModifiedBlurRef.current?.(view.b.state.doc.toString()); return false; },

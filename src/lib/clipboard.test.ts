@@ -4,17 +4,10 @@ import {
 } from '@/lib/clipboard';
 
 /**
- * Chưa có test nào cho module này, dù `copyToClipboard` là đường đi CHUNG của
- * mọi nút Copy trong app (qua `CopyButton`/`useCopyFeedback`). Test chạy trên
- * môi trường web (jsdom không có `window.__TAURI_INTERNALS__` nên `isTauri`
- * luôn false) — đúng nhánh `navigator.clipboard` mà bản build web thật dùng.
- *
- * jsdom không cài `canvas` (không có `getContext('2d')`/`createImageBitmap`
- * thật), nên nhánh RE-ENCODE ảnh không phải PNG sang PNG (`reencodeToPng` khi
- * `blob.type !== 'image/png'`) không test được có ý nghĩa ở đây — dựng canvas
- * giả để nó "chạy qua" không xác nhận được gì về pixel thật, chỉ tốn công.
- * Nhánh PNG-sẵn (bỏ qua canvas hoàn toàn) và toàn bộ đường ĐỌC ảnh (không đụng
- * canvas) thì test được đầy đủ.
+ * `copyToClipboard` backs every Copy button. jsdom has no
+ * `__TAURI_INTERNALS__`, so these tests cover the web (`navigator.clipboard`)
+ * path. jsdom also has no canvas, so re-encoding non-PNG images is not
+ * tested; the PNG path and image reading are.
  */
 
 describe('copyToClipboard / readTextFromClipboard', () => {
@@ -64,9 +57,8 @@ describe('copyImageToClipboard — ảnh đã là PNG sẵn (bỏ qua canvas)', 
   beforeEach(() => {
     capturedItem = null;
     write.mockReset().mockImplementation(async (items: unknown[]) => {
-      // `ClipboardItem` thật là opaque; giả một constructor bắt lại đúng
-      // object { 'image/png': blob } mà code nguồn truyền vào, để xác nhận
-      // đúng MIME type và đúng blob được gửi lên clipboard hệ thống.
+      // `ClipboardItem` is opaque; capture the `{ 'image/png': blob }` record
+      // to check the MIME type and blob sent to the clipboard.
       capturedItem = (items[0] as unknown as { record: Record<string, Blob> }).record;
     });
     Object.defineProperty(navigator, 'clipboard', { value: { write }, configurable: true });
@@ -85,8 +77,7 @@ describe('copyImageToClipboard — ảnh đã là PNG sẵn (bỏ qua canvas)', 
   });
 
   it('nhận cả data: URL — tự fetch rồi mới copy, không cần call site tự giải mã base64', async () => {
-    // jsdom hiểu `data:` URL qua `fetch` gốc, trả về đúng Blob với MIME type
-    // lấy từ chính data URL.
+    // jsdom's `fetch` resolves `data:` URLs to a Blob with the right type.
     const dataUrl = 'data:image/png;base64,ZmFrZS1wbmc=';
     await copyImageToClipboard(dataUrl);
     expect(write).toHaveBeenCalledTimes(1);

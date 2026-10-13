@@ -19,6 +19,7 @@ import { Keycap } from '@/components/ui/keycap';
 import { methodColor, methodShort } from './method-color';
 import { searchRequests, type QuickOpenHit } from './quickOpen';
 import type { Collection } from './types';
+import { t } from './i18n';
 
 interface Props {
   open: boolean;
@@ -84,9 +85,9 @@ export function RequestQuickOpen({ open, onOpenChange, collections, openIds, onP
             'data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
           )}
         >
-          <DialogPrimitive.Title className="sr-only">Go to request</DialogPrimitive.Title>
+          <DialogPrimitive.Title className="sr-only">{t('qo.title')}</DialogPrimitive.Title>
           <DialogPrimitive.Description className="sr-only">
-            Search every collection by request name, URL, or method.
+            {t('qo.desc')}
           </DialogPrimitive.Description>
 
           <div className="flex items-center gap-2 border-b border-line px-3.5">
@@ -96,19 +97,19 @@ export function RequestQuickOpen({ open, onOpenChange, collections, openIds, onP
               value={query}
               onChange={(e) => { setQuery(e.target.value); setSelected(0); }}
               onKeyDown={onKeyDown}
-              placeholder="Go to request — name, URL, or method"
-              aria-label="Go to request"
+              placeholder={t('qo.placeholder')}
+              aria-label={t('qo.title')}
               spellCheck={false}
               className="h-ctl-lg w-full bg-transparent text-sm text-fg outline-hidden placeholder:text-fg-mute/60"
             />
           </div>
 
-          <div className="max-h-[380px] overflow-y-auto p-1.5" role="listbox" aria-label="Matching requests">
+          <div className="max-h-[380px] overflow-y-auto p-1.5" role="listbox" aria-label={t('qo.matching')}>
             {hits.length === 0 && (
-              <p className="px-2.5 py-8 text-center text-[13px] text-fg-mute">
+              <p className="px-2.5 py-8 text-center text-dense text-fg-mute">
                 {total === 0
-                  ? 'No requests yet — create one in the sidebar first.'
-                  : <>Nothing matches &ldquo;{query}&rdquo;.</>}
+                  ? t('qo.noneYet')
+                  : t('qo.nothingMatches', { q: query })}
               </p>
             )}
             {hits.map((hit, i) => {
@@ -160,13 +161,13 @@ export function RequestQuickOpen({ open, onOpenChange, collections, openIds, onP
           <div className="flex items-center gap-3 border-t border-line px-3.5 py-2">
             <span className="flex items-center gap-1 text-[11px] text-fg-mute">
               <Keycap>↑</Keycap>
-              <Keycap>↓</Keycap> navigate
+              <Keycap>↓</Keycap> {t('qo.navigate')}
             </span>
             <span className="flex items-center gap-1 text-[11px] text-fg-mute">
-              <Keycap>⏎</Keycap> open
+              <Keycap>⏎</Keycap> {t('qo.open')}
             </span>
             <span className="ml-auto flex items-center gap-1 text-[11px] text-fg-mute">
-              <Keycap>Esc</Keycap> close
+              <Keycap>Esc</Keycap> {t('qo.close')}
             </span>
           </div>
         </DialogPrimitive.Content>

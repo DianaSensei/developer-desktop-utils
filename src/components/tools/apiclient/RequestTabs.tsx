@@ -18,6 +18,7 @@ import { EnvQuickView } from './EnvQuickView';
 import type { ApiStore } from './store';
 import type { SplitDirection } from './ApiClient';
 import type { ApiResponse, Collection, ResolvedVar, TreeItem } from './types';
+import { t } from './i18n';
 
 // The one slice of ApiClient's per-tab RunState a tab actually needs to know
 // about — kept as its own shape (rather than importing RunState) so this
@@ -125,10 +126,10 @@ export function RequestTabs({
     const others = ids.filter((t) => t !== id);
     const toRight = ids.slice(idx + 1);
     return [
-      { label: 'Close', onClick: () => store.closeTab(id) },
-      { label: 'Close Others', disabled: others.length === 0, onClick: () => store.closeTabs(others) },
-      { label: 'Close to the Right', disabled: toRight.length === 0, onClick: () => store.closeTabs(toRight) },
-      { label: 'Close All', sep: true, onClick: () => store.closeTabs(ids) },
+      { label: t('tabs.close'), onClick: () => store.closeTab(id) },
+      { label: t('tabs.closeOthers'), disabled: others.length === 0, onClick: () => store.closeTabs(others) },
+      { label: t('tabs.closeRight'), disabled: toRight.length === 0, onClick: () => store.closeTabs(toRight) },
+      { label: t('tabs.closeAll'), sep: true, onClick: () => store.closeTabs(ids) },
     ];
   };
 
@@ -169,14 +170,8 @@ export function RequestTabs({
               onContextMenu={(e) => menu.open(e, tabEntries(req.id))}
               title={tip}
               className={cn(
-                // scale-in plays once, on the fresh mount a newly-opened tab gets
-                // (an already-open tab just being reordered/re-rendered keeps its
-                // DOM node by `key`, so it never replays).
-                // Rounded pill, not a full-height rectangle with a top accent
-                // bar — the active tab's own filled background is what marks
-                // it now, à la Postman/the reference screenshot, and the bar
-                // reads as flatter/borderless without a `border-r` between
-                // every tab.
+                // scale-in plays once when a tab mounts; reordered tabs keep their
+                // DOM node by `key`. The active tab is a filled rounded pill.
                 'group relative flex max-w-[180px] shrink-0 cursor-pointer items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs transition-colors motion-safe:animate-scale-in',
                 active ? 'bg-card text-fg shadow-sm' : 'text-fg-mute hover:bg-bg/50 hover:text-fg',
               )}
@@ -189,7 +184,7 @@ export function RequestTabs({
                   the moment it starts, and the spinner is what tells you
                   which of several tabs is still waiting. */}
               {run?.sending
-                ? <Spinner size="xs" className="shrink-0 text-fg-mute" label="Sending" />
+                ? <Spinner size="xs" className="shrink-0 text-fg-mute" label={t('tabs.sending')} />
                 : failed && <StatusDot tone="error" size="xs" className="shrink-0" />}
               {/* The slot keeps its 16px whether or not the × is showing, so a
                   tab's label doesn't reflow the moment the pointer enters it. */}
@@ -199,7 +194,8 @@ export function RequestTabs({
                   'grid h-4 w-4 shrink-0 place-items-center rounded-sm text-fg-mute transition-colors hover:bg-bg-2 hover:text-fg focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus',
                   active ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100',
                 )}
-                title="Close tab"
+                title={t('tabs.closeTab')}
+                aria-label={t('tabs.closeTab')}
               >
                 <X className="h-3 w-3" />
               </button>
@@ -209,11 +205,12 @@ export function RequestTabs({
         {historyActive && (
           <div className="group relative flex shrink-0 items-center gap-1.5 rounded-md bg-card px-2.5 py-1.5 text-xs text-fg shadow-sm motion-safe:animate-scale-in">
             <Clock className="h-3.5 w-3.5 shrink-0 text-acc-ink" />
-            <span>History</span>
+            <span>{t('tabs.history')}</span>
             <button
               onClick={onCloseHistory}
               className="grid h-4 w-4 shrink-0 place-items-center rounded-sm text-fg-mute transition-colors hover:bg-bg-2 hover:text-fg focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus"
-              title="Close history"
+              title={t('tabs.closeHistory')}
+                aria-label={t('tabs.closeHistory')}
             >
               <X className="h-3 w-3" />
             </button>
@@ -229,11 +226,9 @@ export function RequestTabs({
       {edges.end && <span aria-hidden className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-bg via-bg/80 to-transparent" />}
       </div>
 
-      {/* Pinned outside the scrollable tab strip, not inside it — with many
-          tabs open (or a narrower window) the strip scrolls/clips before this
-          ever would, and "open a new request" is exactly the one action that
-          must never end up scrolled out of reach. */}
-      <IconButton onClick={onNewRequest} title="New request" className="h-auto w-auto shrink-0 rounded-none border-l border-line px-2 hover:bg-bg">
+      {/* Outside the scrolling tab strip so "new request" is never
+          scrolled out of reach. */}
+      <IconButton onClick={onNewRequest} title={t('tabs.newRequest')} aria-label={t('tabs.newRequest')} className="h-auto w-auto shrink-0 rounded-none border-l border-line px-2 hover:bg-bg">
         <Plus className="h-4 w-4" />
       </IconButton>
 
@@ -247,35 +242,19 @@ export function RequestTabs({
       <IconButton
         onClick={onRevealActive}
         disabled={historyActive || !activeRequestId}
-        title="Reveal in sidebar"
+        title={t('tabs.reveal')}
+        aria-label={t('tabs.reveal')}
         className="h-auto w-auto shrink-0 rounded-none border-l border-line px-2 hover:bg-bg"
       >
         <Folder className="h-4 w-4" />
       </IconButton>
 
       {/* right cluster: environment · history · layout */}
-      {/* py-1 — hàng này dùng items-stretch nên chiều cao thực tế do phần tử cao
-          nhất quyết định; SelectTrigger cao đúng h-ctl (34px), không có py thì nó
-          CHÍNH LÀ chiều cao cả hàng, khiến pill chạm sát viền trên/dưới toolbar.
-          1.5 → 1: đủ để pill không chạm viền, mà thanh tab thấp đi 4px — đây là
-          thanh chrome, mọi pixel nó không dùng thì phần response dùng. */}
-      {/* max-w-[45%] is what stops the environment cluster from eating the tab
-          strip. The strip is `flex-1 min-w-0` (basis 0), so it silently
-          absorbed every pixel the row was short while this cluster, at
-          `shrink-0` and ~380px wide, never gave any back: at a 1180px window
-          the strip measured 267px — two tabs out of eight open. A percentage
-          cap rather than a minimum on the strip: it can never push a control
-          off the (overflow-hidden) row however narrow the pane gets, and
-          above ~1300px there is slack for both, so nothing shrinks at all.
-          The two selects already elide, so the cap costs a few characters of
-          an environment name and nothing else. */}
-      {/* Below the two selects' combined floor (min-w-[4.5rem] each) plus the
-          icon buttons, the cluster can't shrink any further — at that point
-          it used to spill past the (overflow-hidden) row and clip the
-          trailing icons off-window with no way to reach them. overflow-x-auto
-          turns that hard floor into an internal scroll instead, so History
-          and the layout toggle stay reachable however narrow the window
-          gets. */}
+      {/* py-1 keeps the 34px selects from touching the toolbar edges. */}
+      {/* max-w-[45%] stops this cluster from squeezing the tab strip
+          (`flex-1 min-w-0`) to a couple of tabs on narrow windows.
+          overflow-x-auto lets it scroll internally once it cannot shrink
+          further, so History and the layout toggle stay reachable. */}
       <div className="flex min-w-0 max-w-[45%] shrink items-center gap-1 overflow-x-auto no-scrollbar border-l border-line py-1 pl-2 pr-1.5 text-fg-mute">
         {/* Two independent pickers, not one — a Collection env and a Global
             env can both be active at once (Collection wins on a name
@@ -287,34 +266,25 @@ export function RequestTabs({
           value={(store.activeCollectionId && store.activeEnvByCollection[store.activeCollectionId]) || 'none'}
           onValueChange={(v) => store.activeCollectionId && store.setActiveCollectionEnv(store.activeCollectionId, v === 'none' ? null : v)}
         >
-          {/* h-ctl khớp chiều cao IconButton bên cạnh — bản trước dùng h-8 (32px)
-              cạnh IconButton mặc định h-ctl (34px), lệch 2px khiến cả cụm nhìn
-              không thẳng hàng. */}
-          {/* A <div> wrapper, not <span> — SelectTrigger's own base style
-              carries `[&>span]:line-clamp-1` for its direct-child span
-              (meant for SelectValue's own rendered span), and nesting it a
-              level deeper moves it out of that rule's reach. Radix's
-              SelectValue doesn't forward `className` to that span at all (its
-              class stays empty however it's called), so truncation is
-              re-applied here via `[&>span]` on the div — its span really is
-              a direct child (verified against the rendered DOM) — instead of
-              on SelectValue itself. Without it, a name too long for w-28
-              wraps onto a second line under the icon rather than eliding
-              with "…". */}
+          {/* h-ctl matches the neighboring IconButton. A <div>, not a <span>:
+              SelectTrigger's `[&>span]:line-clamp-1` targets its direct child
+              span, and Radix's SelectValue does not forward `className`, so
+              truncation is applied here with `[&>span]`. Without it a long
+              name wraps onto a second line. */}
           <SelectTrigger
             className="h-ctl w-28 min-w-[4.5rem] shrink text-xs rounded-sm"
-            title="Collection environment — scoped to this collection, follows whichever collection the active request belongs to"
+            title={t('tabs.collectionEnvHint')}
           >
             <div className="flex min-w-0 items-center gap-1 [&>span]:min-w-0 [&>span]:flex-1 [&>span]:truncate">
               <Folder className="h-3 w-3 shrink-0 opacity-70" />
-              <SelectValue placeholder="No Environment" />
+              <SelectValue placeholder={t('noEnvironment')} />
             </div>
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="none">No Environment</SelectItem>
+            <SelectItem value="none">{t('noEnvironment')}</SelectItem>
             {collectionEnvs.length > 0 && (
               <SelectGroup>
-                <SelectLabel className="text-[11px] uppercase tracking-wide text-fg-mute">{collection?.name ?? 'Collection'}</SelectLabel>
+                <SelectLabel className="text-[11px] uppercase tracking-wide text-fg-mute">{collection?.name ?? t('tabs.collection')}</SelectLabel>
                 {collectionEnvs.map((e) => <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>)}
               </SelectGroup>
             )}
@@ -326,15 +296,15 @@ export function RequestTabs({
         >
           <SelectTrigger
             className="h-ctl w-28 min-w-[4.5rem] shrink text-xs rounded-sm"
-            title="Global environment — applies across every collection, unaffected by which one is active"
+            title={t('tabs.globalEnvHint')}
           >
             <div className="flex min-w-0 items-center gap-1 [&>span]:min-w-0 [&>span]:flex-1 [&>span]:truncate">
               <Globe className="h-3 w-3 shrink-0 opacity-70" />
-              <SelectValue placeholder="No Global Env" />
+              <SelectValue placeholder={t('tabs.noGlobalEnv')} />
             </div>
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="none">No Global Env</SelectItem>
+            <SelectItem value="none">{t('tabs.noGlobalEnv')}</SelectItem>
             {globalEnvs.map((e) => <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>)}
           </SelectContent>
         </Select>
@@ -353,14 +323,16 @@ export function RequestTabs({
         <span className="mx-0.5 h-5 w-px bg-line" />
         <IconButton
           onClick={onOpenHistory}
-          title="History"
+          title={t('tabs.history')}
+          aria-label={t('tabs.history')}
           className={cn('hover:bg-bg', historyActive && 'text-acc-ink')}
         >
           <Clock className="h-4 w-4" />
         </IconButton>
         <IconButton
           onClick={onToggleDirection}
-          title={direction === 'horizontal' ? 'Switch to stacked layout' : 'Switch to side-by-side layout'}
+          title={direction === 'horizontal' ? t('tabs.stacked') : t('tabs.sideBySide')}
+          aria-label={direction === 'horizontal' ? t('tabs.stacked') : t('tabs.sideBySide')}
           className="hover:bg-bg"
         >
           {direction === 'horizontal' ? <Rows2 className="h-4 w-4" /> : <Columns2 className="h-4 w-4" />}

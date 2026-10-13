@@ -9,6 +9,7 @@
 
 import { type VarMap } from './types';
 import { previewVars } from './vars';
+import { t } from './i18n';
 
 /**
  * Whether a table should carry the Resolved column at all: only when it has
@@ -49,7 +50,7 @@ export function ResolvedValue({ value, vars }: Readonly<{ value: string; vars: V
     return (
       <span
         className="truncate font-mono text-[11px] text-bad"
-        title={`No value for ${names} — it will be sent literally.`}
+        title={t('resolved.noValue', { names })}
       >
         {names} undefined
       </span>
@@ -57,7 +58,7 @@ export function ResolvedValue({ value, vars }: Readonly<{ value: string; vars: V
   }
   return (
     <span className="truncate font-mono text-[11px] text-fg-mute" title={resolved}>
-      {resolved || <span className="italic">empty</span>}
+      {resolved || <span className="italic">{t('resolved.empty')}</span>}
     </span>
   );
 }

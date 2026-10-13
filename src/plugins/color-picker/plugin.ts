@@ -11,7 +11,7 @@ export default definePlugin({
   route: '/color-picker',
   order: 210,
   defaultEnabled: false,
-  permissions: ['storage', 'clipboard:read', 'clipboard:write'],
+  permissions: ['storage', 'clipboard:read', 'clipboard:write', 'files:write'],
   sdk: '^1.0.0',
   load: () => import('@/components/tools/ColorPicker').then((m) => m.ColorPicker),
 });

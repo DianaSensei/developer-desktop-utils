@@ -221,6 +221,11 @@ phiên làm việc dài) — không phải để log mọi tương tác UI.
 | `usePluginConfig()`, `useLiveConnection()`, `usePluginMcpBridgeActive()` | Ba dịch vụ có hình dạng React, xuất qua cùng cửa `@/platform` vì không thể là thuộc tính phẳng của object `sdk`. |
 | `pluginAudit.recent()` | Đọc nhật ký audit gần đây (Settings → Extensions dùng cái này để hiện bảng "đã làm gì"). |
 
+**Plugin cài từ URL** không `import` được `@/platform` hay `@/design-system` — đọc các hook
+trên qua `window.__DEVTOOL_VENDOR__.platform`, và bộ component UI qua
+`window.__DEVTOOL_VENDOR__.ui` (SDK ≥ 1.1.0). Xem
+[05-external-install.md](05-external-install.md#ui-dùng-bộ-component-của-app-chủ--__devtool_vendor__ui-sdk--110).
+
 ## Kiểm quyền không phải kiểm boolean đơn giản
 
 Toàn bộ `ensure()` nội bộ của SDK vừa kiểm quyền vừa GHI AUDIT trong cùng

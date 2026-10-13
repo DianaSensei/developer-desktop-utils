@@ -10,11 +10,8 @@ import { Keycap } from '@/components/ui/keycap';
 import { Button } from '@/components/ui/button';
 
 /**
- * Test cho các component dựng ở G2.
- *
- * Không kiểm "có render không" — cái đó build đã bắt. Kiểm những HÀNH VI mà một
- * lần refactor vô tình rất dễ làm hỏng mà không ai thấy: vai trò ARIA của lỗi,
- * ranh giới bấm được của dòng cấu hình, và luật màu trạng thái.
+ * Tests for the status and row components: ARIA roles for errors, clickable
+ * boundaries of setting rows, and the status color rule.
  */
 
 describe('StatusChip', () => {
@@ -26,8 +23,7 @@ describe('StatusChip', () => {
     rerender(<StatusChip tone="bad">Lỗi</StatusChip>);
     expect(cls()).toContain('text-bad');
 
-    // Không tông nào được rơi vào lớp accent — đó là điều kiện để đổi tone chủ
-    // đạo mà chip trạng thái giữ nguyên màu.
+    // No tone may use the accent, so changing the tone keeps status colors.
     for (const tone of ['ok', 'warn', 'bad', 'info'] as const) {
       rerender(<StatusChip tone={tone}>x</StatusChip>);
       expect((container.firstChild as HTMLElement).className).not.toMatch(/\bt(ext|ex)-acc|bg-acc/);
@@ -45,7 +41,7 @@ describe('StatusChip', () => {
 
 describe('ExplainBand', () => {
   it('báo lỗi bằng role="alert", các tông khác chỉ là "status"', () => {
-    // Lỗi phải được trình đọc màn hình đọc ngay; "hợp lệ" thì không nên cắt lời.
+    // Errors interrupt screen readers; "valid" should not.
     const { rerender } = render(<ExplainBand tone="bad">Sai cú pháp</ExplainBand>);
     expect(screen.getByRole('alert')).toBeTruthy();
 
@@ -93,9 +89,11 @@ describe('ParamRow', () => {
 
   it('chỉ hiện nút trợ giúp khi có nội dung help', () => {
     const { rerender } = render(<ParamRow label="A" value="1" />);
-    expect(screen.queryByLabelText('Giải thích thêm')).toBeNull();
+    // Localized label (ui.messages.ts); English outside LocaleProvider.
+    const helpLabel = /Giải thích thêm|More details/;
+    expect(screen.queryByLabelText(helpLabel)).toBeNull();
     rerender(<ParamRow label="A" value="1" help="Sâu hơn" />);
-    expect(screen.getByLabelText('Giải thích thêm')).toBeTruthy();
+    expect(screen.getByLabelText(helpLabel)).toBeTruthy();
   });
 });
 
@@ -111,7 +109,7 @@ describe('SettingRow', () => {
   it('disabled thì không bấm được', () => {
     const open = vi.fn();
     render(<SettingRow title="Khoá" onOpen={open} disabled />);
-    // Dòng bị vô hiệu không được dựng thành nút, nếu không bàn phím vẫn tới được.
+    // A disabled row must not be a button, or keyboard focus still reaches it.
     expect(screen.queryByRole('button')).toBeNull();
     expect(open).not.toHaveBeenCalled();
   });
@@ -156,7 +154,7 @@ describe('Button + Keycap', () => {
 
   it('Keycap mod chèn phím lệnh của hệ điều hành', () => {
     render(<Keycap mod>K</Keycap>);
-    // Chạy trên jsdom (không phải Mac) nên là Ctrl+K; trên macOS sẽ là ⌘K.
+    // jsdom is not a Mac, so Ctrl+K here; ⌘K on macOS.
     expect(screen.getByText(/K$/).textContent).toMatch(/^(⌘K|Ctrl\+K)$/);
   });
 });

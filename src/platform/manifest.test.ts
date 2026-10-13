@@ -91,7 +91,7 @@ describe('validateManifest', () => {
     expect(validateManifest({ ...base, permissions: ['http'] }).join()).toMatch(/không khai hosts/);
     expect(validateManifest({ ...base, hosts: ['dns.google'] }).join()).toMatch(/thiếu quyền "http"/);
     expect(validateManifest({ ...base, permissions: ['http'], hosts: ['dns.google'] })).toEqual([]);
-    // "*" hợp lệ, nhưng phải được VIẾT RA — đó là điểm của luật này.
+    // "*" is valid but must be written out explicitly.
     expect(validateManifest({ ...base, permissions: ['http'], hosts: ['*'] })).toEqual([]);
   });
 

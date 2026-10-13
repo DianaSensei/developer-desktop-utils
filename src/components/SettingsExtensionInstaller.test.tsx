@@ -3,16 +3,10 @@ import { render, screen, cleanup, fireEvent, waitFor, act } from '@testing-libra
 import { storageRemove } from '@/lib/persistentStore';
 
 /**
- * `isTauri` được đọc MỘT LẦN lúc `@/lib/platform` được nạp — cùng cái bẫy đã
- * ghi ở `installer.test.ts`. `vi.resetModules()` + gán `__TAURI_INTERNALS__`
- * TRƯỚC khi `import('@/components/SettingsExtensionInstaller')` là cách duy
- * nhất để mọi module transitively import `@/lib/platform` đọc đúng giá trị
- * test này cần.
- *
- * Danh sách "đã cài" (gỡ/cập nhật) không còn ở component này nữa — xem
- * `SettingsInstalledExtensions.test.tsx`. File này chỉ còn phủ form "cài từ
- * URL": xem trước + cài, không có gì gọi `listInstalledArtifacts` lúc mount
- * nữa nên không cần mock "list lúc mount" như bản cũ.
+ * `isTauri` is read once when `@/lib/platform` loads, so each test resets
+ * modules and sets `__TAURI_INTERNALS__` before importing the component.
+ * Covers the paste-a-URL form (preview and install); the installed list is
+ * tested in SettingsInstalledExtensions.test.tsx.
  */
 async function settle(ms = 20) {
   await act(async () => {
@@ -74,9 +68,8 @@ function installedServiceRaw(overrides: Partial<Record<string, unknown>> = {}) {
 }
 
 /**
- * `resetModules()` + import + render, dùng chung cho MỌI test cần một lần nạp
- * module riêng (isTauri đọc một lần lúc `@/lib/platform` được nạp — xem ghi
- * chú ở đầu file).
+ * Resets modules, imports and renders, for tests that need a fresh module
+ * graph (see the note above).
  */
 async function renderInstaller(opts?: { tauri?: boolean }) {
   vi.resetModules();
@@ -85,10 +78,8 @@ async function renderInstaller(opts?: { tauri?: boolean }) {
   } else {
     delete (window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__;
   }
-  // Cả `LocaleProvider` lẫn component đều phải đến từ CÙNG một lần nạp module
-  // (sau `resetModules()`) — nạp `LocaleProvider` từ một graph module khác thì
-  // `useContext` bên trong component không thấy đúng Provider, ném "must be
-  // used within a LocaleProvider" dù JSX nhìn đúng.
+  // LocaleProvider must come from the same module graph as the component,
+  // or its context is not found.
   const { LocaleProvider } = await import('@/contexts/LocaleContext');
   const { SettingsExtensionInstaller } = await import('@/components/SettingsExtensionInstaller');
   return render(
@@ -170,16 +161,15 @@ describe('SettingsExtensionInstaller — xem trước (preview)', () => {
     await waitFor(() => expect(screen.getByText('devtool-svc-demo@1.0.0')).toBeTruthy());
     expect(invokeMock).toHaveBeenCalledWith('artifact_installer_current_target_triple', undefined);
     expect(screen.getByText('Service')).toBeTruthy();
-    // Xuất hiện Ở CẢ HAI chỗ: dòng "target máy này" và chip target manifest có
-    // — cả hai đều đúng, chỉ cần khẳng định có ít nhất một, không phải đúng một.
+    // The triple appears in two places (this machine and the manifest's
+    // targets); at least one is enough.
     expect(screen.getAllByText(/aarch64-apple-darwin/).length).toBeGreaterThan(0);
     expect(
       screen.getByText(/The manifest has a build for this platform\.|Manifest có bản cho nền tảng này\./),
     ).toBeTruthy();
 
-    // kind=service KHÔNG đi qua assertNoConflictingInstall (chỉ áp dụng cho
-    // plugin) — bấm Install ở đây phải đi thẳng tới artifact_installer_install,
-    // không có lệnh list nào chen vào trước.
+    // Services skip assertNoConflictingInstall (plugins only), so install
+    // goes straight to artifact_installer_install.
     invokeMock.mockResolvedValueOnce(installedServiceRaw());
     fireEvent.click(screen.getByRole('button', { name: /^Install$|^Cài đặt$/ }));
 
@@ -278,10 +268,3 @@ describe('SettingsExtensionInstaller — cài đặt (success)', () => {
   });
 });
 
-// Bài test "hàng đợi desktop-devtool-app://install (pendingInstall)" trước
-// đây thuộc file này đã bị XOÁ: `SettingsExtensionInstaller` không còn nghe
-// `pendingInstall` nữa (tab "Cài từ URL" giờ chỉ phục vụ URL người dùng tự
-// dán tay) — một lượt cài tới từ deep link/market giờ hiện thẳng
-// `ExtensionInstallDialog`, đè lên trang `SettingsExtensions`, không rơi
-// vào tab này nữa. Xem `SettingsExtensions.pendingInstallTab.test.tsx` cho
-// hành vi mới.

@@ -28,7 +28,7 @@ describe('detectClipboardIntent', () => {
     });
 
     it('không nhận nhầm ba đoạn base64url không phải JWT', () => {
-      // Ba đoạn hợp lệ base64url nhưng đoạn đầu không giải mã ra JSON có "alg".
+      // Valid base64url segments, but the first does not decode to JSON with "alg".
       expect(detectClipboardIntent('YWJj.ZGVm.Z2hp')).toBeNull();
     });
   });
@@ -44,8 +44,7 @@ describe('detectClipboardIntent', () => {
     });
 
     it('ưu tiên jwt hơn json khi cả hai đều khớp về hình thức', () => {
-      // JWT không bắt đầu bằng { hay [ nên thực ra không đụng nhánh JSON —
-      // test này khẳng định thứ tự kiểm tra jwt đứng TRƯỚC json trong code.
+      // A JWT never starts with { or [, so this pins the check order.
       expect(detectClipboardIntent(SAMPLE_JWT)?.kind).toBe('jwt');
     });
   });
@@ -68,7 +67,7 @@ describe('detectClipboardIntent', () => {
     });
 
     it('không nhận nhầm năm số cách nhau bằng dấu cách', () => {
-      // Không có */,— nào trong các trường thì không đủ tin đó là cron.
+      // No `*`, `/` or `,` in any field: not convincingly cron.
       expect(detectClipboardIntent('1 2 3 4 5')).toBeNull();
     });
   });
@@ -114,8 +113,7 @@ describe('detectClipboardIntent', () => {
     });
 
     it('hex đứng trước base64 trong thứ tự kiểm tra', () => {
-      // "deadbeef" cũng thoả điều kiện độ dài chia hết 4 của base64, nhưng
-      // phải được phân vào hex vì hex là mẫu chặt hơn.
+      // "deadbeef" also fits base64's length rule, but hex is the stricter match.
       expect(detectClipboardIntent('deadbeef')?.toolId).toBe('base64');
       expect(detectClipboardIntent('deadbeef')?.kind).toBe('hex');
     });

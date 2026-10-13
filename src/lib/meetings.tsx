@@ -22,13 +22,8 @@ export interface Meeting {
   updatedAt: number;
 }
 
-// `crypto` luôn có mặt ở mọi môi trường app này thực sự chạy (webview Tauri,
-// trình duyệt hiện đại lúc `npm run dev`, và cả jsdom lúc test) — không cần
-// nhánh dự phòng `typeof crypto === 'undefined'`. `crypto.randomUUID` không
-// có ở vài webview cũ hơn, nên `crypto.getRandomValues` (chuẩn Web Crypto có
-// mặt rộng hơn nhiều) là phương án dự phòng, thay vì `Math.random()` — một
-// PRNG không an toàn mà các máy quét tĩnh như SonarCloud luôn gắn cờ bất kể
-// ngữ cảnh dùng.
+// Prefer `crypto.randomUUID`; some older webviews lack it, so fall back to
+// `crypto.getRandomValues` rather than `Math.random()`.
 function uid(): string {
   if (crypto.randomUUID) return crypto.randomUUID();
   const bytes = crypto.getRandomValues(new Uint8Array(8));

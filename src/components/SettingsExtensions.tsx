@@ -8,22 +8,13 @@ import { Tabs } from '@/components/ui/tabs';
 import { pendingInstall, type PendingInstallItem } from '@/lib/pendingInstall';
 
 /**
- * Settings → Extensions: cài THÊM plugin/sidecar KHÔNG có sẵn trong bản
- * biên dịch của app, qua Chợ tiện ích hoặc dán URL manifest tay — và quản lý
- * (cập nhật/gỡ) những gì đã cài, bất kể cài từ đường nào. Tách khỏi
- * Settings → Plugins (danh sách tool biên dịch sẵn + nhật ký) — hai câu hỏi
- * khác nhau: "app này có những plugin nào sẵn, quyền gì" so với "tôi muốn
- * cài thêm cái gì đó KHÔNG có sẵn".
+ * Settings → Extensions: install plugins and sidecars that are not built in
+ * (from the marketplace or a pasted manifest URL) and manage installed ones.
+ * Built-in tools and their permissions are under Settings → Plugins.
  *
- * Tab "Đã cài" là tab RIÊNG, không lồng trong "Cài từ URL" hay "Chợ tiện
- * ích" — trước đây danh sách gỡ/cập nhật bị chôn dưới tab "Cài từ URL", nên
- * một người chỉ dùng Chợ tiện ích để cài sẽ không bao giờ tìm ra chỗ để gỡ.
- *
- * Một lượt cài tới từ BÊN NGOÀI trang này (deep link
- * `desktop-devtool-app://install`, xử lý ở `deepLink.ts`) hiện `ExtensionInstallDialog`
- * NGAY TẠI ĐÂY, đè lên bất kỳ tab nào đang mở — không còn ép chuyển sang tab
- * "Cài từ URL" như trước (tab đó giờ chỉ còn dùng cho URL người dùng tự dán
- * tay, không liên quan gì tới hàng đợi `pendingInstall` nữa).
+ * Installed extensions have their own tab. Install requests from outside
+ * (deep links, see deepLink.ts) open `ExtensionInstallDialog` over
+ * whichever tab is showing.
  */
 
 export function SettingsExtensions() {
@@ -40,8 +31,7 @@ export function SettingsExtensions() {
     return pendingInstall.subscribe(drain);
   }, []);
 
-  // Nhớ lại theo danh tính `pendingBatch`, không tính mới mỗi lần render —
-  // cùng lý do đã ghi ở `SettingsMarketplace.tsx`'s `installUrls`.
+  // Memoized per batch, like `installUrls` in SettingsMarketplace.tsx.
   const pendingUrls = useMemo(() => pendingBatch?.map((item) => item.url) ?? [], [pendingBatch]);
 
   return (
