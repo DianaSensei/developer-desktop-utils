@@ -57,8 +57,12 @@ jobs:
           cache-shared-key: coverage
           cache-save-if: 'false'
 
-      - name: Typecheck
-        run: npx tsc --noEmit
+      # `npm run build` is `tsc && vite build`: the typecheck, plus the
+      # ../dist that tauri's generate_context! reads (`frontendDist`) at
+      # compile time — `cargo test` below fails without it, same as in
+      # coverage.yml's `rust` job.
+      - name: Typecheck and build frontend (creates ../dist for generate_context!)
+        run: npm run build
 
       - name: Frontend unit tests
         run: npm test
