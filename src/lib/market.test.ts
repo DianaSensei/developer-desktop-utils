@@ -134,6 +134,77 @@ describe('fetchMarketCatalog', () => {
     expect(plugins[0].id).toBe('ok');
   });
 
+  it('parse đúng field "beta" khi tác giả có phát hành bản beta', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        jsonResponse({
+          plugins: [
+            {
+              id: 'demo',
+              label: 'Demo',
+              description: 'A demo plugin',
+              version: '1.0.0',
+              pluginManifestUrl: 'https://example.com/demo-plugin.json',
+              beta: {
+                version: '1.1.0-beta.1',
+                pluginManifestUrl: 'https://example.com/demo-plugin-beta.json',
+                serviceManifestUrl: 'https://example.com/demo-service-beta.json',
+              },
+            },
+          ],
+        }),
+      ),
+    );
+
+    const plugins = await fetchMarketCatalog('https://example.com/catalog.json');
+    expect(plugins[0].beta).toEqual({
+      version: '1.1.0-beta.1',
+      pluginManifestUrl: 'https://example.com/demo-plugin-beta.json',
+      serviceManifestUrl: 'https://example.com/demo-service-beta.json',
+    });
+  });
+
+  it('không có "beta" thì field đó vắng mặt, không phải lỗi hình dạng', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        jsonResponse({
+          plugins: [
+            { id: 'demo', label: 'Demo', description: 'd', version: '1.0.0', pluginManifestUrl: 'https://example.com/demo.json' },
+          ],
+        }),
+      ),
+    );
+
+    const plugins = await fetchMarketCatalog('https://example.com/catalog.json');
+    expect(plugins[0].beta).toBeUndefined();
+  });
+
+  it('"beta" sai hình dạng (thiếu version) chỉ làm rớt bản beta, không loại cả plugin', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        jsonResponse({
+          plugins: [
+            {
+              id: 'demo',
+              label: 'Demo',
+              description: 'd',
+              version: '1.0.0',
+              pluginManifestUrl: 'https://example.com/demo.json',
+              beta: { pluginManifestUrl: 'https://example.com/demo-beta.json' }, // thiếu version
+            },
+          ],
+        }),
+      ),
+    );
+
+    const plugins = await fetchMarketCatalog('https://example.com/catalog.json');
+    expect(plugins).toHaveLength(1);
+    expect(plugins[0].beta).toBeUndefined();
+  });
+
   it('ném lỗi rõ ràng khi HTTP lỗi', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(null, false, 404)));
     await expect(fetchMarketCatalog('https://example.com/catalog.json')).rejects.toThrow('HTTP 404');

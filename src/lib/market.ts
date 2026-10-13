@@ -17,17 +17,29 @@ export interface Market {
   builtin: boolean;
 }
 
-export interface MarketPlugin {
-  id: string;
-  label: string;
-  description: string;
+/** One installable build: the stable fields flattened on `MarketPlugin`, or
+ *  its optional `beta`. Both carry what an install needs (version, plugin
+ *  manifest URL, optional service manifest URL). */
+export interface MarketPluginVariant {
   version: string;
-  keywords: string[];
   pluginManifestUrl: string;
   serviceManifestUrl?: string;
   /** Target triples the sidecar supports, if known. Used for a warning,
    *  never to block an install. */
   targets?: string[];
+}
+
+export interface MarketPlugin extends MarketPluginVariant {
+  id: string;
+  label: string;
+  description: string;
+  keywords: string[];
+  /** Beta build of the same plugin (same id, different version and URLs),
+   *  if the author publishes one. Only one build of a plugin is installed at
+   *  a time: installing the other channel replaces the current build (see
+   *  the switch button in `SettingsMarketplace.tsx`). Missing means no beta,
+   *  not a malformed entry. */
+  beta?: MarketPluginVariant;
 }
 
 const BUILTIN_MARKETS: Market[] = [
@@ -122,27 +134,36 @@ async function marketFetch(url: string): Promise<Response> {
   return fetch(url);
 }
 
-function toMarketPlugin(raw: unknown): MarketPlugin | null {
+/** Parses the installable part of an entry, shared by the stable fields and
+ *  `beta` (which inherits id, label, description and keywords from its
+ *  parent). */
+function toMarketPluginVariant(raw: unknown): MarketPluginVariant | null {
   if (!raw || typeof raw !== 'object') return null;
   const r = raw as Record<string, unknown>;
-  if (
-    !isNonEmptyString(r.id) ||
-    !isNonEmptyString(r.label) ||
-    !isNonEmptyString(r.description) ||
-    !isNonEmptyString(r.version) ||
-    !isNonEmptyString(r.pluginManifestUrl)
-  ) {
-    return null;
-  }
+  if (!isNonEmptyString(r.version) || !isNonEmptyString(r.pluginManifestUrl)) return null;
   return {
-    id: r.id,
-    label: r.label,
-    description: r.description,
     version: r.version,
-    keywords: Array.isArray(r.keywords) ? r.keywords.filter(isNonEmptyString) : [],
     pluginManifestUrl: r.pluginManifestUrl,
     serviceManifestUrl: isNonEmptyString(r.serviceManifestUrl) ? r.serviceManifestUrl : undefined,
     targets: Array.isArray(r.targets) ? r.targets.filter(isNonEmptyString) : undefined,
+  };
+}
+
+function toMarketPlugin(raw: unknown): MarketPlugin | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+  const stable = toMarketPluginVariant(r);
+  if (!stable || !isNonEmptyString(r.id) || !isNonEmptyString(r.label) || !isNonEmptyString(r.description)) {
+    return null;
+  }
+  return {
+    ...stable,
+    id: r.id,
+    label: r.label,
+    description: r.description,
+    keywords: Array.isArray(r.keywords) ? r.keywords.filter(isNonEmptyString) : [],
+    // A malformed `beta` drops only the beta, not the whole plugin.
+    beta: toMarketPluginVariant(r.beta) ?? undefined,
   };
 }
 

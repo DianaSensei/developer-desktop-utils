@@ -12,7 +12,9 @@ import {
   setSelectedMarketId,
   type Market,
   type MarketPlugin,
+  type MarketPluginVariant,
 } from '@/lib/market';
+import { compareVersions, isPrerelease } from '@/lib/semver';
 import { currentTargetTriple, listInstalledArtifacts, type InstalledArtifactRecord } from '@/platform';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -42,14 +44,17 @@ export function SettingsMarketplace() {
   const [newLabel, setNewLabel] = useState('');
   const [newUrl, setNewUrl] = useState('');
 
-  // Plugin being previewed for install; `null` when the dialog is closed.
-  const [installTarget, setInstallTarget] = useState<MarketPlugin | null>(null);
-  // Memoized per plugin so re-renders while the dialog is open do not
-  // create a new array and refetch inside `ExtensionInstallDialog`.
-  const installUrls = useMemo(
-    () => (installTarget ? [installTarget.pluginManifestUrl, installTarget.serviceManifestUrl].filter((u): u is string => Boolean(u)) : []),
-    [installTarget],
-  );
+  // Plugin and channel being previewed for install; `null` when the dialog
+  // is closed. The channel picks the URLs: the plugin's own fields (stable)
+  // or `plugin.beta`.
+  const [installTarget, setInstallTarget] = useState<{ plugin: MarketPlugin; channel: MarketChannel } | null>(null);
+  // Memoized per plugin and channel so re-renders while the dialog is open do
+  // not create a new array and refetch inside `ExtensionInstallDialog`.
+  const installUrls = useMemo(() => {
+    const variant = installTarget && channelVariant(installTarget.plugin, installTarget.channel);
+    if (!variant) return [];
+    return [variant.pluginManifestUrl, variant.serviceManifestUrl].filter((u): u is string => Boolean(u));
+  }, [installTarget]);
 
   const refreshInstalled = useCallback(async () => {
     if (!isTauri) return;
@@ -213,7 +218,7 @@ export function SettingsMarketplace() {
                 (r) => r.kind === 'plugin' && r.manifest.id === p.id && (r.marketId === selected?.id || r.marketId === undefined),
               )}
               targetTriple={targetTriple}
-              onInstall={() => setInstallTarget(p)}
+              onInstall={(channel) => setInstallTarget({ plugin: p, channel })}
             />
           ))}
         </div>
@@ -239,14 +244,20 @@ function MarketPluginCard({
   plugin: MarketPlugin;
   installedRecord: InstalledArtifactRecord | undefined;
   targetTriple: string | null;
-  onInstall: () => void;
+  onInstall: (channel: 'stable' | 'beta') => void;
 }) {
   const { t } = useLocale();
   const installedVersion =
     installedRecord?.kind === 'plugin' ? installedRecord.manifest.version : undefined;
-  const upToDate = installedVersion === plugin.version;
+  const hasBeta = !!plugin.beta;
+  const installedChannel = installedVersion === undefined ? undefined : inferChannel(plugin, installedVersion);
+  // The build this card is about: the installed channel's, or stable before
+  // anything is installed. A beta that left the catalog falls back to stable.
+  const current = channelVariant(plugin, installedChannel ?? 'stable') ?? plugin;
+  const upToDate = installedVersion !== undefined && compareVersions(installedVersion, current.version) >= 0;
   const unsupported =
-    !!plugin.targets && plugin.targets.length > 0 && !!targetTriple && !plugin.targets.includes(targetTriple);
+    !!current.targets && current.targets.length > 0 && !!targetTriple && !current.targets.includes(targetTriple);
+  const actions = cardActions(plugin, installedChannel, upToDate);
 
   return (
     <div
@@ -259,7 +270,15 @@ function MarketPluginCard({
         <Package className="h-4 w-4 shrink-0 mt-0.5 text-acc" />
         <div className="min-w-0 flex-1">
           <p className="truncate text-xs font-medium">{plugin.label}</p>
-          <p className="truncate font-mono text-[11px] text-fg-mute/60">{plugin.id}@{plugin.version}</p>
+          <p className="flex items-center gap-1.5 truncate font-mono text-[11px] text-fg-mute/60">
+            {plugin.id}@{installedVersion ?? plugin.version}
+            {/* The channel label only helps when the plugin has a beta. */}
+            {hasBeta && installedChannel && (
+              <span className="shrink-0 rounded border px-1 py-0.5 font-sans text-fg-mute/80">
+                {t(`settings.extensions.marketplace.${installedChannel === 'beta' ? 'channelBeta' : 'channelStable'}`)}
+              </span>
+            )}
+          </p>
         </div>
       </div>
 
@@ -281,13 +300,66 @@ function MarketPluginCard({
 
       {/* A warning only: `targets` is advisory (an unofficial market may
           omit a triple that exists), so the user decides. */}
-      <Button size="sm" onClick={onInstall} disabled={upToDate} className="self-start">
-        {upToDate
-          ? t('settings.extensions.marketplace.installed')
-          : installedVersion
-            ? t('settings.extensions.marketplace.updateTo', { version: plugin.version })
-            : t('settings.extensions.marketplace.install')}
-      </Button>
+      <div className="flex flex-wrap gap-1.5">
+        {actions.map((a) => (
+          <Button
+            key={a.channel}
+            size="sm"
+            variant={a.primary ? undefined : 'outline'}
+            disabled={a.disabled}
+            onClick={() => onInstall(a.channel)}
+          >
+            {t(`settings.extensions.marketplace.${a.labelKey}`, a.version ? { version: a.version } : undefined)}
+          </Button>
+        ))}
+      </div>
     </div>
   );
+}
+
+type MarketChannel = 'stable' | 'beta';
+
+function channelVariant(plugin: MarketPlugin, channel: MarketChannel): MarketPluginVariant | undefined {
+  return channel === 'beta' ? plugin.beta : plugin;
+}
+
+/** Which channel an installed version came from. The install record does
+ *  not store the channel, so it is read off the version: an exact match with
+ *  the catalog's stable or beta build wins (stable on a tie), otherwise a
+ *  prerelease tag means an older beta. */
+function inferChannel(plugin: MarketPlugin, installedVersion: string): MarketChannel {
+  if (installedVersion === plugin.version) return 'stable';
+  if (installedVersion === plugin.beta?.version) return 'beta';
+  return isPrerelease(installedVersion) ? 'beta' : 'stable';
+}
+
+interface CardAction {
+  channel: MarketChannel;
+  labelKey: 'install' | 'installBeta' | 'installed' | 'updateTo' | 'switchToStable' | 'switchToBeta';
+  version?: string;
+  primary: boolean;
+  disabled?: boolean;
+}
+
+/** Buttons for a card: install (and install beta) when nothing is
+ *  installed; otherwise update-or-installed for the current channel plus a
+ *  switch to the other channel when it exists. Switching replaces the
+ *  installed build. */
+function cardActions(plugin: MarketPlugin, installed: MarketChannel | undefined, upToDate: boolean): CardAction[] {
+  if (installed === undefined) {
+    const actions: CardAction[] = [{ channel: 'stable', labelKey: 'install', primary: true }];
+    if (plugin.beta) actions.push({ channel: 'beta', labelKey: 'installBeta', primary: false });
+    return actions;
+  }
+  // A beta that left the catalog leaves only stable to update to.
+  const channel: MarketChannel = installed === 'beta' && plugin.beta ? 'beta' : 'stable';
+  const target = channelVariant(plugin, channel) ?? plugin;
+  const actions: CardAction[] = [
+    upToDate
+      ? { channel, labelKey: 'installed', primary: true, disabled: true }
+      : { channel, labelKey: 'updateTo', version: target.version, primary: true },
+  ];
+  if (channel === 'beta') actions.push({ channel: 'stable', labelKey: 'switchToStable', primary: false });
+  else if (plugin.beta) actions.push({ channel: 'beta', labelKey: 'switchToBeta', primary: false });
+  return actions;
 }

@@ -26,6 +26,7 @@ import {
   Server, ServerCog, ShieldCheck, Timer,
 } from 'lucide-react';
 import { isTauri } from '@/lib/platform';
+import { compareVersions } from '@/lib/semver';
 import type { PluginManifest, PluginPermission } from './types';
 import type { ServiceDescriptor } from './service';
 
@@ -271,16 +272,6 @@ export async function checkForUpdate(
 ): Promise<{ available: boolean; remote?: RemotePluginManifest }> {
   const remote = await fetchManifestPreview(record.sourceUrl);
   return { available: compareVersions(remote.version, record.manifest.version) > 0, remote };
-}
-
-function compareVersions(a: string, b: string): number {
-  const pa = a.split('.').map(Number);
-  const pb = b.split('.').map(Number);
-  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
-    const diff = (pa[i] ?? 0) - (pb[i] ?? 0);
-    if (diff !== 0) return diff;
-  }
-  return 0;
 }
 
 // Services
