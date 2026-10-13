@@ -205,11 +205,18 @@ export async function fetchArtifactManifestPreview(url: string): Promise<RemoteA
 
 /** Downloads, verifies and stores the artifact at `url` (Rust branches on
  *  `kind`). `marketId` is set when the URL comes from a marketplace card.
+ *  `expectedManifest` is the manifest the user approved in a preview: Rust
+ *  fetches it again and refuses the install if it differs.
  *  Call `assertNoConflictingInstall` first. */
-export async function installArtifact(url: string, marketId?: string): Promise<InstalledArtifactRecord> {
+export async function installArtifact(
+  url: string,
+  marketId?: string,
+  expectedManifest?: RemoteArtifactManifest,
+): Promise<InstalledArtifactRecord> {
   const raw = await invokeCommand<RawInstalledArtifactRecord>('artifact_installer_install', {
     sourceUrl: url,
     marketId,
+    expectedManifest,
   });
   return toCamelArtifactRecord(raw);
 }

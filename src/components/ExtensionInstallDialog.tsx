@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { useLocale } from '@/contexts/LocaleContext';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -6,25 +6,37 @@ import {
 import { Button } from '@/components/ui/button';
 import { Callout } from '@/components/ui/callout';
 import { Spinner } from '@/components/ui/spinner';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+  ExtensionManifestPreview,
+  findReplacedRecord,
+  replacementNeedsAcknowledgement,
+} from '@/components/ExtensionManifestPreview';
 import {
   assertNoConflictingInstall,
   currentTargetTriple,
   fetchArtifactManifestPreview,
   getPlugin,
   installArtifact,
+  listInstalledArtifacts,
+  type InstalledArtifactRecord,
   type RemoteArtifactManifest,
 } from '@/platform';
 
 /**
  * Previews and installs every URL of one install request (a plugin and its
  * sidecar, if any) in a single confirmation. Used by marketplace cards and
- * `desktop-devtool-app://install` deep links. The confirmation (name,
- * permissions, source) is never skipped.
+ * `desktop-devtool-app://install` deep links, and updates of installed
+ * extensions. The confirmation (name, permissions, hosts, source, what it
+ * replaces) is never skipped, and the install is refused if the source
+ * serves a different manifest than the one shown.
  */
 
 interface PreviewItem {
   url: string;
   manifest?: RemoteArtifactManifest;
+  /** Installed copy this item would replace. */
+  replaced?: InstalledArtifactRecord;
   error?: string;
 }
 
@@ -44,16 +56,19 @@ export function ExtensionInstallDialog({ urls, marketId, open, onOpenChange, onI
   const [installing, setInstalling] = useState(false);
   const [installError, setInstallError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+  const [acknowledged, setAcknowledged] = useState(false);
+  const ackId = useId();
 
   useEffect(() => {
-    if (!open) {
-      setPreviews(null);
-      setTargetTriple(null);
-      setInstalling(false);
-      setInstallError(null);
-      setDone(false);
-      return;
-    }
+    // Reset on close and on every new batch (a second deep link can arrive
+    // while the dialog is open).
+    setPreviews(null);
+    setTargetTriple(null);
+    setInstalling(false);
+    setInstallError(null);
+    setDone(false);
+    setAcknowledged(false);
+    if (!open) return;
     let cancelled = false;
     void (async () => {
       // Sequential rather than Promise.all: concurrent first calls raced
@@ -65,6 +80,16 @@ export function ExtensionInstallDialog({ urls, marketId, open, onOpenChange, onI
         } catch (e) {
           results.push({ url, error: String(e instanceof Error ? e.message : e) });
         }
+      }
+      let installed: InstalledArtifactRecord[] = [];
+      try {
+        installed = await listInstalledArtifacts();
+      } catch {
+        // Without the list nothing is marked as replaced; the install call
+        // still reports a conflicting source.
+      }
+      for (const item of results) {
+        if (item.manifest) item.replaced = findReplacedRecord(item.manifest, installed);
       }
       if (cancelled) return;
       setPreviews(results);
@@ -78,6 +103,7 @@ export function ExtensionInstallDialog({ urls, marketId, open, onOpenChange, onI
   }, [open, urls]);
 
   const installable = (previews ?? []).filter((p): p is PreviewItem & { manifest: RemoteArtifactManifest } => !!p.manifest);
+  const needsAcknowledgement = installable.some((p) => replacementNeedsAcknowledgement(p.manifest, p.url, p.replaced));
 
   const handleInstall = async () => {
     setInstallError(null);
@@ -87,7 +113,9 @@ export function ExtensionInstallDialog({ urls, marketId, open, onOpenChange, onI
         if (item.manifest.kind === 'plugin') {
           await assertNoConflictingInstall(item.manifest.id, marketId, getPlugin(item.manifest.id)?.group);
         }
-        await installArtifact(item.url, marketId);
+        // Rust re-fetches the manifest; passing the previewed one makes it
+        // refuse anything the user did not see.
+        await installArtifact(item.url, marketId, item.manifest);
       }
       setDone(true);
       onInstalled?.();
@@ -134,10 +162,22 @@ export function ExtensionInstallDialog({ urls, marketId, open, onOpenChange, onI
                 {item.error ? (
                   <Callout tone="error" size="sm">{item.error}</Callout>
                 ) : (
-                  <ManifestPreview manifest={item.manifest!} targetTriple={targetTriple} />
+                  <ExtensionManifestPreview
+                    manifest={item.manifest!}
+                    sourceUrl={item.url}
+                    targetTriple={targetTriple}
+                    replaced={item.replaced}
+                  />
                 )}
               </div>
             ))}
+
+            {needsAcknowledgement && (
+              <div className="flex items-start gap-2">
+                <Checkbox id={ackId} size="sm" checked={acknowledged} onCheckedChange={setAcknowledged} className="mt-0.5" />
+                <label htmlFor={ackId} className="text-[11px]">{t('settings.extensions.install.acknowledge')}</label>
+              </div>
+            )}
 
             {installError && <Callout tone="error" size="sm">{installError}</Callout>}
           </div>
@@ -148,7 +188,9 @@ export function ExtensionInstallDialog({ urls, marketId, open, onOpenChange, onI
             <Button
               size="sm"
               onClick={() => void handleInstall()}
-              disabled={previews === null || installable.length === 0 || installing}
+              disabled={
+                previews === null || installable.length === 0 || installing || (needsAcknowledgement && !acknowledged)
+              }
             >
               {installing ? <Spinner size="sm" /> : t('settings.extensions.install.confirm')}
             </Button>
@@ -156,58 +198,5 @@ export function ExtensionInstallDialog({ urls, marketId, open, onOpenChange, onI
         )}
       </DialogContent>
     </Dialog>
-  );
-}
-
-function ManifestPreview({ manifest, targetTriple }: { manifest: RemoteArtifactManifest; targetTriple: string | null }) {
-  const { t } = useLocale();
-  const targetSupported =
-    manifest.kind === 'service' && targetTriple ? Object.hasOwn(manifest.targets, targetTriple) : null;
-
-  return (
-    <>
-      <div className="flex items-center gap-2">
-        <span className="rounded border px-1.5 py-0.5 font-mono text-[11px] uppercase text-fg-mute">
-          {manifest.kind === 'plugin' ? t('settings.extensions.install.kind.plugin') : t('settings.extensions.install.kind.service')}
-        </span>
-        {manifest.kind === 'plugin' ? (
-          <p className="text-xs font-medium">
-            {manifest.label} <span className="font-mono text-fg-mute/60">{manifest.id}@{manifest.version}</span>
-          </p>
-        ) : (
-          <p className="text-xs font-medium font-mono">{manifest.bin}@{manifest.version}</p>
-        )}
-      </div>
-
-      {manifest.kind === 'plugin' ? (
-        <>
-          <p className="text-[11px] text-fg-mute">{manifest.description}</p>
-          {manifest.permissions.length > 0 && (
-            <div className="flex flex-wrap gap-1">
-              {manifest.permissions.map((perm) => (
-                <span key={perm} className="rounded border px-1.5 py-0.5 font-mono text-[11px] text-fg-mute">
-                  {perm}
-                </span>
-              ))}
-            </div>
-          )}
-        </>
-      ) : (
-        <div className="space-y-1">
-          {targetTriple && (
-            <p className="text-[11px] text-fg-mute">
-              {t('settings.extensions.install.targetTriple', { triple: targetTriple })}
-            </p>
-          )}
-          {targetSupported !== null && (
-            <p className={targetSupported ? 'text-[11px] text-fg-mute' : 'text-[11px] text-bad'}>
-              {targetSupported
-                ? t('settings.extensions.install.targetSupported')
-                : t('settings.extensions.install.targetUnsupported')}
-            </p>
-          )}
-        </div>
-      )}
-    </>
   );
 }

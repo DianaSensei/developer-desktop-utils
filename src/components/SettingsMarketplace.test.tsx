@@ -195,8 +195,18 @@ describe('SettingsMarketplace — cài đặt (dialog xác nhận ngay tại tra
     fireEvent.click(within(dialog).getByRole('button', { name: /^Install$|^Cài đặt$/ }));
 
     await waitFor(() => expect(installMock).toHaveBeenCalledTimes(2));
-    expect(installMock).toHaveBeenCalledWith({ sourceUrl: 'https://example.com/demo-plugin.json', marketId: 'official' });
-    expect(installMock).toHaveBeenCalledWith({ sourceUrl: 'https://example.com/demo-service.json', marketId: 'official' });
+    // Each install carries the manifest the user saw, so Rust can refuse a
+    // changed one.
+    expect(installMock).toHaveBeenCalledWith({
+      sourceUrl: 'https://example.com/demo-plugin.json',
+      marketId: 'official',
+      expectedManifest: demoPluginManifest(),
+    });
+    expect(installMock).toHaveBeenCalledWith({
+      sourceUrl: 'https://example.com/demo-service.json',
+      marketId: 'official',
+      expectedManifest: demoServiceManifest(),
+    });
   });
 
   it('targets chỉ mang tính tham khảo: nền tảng máy không nằm trong targets thì CẢNH BÁO nhưng vẫn cho bấm Install', async () => {
@@ -242,6 +252,7 @@ describe('SettingsMarketplace — cài đặt (dialog xác nhận ngay tại tra
 
     await waitFor(() => expect(installMock).toHaveBeenCalledTimes(1));
     expect(installMock).toHaveBeenCalledWith({
+      expectedManifest: { ...demoPluginManifest(), version: '1.1.0-beta.1' },
       sourceUrl: 'https://example.com/demo-plugin-beta.json',
       marketId: 'official',
     });
