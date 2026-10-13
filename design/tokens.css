@@ -258,7 +258,7 @@
 }
 
 /* ============================================================================
-   ACCENT PRESETS — a new tone is three numbers. Set data-accent on <html>
+   ACCENT PRESETS — a new tone is three numbers. Set data-accent on the `html` element
    (or any container).
    ========================================================================== */
 [data-accent="azure"]   { --a-h: 218; --a-s: 76%; --a-l: 48%; }
@@ -273,7 +273,7 @@
 [data-accent="amber"]   { --a-h:  34; --a-s: 78%; --a-l: 35%; }
 
 /* ============================================================================
-   CORNER PRESETS — swap all radius steps at once. Set data-corner on <html>.
+   CORNER PRESETS — swap all radius steps at once. Set data-corner on the `html` element.
 
    Works only because every radius in the app reads `--r-*`; guard.test.ts
    rejects hard-coded values like `rounded-[12px]`. `--r-full` is not part of
@@ -288,7 +288,7 @@
 
 /* ============================================================================
    UI FONT PRESETS — change `--sans` only; `--mono` has its own preset.
-   Set data-font on <html>. Besides the bundled Be Vietnam Pro these are
+   Set data-font on the `html` element. Besides the bundled Be Vietnam Pro these are
    generic stacks pointing at installed system fonts (webviews have no
    portable font enumeration API).
    ========================================================================== */
@@ -310,7 +310,7 @@
 
 /* ============================================================================
    MONO FONT PRESETS — both are bundled, self-hosted fonts (Fira Code has
-   ligatures). Set data-mono-font on <html>. */
+   ligatures). Set data-mono-font on the `html` element. */
 [data-mono-font="ibm-plex-mono"] {
   --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo,
           Consolas, "Liberation Mono", monospace;
