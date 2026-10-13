@@ -5,7 +5,9 @@ use std::path::Path;
 
 /// Writes `contents` to `path`, readable and writable by the current user
 /// only. On Unix the file is created with mode 0600, so it is never briefly
-/// readable by others, and an existing file is tightened as well. Windows'
+/// readable by others. An existing file is tightened too, best-effort: some
+/// filesystems (vfat, some FUSE/SMB mounts) reject chmod, and failing there
+/// would break the vault and MCP bridge where they used to work. Windows'
 /// default ACLs already restrict new files in the user's profile.
 pub fn write(path: &Path, contents: impl AsRef<[u8]>) -> std::io::Result<()> {
     let mut options = std::fs::OpenOptions::new();
@@ -15,7 +17,7 @@ pub fn write(path: &Path, contents: impl AsRef<[u8]>) -> std::io::Result<()> {
         use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
         options.mode(0o600);
         let mut file = options.open(path)?;
-        file.set_permissions(std::fs::Permissions::from_mode(0o600))?;
+        let _ = file.set_permissions(std::fs::Permissions::from_mode(0o600));
         file.write_all(contents.as_ref())
     }
     #[cfg(not(unix))]
