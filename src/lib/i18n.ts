@@ -105,6 +105,7 @@ export const DICTIONARY = {
   'settings.monoFont.previewLabel': { vi: 'Xem trước', en: 'Preview' },
 
   // ── Sidebar: status, tooltips, buttons ─────────────────────────────────
+  'shell.sidebar.navLabel': { vi: 'Danh sách tool', en: 'Tools' },
   'shell.sidebar.connected': { vi: 'Đang kết nối', en: 'Connected' },
   'shell.sidebar.connectedLabel': { vi: '{{label}} — đang kết nối', en: '{{label}} — connected' },
   'shell.sidebar.disabledLabel': { vi: '{{label}} — đã tắt', en: '{{label}} — turned off' },
@@ -183,6 +184,7 @@ export const DICTIONARY = {
   'common.unfavorite': { vi: 'Bỏ khỏi mục yêu thích', en: 'Remove from favorites' },
   'common.favoriteAria': { vi: 'Yêu thích {{label}}', en: 'Favorite {{label}}' },
   'common.unfavoriteAria': { vi: 'Bỏ yêu thích {{label}}', en: 'Unfavorite {{label}}' },
+  'shell.skipToContent': { vi: 'Tới nội dung tool', en: 'Skip to tool' },
   'shell.error.title': { vi: 'Tool này gặp lỗi', en: 'This tool hit an error' },
   'shell.error.fallback': { vi: 'Có lỗi khi hiển thị tool.', en: 'Something went wrong while rendering.' },
   'shell.error.retry': { vi: 'Thử lại', en: 'Try again' },
@@ -206,6 +208,11 @@ export const DICTIONARY = {
   'settings.section.extensions': { vi: 'Tiện ích', en: 'Extensions' },
   'settings.tools.enabledCount': { vi: '{{enabled}}/{{total}} đã bật', en: '{{enabled}} of {{total}} enabled' },
   'settings.tools.enableAll': { vi: 'Bật tất cả', en: 'Enable all' },
+  'settings.paletteClipboard.label': { vi: 'Gợi ý tool từ clipboard', en: 'Suggest a tool from the clipboard' },
+  'settings.paletteClipboard.description': {
+    vi: 'Khi mở ⌘K, đọc clipboard (chỉ trên máy) để gợi ý tool hợp với nội dung vừa chép. Tắt nếu bạn hay chép mật khẩu hoặc token.',
+    en: 'When ⌘K opens, read the clipboard (locally) to suggest a tool for what you copied. Turn off if you often copy passwords or tokens.',
+  },
   'settings.confirm.disableAllTitle': { vi: 'Tắt tất cả tool?', en: 'Disable every tool?' },
   'settings.confirm.disableAllBody': {
     vi: 'Sidebar sẽ trống cho tới khi bạn bật lại từng tool. Dữ liệu của tool vẫn được giữ.',
@@ -489,6 +496,15 @@ export const DICTIONARY = {
   'onboarding.group.design-media': { vi: 'Thiết kế & Media', en: 'Design & Media' },
   'onboarding.group.network-security': { vi: 'Mạng & Bảo mật', en: 'Network & Security' },
   'onboarding.group.fun': { vi: 'Giải trí', en: 'Fun' },
+  'guide.howToUse': { vi: 'Cách dùng', en: 'How to use' },
+  'guide.goodToKnow': { vi: 'Nên biết', en: 'Good to know' },
+  'guide.headsUp': { vi: 'Lưu ý', en: 'Heads up' },
+  'guide.generic.live': { vi: 'Hầu hết tool cập nhật kết quả ngay khi bạn gõ — không cần nút “chạy”.', en: 'Most tools update their output live as you type — no “run” button needed.' },
+  'guide.generic.pasteBefore': { vi: 'Dán nhanh bằng', en: 'Paste instantly with' },
+  'guide.generic.undo': { vi: 'hoàn tác / làm lại bằng', en: 'undo / redo with' },
+  'guide.generic.copy': { vi: 'Sao chép kết quả bằng nút copy cạnh ô kết quả.', en: 'Copy results with the copy button next to the output.' },
+  'guide.generic.saved': { vi: 'Nội dung bạn nhập được lưu trên máy và mở lại lần sau.', en: 'Your input is saved locally and restored next time you open the tool.' },
+  'guide.generic.local': { vi: 'Mọi thứ chạy trên máy bạn — không gửi đi đâu, trừ tool mà mục đích chính là tra cứu mạng.', en: 'Everything runs on your device — nothing is sent anywhere unless a tool’s whole purpose is a network lookup.' },
   'guide.title': { vi: 'Cách dùng {{label}}', en: 'Using {{label}}' },
   'guide.whatsNewTitle': { vi: 'Có gì mới ở {{label}}', en: "What's new in {{label}}" },
   'onboarding.done.cta': { vi: 'Bắt đầu sử dụng DevTool', en: 'Start using DevTool' },

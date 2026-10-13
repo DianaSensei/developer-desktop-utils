@@ -171,26 +171,32 @@ export function MockServer() {
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         {config.stubs.map((s, i) => (
+          // The row is a plain container; selection is its own button, so
+          // the row's action buttons are not nested inside another control.
           <div
             key={s.id}
-            role="button"
-            tabIndex={0}
             onClick={() => setSelectedId(s.id)}
-            onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setSelectedId(s.id)}
             className={cn(
               'group flex cursor-pointer items-center gap-2 border-l-2 px-3 py-2 transition-colors hover:bg-bg-2/40',
               s.id === selectedId ? 'border-l-acc bg-bg-2/60' : 'border-l-transparent',
               !s.enabled && 'opacity-50',
             )}
           >
-            <span className={cn('w-11 shrink-0 rounded px-1 py-0.5 text-center text-[11px] font-semibold', badgeClass(s.method))}>
-              {s.method}
-            </span>
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-xs font-medium">{s.name || '(unnamed)'}</div>
-              <div className="truncate font-mono text-[11px] text-fg-mute">{s.path}</div>
-            </div>
-            <div className="flex shrink-0 items-center opacity-0 transition-opacity group-hover:opacity-100">
+            <button
+              type="button"
+              aria-current={s.id === selectedId ? 'true' : undefined}
+              onClick={(e) => { e.stopPropagation(); setSelectedId(s.id); }}
+              className="flex min-w-0 flex-1 items-center gap-2 rounded-xs text-left focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus"
+            >
+              <span className={cn('w-11 shrink-0 rounded px-1 py-0.5 text-center text-[11px] font-semibold', badgeClass(s.method))}>
+                {s.method}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-xs font-medium">{s.name || m('unnamedStub')}</span>
+                <span className="block truncate font-mono text-[11px] text-fg-mute">{s.path}</span>
+              </span>
+            </button>
+            <div className="flex shrink-0 items-center opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
               <IconBtn label={m('moveUp')} title={m('moveUp')} disabled={i === 0} onClick={(e) => { e.stopPropagation(); moveStub(s.id, -1); }}>
                 <ChevronUp className="h-3.5 w-3.5" />
               </IconBtn>
@@ -212,7 +218,7 @@ export function MockServer() {
             onClick={addStub}
             className="m-3 flex w-[calc(100%-1.5rem)] items-center justify-center gap-1.5 rounded-md border border-dashed py-6 text-xs text-fg-mute hover:bg-bg-2/40"
           >
-            <Plus className="h-4 w-4" /> Add your first stub
+            <Plus className="h-4 w-4" /> {m('addFirstStub')}
           </button>
         )}
       </div>

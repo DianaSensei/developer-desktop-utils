@@ -473,6 +473,7 @@ export function ArrayDeduplicator() {
             <LineNumbers textareaRef={inputRef} lineCount={inputLineCount} />
             <textarea
               ref={inputRef}
+              aria-label={m('inputHint')}
               defaultValue={currentValueRef.current}
               onChange={(e) => onValueChange(e.target.value)}
               placeholder={m('placeholder', { hint: quickPasteHint })}
@@ -523,6 +524,7 @@ export function ArrayDeduplicator() {
             <LineNumbers textareaRef={outputRef} lineCount={result?.unique ?? 0} />
             <textarea
               ref={outputRef}
+              aria-label={c('output')}
               readOnly
               spellCheck={false}
               wrap={AREA_WRAP}

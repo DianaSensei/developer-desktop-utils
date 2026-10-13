@@ -39,7 +39,11 @@ export function useMockServer() {
     if (!isTauri || !runningRef.current) return;
     if (debounce.current) clearTimeout(debounce.current);
     debounce.current = setTimeout(() => {
-      invoke('mock_update_rules', { config: configRef.current }).catch(() => {});
+      // A rejected update leaves the server on the previous rules, so say so
+      // instead of letting it serve stale stubs silently.
+      invoke('mock_update_rules', { config: configRef.current })
+        .then(() => setError(null))
+        .catch((e) => setError(`Rules not applied: ${e instanceof Error ? e.message : String(e)}`));
     }, 300);
     return () => {
       if (debounce.current) clearTimeout(debounce.current);

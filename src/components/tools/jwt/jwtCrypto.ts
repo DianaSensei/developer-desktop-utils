@@ -264,8 +264,40 @@ export interface DecodedToken {
   signature: string;
 }
 
+/**
+ * Trims the token and drops an `Authorization` prefix (`Bearer …`), which
+ * is how tokens are usually copied out of request headers.
+ */
+export function normalizeToken(token: string): string {
+  return token.trim().replace(/^(?:authorization:\s*)?bearer\s+/i, '').trim();
+}
+
+/**
+ * Explains why a string is not a decodable JWT, in terms of its shape, or
+ * returns null when the shape is fine. jose's own message ("Invalid Token or
+ * Protected Header formatting") does not say what to fix.
+ */
+export function jwtShapeProblem(token: string): string | null {
+  const parts = token.split('.');
+  if (parts.length === 5) {
+    return 'This looks like an encrypted token (JWE, 5 parts). Only signed JWTs (3 parts) can be decoded here.';
+  }
+  if (parts.length !== 3) {
+    return `A JWT has 3 parts separated by dots (header.payload.signature); this has ${parts.length}.`;
+  }
+  const names = ['header', 'payload'] as const;
+  for (let i = 0; i < 2; i++) {
+    if (!parts[i]) return `The ${names[i]} part is empty.`;
+    const bad = parts[i].match(/[^A-Za-z0-9_\-=]/);
+    if (bad) return `The ${names[i]} part has a character that is not base64url: "${bad[0]}".`;
+  }
+  return null;
+}
+
 export function decodeToken(token: string): DecodedToken {
-  const trimmed = token.trim();
+  const trimmed = normalizeToken(token);
+  const problem = jwtShapeProblem(trimmed);
+  if (problem) throw new Error(problem);
   return {
     header: decodeProtectedHeader(trimmed) as Record<string, unknown>,
     payload: decodeJwt(trimmed),
@@ -438,8 +470,10 @@ export interface VerifyOutcome {
 }
 
 export async function verifyToken(input: VerifyInput): Promise<VerifyOutcome> {
-  const token = input.token.trim();
+  const token = normalizeToken(input.token);
   if (!token) return { valid: false, code: 'format', message: 'Paste a token first.' };
+  const problem = jwtShapeProblem(token);
+  if (problem) return { valid: false, code: 'format', message: `Not a JWT: ${problem}` };
 
   let header: Record<string, unknown>;
   try {

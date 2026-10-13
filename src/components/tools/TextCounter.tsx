@@ -8,6 +8,7 @@ import { useQuickPaste, useQuickPasteHint } from '@/hooks/useQuickPaste';
 import { useInputHistory } from '@/hooks/useInputHistory';
 import { useMessages } from '@/contexts/LocaleContext';
 import MESSAGES from '@/components/tools/TextCounter.messages';
+import { computeTextStats } from '@/lib/textStats';
 
 // 200 words per minute. Anything under a minute is reported as such rather
 // than rounded up to "1 min".
@@ -23,99 +24,11 @@ export function TextCounter() {
   const quickPasteHint = useQuickPasteHint();
   const [text, setText] = usePluginState(sdk, 'textCounter:text', '', { legacyKey: 'devtool:textCounter:text' });
 
-  // The stats below do several full-string scans (splits, TextEncoder, per-char
-  // counts). Defer so the textarea stays responsive on large input.
+  // One pass over the text (lib/textStats.ts); deferred so typing in a large
+  // document stays responsive.
   const deferredText = useDeferredValue(text);
 
-  const stats = useMemo(() => {
-    const text = deferredText;
-    const empty = {
-      characters: 0,
-      charactersNoSpaces: 0,
-      words: 0,
-      lines: 0,
-      paragraphs: 0,
-      sentences: 0,
-      readingTime: 0,
-      codePoints: 0,
-      utf8Bytes: 0,
-      utf16Bytes: 0,
-      utf32Bytes: 0,
-      asciiChars: 0,
-      latin1Chars: 0,
-      bmpChars: 0,
-      astralChars: 0,
-      fitsAscii: true,
-      fitsLatin1: true,
-    };
-
-    if (!text) {
-      return empty;
-    }
-
-    const characters = text.length;
-    const charactersNoSpaces = text.replace(/\s/g, '').length;
-
-    // Word count - split by whitespace and filter empty strings
-    const words = text.trim().split(/\s+/).filter(word => word.length > 0).length;
-
-    // Line count - split by newlines
-    const lines = text.split('\n').length;
-
-    // Paragraph count - split by double newlines or more
-    const paragraphs = text.split(/\n\s*\n/).filter(p => p.trim().length > 0).length;
-
-    // Sentence count - split by sentence terminators
-    const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 0).length;
-
-    // Reading time estimate (avg 200 words per minute)
-    const readingTime = words / 200;
-
-    // Code points (handles emoji/surrogate pairs as a single character)
-    const codePointArray = Array.from(text);
-    const codePoints = codePointArray.length;
-
-    // Byte sizes per encoding
-    const utf8Bytes = new TextEncoder().encode(text).length; // variable-width, 1-4 bytes
-    const utf16Bytes = characters * 2; // each UTF-16 code unit is 2 bytes
-    const utf32Bytes = codePoints * 4; // each code point is 4 bytes
-
-    // Character composition by Unicode range
-    let asciiChars = 0;
-    let latin1Chars = 0;
-    let bmpChars = 0;
-    let astralChars = 0;
-    for (const ch of codePointArray) {
-      const cp = ch.codePointAt(0) ?? 0;
-      if (cp <= 0x7f) asciiChars++;
-      else if (cp <= 0xff) latin1Chars++;
-      else if (cp <= 0xffff) bmpChars++;
-      else astralChars++;
-    }
-
-    const fitsAscii = latin1Chars === 0 && bmpChars === 0 && astralChars === 0;
-    const fitsLatin1 = bmpChars === 0 && astralChars === 0;
-
-    return {
-      characters,
-      charactersNoSpaces,
-      words,
-      lines,
-      paragraphs,
-      sentences,
-      readingTime,
-      codePoints,
-      utf8Bytes,
-      utf16Bytes,
-      utf32Bytes,
-      asciiChars,
-      latin1Chars,
-      bmpChars,
-      astralChars,
-      fitsAscii,
-      fitsLatin1,
-    };
-  }, [deferredText]);
+  const stats = useMemo(() => computeTextStats(deferredText), [deferredText]);
 
   const smallestEncoding = !text
     ? '—'
@@ -152,7 +65,8 @@ export function TextCounter() {
       </div>
 
       {/* Right: stats scrollable */}
-      <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4">
+      {/* Focusable so the stats can be scrolled from the keyboard. */}
+      <div tabIndex={0} role="region" aria-label={m('statsLabel')} className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4 focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-inset focus-visible:ring-focus">
         {/* All stats use the default tone: colour is reserved for status (design/RULES.md). */}
         <StatGrid columns={4}>
           <Stat variant="compact" label={m('characters')} value={stats.characters} />

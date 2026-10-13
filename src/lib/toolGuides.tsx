@@ -5,6 +5,8 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { MOD_KEY } from '@/lib/platform';
+import { useLocale } from '@/contexts/LocaleContext';
+import type { TranslationKey } from '@/lib/i18n';
 
 // Per-tool "how to use" guides shown by the header help (?) button. Tools listed
 // here get a hand-written guide; any tool not listed falls back to a generic
@@ -14,7 +16,7 @@ const mod = MOD_KEY;
 
 export function GuideSection({
   icon: Icon, title, tone, children,
-}: { icon: typeof Send; title: string; tone?: 'caveat'; children: ReactNode }) {
+}: { icon: typeof Send; title: ReactNode; tone?: 'caveat'; children: ReactNode }) {
   return (
     <section className="space-y-1.5">
       <h3 className="flex items-center gap-2 text-xs font-semibold text-fg">
@@ -45,13 +47,21 @@ function List({ items, tone }: { items: ReactNode[]; tone?: 'caveat' }) {
   );
 }
 
+// Translated text inside the guide constants below. TOOL_GUIDES is built
+// once at import, so a plain t() call would freeze the locale; a component
+// reads it when the guide renders.
+function Tr({ k }: { k: TranslationKey }) {
+  const { t } = useLocale();
+  return <>{t(k)}</>;
+}
+
 // Most tools follow the same shape: how to use, things to know, and heads-up.
 function makeGuide(g: { use: ReactNode[]; know?: ReactNode[]; caveat?: ReactNode[] }): ReactNode {
   return (
     <>
-      <GuideSection icon={ListChecks} title="How to use"><List items={g.use} /></GuideSection>
-      {g.know && <GuideSection icon={Lightbulb} title="Good to know"><List items={g.know} /></GuideSection>}
-      {g.caveat && <GuideSection icon={AlertTriangle} title="Heads up" tone="caveat"><List items={g.caveat} tone="caveat" /></GuideSection>}
+      <GuideSection icon={ListChecks} title={<Tr k="guide.howToUse" />}><List items={g.use} /></GuideSection>
+      {g.know && <GuideSection icon={Lightbulb} title={<Tr k="guide.goodToKnow" />}><List items={g.know} /></GuideSection>}
+      {g.caveat && <GuideSection icon={AlertTriangle} title={<Tr k="guide.headsUp" />} tone="caveat"><List items={g.caveat} tone="caveat" /></GuideSection>}
     </>
   );
 }
@@ -59,16 +69,17 @@ function makeGuide(g: { use: ReactNode[]; know?: ReactNode[]; caveat?: ReactNode
 // Generic guide for tools without a dedicated entry: their own description plus
 // the conventions shared across the app's tools.
 export function GenericGuide({ description }: { description: string }) {
+  const { t } = useLocale();
   return (
     <>
       {description && <p className="text-xs leading-relaxed text-fg-mute">{description}</p>}
-      <GuideSection icon={Lightbulb} title="Good to know">
+      <GuideSection icon={Lightbulb} title={t('guide.goodToKnow')}>
         <List items={[
-          'Most tools update their output live as you type — no “run” button needed.',
-          <>Paste instantly with <Key>{mod}</Key>+<Key>V</Key>; undo / redo with <Key>{mod}</Key>+<Key>Z</Key> / <Key>{mod}</Key>+<Key>⇧</Key>+<Key>Z</Key>.</>,
-          'Copy results with the copy button next to the output.',
-          'Your input is saved locally and restored next time you open the tool.',
-          'Everything runs on your device — nothing is sent anywhere unless a tool’s whole purpose is a network lookup.',
+          t('guide.generic.live'),
+          <>{t('guide.generic.pasteBefore')} <Key>{mod}</Key>+<Key>V</Key>; {t('guide.generic.undo')} <Key>{mod}</Key>+<Key>Z</Key> / <Key>{mod}</Key>+<Key>⇧</Key>+<Key>Z</Key>.</>,
+          t('guide.generic.copy'),
+          t('guide.generic.saved'),
+          t('guide.generic.local'),
         ]} />
       </GuideSection>
     </>

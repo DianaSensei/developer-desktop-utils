@@ -16,6 +16,7 @@ vi.mock('@/lib/clipboard', () => ({
 }));
 
 import { readTextFromClipboard } from '@/lib/clipboard';
+import { setPaletteClipboardEnabled } from '@/lib/paletteClipboard';
 
 function renderPalette() {
   return render(
@@ -32,6 +33,7 @@ function renderPalette() {
 }
 
 beforeEach(() => {
+  vi.mocked(readTextFromClipboard).mockClear();
   vi.mocked(readTextFromClipboard).mockResolvedValue(null);
 });
 
@@ -119,6 +121,18 @@ describe('CommandPalette — gợi ý clipboard', () => {
 
     await waitFor(() => expect(screen.getByText(/JWT/i)).toBeTruthy());
     expect(screen.getByText(/dấu chấm|dots/i)).toBeTruthy();
+  });
+
+  it('tắt "Gợi ý tool từ clipboard" thì không đọc clipboard', async () => {
+    setPaletteClipboardEnabled(false);
+    try {
+      renderPalette();
+      fireEvent.keyDown(window, { key: 'k', ctrlKey: true });
+      await waitFor(() => expect(screen.getByRole('dialog')).toBeTruthy());
+      expect(readTextFromClipboard).not.toHaveBeenCalled();
+    } finally {
+      setPaletteClipboardEnabled(true);
+    }
   });
 
   it('không gợi ý gì khi clipboard không đoán được', async () => {

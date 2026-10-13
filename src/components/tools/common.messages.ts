@@ -24,4 +24,8 @@ export default defineMessages({
   noMatches: { vi: 'Không có kết quả khớp', en: 'No matches found' },
   quickPasteMac: { vi: 'Nhấn ⌘V để dán', en: 'Press ⌘V to paste' },
   quickPasteOther: { vi: 'Nhấn Ctrl+V để dán', en: 'Press Ctrl+V to paste' },
+  netHint_dns: { vi: 'Không tìm thấy tên miền (DNS). Kiểm tra lại địa chỉ, hoặc mạng/VPN đang dùng.', en: 'The host name could not be found (DNS). Check the address, or your network/VPN.' },
+  netHint_refused: { vi: 'Server từ chối kết nối — không có gì đang nghe ở cổng này. Server đã chạy chưa, đúng cổng chưa?', en: 'The connection was refused — nothing is listening on that port. Is the server running, on the right port?' },
+  netHint_timeout: { vi: 'Hết thời gian chờ. Server chậm hoặc không trả lời; thử lại hoặc kiểm tra firewall/VPN.', en: 'The request timed out. The server is slow or not answering; retry or check a firewall/VPN.' },
+  netHint_unreachable: { vi: 'Không kết nối được tới server. Kiểm tra địa chỉ, kết nối mạng, proxy/VPN.', en: 'Could not reach the server. Check the address, your connection, and any proxy/VPN.' },
 });

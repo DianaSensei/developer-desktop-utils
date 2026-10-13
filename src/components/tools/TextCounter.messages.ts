@@ -28,4 +28,5 @@ export default defineMessages({
   avgCharsPerWord: { vi: 'Ký tự TB/từ:', en: 'Avg chars/word:' },
   composition: { vi: 'Thành phần ký tự', en: 'Character Composition' },
   supplementary: { vi: 'Ngoài BMP (U+10000+):', en: 'Supplementary (U+10000+):' },
+  statsLabel: { vi: 'Thống kê', en: 'Statistics' },
 });

@@ -49,15 +49,15 @@ nằm ở **ba chỗ hai đợt audit tĩnh không thấy được**:
 | 8 | P1 | Khoá HMAC và khoá AES lưu dạng rõ trong `app-settings.json` | Dữ liệu | ✅ |
 | 9 | P2 | ⌘V "dán nhanh" không có tác dụng khi focus đang ở ô output read-only | Bàn phím | ✅ |
 | 10 | P2 | Chuột phải bị chặn cả trong ô nhập (mất Cut/Copy/Paste/Spellcheck) | Thói quen dùng | ✅ |
-| 11 | P2 | Tương phản: 129 chỗ `text-fg-mute/NN` — gợi ý, gutter, placeholder dưới AA ở cả hai theme | A11y | ◐ |
-| 12 | P2 | Nhãn truy cập: 15 nút/Select không tên, 6 editor CodeMirror không nhãn, nút lồng trong link/tab | A11y | ◐ |
-| 13 | P2 | Phải nhấn ~40 lần Tab mới tới nội dung tool; không có skip link | Bàn phím | ◐ |
-| 14 | P2 | Thông báo lỗi thô của engine (`atob`, "Failed to fetch", lỗi thư viện JWT) | Phản hồi lỗi | ◐ |
+| 11 | P2 | Tương phản: 129 chỗ `text-fg-mute/NN` — gợi ý, gutter, placeholder dưới AA ở cả hai theme | A11y | ✅ |
+| 12 | P2 | Nhãn truy cập: 15 nút/Select không tên, 6 editor CodeMirror không nhãn, nút lồng trong link/tab | A11y | ✅ |
+| 13 | P2 | Phải nhấn ~40 lần Tab mới tới nội dung tool; không có skip link | Bàn phím | ✅ |
+| 14 | P2 | Thông báo lỗi thô của engine (`atob`, "Failed to fetch", lỗi thư viện JWT) | Phản hồi lỗi | ✅ |
 | 15 | P2 | Base64 không nhận base64url / thiếu padding / tiền tố `data:` | Chức năng | ✅ |
-| 16 | P2 | Text Counter đứng ~1,9s, JSON ~0,75s khi dán 2,5 MB, không có chỉ báo | Hiệu năng | — |
+| 16 | P2 | Text Counter đứng ~1,9s, JSON ~0,75s khi dán 2,5 MB, không có chỉ báo | Hiệu năng | ◐ |
 | 17 | P2 | Windows: vùng resize đè lên mép trên của nút Close/Maximize | Chrome | ✅ |
 | 18 | P2 | Onboarding: chọn nhóm = đánh dấu sao mọi tool trong nhóm; bỏ chọn không tắt gì | Onboarding | ✅ |
-| 19 | P2 | ⌘K đọc clipboard mỗi lần mở mà không có tuỳ chọn tắt | Minh bạch | — |
+| 19 | P2 | ⌘K đọc clipboard mỗi lần mở mà không có tuỳ chọn tắt | Minh bạch | ✅ |
 | 20 | P2 | Nút nguy hiểm không cần xác nhận: Settings → Reset / Disable all / Reset config | An toàn thao tác | ✅ |
 | 21 | P2 | ErrorBoundary: chỉ có tiếng Anh, "Try again" lặp lỗi nếu state lưu bị hỏng | Phục hồi | ✅ |
 | 22 | P2 | "Pick from Screen" hiện trên macOS/Linux, nơi nó không bao giờ chạy được | Chức năng | ✅ |
@@ -433,3 +433,31 @@ Lucky Wheel 800px không đè; menu "Tất cả tab" căn mép phải; axe `aria
 | 21 | ErrorBoundary song ngữ, "Chép chi tiết lỗi", "Xoá dữ liệu của tool…" (xoá `devtool:<id>:*`, có xác nhận, không đụng vault). Test `ErrorBoundary.test.tsx`. |
 | 22 | Nút "Pick from Screen" chỉ hiện khi có `EyeDropper`. |
 | 23 | ◐ Lucky Wheel (nhãn lộn ngược, chuỗi cứng). Các mục P3 còn lại chưa làm. |
+
+### Vòng sửa thứ hai
+
+Kiểm lại bằng `tsc`, vitest (135 file / 1552 test) và quét axe trên bản build với chrome
+desktop giả lập (EN sáng 1200px + VI tối 800px, 23 màn hình). So với lúc audit: `color-contrast`
+38 → 0, `button-name` 15 → 0, `label` 4 → 0, `landmark-unique` 2 → 0, `nested-interactive`
+→ 0, `aria-input-field-name` 8 → 0. Chỉ còn `region` (nội dung ngoài landmark, chung cho cả app)
+và không có lỗi console nào.
+
+| # | Sửa thế nào |
+|---|---|
+| 11 | Token syntax/method ở theme sáng tối hơn để đạt ≥ 4,5:1 trên nền editor `#f0f2f5` (chuỗi, số, comment, toán tử, function, property, key JSON; GET/POST/PUT). Badge method dùng nền nhuộm 10% thay vì 16%. Keycap trong nút chính 60% → 90%. Chữ accent trên nền nhuộm accent dùng `text-acc-ink` (menu, IconButton, chip Regex/QR/Network). **Chưa làm:** token `--fg-faint` + guard cấm `text-fg-mute/NN`. |
+| 12 | `SelectTrigger` không có `aria-label` thì lấy giá trị hiện tại làm tên (`aria-labelledby` trỏ vào phần bọc giá trị). `CodeViewer` có `ariaLabel`. Thêm nhãn cho textarea của Deduplicate, ô Count của Generator, Status/Delay của Mock Server. Mỗi `<nav>` có tên riêng. Mục stub của Mock Server không còn là `role=button` chứa nút khác. |
+| 13 | Skip link "Tới nội dung tool" (hiện khi focus, đưa focus vào ô nhập đầu tiên của tool); nút ⭐ trong sidebar ra khỏi thứ tự Tab (đánh dấu sao bằng bàn phím ở Settings → Tools). |
+| 14 | JWT: báo đúng chỗ sai (số phần, JWE 5 phần, ký tự không phải base64url) và tự bỏ tiền tố `Bearer` / `Authorization:`. Regex: lỗi cú pháp hiện ngay dưới ô pattern (`aria-invalid`, `role=alert`); "quá chậm" vẫn ở pane kết quả. Mạng: `lib/networkError.ts` phân loại DNS / bị từ chối / hết thời gian / không tới được; Network Tools và API Client hiện một câu dễ hiểu phía trên chuỗi lỗi gốc. |
+| 16 | ◐ Text Counter đếm trong một vòng lặp (`lib/textStats.ts`, test so khớp với cách cũ trên 300 chuỗi ngẫu nhiên): phần JS khi dán 2,5 MB còn ~25 ms. **Còn lại** ~1,1 s là trình duyệt dàn layout textarea chứa một dòng 2,5 MB (đo bằng CPU profile: "(program)", không phải JS của app). Muốn hết phải đổi ô nhập sang editor ảo hoá (CodeMirror), là một thay đổi riêng. |
+| 19 | Settings → Giao diện có công tắc "Gợi ý tool từ clipboard"; tắt thì ⌘K không đọc clipboard. Test. |
+| 4+ | Dưới 1024px sidebar tự thu gọn còn 56px để tool đủ rộng, không ghi đè lựa chọn đã lưu; mở rộng khi hẹp chỉ có hiệu lực tới lúc cửa sổ rộng lại. |
+| 7+ | Khung guide song ngữ: tiêu đề "Cách dùng / Nên biết / Lưu ý" và guide chung cho mọi tool. |
+| 23 | ◐ Icon theme ở header web giờ là theme hiện tại (giống sidebar); Settings đang chọn dùng cùng style với tool đang chọn; Generator sinh sẵn một lượt khi mở và khi đổi chế độ; nút Dán của 2FA đi qua `sdk.clipboard`; Mock Server báo "Rules not applied" khi cập nhật rule thất bại. |
+
+**Cần bạn quyết định / việc lớn còn lại**
+
+- Trang mở đầu `/` vẫn là Cron Generator: route bị `registry.test.ts` khoá, và deep link cũ có thể trỏ vào `/`. Đổi thì cần chọn tool nào làm trang đầu.
+- Nội dung chi tiết của từng guide (~450 dòng, nhiều nhất là API Client) vẫn chỉ tiếng Anh.
+- Time Tracker bắt buộc nhập tên trước khi bấm Bắt đầu; cho phép bắt đầu trước cần sửa store (bản ghi chưa đặt tên).
+- ⌘F bị chặn toàn cục; tìm trong preview Markdown/guide cần một ô tìm riêng.
+- Xuất/nhập toàn bộ dữ liệu app trong Settings.

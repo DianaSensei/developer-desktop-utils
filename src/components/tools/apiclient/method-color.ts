@@ -32,11 +32,11 @@ const BG: Record<HttpMethod, string> = {
 
 // Full pill badge for the sidebar tree — bg + text color in one token.
 const BADGE: Record<HttpMethod, string> = {
-  GET:     'bg-[hsl(var(--method-get-c)/0.16)]    text-[var(--method-get)]',
-  POST:    'bg-[hsl(var(--method-post-c)/0.16)]   text-[var(--method-post)]',
-  PUT:     'bg-[hsl(var(--method-put-c)/0.16)]    text-[var(--method-put)]',
-  PATCH:   'bg-[hsl(var(--method-patch-c)/0.16)]  text-[var(--method-patch)]',
-  DELETE:  'bg-[hsl(var(--method-delete-c)/0.16)] text-[var(--method-delete)]',
+  GET:     'bg-[hsl(var(--method-get-c)/0.10)]    text-[var(--method-get)]',
+  POST:    'bg-[hsl(var(--method-post-c)/0.10)]   text-[var(--method-post)]',
+  PUT:     'bg-[hsl(var(--method-put-c)/0.10)]    text-[var(--method-put)]',
+  PATCH:   'bg-[hsl(var(--method-patch-c)/0.10)]  text-[var(--method-patch)]',
+  DELETE:  'bg-[hsl(var(--method-delete-c)/0.10)] text-[var(--method-delete)]',
   HEAD:    'bg-bg-2/60 text-fg-mute',
   OPTIONS: 'bg-bg-2/60 text-fg-mute',
 };

@@ -6,7 +6,7 @@ import {
   RotateCcw, GripVertical, X, Search, CheckCheck, Ban, Star,
   RefreshCw, Download, CheckCircle2, AlertCircle, WifiOff, XCircle,
   Clipboard, FolderOpen, FolderClosed, Shield, Globe, Sparkles, Compass,
-  RotateCw, HardDrive, LayoutGrid, Cog, Languages, Palette, Type, Keyboard, SquareDashed,
+  RotateCw, HardDrive, LayoutGrid, Cog, Languages, Palette, Type, Keyboard, SquareDashed, ClipboardList,
 } from 'lucide-react';
 import { isTauri } from '@/lib/platform';
 import { useLocale } from '@/contexts/LocaleContext';
@@ -46,6 +46,7 @@ import { useUpdate } from '@/contexts/UpdateContext';
 import { useExtensionUpdates } from '@/contexts/ExtensionUpdateContext';
 import { Badge } from '@/components/ui/badge';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { paletteClipboardEnabled, setPaletteClipboardEnabled } from '@/lib/paletteClipboard';
 import { AppLogo } from '@/components/AppLogo';
 import { ExperimentalBadge } from '@/components/ExperimentalBadge';
 import { useOnboarding } from '@/contexts/OnboardingContext';
@@ -387,6 +388,8 @@ export function Settings() {
     TOOL_DEFS.forEach((t) => { if (features[t.id] !== false) toggleFeature(t.id); });
   };
 
+  const [paletteClipboard, setPaletteClipboard] = useState(paletteClipboardEnabled);
+
   // One-click actions that undo the user's own setup ask first.
   const [pendingConfirm, setPendingConfirm] = useState<'disableAll' | 'resetTools' | 'resetConfig' | null>(null);
   const CONFIRMS = {
@@ -472,7 +475,7 @@ export function Settings() {
     <div className="flex h-full min-h-0">
       {/* Left nav: plain text, no icons, so it does not compete with the
           main sidebar. One section is shown at a time. */}
-      <nav className="w-48 shrink-0 overflow-y-auto border-r border-line bg-chrome px-2 py-4">
+      <nav aria-label={t('shell.sidebar.settings')} className="w-48 shrink-0 overflow-y-auto border-r border-line bg-chrome px-2 py-4">
         <ul className="space-y-0.5">
           {SETTINGS_SECTIONS.map((s) => (
             <li key={s.id}>
@@ -589,6 +592,21 @@ export function Settings() {
                 {'const ok = (a !== b) && (a >= b) ? a => a * 2 : null;'}
               </code>
             </div>
+          }
+        />
+        <SettingRow
+          icon={ClipboardList}
+          title={t('settings.paletteClipboard.label')}
+          description={t('settings.paletteClipboard.description')}
+          control={
+            <Toggle
+              checked={paletteClipboard}
+              onChange={() => {
+                setPaletteClipboardEnabled(!paletteClipboard);
+                setPaletteClipboard(!paletteClipboard);
+              }}
+              label={t('settings.paletteClipboard.label')}
+            />
           }
         />
       </SettingGroup>

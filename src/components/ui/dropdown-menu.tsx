@@ -231,7 +231,7 @@ export const DropdownMenuItem = React.forwardRef<HTMLButtonElement, DropdownMenu
         className={cn(
           'flex w-full items-center gap-2.5 rounded px-2 py-1.5 text-left text-xs',
           'transition-colors duration-press ease-out-soft hover:bg-acc',
-          active && 'bg-acc/10 text-acc',
+          active && 'bg-acc/10 text-acc-ink',
           danger && 'text-bad hover:bg-bad/10',
           className,
         )}

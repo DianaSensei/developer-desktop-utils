@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useDesktopChrome } from '@/hooks/useDesktopChrome';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useThemeSync, triggerThemeTransition } from '@/hooks/useThemeSync';
 import { TOOL_DEF_MAP, DEFAULT_TOOL_ORDER } from '@/lib/toolDefs';
 import { allTools, toolPath } from '@/lib/toolRegistry';
@@ -111,6 +112,16 @@ function ResizeHandles() {
       {edge('SouthEast', { bottom: 0, right: 0, width: C, height: C, cursor: 'nwse-resize' })}
     </>
   );
+}
+
+/** Focuses the first editable field of the open tool, else the tool area. */
+function focusToolContent() {
+  const main = document.getElementById('tool-content');
+  if (!main) return;
+  const field = main.querySelector<HTMLElement>(
+    'textarea:not([readonly]), input:not([type="hidden"]):not([readonly]), [contenteditable="true"]',
+  );
+  (field ?? main).focus();
 }
 
 function applySavedOrder<T extends { featureId: string }>(tools: T[], savedOrder: string[]): T[] {
@@ -206,7 +217,7 @@ function NavScrollArea({
 
   return (
     <div className="relative flex-1 min-h-0">
-      <nav ref={navRef} className="h-full overflow-y-auto px-1.5 py-2">
+      <nav ref={navRef} aria-label={t('shell.sidebar.navLabel')} className="h-full overflow-y-auto px-1.5 py-2">
         {navEntries.length === 0 && disabledMatches.length === 0 && query && (
           <p className="px-2 py-4 text-center text-[11px] text-fg-mute">{t('shell.search.noMatch', { query })}</p>
         )}
@@ -293,6 +304,9 @@ function NavScrollArea({
                     {!isCollapsed && (
                       <button
                         type="button"
+                        // Out of the Tab order: it doubled every sidebar stop.
+                        // Keyboard users star tools in Settings → Tools.
+                        tabIndex={-1}
                         aria-label={fav ? t('common.unfavoriteAria', { label: entry.label }) : t('common.favoriteAria', { label: entry.label })}
                         title={fav ? t('common.unfavorite') : t('common.favorite')}
                         onClick={(e) => {
@@ -308,7 +322,7 @@ function NavScrollArea({
                           'ml-auto shrink-0 rounded-xs p-0.5 transition-colors duration-fast ease-out-soft',
                           fav
                             ? 'text-warn opacity-100'
-                            : 'text-fg-mute/50 opacity-0 hover:text-warn group-hover:opacity-100 focus-visible:opacity-100'
+                            : 'text-fg-mute/50 opacity-0 hover:text-warn group-hover:opacity-100 group-focus-visible:opacity-100'
                         )}
                       >
                         <Star className={cn('h-3.5 w-3.5', fav && 'fill-current')} />
@@ -653,7 +667,7 @@ function Sidebar({
                 'group relative flex items-center rounded-md px-2.5 py-1.5 transition-[color,background-color,box-shadow] duration-base ease-out-soft',
                 isCollapsed ? 'justify-center' : 'gap-2.5',
                 isSettingsActive
-                  ? 'bg-acc/10 text-acc font-medium'
+                  ? 'bg-acc-tint text-acc-ink font-medium'
                   : 'text-fg-mute hover:text-fg hover:bg-fg/[0.05]'
               )}
             >
@@ -731,8 +745,17 @@ function AppContent() {
     setThemePreferenceState(value);
   };
 
+  // Below 1024px the sidebar starts collapsed (56px) so the tool keeps its
+  // width, without touching the saved preference: widening the window brings
+  // the user's own choice back. Toggling while narrow only lasts until then.
+  const narrow = useMediaQuery('(max-width: 1023.98px)');
+  const [expandedWhileNarrow, setExpandedWhileNarrow] = useState(false);
+  useEffect(() => { if (!narrow) setExpandedWhileNarrow(false); }, [narrow]);
+  const sidebarCollapsed = narrow ? !expandedWhileNarrow : isCollapsed;
+
   const toggleCollapse = () => {
-    setIsCollapsed(!isCollapsed);
+    if (narrow) setExpandedWhileNarrow((v) => !v);
+    else setIsCollapsed(!isCollapsed);
   };
 
   const enabledTools = allTools.filter((tool) => isFeatureEnabled(tool.featureId));
@@ -836,6 +859,16 @@ function AppContent() {
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-bg text-fg">
+      {/* Skip link: without it, keyboard users tab through the titlebar and
+          every sidebar row (~40 stops) before reaching the tool. Hidden until
+          focused; moves focus to the first field of the tool. */}
+      <button
+        type="button"
+        onClick={focusToolContent}
+        className="sr-only focus-visible:not-sr-only focus-visible:fixed focus-visible:left-3 focus-visible:top-3 focus-visible:z-[300] focus-visible:rounded-md focus-visible:bg-card focus-visible:px-3 focus-visible:py-2 focus-visible:text-sm focus-visible:font-medium focus-visible:shadow-lg focus-visible:ring-[3px] focus-visible:ring-focus"
+      >
+        {t('shell.skipToContent')}
+      </button>
       {showCustomChrome && !isMaximized && <ResizeHandles />}
       {/* macOS overlay titlebar, spanning the whole window and independent
           of the sidebar's width. `data-tauri-drag-region="deep"` makes it
@@ -914,10 +947,10 @@ function AppContent() {
         onClose={() => setSidebarOpen(false)}
         themePreference={themePreference}
         onThemeChange={changeTheme}
-        isCollapsed={isCollapsed}
+        isCollapsed={sidebarCollapsed}
         onToggleCollapse={toggleCollapse}
       />
-      <main className="flex-1 flex flex-col min-h-0 overflow-hidden">
+      <main id="tool-content" tabIndex={-1} className="flex-1 flex flex-col min-h-0 overflow-hidden outline-hidden">
         {/* With a custom titlebar the tool header lives there; not
             rendering it here keeps #tool-header-actions unique. */}
         {!showMergedTitlebar && (
@@ -956,12 +989,14 @@ function AppContent() {
                 onClick={() => changeTheme(NEXT_THEME[themePreference])}
                 title={t('shell.titlebar.themeCycleTap', { theme: t(THEME_OPTIONS.find((o) => o.value === themePreference)!.labelKey) })}
               >
+                {/* The current preference, as in the sidebar row (it used to
+                    show the opposite theme here). */}
                 {themePreference === 'system' ? (
                   <Monitor className="h-4 w-4" />
                 ) : isDark ? (
-                  <Sun className="h-4 w-4" />
-                ) : (
                   <Moon className="h-4 w-4" />
+                ) : (
+                  <Sun className="h-4 w-4" />
                 )}
               </Button>
             </div>
