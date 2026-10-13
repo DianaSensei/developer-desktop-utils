@@ -362,7 +362,10 @@ where
     Fut: std::future::Future<Output = bool>,
 {
     let path = resolve_sidecar_path(index_dir, beside_dir, bin)?;
-    if BUNDLED_SERVICES.contains(&bin) && path.parent() == Some(beside_dir) {
+    // Exempt only the exact bundled file, not any file the (webview-writable)
+    // install index points at in the executable's directory.
+    let is_bundled_copy = BUNDLED_SERVICES.contains(&bin) && resolve_beside_dir(beside_dir, bin).is_ok_and(|b| b == path);
+    if is_bundled_copy {
         return Ok(TrustedBinary { path, sha256: None });
     }
     let bytes = tokio::fs::read(&path)
@@ -665,6 +668,27 @@ mod tests {
         .await;
         assert!(asked.load(std::sync::atomic::Ordering::SeqCst));
         assert!(denied.is_err());
+    }
+
+    #[tokio::test]
+    async fn index_pointing_at_another_file_beside_the_exe_still_asks() {
+        let bin = "devtool-svc-echo";
+        let beside = temp_dir("trust-beside-other");
+        std::fs::write(beside.join(bin), b"bundled").unwrap();
+        let other = beside.join("some-other-shipped-binary");
+        std::fs::write(&other, b"other").unwrap();
+        let extensions = beside.join("extensions");
+        std::fs::create_dir_all(&extensions).unwrap();
+        write_fake_service_index(&extensions, bin, &other);
+        let trust = memory_trust();
+        let asked = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let a = asked.clone();
+        let _ = ensure_trusted_with(&trust, bin, Some(&extensions), &beside, None, None, move |_| async move {
+            a.store(true, std::sync::atomic::Ordering::SeqCst);
+            false
+        })
+        .await;
+        assert!(asked.load(std::sync::atomic::Ordering::SeqCst));
     }
 
     #[tokio::test]
