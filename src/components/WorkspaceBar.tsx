@@ -36,6 +36,15 @@ export function useWorkspaceBarVisible() {
   return tabs.length >= 2 || workspaces.length >= 2;
 }
 
+/**
+ * The ⌘/Ctrl digit that opens tab `index` (WorkspaceContext): 1–8 for the
+ * first eight tabs, 9 for the last tab past those, none for the rest.
+ */
+export function tabShortcutDigit(index: number, count: number): number | null {
+  if (index < 8) return index + 1;
+  return index === count - 1 ? 9 : null;
+}
+
 const shortcut = (keys: string) => (IS_MAC ? `${MOD_KEY}${keys}` : `${MOD_KEY}+${keys}`);
 
 export function WorkspaceBar({ size = 'header', fallback = null }: WorkspaceBarProps) {
@@ -234,9 +243,9 @@ export function WorkspaceBar({ size = 'header', fallback = null }: WorkspaceBarP
                 >
                   <span className="flex items-center gap-2">
                     <span className="min-w-0 flex-1 truncate">{tool.label}</span>
-                    {i < 9 && (
+                    {tabShortcutDigit(i, tabs.length) && (
                       <span className="shrink-0 font-mono text-[11px] text-fg-mute">
-                        {shortcut(String(i === tabs.length - 1 && i >= 8 ? 9 : i + 1))}
+                        {shortcut(String(tabShortcutDigit(i, tabs.length)))}
                       </span>
                     )}
                   </span>

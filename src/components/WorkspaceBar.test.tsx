@@ -1,7 +1,7 @@
 import { describe, expect, it, afterEach, beforeEach } from 'vitest';
 import { render, screen, fireEvent, cleanup, within } from '@testing-library/react';
 import { MemoryRouter, Link, useLocation } from 'react-router-dom';
-import { WorkspaceBar } from '@/components/WorkspaceBar';
+import { WorkspaceBar, tabShortcutDigit } from '@/components/WorkspaceBar';
 import { FeatureProvider } from '@/contexts/FeatureContext';
 import { LocaleProvider } from '@/contexts/LocaleContext';
 import { WorkspaceProvider } from '@/contexts/WorkspaceContext';
@@ -145,5 +145,15 @@ describe('WorkspaceBar', () => {
     first.unmount();
     render(<Harness initialPath="/json" />);
     expect(within(screen.getByRole('tablist')).getAllByRole('tab')).toHaveLength(2);
+  });
+});
+
+describe('tabShortcutDigit', () => {
+  it('matches ⌘1–8 to the first eight tabs and ⌘9 to the last', () => {
+    // 10 tabs: the 9th has no shortcut; ⌘9 opens the 10th.
+    expect(Array.from({ length: 10 }, (_, i) => tabShortcutDigit(i, 10))).toEqual([1, 2, 3, 4, 5, 6, 7, 8, null, 9]);
+    // 3 tabs: plain positions.
+    expect(Array.from({ length: 3 }, (_, i) => tabShortcutDigit(i, 3))).toEqual([1, 2, 3]);
+    expect(tabShortcutDigit(8, 9)).toBe(9);
   });
 });
