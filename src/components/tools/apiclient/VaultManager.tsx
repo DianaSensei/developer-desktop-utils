@@ -8,13 +8,14 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { KeyValueEditor } from './KeyValueEditor';
 import type { ApiStore } from './store';
+import { t } from './i18n';
 
 export function VaultManager({ store, open, onClose }: { store: ApiStore; open: boolean; onClose: () => void }) {
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent size="lg" scrollable>
         <DialogHeader className="border-b px-4 py-3">
-          <DialogTitle>Vault</DialogTitle>
+          <DialogTitle>{t('vault.title')}</DialogTitle>
         </DialogHeader>
         <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
           <p className="text-[11px] text-fg-mute">

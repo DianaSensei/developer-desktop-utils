@@ -17,9 +17,8 @@
 // each algorithm, not a second copy for MCP.
 //
 // A caller supplies its own key/passphrase per call — nothing here ever
-// reads the tool's own persisted `devtool:hash:key`/`devtool:hash:hmacKey`
-// fields, so (unlike the Vault-style exclusions elsewhere in this repo)
-// there is no separate "secret store" this bridge could leak.
+// reads the keys the tool keeps in its vault (`aes-key`/`hmac-key`), so
+// there is no stored secret this bridge could leak.
 
 import {
   ALGORITHMS, CODECS, ENCRYPT_ALGOS, HMAC_ALGORITHMS,
@@ -110,13 +109,9 @@ export function buildCodecHandlers(): Record<string, ToolHandler> {
       if (algo === 'aes-gcm') {
         return { algorithm: algo, output: await decryptAesGcm(ciphertext, key) };
       }
-      // crypto-js usually fails a wrong key/malformed ciphertext silently
-      // (empty string) for these modes, but not always: when the garbage
-      // bytes a wrong key produces happen to fail its OWN UTF-8 decode step,
-      // it throws its own "Malformed UTF-8 data" instead — same underlying
-      // cause, different symptom. Normalize both to the one message, exactly
-      // like EncodeHashEncrypt.tsx's own Decrypt tab already does (its
-      // `catch` a few lines away from its `doDecrypt` call).
+      // crypto-js usually returns an empty string for a wrong key or bad
+      // ciphertext, but sometimes throws "Malformed UTF-8 data" instead.
+      // Both get the same message, as in EncodeHashEncrypt's Decrypt tab.
       let output: string;
       try {
         output = doDecrypt(algo as CryptoJsAlgo, ciphertext, key);

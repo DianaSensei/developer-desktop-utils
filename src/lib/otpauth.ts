@@ -28,10 +28,8 @@ export interface ParsedOtp {
 const B32_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
 
 export function base32Decode(input: string): Uint8Array {
-  // Bỏ khoảng trắng TRƯỚC rồi mới cắt padding: secret dán từ trang web thường
-  // có dạng "JBSW Y3DP EHPK 3PXP" và đôi khi kèm cả '=' lẫn khoảng trắng thừa ở
-  // cuối. Làm ngược thứ tự thì `/=+$/` không khớp vì còn dấu cách chắn phía sau,
-  // '=' sót lại và hàm ném "Invalid character: =" cho một secret hoàn toàn hợp lệ.
+  // Strip whitespace before padding: secrets pasted as "JBSW Y3DP ..."
+  // may end with '=' followed by spaces, which would otherwise survive.
   const clean = input.toUpperCase().replace(/\s/g, '').replace(/=+$/, '');
   let bits = 0, value = 0, out = 0;
   const result = new Uint8Array(Math.floor((clean.length * 5) / 8));

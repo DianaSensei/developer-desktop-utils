@@ -139,7 +139,7 @@ export function McpSetupDialog({ open, onClose }: { open: boolean; onClose: () =
             <div className="space-y-2">
               <div className="text-xs font-medium text-fg-mute">Run once in a terminal:</div>
               <div className="flex items-start gap-2 rounded-md border border-line bg-bg-2 px-3 py-2.5">
-                <pre className="min-w-0 flex-1 overflow-x-auto whitespace-pre-wrap break-all font-mono text-[11.5px] text-fg">{command}</pre>
+                <pre className="min-w-0 flex-1 overflow-x-auto whitespace-pre-wrap break-all font-mono text-[11px] text-fg">{command}</pre>
                 <CopyButton value={command} iconClassName="h-3.5 w-3.5" />
               </div>
               <p className="text-[11px] text-fg-mute">

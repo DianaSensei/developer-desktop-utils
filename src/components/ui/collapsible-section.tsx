@@ -1,18 +1,9 @@
-// Disclosure: a header row that toggles a body open and closed.
-//
-// About a dozen places implement this by hand — Settings' "App permissions" and
-// "Configuration", the Date/Time tool's sections, RabbitMQ's connection-form
-// "Advanced" and the RPC options, Kafka's left-panel consumer list, the API
-// Client's request-body section. Every one of them re-decides whether the
-// chevron points down-when-open or rotates from right, and whether the header
-// text is uppercase.
-//
-// House rule encoded here: a single chevron that rotates (no icon swap, so the
-// transition is animatable), pointing right when closed and down when open.
+// Disclosure: a header row that toggles a body open and closed. One chevron
+// rotates (no icon swap), pointing right when closed and down when open.
 //
 //   <CollapsibleSection title="Advanced" defaultOpen={false}>…</CollapsibleSection>
 //
-// Controlled when you need the open state elsewhere (persisted, or driven by a
+// Controlled when the open state lives elsewhere (persisted, or opened by a
 // search hit):
 //
 //   <CollapsibleSection title="Ports" open={open} onOpenChange={setOpen}>…</CollapsibleSection>
@@ -92,25 +83,14 @@ export function CollapsibleSection({
         </button>
         {actions && <div className="flex shrink-0 items-center gap-1">{actions}</div>}
       </div>
-      {/* ── Mở ra / thu vào có chiều cao thật ────────────────────────────────
-          Bản trước là `{open && …}`: nội dung XUẤT HIỆN và BIẾN MẤT tức thì,
-          mọi thứ bên dưới giật một cái, trong khi mũi tên bên trên lại quay
-          mượt. Nửa có chuyển động nửa không như vậy đọc ra tệ hơn hẳn so với
-          việc cả hai cùng đứng im.
-
-          Dùng thủ thuật `grid-template-rows: 0fr → 1fr`: trình duyệt nội suy
-          được giữa hai giá trị đó, nên có được đúng thứ mà `height: auto`
-          không cho — chiều cao co giãn theo nội dung mà vẫn animate được, và
-          không phải đo bằng JS hay đặt `max-height` phỏng chừng (đặt hụt thì
-          cắt mất nội dung, đặt thừa thì đoạn cuối của animation là khoảng
-          trống trôi qua).
-
-          Nội dung vẫn nằm trong DOM khi đóng, nên `hidden` được đặt cho trình
-          đọc màn hình và bàn phím không Tab vào phần đang cuộn lại. */}
+      {/* Animates real height with `grid-template-rows: 0fr → 1fr`, which
+          the browser can interpolate (unlike `height: auto`), without JS
+          measuring or a guessed max-height. Closed content stays in the DOM
+          with `hidden` so it is skipped by screen readers and Tab. */}
       <div
         className={cn(
           'grid transition-[grid-template-rows] ease-out-soft',
-          // Luật 1: mở ra chậm hơn thu vào — xem `design/tokens.css`.
+          // Rule 1: opening is slower than closing (design/tokens.css).
           open ? 'grid-rows-[1fr] duration-base' : 'grid-rows-[0fr] duration-exit',
         )}
       >

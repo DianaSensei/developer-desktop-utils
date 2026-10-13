@@ -23,6 +23,8 @@ import {
   weekRangeLabel,
   weekdayShort,
 } from './time';
+import { useMessages } from '@/contexts/LocaleContext';
+import MESSAGES from '@/components/tools/clockify/TimeTracker.messages';
 
 const HOUR_PX = 48;
 const SNAP_MIN = 15;
@@ -82,6 +84,7 @@ function layoutColumns(items: { id: string; startMin: number; endMin: number }[]
 }
 
 export function CalendarView() {
+  const tr = useMessages(MESSAGES);
   const { entries, projectById, now, addEntry, updateEntry, deleteEntry, settings } = useClockify();
   const { meetings, addMeeting } = useMeetings();
   const [anchor, setAnchor] = useState(() => now);
@@ -224,13 +227,13 @@ export function CalendarView() {
     <div className="flex h-full flex-col">
       {/* Nav */}
       <div className="flex shrink-0 items-center gap-2 border-b p-3">
-        <Button variant="outline" size="icon" className="h-ctl w-ctl" onClick={() => setAnchor((a) => addDays(a, view === 'day' ? -1 : -7))}>
+        <Button variant="outline" size="icon" className="h-ctl w-ctl" onClick={() => setAnchor((a) => addDays(a, view === 'day' ? -1 : -7))} aria-label={view === 'day' ? tr('previousDay') : tr('previousWeek')} title={view === 'day' ? tr('previousDay') : tr('previousWeek')}>
           <ChevronLeft className="h-4 w-4" />
         </Button>
         <Button variant="outline" size="sm" className="h-ctl" onClick={() => setAnchor(now)}>
-          Today
+          {tr('today')}
         </Button>
-        <Button variant="outline" size="icon" className="h-ctl w-ctl" onClick={() => setAnchor((a) => addDays(a, view === 'day' ? 1 : 7))}>
+        <Button variant="outline" size="icon" className="h-ctl w-ctl" onClick={() => setAnchor((a) => addDays(a, view === 'day' ? 1 : 7))} aria-label={view === 'day' ? tr('nextDay') : tr('nextWeek')} title={view === 'day' ? tr('nextDay') : tr('nextWeek')}>
           <ChevronRight className="h-4 w-4" />
         </Button>
         <span className="ml-2 text-sm font-medium">
@@ -250,7 +253,7 @@ export function CalendarView() {
             setDraft({ start: base, end: base + 60 * MS_MIN });
           }}
         >
-          New
+          {tr('new')}
         </Button>
         <div className="flex rounded-md border p-0.5">
           {(['week', 'day'] as const).map((v) => (
@@ -367,7 +370,7 @@ export function CalendarView() {
                         <span className="absolute inset-y-0 left-0 w-1 bg-[var(--cat-3)]" />
                         <div className="flex items-center gap-1 font-semibold">
                           <Users className="h-3 w-3 shrink-0" />
-                          <span className="truncate">{mt.title || 'Meeting'}</span>
+                          <span className="truncate">{mt.title || tr('meeting')}</span>
                         </div>
                         {height > 34 && (
                           <div className="truncate text-[11px] font-medium opacity-80">{timeOfDay(mt.start, false)} – {timeOfDay(mt.end, false)}</div>
@@ -405,7 +408,7 @@ export function CalendarView() {
                           <span onMouseDown={(ev) => startResize(e, 'end', ev)} className="absolute inset-x-0 bottom-0 z-10 h-1.5 cursor-ns-resize opacity-0 group-hover:opacity-100" />
                         </>
                       )}
-                      <div className="truncate font-semibold">{e.description || project?.name || 'Untitled'}</div>
+                      <div className="truncate font-semibold">{e.description || project?.name || tr('untitled')}</div>
                       {!compact && (
                         <div className="truncate text-[11px] font-medium opacity-80">
                           {timeOfDay(d + b.startMin * MS_MIN, false)} – {running ? 'now' : timeOfDay(d + b.endMin * MS_MIN, false)}
@@ -464,28 +467,30 @@ function EntryEditor({
   onChange: (patch: Partial<TimeEntry>) => void;
   onDelete: () => void;
 }) {
+  const tr = useMessages(MESSAGES);
+  const [armedDelete, setArmedDelete] = useState(false);
   return (
-    <Modal open onClose={onClose} title="Edit entry">
+    <Modal open onClose={onClose} title={tr('editEntry')}>
       <div className="space-y-3">
         <div className="space-y-1.5">
-          <Label className="text-xs">Description</Label>
-          <Input value={entry.description} onChange={(e) => onChange({ description: e.target.value })} placeholder="What did you work on?" autoFocus />
+          <Label className="text-xs">{tr('description')}</Label>
+          <Input value={entry.description} onChange={(e) => onChange({ description: e.target.value })} placeholder={tr('whatDidYouWork')} autoFocus />
         </div>
         <div className="space-y-1.5">
-          <Label className="text-xs">Project</Label>
+          <Label className="text-xs">{tr('project')}</Label>
           <ProjectPicker value={entry.projectId} taskValue={entry.taskId} onChange={(p, t) => onChange({ projectId: p, taskId: t })} />
         </div>
         <div className="flex flex-wrap gap-3">
           <div className="space-y-1.5">
-            <Label className="text-xs">Start</Label>
+            <Label className="text-xs">{tr('start')}</Label>
             <DateTimePicker value={entry.start} onChange={(ts) => onChange({ start: ts, ...(entry.end !== null && ts > entry.end ? { end: ts } : {}) })} />
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs">End</Label>
+            <Label className="text-xs">{tr('end')}</Label>
             {entry.end !== null ? (
               <DateTimePicker value={entry.end} onChange={(ts) => onChange({ end: Math.max(ts, entry.start) })} />
             ) : (
-              <div className="flex h-ctl-lg items-center px-1 text-xs text-fg-mute">Running…</div>
+              <div className="flex h-ctl-lg items-center px-1 text-xs text-fg-mute">{tr('running')}</div>
             )}
           </div>
         </div>
@@ -493,10 +498,17 @@ function EntryEditor({
           <TagPicker value={entry.tagIds} onChange={(ids) => onChange({ tagIds: ids })} />
         </div>
         <div className="flex justify-between border-t pt-3">
-          <Button variant="ghost" size="sm" className="gap-1.5 text-bad hover:bg-bad/10 hover:text-bad" onClick={onDelete}>
-            <Trash2 className="h-4 w-4" /> Delete
+          {/* Delete time entry: the first click arms, the second deletes. */}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-1.5 text-bad hover:bg-bad/10 hover:text-bad"
+            onClick={() => (armedDelete ? onDelete() : setArmedDelete(true))}
+            onBlur={() => setArmedDelete(false)}
+          >
+            <Trash2 className="h-4 w-4" /> {armedDelete ? tr('confirmDelete') : tr('delete')}
           </Button>
-          <Button size="sm" onClick={onClose}>Done</Button>
+          <Button size="sm" onClick={onClose}>{tr('done')}</Button>
         </div>
       </div>
     </Modal>
@@ -516,6 +528,7 @@ function QuickCreateDialog({
   onCreateTask: (fields: Pick<TimeEntry, 'description' | 'projectId' | 'taskId' | 'tagIds' | 'start' | 'end'>) => void;
   onCreateMeeting: (fields: { title: string; start: number; end: number }) => void;
 }) {
+  const tr = useMessages(MESSAGES);
   const [kind, setKind] = useState<'task' | 'meeting'>('task');
   const [title, setTitle] = useState('');
   const [projectId, setProjectId] = useState<string | null>(null);
@@ -532,11 +545,11 @@ function QuickCreateDialog({
   };
 
   return (
-    <Modal open onClose={onCancel} title="New event">
+    <Modal open onClose={onCancel} title={tr('newEvent')}>
       <div className="space-y-3">
         {/* Task / Meeting selector */}
         <div className="flex rounded-md border p-0.5">
-          {([['task', 'Task', Clock], ['meeting', 'Meeting', Users]] as const).map(([k, label, Icon]) => (
+          {([['task', tr('task'), Clock], ['meeting', tr('meeting'), Users]] as const).map(([k, label, Icon]) => (
             <button
               key={k}
               onClick={() => setKind(k)}
@@ -548,30 +561,30 @@ function QuickCreateDialog({
         </div>
 
         <div className="space-y-1.5">
-          <Label className="text-xs">{kind === 'task' ? 'Description' : 'Title'}</Label>
+          <Label className="text-xs">{kind === 'task' ? tr('description') : tr('title')}</Label>
           <Input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') submit(); }}
-            placeholder={kind === 'task' ? 'What are you working on?' : 'Meeting title'}
+            placeholder={kind === 'task' ? tr('whatWorkingOn') : tr('meetingTitle')}
             autoFocus
           />
         </div>
 
         {kind === 'task' && (
           <div className="space-y-1.5">
-            <Label className="text-xs">Project</Label>
+            <Label className="text-xs">{tr('project')}</Label>
             <ProjectPicker value={projectId} taskValue={taskId} onChange={(p, t) => { setProjectId(p); setTaskId(t); }} />
           </div>
         )}
 
         <div className="flex flex-wrap gap-3">
           <div className="space-y-1.5">
-            <Label className="text-xs">Start</Label>
+            <Label className="text-xs">{tr('start')}</Label>
             <DateTimePicker value={start} onChange={(ts) => { setStart(ts); if (ts >= end) setEnd(ts + 60 * MS_MIN); }} />
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs">End</Label>
+            <Label className="text-xs">{tr('end')}</Label>
             <DateTimePicker value={end} onChange={setEnd} />
           </div>
         </div>
@@ -583,15 +596,15 @@ function QuickCreateDialog({
         )}
 
         {kind === 'meeting' && (
-          <p className="text-[11px] text-fg-mute">Notes (agenda, decisions, action items) open next, and stay in sync with the Meeting Notes tool.</p>
+          <p className="text-[11px] text-fg-mute">{tr('notesSync')}</p>
         )}
 
         <div className="flex items-center justify-between border-t pt-3">
-          <span className="text-xs text-fg-mute">{valid ? fmtTimer(end - start) : 'End must be after start'}</span>
+          <span className="text-xs text-fg-mute">{valid ? fmtTimer(end - start) : tr('endAfterStart')}</span>
           <div className="flex gap-2">
-            <Button variant="ghost" size="sm" onClick={onCancel}>Cancel</Button>
+            <Button variant="ghost" size="sm" onClick={onCancel}>{tr('cancel')}</Button>
             <Button size="sm" disabled={!valid} onClick={submit}>
-              {kind === 'task' ? 'Add entry' : 'Create & add notes'}
+              {kind === 'task' ? tr('addEntry') : tr('createAndNotes')}
             </Button>
           </div>
         </div>

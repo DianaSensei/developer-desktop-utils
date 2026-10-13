@@ -2,19 +2,26 @@ import { useEffect } from 'react';
 
 // This is a desktop app, not a web page, so browser-style affordances don't
 // belong: the native right-click context menu (Back / Reload / Inspect / Open
-// Link / Look Up …) and history back/forward navigation. This hook disables
-// both app-wide. Call it once near the app root.
+// Link / Look Up …) outside text fields, and history back/forward navigation.
+// This hook disables both app-wide. Call it once near the app root.
 
 function isEditable(target: EventTarget | null): boolean {
   const el = target as HTMLElement | null;
-  if (!el) return false;
-  return el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable;
+  if (!el || typeof el.tagName !== 'string') return false;
+  // CodeMirror's caret target can be a child of the contenteditable root.
+  return el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable
+    || !!el.closest?.('[contenteditable="true"]');
 }
 
 export function useDesktopChrome() {
   useEffect(() => {
-    // Suppress the browser/WebKit context menu everywhere.
-    const onContextMenu = (e: MouseEvent) => e.preventDefault();
+    // Suppress the browser/WebKit context menu, except in text fields: there
+    // it carries Cut/Copy/Paste and spelling suggestions, which people use.
+    // Components that draw their own menu call preventDefault themselves.
+    const onContextMenu = (e: MouseEvent) => {
+      if (e.defaultPrevented || isEditable(e.target)) return;
+      e.preventDefault();
+    };
 
     const onKeyDown = (e: KeyboardEvent) => {
       // Backspace / Delete must never navigate back — only edit text.

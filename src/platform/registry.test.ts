@@ -4,22 +4,12 @@ import { TOOL_DEFS, DEFAULT_TOOL_ORDER } from '@/lib/toolDefs';
 import { TOOL_ROUTES, allTools } from '@/lib/toolRegistry';
 
 /**
- * Registry quét `src/plugins/<id>/plugin.ts` lúc nạp module, nên một manifest sai
- * chính tả sẽ bị LOẠI ÂM THẦM: app vẫn dựng, chỉ là thiếu mất một tool trong
- * sidebar — đúng kiểu lỗi không ai phát hiện cho tới khi người dùng báo. Bộ
- * test này là chỗ duy nhất biến sai lệch đó thành CI đỏ.
+ * The registry silently drops an invalid manifest, so a typo would remove a
+ * tool from the sidebar without any error. These tests turn that into a CI
+ * failure.
  *
- * Các bảng pin bên dưới được trích từ ba file đăng ký TAY ở commit ngay trước
- * khi có Platform (toolDefs.ts, toolRegistry.ts, FeatureContext.tsx). Chúng
- * chứng minh việc chuyển sang manifest KHÔNG đổi gì với người dùng: đúng số
- * tool, đúng thứ tự sidebar, đúng route, đúng mặc định bật/tắt. Khi thêm hoặc
- * bỏ plugin về sau thì cập nhật bảng ở đây một cách CÓ CHỦ Ý — đó chính là
- * điểm rà soát ta muốn có.
- *
- * redis-client/rabbit-client/container-manager/kafka-explorer rời khỏi bảng
- * này (không còn compile-time) khi bốn plugin đó chuyển sang
- * developer-desktop-miniapp — xem
- * docs/decisions/architecture/optional-broker-plugins.md.
+ * The pinned tables record the expected tools, sidebar order, routes and
+ * defaults. Update them deliberately when adding or removing a plugin.
  */
 
 const PINNED_ORDER = [

@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { SectionLabel } from '@/components/ui/section-label';
 import type { Environment, ResolvedVar, ResolvedVarSource } from './types';
+import { t } from './i18n';
 
 interface Props {
   // The two environments actually applied right now — pass
@@ -29,10 +30,10 @@ interface Props {
 }
 
 const GROUP_ORDER: ResolvedVarSource[] = ['collectionEnv', 'globalEnv', 'collectionVar', 'vault'];
-const GROUP_LABEL: Record<ResolvedVarSource, string> = {
-  collectionEnv: 'Collection Environment', globalEnv: 'Global Environment',
-  collectionVar: 'Collection Variables', vault: 'Vault',
-};
+const groupLabel = (source: ResolvedVarSource): string => ({
+  collectionEnv: t('qv.collectionEnv'), globalEnv: t('qv.globalEnv'),
+  collectionVar: t('env.collectionVars'), vault: t('vault.title'),
+} satisfies Record<ResolvedVarSource, string>)[source];
 const ENV_SOURCES = new Set<ResolvedVarSource>(['collectionEnv', 'globalEnv']);
 
 export function EnvQuickView({ collectionEnv, globalEnv, resolvedVars, onManageEnvironments, onManageVault }: Props) {
@@ -45,7 +46,8 @@ export function EnvQuickView({ collectionEnv, globalEnv, resolvedVars, onManageE
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        title="Quick view variables (Collection env, Global env, Collection Variables, Vault)"
+        title={t('qv.title')}
+        aria-label={t('qv.title')}
         className="flex h-ctl w-ctl shrink-0 items-center justify-center rounded-sm text-fg-mute transition-colors hover:bg-bg hover:text-fg focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus"
       >
         <Eye className="h-4 w-4" />
@@ -68,7 +70,7 @@ export function EnvQuickView({ collectionEnv, globalEnv, resolvedVars, onManageE
             {!collectionEnv && !globalEnv && (
               <div className="flex min-w-0 items-center gap-1.5">
                 <Layers className="h-3.5 w-3.5 shrink-0 text-fg-mute" />
-                <span className="truncate text-xs font-medium text-fg-mute">No Environment</span>
+                <span className="truncate text-xs font-medium text-fg-mute">{t('noEnvironment')}</span>
               </div>
             )}
           </div>
@@ -77,7 +79,8 @@ export function EnvQuickView({ collectionEnv, globalEnv, resolvedVars, onManageE
               type="button"
               onClick={() => setRevealSecrets((v) => !v)}
               className="shrink-0 rounded p-1 text-fg-mute transition-colors hover:text-fg focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus"
-              title={revealSecrets ? 'Hide secret environment values' : 'Reveal secret environment values'}
+              title={revealSecrets ? t('qv.hideSecrets') : t('qv.revealSecrets')}
+              aria-label={revealSecrets ? t('qv.hideSecrets') : t('qv.revealSecrets')}
             >
               {revealSecrets ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
             </button>
@@ -87,8 +90,7 @@ export function EnvQuickView({ collectionEnv, globalEnv, resolvedVars, onManageE
         <div className="max-h-80 overflow-y-auto p-1">
           {resolvedVars.length === 0 ? (
             <p className="px-2 py-4 text-center text-[11px] text-fg-mute">
-              No variables in scope for this request yet — set one in a Collection or Global
-              environment, Collection Variables, the Vault, or with a script.
+              {t('qv.none')}
             </p>
           ) : (
             <div className="space-y-2">
@@ -97,18 +99,18 @@ export function EnvQuickView({ collectionEnv, globalEnv, resolvedVars, onManageE
                 if (rows.length === 0) return null;
                 return (
                   <div key={source}>
-                    <SectionLabel className="px-2 py-1" count={rows.length}>{GROUP_LABEL[source]}</SectionLabel>
+                    <SectionLabel className="px-2 py-1" count={rows.length}>{groupLabel(source)}</SectionLabel>
                     <div className="divide-y divide-line">
                       {rows.map((r) => (
                         <div key={r.name} className="flex items-start gap-2 px-2 py-1.5 text-xs">
                           <span className="w-2/5 shrink-0 truncate font-medium" title={r.name}>{r.name}</span>
                           <span
                             className="min-w-0 flex-1 truncate font-mono text-fg-mute"
-                            title={r.secret && !(ENV_SOURCES.has(source) && revealSecrets) ? 'Secret — masked here' : r.value}
+                            title={r.secret && !(ENV_SOURCES.has(source) && revealSecrets) ? t('qv.secretMasked') : r.value}
                           >
                             {r.secret && !(ENV_SOURCES.has(source) && revealSecrets)
                               ? '••••••••'
-                              : r.value || <span className="italic text-fg-mute/50">empty</span>}
+                              : r.value || <span className="italic text-fg-mute/50">{t('qv.empty')}</span>}
                           </span>
                         </div>
                       ))}
@@ -123,10 +125,10 @@ export function EnvQuickView({ collectionEnv, globalEnv, resolvedVars, onManageE
         <DropdownMenuSeparator className="my-0" />
         <div className="p-1">
           <DropdownMenuItem onClick={onManageEnvironments} icon={<Settings2 className="h-3.5 w-3.5" />}>
-            Environments &amp; Collection Variables…
+            {t('qv.manageEnvs')}
           </DropdownMenuItem>
           <DropdownMenuItem onClick={onManageVault} icon={<KeyRound className="h-3.5 w-3.5" />}>
-            Vault…
+            {t('qv.vault')}
           </DropdownMenuItem>
         </div>
       </DropdownMenuContent>

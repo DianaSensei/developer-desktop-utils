@@ -1,8 +1,5 @@
-// Right-click context menu — a cursor-positioned sibling of DropdownMenu, for
-// per-row actions in trees and lists (collections, connections, topics...).
-// Extracted from API Client's Sidebar so Kafka Explorer / RabbitMQ / any future
-// tree-like list gets the same right-click behavior and styling for free
-// instead of a second hand-rolled copy.
+// Right-click context menu: a cursor-positioned sibling of DropdownMenu for
+// per-row actions in trees and lists (collections, connections, topics).
 
 import { cn } from '@/lib/utils';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -39,12 +36,10 @@ export function useContextMenu() {
   return { state, open, close };
 }
 
-/* `useContextMenu` sở hữu `state`, và `<ContextMenu>` chỉ render khi `state`
-   khác null — cùng kiểu mount `{state && <ContextMenu/>}` từng làm
-   `DropdownMenu` biến mất trong một khung hình lúc đóng. Sửa ở đây cùng cách:
-   panel tự quản `closing` và trì hoãn `onClose` đúng `--dur-exit` (130ms) để
-   kịp chạy animation ra trước khi cha gỡ nó. Xem ghi chú đầy đủ trong
-   `dropdown-menu.tsx` và `modal-shell.tsx` — cùng một lớp lỗi, ba chỗ. */
+/* The parent renders <ContextMenu> only while `state` is set, so the panel
+   tracks `closing` itself and delays `onClose` by `--dur-exit` (130ms) to
+   play its exit animation (same approach as dropdown-menu.tsx and
+   modal-shell.tsx). */
 
 export interface ContextMenuProps {
   state: ContextMenuState;
@@ -58,10 +53,8 @@ export function ContextMenu({ state, onClose, width = 220 }: ContextMenuProps) {
   const height = entries.length * 32 + 8;
   const left = Math.min(x, window.innerWidth - width - 8);
   const top = Math.min(y, Math.max(8, window.innerHeight - height - 8));
-  // Panel bị đẩy khỏi con trỏ khi gần mép màn hình (hai `Math.min` trên) — gốc
-  // biến đổi bám theo VỊ TRÍ CON TRỎ THẬT (`x, y`), không theo `left, top` đã
-  // bị kẹp, nên panel vẫn "mọc ra" đúng từ chỗ vừa bấm chuột phải kể cả khi
-  // nó bị đẩy đi.
+  // The panel may be pushed away from an edge; its transform origin stays
+  // at the real cursor position so it still grows from the click.
   const originX = x - left;
   const originY = y - top;
 

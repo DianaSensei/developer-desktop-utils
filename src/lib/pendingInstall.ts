@@ -1,30 +1,16 @@
-// Hàng đợi URL manifest chờ cài — cầu nối giữa `deepLink.ts` (nhận
-// `desktop-devtool-app://install?...` từ hệ điều hành) và `SettingsExtensions`
-// (nghe hàng đợi này, tự mở `ExtensionInstallDialog` để xem trước/xác nhận).
-// `SettingsMarketplace` KHÔNG dùng hàng đợi này nữa — bấm Install trên một
-// thẻ market mở thẳng `ExtensionInstallDialog` tại chỗ (xem
-// `SettingsMarketplace.tsx`), chỉ deep link mới cần một hàng đợi vì URL tới
-// từ hệ điều hành có thể sớm hơn lúc `SettingsExtensions` kịp mount. Không tự
-// cài gì ở đây: hàng đợi chỉ giữ URL (+ marketId nếu có nguồn), còn bước xem
-// trước/xác nhận/cài thật vẫn đi qua đúng luồng
-// `fetchArtifactManifestPreview`/`installArtifact` — deep link chỉ thay việc
-// copy/dán bằng một cú bấm, không bỏ qua bước xác nhận (một manifest độc hại
-// trỏ tới từ một link giả mạo vẫn phải qua đúng màn hình xem trước đó).
+// Queue of manifest URLs waiting to be installed, between deepLink.ts (which
+// receives `desktop-devtool-app://install?...`) and SettingsExtensions (which
+// opens the install preview). A deep link can arrive before that screen
+// mounts, hence the queue. Nothing is installed here: every item still goes
+// through the preview and confirmation.
 //
-// CÓ subscribe/notify (không chỉ enqueue/dequeue tay): nếu người dùng ĐANG
-// đứng ở Settings → Extensions và một link `desktop-devtool-app://` thứ hai
-// tới trong lúc đó, `SettingsExtensions` không remount (điều hướng tới path
-// đang đứng sẵn không mount lại component) — effect chỉ chạy lúc mount sẽ bỏ
-// lỡ URL mới. `notify()` cho listener đang mount một cơ hội tự kéo hàng đợi
-// mà không cần đợi remount.
+// Listeners are notified on enqueue because a link that arrives while
+// Settings → Extensions is already open does not remount it.
 
 export interface PendingInstallItem {
   url: string;
-  /** Market đã cung cấp URL này (SettingsMarketplace), nếu có — `undefined`
-   *  cho một URL từ deep link hoặc dán tay, không gắn với market nào. Đi
-   *  thẳng tới `installArtifact(url, marketId)` khi người dùng xác nhận cài,
-   *  để hai market khác nhau cùng phát hành một plugin trùng id không đè lên
-   *  nhau (xem `artifact_installer.rs`'s `InstalledPluginRecord::market_id`). */
+  /** Market that supplied the URL, if any; passed to
+   *  `installArtifact(url, marketId)`. */
   marketId?: string;
 }
 
@@ -37,43 +23,31 @@ function notify() {
 let queue: PendingInstallItem[] = [];
 
 export const pendingInstall = {
-  /** Nạp một hoặc nhiều URL manifest mới (plugin trước, service sau — theo
-   *  đúng thứ tự deep link/market truyền vào), tất cả gắn CHUNG một
-   *  `marketId` (một lần gọi luôn tới từ đúng một nguồn — một link deep link
-   *  hoặc một cú bấm Install trên một market), rồi báo cho mọi listener đang
-   *  mount (nếu có) để tự kéo ngay, không cần remount.
-   *
-   *  THAY THẾ toàn bộ hàng đợi cũ thay vì nối vào cuối: mỗi lần gọi đây là
-   *  một cú bấm "Install" MỚI từ bên ngoài — nếu người dùng bấm link/thẻ B
-   *  trong khi vẫn còn URL service của A đang treo trong hàng đợi (chưa xác
-   *  nhận cài xong ở `SettingsExtensionInstaller`), nối vào cuối sẽ khiến
-   *  `dequeue()` (FIFO) trả về đúng cái URL cũ của A trước, khiến người dùng
-   *  thấy "dữ liệu cũ" thay vì bản xem trước của B mà họ vừa yêu cầu. Ý định
-   *  mới luôn thắng ý định cũ chưa hoàn tất.
-   */
+  /** Replaces the queue with new URLs (plugin first, then service), all
+   *  from one source, and notifies listeners. Replacing rather than
+   *  appending means a new install request always wins over an unfinished
+   *  one. */
   enqueue(urls: string[], marketId?: string) {
     const cleaned = urls.map((u) => u.trim()).filter(Boolean);
     if (cleaned.length === 0) return;
     queue = cleaned.map((url) => ({ url, marketId }));
     notify();
   },
-  /** Lấy và xoá mục kế tiếp, hoặc `null` nếu hàng đợi rỗng. */
+  /** Takes the next item, or `null` when empty. */
   dequeue(): PendingInstallItem | null {
     if (queue.length === 0) return null;
     const [next, ...rest] = queue;
     queue = rest;
     return next;
   },
-  /** Lấy và xoá TOÀN BỘ hàng đợi cùng lúc (mảng rỗng nếu không có gì) — dùng
-   *  khi plugin + sidecar service của nó (hai URL, cùng một cú bấm/link) cần
-   *  hiện chung MỘT màn xem trước/xác nhận thay vì bắt xác nhận riêng từng
-   *  cái, khác `dequeue()` (lấy từng mục một). */
+  /** Takes every item at once, so a plugin and its sidecar can share one
+   *  preview. */
   dequeueAll(): PendingInstallItem[] {
     const all = queue;
     queue = [];
     return all;
   },
-  /** Đăng ký nghe "có URL mới vừa được thêm". Trả về hàm huỷ đăng ký. */
+  /** Notifies when items are added. Returns an unsubscribe function. */
   subscribe(listener: () => void): () => void {
     listeners.add(listener);
     return () => listeners.delete(listener);

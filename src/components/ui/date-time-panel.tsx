@@ -3,6 +3,8 @@ import { format } from 'date-fns';
 import { DatePicker } from './date-picker';
 import { TimePicker } from './time-picker';
 import { cn, pad2 } from '@/lib/utils';
+import { useMessages } from '@/contexts/LocaleContext';
+import UI from '@/components/ui/ui.messages';
 
 // ---------------------------------------------------------------------------
 // DateTimePanel — a self-contained, confirm-on-apply date + time picker panel.
@@ -57,10 +59,11 @@ export function DateTimePanel({
   onCancel,
   tz = LOCAL_TZ,
   showSeconds = true,
-  confirmLabel = 'Confirm',
-  cancelLabel = 'Cancel',
+  confirmLabel,
+  cancelLabel,
   className,
 }: DateTimePanelProps) {
+  const ui = useMessages(UI);
   // Seed from the wall-clock representation of `value` in `tz`.
   const initWall = useMemo(() => new Date(formatInTz(value, tz, 'yyyy-MM-dd HH:mm:ss')), [value, tz]);
 
@@ -139,14 +142,14 @@ export function DateTimePanel({
           onClick={onCancel}
           className="flex-1 rounded-md border px-3 py-1.5 text-xs transition-colors hover:bg-bg-2"
         >
-          {cancelLabel}
+          {cancelLabel ?? ui('cancel')}
         </button>
         <button
           type="button"
           onClick={handleConfirm}
           className="flex-1 rounded-md bg-acc px-3 py-1.5 text-xs text-acc-fg transition-colors hover:bg-acc/90"
         >
-          {confirmLabel}
+          {confirmLabel ?? ui('confirm')}
         </button>
       </div>
     </div>

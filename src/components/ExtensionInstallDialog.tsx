@@ -16,17 +16,10 @@ import {
 } from '@/platform';
 
 /**
- * Xác nhận + cài MỘT LẦN cho toàn bộ URL của một lượt cài (plugin + sidecar
- * service của nó, nếu có) — thay vì bắt người dùng bấm "Cài đặt" riêng từng
- * URL như `SettingsExtensionInstaller` (vẫn giữ cho trường hợp dán URL tay,
- * một URL một lúc). Dùng chung cho cả hai lối vào bên ngoài: bấm Install
- * trên một thẻ Chợ tiện ích, và deep link `desktop-devtool-app://install`
- * — cả hai chỉ khác nhau ở CHỖ LẤY danh sách URL, còn màn xem trước/xác
- * nhận/cài này thì giống hệt nhau.
- *
- * Vẫn KHÔNG bỏ bước xác nhận (tên/quyền/nguồn hiện ra trước khi cài) —
- * chỉ gộp nhiều URL của CÙNG một lượt cài vào một màn duy nhất thay vì
- * nhiều màn nối tiếp, và bỏ việc phải rời sang tab khác để thấy nó.
+ * Previews and installs every URL of one install request (a plugin and its
+ * sidecar, if any) in a single confirmation. Used by marketplace cards and
+ * `desktop-devtool-app://install` deep links. The confirmation (name,
+ * permissions, source) is never skipped.
  */
 
 interface PreviewItem {
@@ -40,8 +33,7 @@ interface ExtensionInstallDialogProps {
   marketId?: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Gọi sau khi cài xong ít nhất một URL — để component cha (vd Marketplace)
-   *  tự làm mới trạng thái "Đã cài" của nó. */
+  /** Called after at least one URL installed, so the parent can refresh. */
   onInstalled?: () => void;
 }
 
@@ -64,12 +56,8 @@ export function ExtensionInstallDialog({ urls, marketId, open, onOpenChange, onI
     }
     let cancelled = false;
     void (async () => {
-      // Tuần tự, không Promise.all: hai lời gọi Tauri riêng biệt bắn đồng
-      // thời từng gây ra một cuộc đua module y hệt đã ghi ở
-      // `SettingsExtensionInstaller.test.tsx`/`SettingsMarketplace.tsx` (lần
-      // `import('@tauri-apps/api/core')` thứ hai có thể không đi qua
-      // `vi.mock` trong test). Gọi tuần tự để lời gọi sau luôn thấy module
-      // đã nạp xong từ lời gọi trước.
+      // Sequential rather than Promise.all: concurrent first calls raced
+      // the '@tauri-apps/api/core' mock in tests.
       const results: PreviewItem[] = [];
       for (const url of urls) {
         try {

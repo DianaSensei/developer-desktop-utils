@@ -187,9 +187,8 @@ export function useMcpBridge(state: MockServerState, enabled = true): void {
       // here is what makes its tools show up in `list_tools` at all. Same
       // 'native' + allowlist gate as `mcp_respond` below.
       await sdk.native.invoke('mcp_register_tools', { pluginId: sdk.id, tools: MOCK_SERVER_MCP_TOOLS });
-      // Qua SDK: sự kiện `mcp:call` và lệnh `mcp_respond` đều nằm trong quyền
-      // 'native' + allowlist của plugin, nên cầu nối này cũng hiện trong nhật ký
-      // như mọi lời gọi khác thay vì là một đường đi vòng.
+      // Through the SDK: the `mcp:call` event and `mcp_respond` are covered
+      // by the plugin's 'native' permission and allowlist, so they are audited.
       const fn = await sdk.native.listen<McpCallEvent>('mcp:call', async (payload) => {
         const { id, tool, args } = payload;
         const handler = handlersRef.current[tool];

@@ -6,7 +6,10 @@ import {
   type BadgeTone,
 } from '@/design-system';
 import { DiffMergeView, type DiffStats, type DiffSide } from './DiffMergeView';
-import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
+import { useQuickPaste, useQuickPasteHint } from '@/hooks/useQuickPaste';
+import { useMessages } from '@/contexts/LocaleContext';
+import MESSAGES from '@/components/tools/diff/TextDiff.messages';
+import { ToolToolbar } from '@/components/ui/tool-layout';
 
 type Mode = 'text' | 'json';
 
@@ -66,7 +69,7 @@ function preview(v: unknown): string {
   return s.length > 200 ? s.slice(0, 200) + '…' : s;
 }
 
-interface JsonDiffResult { changes: Change[] | null; error: string | null }
+interface JsonDiffResult { changes: Change[] | null; error: { side: 'original' | 'modified'; message: string } | null }
 
 // The structural walk above is unbounded recursion over parsed JSON — guard
 // against pathological inputs freezing the tab. The visual diff below doesn't
@@ -80,8 +83,8 @@ function computeJsonDiff(a: string, b: string): JsonDiffResult {
   }
   let pa: unknown;
   let pb: unknown;
-  try { pa = JSON.parse(a); } catch (e) { return { changes: null, error: `Original: ${(e as Error).message}` }; }
-  try { pb = JSON.parse(b); } catch (e) { return { changes: null, error: `Modified: ${(e as Error).message}` }; }
+  try { pa = JSON.parse(a); } catch (e) { return { changes: null, error: { side: 'original', message: (e as Error).message } }; }
+  try { pb = JSON.parse(b); } catch (e) { return { changes: null, error: { side: 'modified', message: (e as Error).message } }; }
   const out: Change[] = [];
   diffJson(pa, pb, '', out);
   return { changes: out, error: null };
@@ -91,6 +94,8 @@ function computeJsonDiff(a: string, b: string): JsonDiffResult {
 
 export function TextDiff() {
   const sdk = usePluginSdkFor('diff');
+  const m = useMessages(MESSAGES);
+  const quickPasteHint = useQuickPasteHint();
   const [mode, setMode] = usePluginState<Mode>(sdk, 'diff:mode', 'text', { legacyKey: 'devtool:diff:mode' });
   const [text1, setText1] = usePluginState(sdk, 'diff:text1', '', { legacyKey: 'devtool:diff:text1' });
   const [text2, setText2] = usePluginState(sdk, 'diff:text2', '', { legacyKey: 'devtool:diff:text2' });
@@ -139,26 +144,26 @@ export function TextDiff() {
   return (
     <div className="flex flex-col h-full">
       {/* Toolbar */}
-      <div className="shrink-0 header-chrome px-4 py-2.5 flex items-center gap-3">
+      <ToolToolbar className="flex items-center gap-3">
         <Segmented
           value={mode}
           onValueChange={setMode}
           options={[
-            { value: 'text', label: 'Text' },
+            { value: 'text', label: m('text') },
             { value: 'json', label: 'JSON' },
           ]}
-          aria-label="Diff mode"
+          aria-label={m('modeLabel')}
         />
         <span className="hidden text-xs text-fg-mute lg:block">
           {mode === 'text'
-            ? 'Live diff — synced scrolling, inline highlights, and chunk arrows to copy changes across.'
-            : 'Structural diff by path below, plus a synced line diff of the formatted JSON.'}
+            ? m('textHint')
+            : m('jsonHint')}
         </span>
 
         <div className="ml-auto flex items-center gap-2">
           {hasContent && stats && (
             stats.chunks === 0 ? (
-              <Badge tone="success" size="sm">No differences</Badge>
+              <Badge tone="success" size="sm">{m('noDifferences')}</Badge>
             ) : (
               <span className="inline-flex items-center gap-2 rounded-md border border-line bg-bg-2/40 px-2 py-1 font-mono text-xs tabular-nums">
                 <span className="text-ok">+{stats.added}</span>
@@ -167,30 +172,31 @@ export function TextDiff() {
             )
           )}
           <IconButton
-            title="Swap original and modified"
-            aria-label="Swap original and modified"
+            title={m('swap')}
+            aria-label={m('swap')}
             onClick={swap}
             disabled={!hasContent}
           >
             <ArrowLeftRight className="h-4 w-4" />
           </IconButton>
           <IconButton
-            title={collapseUnchanged ? 'Show full text' : 'Collapse unchanged lines'}
-            aria-label="Toggle collapse unchanged lines"
+            title={collapseUnchanged ? m('showFull') : m('collapseUnchanged')}
+            aria-label={m('collapseUnchanged')}
+            aria-pressed={collapseUnchanged}
             active={collapseUnchanged}
             onClick={() => setCollapseUnchanged((v) => !v)}
           >
             <FoldVertical className="h-4 w-4" />
           </IconButton>
         </div>
-      </div>
+      </ToolToolbar>
 
       {/* Pane header — labels + copy actions, aligned with the merge view's
           50/50 columns (the middle spacer matches its revert-arrow gutter). */}
       <div className="flex shrink-0">
-        <PaneHeader className="min-w-0 flex-1" label="Original" action={<CopyButton value={text1} iconClassName="h-3.5 w-3.5" />} />
+        <PaneHeader className="min-w-0 flex-1" label={m('original')} action={<CopyButton value={text1} iconClassName="h-3.5 w-3.5" />} />
         <div className="w-[1.6em] shrink-0 border-b border-line bg-bg-2/10" />
-        <PaneHeader className="min-w-0 flex-1" label="Modified" action={<CopyButton value={text2} iconClassName="h-3.5 w-3.5" />} />
+        <PaneHeader className="min-w-0 flex-1" label={m('modified')} action={<CopyButton value={text2} iconClassName="h-3.5 w-3.5" />} />
       </div>
 
       <DiffMergeView
@@ -206,8 +212,8 @@ export function TextDiff() {
         collapseUnchanged={collapseUnchanged}
         onStatsChange={setStats}
         onFocusSide={handleFocusSide}
-        originalPlaceholder={mode === 'json' ? 'Paste original JSON' : `Enter original text — ${quickPasteHint}`}
-        modifiedPlaceholder={mode === 'json' ? 'Paste modified JSON' : `Enter modified text — ${quickPasteHint}`}
+        originalPlaceholder={mode === 'json' ? m('pasteOriginalJson') : m('enterOriginal', { hint: quickPasteHint })}
+        modifiedPlaceholder={mode === 'json' ? m('pasteModifiedJson') : m('enterModified', { hint: quickPasteHint })}
       />
 
       {/* Structural JSON diff — logical changes by path, unaffected by
@@ -216,13 +222,13 @@ export function TextDiff() {
         <div className="shrink-0 border-t border-line" style={{ maxHeight: '32%' }}>
           <div className="h-full overflow-y-auto">
             <CollapsibleSection
-              title="Structural changes"
-              hint={jsonDiff?.changes?.length ? `— ${jsonDiff.changes.length} by path` : undefined}
+              title={m('structuralChanges')}
+              hint={jsonDiff?.changes?.length ? m('byPath', { n: jsonDiff.changes.length }) : undefined}
               defaultOpen={!!jsonDiff?.changes?.length || !!jsonDiff?.error}
               className="px-4 py-2.5"
             >
               {jsonDiff?.error ? (
-                <p className="font-mono text-xs text-bad">Invalid JSON — {jsonDiff.error}</p>
+                <p className="font-mono text-xs text-bad">{m('invalidJson', { error: m(jsonDiff.error.side === 'original' ? 'originalError' : 'modifiedError', { error: jsonDiff.error.message }) })}</p>
               ) : jsonDiff?.changes && jsonDiff.changes.length > 0 ? (
                 <div className="space-y-1 pb-1">
                   {jsonDiff.changes.map((c, i) => (
@@ -232,8 +238,8 @@ export function TextDiff() {
               ) : (
                 <p className="pb-1 text-sm text-fg-mute">
                   {text1.length + text2.length > STRUCTURAL_DIFF_CHAR_LIMIT
-                    ? 'Input is too large for the structural diff — the line diff above still works.'
-                    : 'No differences — the two JSON values are structurally identical.'}
+                    ? m('tooLarge')
+                    : m('identical')}
                 </p>
               )}
             </CollapsibleSection>

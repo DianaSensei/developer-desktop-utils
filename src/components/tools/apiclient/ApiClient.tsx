@@ -32,6 +32,7 @@ import { useApiClientRuntime } from './mcpRuntimeContext';
 import { isScriptSandboxDegraded, stopScriptSandbox, subscribeSandboxStatus } from './scriptHost';
 import type { ApiRequest, ApiResponse, LogEntry, TestResult, VarMap } from './types';
 import { buildResolvedVars } from './vars';
+import { t } from './i18n';
 
 export type SplitDirection = 'horizontal' | 'vertical';
 
@@ -218,7 +219,7 @@ export function ApiClient() {
       if (!isCurrent()) return;
       if ((e as Error).name === 'AbortError') {
         // Keep the previous response on screen; only note that this run stopped.
-        patchRun(id, { error: 'Request cancelled.' });
+        patchRun(id, { error: t('shell.cancelled') });
       } else {
         patchRun(id, { error: errToString(e), response: null, tests: [], logs: [] });
       }
@@ -248,10 +249,8 @@ export function ApiClient() {
   const quickOpenRef = useRef(quickOpen);
   quickOpenRef.current = quickOpen;
 
-  // New request in the first collection — and, with no collection yet, a
-  // collection first. ⌘B / the + button / the empty state used to silently do
-  // nothing on a fresh workspace, which reads as "the shortcut is broken"
-  // rather than "make a collection first".
+  // New request in the first collection, creating a collection first when
+  // there is none, so ⌘B / + / the empty state always do something.
   const newRequest = useCallback(() => {
     const s = storeRef.current;
     const collectionId = s.collections[0]?.id ?? s.addCollection();
@@ -408,7 +407,12 @@ export function ApiClient() {
   const run = activeRequest ? (runs[activeRequest.id] ?? EMPTY_RUN) : EMPTY_RUN;
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden">
+    // While request tabs are open, ⌘/Ctrl+1…9 belong to them: the attribute
+    // tells the app's workspace shortcuts (WorkspaceContext) to stand aside.
+    <div
+      className="flex h-full min-h-0 flex-col overflow-hidden"
+      data-claims-shortcuts={store.openRequests.length > 0 ? 'mod-digit' : undefined}
+    >
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <div className="shrink-0 overflow-hidden" style={{ width: sidebarWidth }}>
           <Sidebar store={store} searchInputRef={searchInputRef} onRun={handleRun} revealTick={revealTick} />
@@ -424,8 +428,7 @@ export function ApiClient() {
           <span className="absolute -inset-x-1 inset-y-0" />
         </div>
 
-        {/* Mặt làm việc — sáng nhất màn hình, đối lại cột điều hướng `--chrome`
-            bên trái. Đây là thứ nói cho mắt biết chỗ nào để làm việc. */}
+        {/* The work surface, brighter than the `--chrome` nav column. */}
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-card">
           <RequestTabs
             store={store}
@@ -495,15 +498,15 @@ export function ApiClient() {
             <div className="flex flex-1 flex-col items-center justify-center gap-4 text-fg-mute motion-safe:animate-fade-in-up">
               <Send className="h-10 w-10 opacity-20" />
               <div className="text-center">
-                <p className="text-sm font-medium text-fg/70">No request open</p>
-                <p className="mt-1 text-xs">Select a request from the sidebar, or create / find one:</p>
+                <p className="text-sm font-medium text-fg/70">{t('shell.noRequestOpen')}</p>
+                <p className="mt-1 text-xs">{t('shell.selectOrCreate')}</p>
               </div>
               <div className="flex items-center gap-2">
                 <Button size="sm" onClick={newRequest} sc="B" scMod className="h-ctl gap-1.5">
-                  <Plus className="h-3.5 w-3.5" /> New request
+                  <Plus className="h-3.5 w-3.5" /> {t('shell.newRequest')}
                 </Button>
                 <Button size="sm" variant="outline" onClick={() => setQuickOpen(true)} sc="P" scMod className="h-ctl gap-1.5">
-                  <Search className="h-3.5 w-3.5" /> Go to request
+                  <Search className="h-3.5 w-3.5" /> {t('shell.goToRequest')}
                 </Button>
               </div>
             </div>

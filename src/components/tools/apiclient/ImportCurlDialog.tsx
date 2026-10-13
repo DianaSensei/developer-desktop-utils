@@ -7,6 +7,7 @@ import { Callout } from '@/components/ui/callout';
 import { TextEditor } from '@/design-system';
 import { hasSessionCredentials, looksLikeCmdFormat, parseCurl } from './curl';
 import type { ApiStore } from './store';
+import { t } from './i18n';
 
 export function ImportCurlDialog({ store, open, onClose }: { store: ApiStore; open: boolean; onClose: () => void }) {
   const [text, setText] = useState('');
@@ -36,14 +37,14 @@ export function ImportCurlDialog({ store, open, onClose }: { store: ApiStore; op
     setError(null);
     try {
       const req = parseCurl(text);
-      if (!req.url.trim()) { setError('No URL found in the cURL command.'); return; }
+      if (!req.url.trim()) { setError(t('curl.noUrl')); return; }
       const collectionId = store.activeCollectionId ?? store.collections[0]?.id;
-      if (!collectionId) { setError('Create a collection first.'); return; }
+      if (!collectionId) { setError(t('curl.createCollection')); return; }
       store.addRequest(collectionId, req);
       setText('');
       onClose();
     } catch (e) {
-      setError((e as Error).message || 'Could not parse the cURL command.');
+      setError((e as Error).message || t('curl.parseFailed'));
     }
   };
 
@@ -51,7 +52,7 @@ export function ImportCurlDialog({ store, open, onClose }: { store: ApiStore; op
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent size="lg" scrollable>
         <DialogHeader className="border-b px-4 py-3">
-          <DialogTitle>Import cURL</DialogTitle>
+          <DialogTitle>{t('side.importCurl')}</DialogTitle>
         </DialogHeader>
         <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
           <div ref={editorWrapRef}>
@@ -63,22 +64,21 @@ export function ImportCurlDialog({ store, open, onClose }: { store: ApiStore; op
             />
           </div>
           {cmdFormat && (
-            <Callout tone="warning" size="sm" title="Looks like Windows cmd format">
-              This parser only understands the bash/POSIX cURL format. In Chrome/Edge DevTools, use{' '}
-              <strong className="text-fg">Copy → Copy as cURL (bash)</strong>, not "(cmd)" — the cmd version's{' '}
-              <code className="rounded bg-bg-2 px-1">^</code> line continuations and quoting will likely mis-parse.
+            <Callout tone="warning" size="sm" title={t('curl.cmdTitle')}>
+              {t('curl.cmdA')}{' '}
+              <strong className="text-fg">Copy → Copy as cURL (bash)</strong>{t('curl.cmdB')}{' '}
+              <code className="rounded bg-bg-2 px-1">^</code> {t('curl.cmdC')}
             </Callout>
           )}
           {hasCreds && (
-            <Callout tone="info" size="sm" title="Includes a session credential">
-              This command carries a Cookie, Authorization, or basic-auth value copied from that browser session —
-              it's a snapshot, not a live login, so it can expire or be rotated independently of this request.
+            <Callout tone="info" size="sm" title={t('curl.credTitle')}>
+              {t('curl.credBody')}
             </Callout>
           )}
           {error && <Callout tone="error" size="sm">{error}</Callout>}
           <div className="flex justify-end gap-2">
-            <Button variant="outline" size="sm" onClick={onClose}>Cancel</Button>
-            <Button size="sm" onClick={handleImport} disabled={!text.trim()}>Import</Button>
+            <Button variant="outline" size="sm" onClick={onClose}>{t('cancel')}</Button>
+            <Button size="sm" onClick={handleImport} disabled={!text.trim()}>{t('import')}</Button>
           </div>
         </div>
       </DialogContent>

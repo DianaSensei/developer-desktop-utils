@@ -3,14 +3,9 @@ import { render, screen, cleanup, fireEvent, waitFor, act, within } from '@testi
 import { storageRemove } from '@/lib/persistentStore';
 
 /**
- * `isTauri` được đọc MỘT LẦN lúc `@/lib/platform` được nạp — cùng cái bẫy đã
- * ghi ở `SettingsExtensionInstaller.test.tsx`. `vi.resetModules()` + gán
- * `__TAURI_INTERNALS__` TRƯỚC khi `import('@/components/SettingsMarketplace')`
- * là cách duy nhất mọi module transitively import `@/lib/platform` đọc đúng
- * giá trị test này cần. `listInstalledArtifacts`/`currentTargetTriple`/xem
- * trước/cài đặt đều gọi `invoke` qua `@tauri-apps/api/core` — định tuyến
- * theo TÊN lệnh để không lẫn hình dạng trả về của nhau; catalog thì đi qua
- * `fetch` toàn cục (không phải `invoke`) — mock riêng đường đó.
+ * `isTauri` is read once at module load, so each test resets modules and
+ * sets `__TAURI_INTERNALS__` before importing. `invoke` is routed by command
+ * name; the catalog goes through the global `fetch`, mocked separately.
  */
 function jsonResponse(body: unknown, ok = true, status = 200) {
   return { ok, status, json: async () => body } as Response;
@@ -48,10 +43,8 @@ function demoServiceManifest() {
   };
 }
 
-// invoke() thấy nhiều lệnh khác nhau trong CÙNG một lần render (danh sách đã
-// cài, target-triple máy này, xem trước manifest theo URL, rồi cài thật) —
-// định tuyến theo `command` (và `args.url` khi cần) thay vì một
-// `mockResolvedValue` chung, để mỗi lệnh luôn thấy đúng hình dạng của nó.
+// Several commands run in one render (installed list, target triple,
+// preview, install); route by command so each gets the right shape.
 let installedArtifacts: unknown[] = [];
 let targetTriple = 'aarch64-apple-darwin';
 const manifestByUrl: Record<string, unknown> = {
@@ -75,9 +68,8 @@ const invokeMock = vi.fn((command: string, args?: { url?: string }) => {
   }
 });
 vi.mock('@tauri-apps/api/core', () => ({ invoke: (...args: Parameters<typeof invokeMock>) => invokeMock(...args) }));
-// `market.ts` đi qua tauri-plugin-http (không phải `invoke`, không phải
-// `fetch` toàn cục) khi `isTauri` — mock nó gọi thẳng `fetch` toàn cục để một
-// `vi.stubGlobal('fetch', ...)` áp dụng cho cả hai môi trường trong cùng test.
+// In Tauri, market.ts uses tauri-plugin-http; route it to the global
+// `fetch` so one `vi.stubGlobal('fetch', ...)` covers both paths.
 vi.mock('@tauri-apps/plugin-http', () => ({ fetch: (...args: Parameters<typeof globalThis.fetch>) => globalThis.fetch(...args) }));
 
 async function settle(ms = 20) {
@@ -126,8 +118,7 @@ describe('SettingsMarketplace — bản web (không phải Tauri)', () => {
 
     expect(screen.getByText(/only works in the desktop app|chỉ hoạt động trên bản desktop/)).toBeTruthy();
     expect(invokeMock).not.toHaveBeenCalled();
-    // Bản web chỉ hiện cảnh báo, không có gì để hiển thị — effect tải catalog
-    // phải tự dừng ở `!isTauri`, không âm thầm bắn request không ai dùng tới.
+    // The web build shows only the notice and must not fetch the catalog.
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });
@@ -172,7 +163,7 @@ describe('SettingsMarketplace — cài đặt (dialog xác nhận ngay tại tra
 
     fireEvent.click(screen.getByRole('button', { name: /^Install$|^Cài đặt$/ }));
 
-    // Dialog xem trước cả hai URL cùng lúc, không rời trang/tab nào.
+    // The dialog previews both URLs at once, on this page.
     const dialog = await screen.findByRole('dialog');
     await waitFor(() => expect(within(dialog).getByText('devtool-svc-demo@1.0.0')).toBeTruthy());
 
@@ -211,12 +202,9 @@ describe('SettingsMarketplace — cài đặt (dialog xác nhận ngay tại tra
         source_url: 'https://example.com/demo-plugin.json',
         bundle_path: '/tmp/demo/bundle.mjs',
         installed_at: 1_700_000_000_000,
-        // Hình dạng THẬT Rust gửi cho một bản ghi không market — `null`, không
-        // phải vắng hẳn trường (`Option<String>` không có
-        // `skip_serializing_if`). Bug đã xảy ra: so `=== undefined` phía
-        // component không khớp `null`, khiến bản ghi này (cài từ trước tính
-        // năng market, không thuộc market nào) bị coi là CHƯA cài — nút vẫn
-        // hiện "Install" thay vì "Installed", mời cài chồng thêm một bản nữa.
+        // Rust sends `null`, not an absent field, for a record without a
+        // market. Comparing with `=== undefined` once showed such records
+        // as not installed.
         market_id: null,
       },
     ];

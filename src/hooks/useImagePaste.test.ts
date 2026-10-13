@@ -3,8 +3,8 @@ import { renderHook, act } from '@testing-library/react';
 import { useImagePaste } from '@/hooks/useImagePaste';
 import * as clipboard from '@/lib/clipboard';
 
-/** Chưa có test nào — đường dán ảnh (⌘V ngoài ô nhập liệu, hoặc sự kiện paste
- *  gốc có kèm file ảnh) dùng bởi các tool nhận ảnh (QR, Base64 ảnh…). */
+/** Image paste (⌘V outside inputs, or a paste event with an image file),
+ *  used by tools that accept images (QR, Base64 image...). */
 
 vi.mock('@/lib/clipboard', () => ({ readImageFromClipboard: vi.fn() }));
 
@@ -105,9 +105,8 @@ describe('useImagePaste — sự kiện paste gốc (kèm file ảnh, ưu tiên 
     const onImage = vi.fn();
     renderHook(() => useImagePaste(onImage));
     const file = new File(['png-bytes'], 'x.png', { type: 'image/png' });
-    // `FileReader.readAsDataURL` xong việc qua callback `onload` CỦA RIÊNG NÓ
-    // (một macrotask, không phải Promise) — dispatch sự kiện xong không có gì
-    // để `await` trực tiếp, nên phải chờ bằng `vi.waitFor`.
+    // FileReader finishes in its own onload macrotask, so wait with
+    // `vi.waitFor` rather than awaiting the dispatch.
     act(() => { pasteWithImage(file); });
     await vi.waitFor(() => expect(onImage).toHaveBeenCalledTimes(1));
     expect(String(onImage.mock.calls[0][0])).toMatch(/^data:image\/png;base64,/);

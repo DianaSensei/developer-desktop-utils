@@ -74,10 +74,9 @@ interface PmCollection {
 
 export interface PostmanImport {
   collection: Collection;
-  // Notes about anything that couldn't be mapped one-to-one — currently just
-  // an auth scheme this app has no equivalent for (see importAuth's SUPPORTED
-  // set). Shown after import so the result is never silently lossy, the same
-  // contract openapi.ts's import already keeps.
+  // Notes about anything not mapped one-to-one (currently auth schemes
+  // with no equivalent, see SUPPORTED_AUTH_TYPES). Shown after import, as
+  // openapi.ts does.
   warnings: string[];
 }
 
@@ -95,23 +94,15 @@ function findKv(list: PmKeyValue[] | undefined, key: string): string {
   return list?.find((p) => p.key === key)?.value ?? '';
 }
 
-// Auth types this app can actually reproduce. Postman also defines awsv4,
-// digest (→ handled separately below), ntlm, oauth1, hawk, edgegrid, asap and
-// akamai — none of which this client can sign, so importing one of those
-// silently as "No Auth" would leave every request quietly unauthenticated
-// with nothing in the UI explaining why. `warn` records it instead; the
-// caller surfaces it the same way an unsupported OpenAPI body type is.
+// Auth types this app can reproduce. Others (awsv4, ntlm, oauth1, hawk,
+// edgegrid, asap, akamai) cannot be signed here, so they are reported
+// through `warn` rather than imported as "No Auth" without explanation.
 const SUPPORTED_AUTH_TYPES = new Set(['bearer', 'basic', 'digest', 'apikey', 'oauth2']);
 
-// `auth` is `undefined` in exactly the case Postman itself uses it for:
-// the request/folder declares no auth block of its own, so it inherits
-// whatever its parent folder or the collection root has — this app's own
-// 'inherit' type is precisely that. A present block with `type: 'noauth'`
-// is the other, different thing Postman has a name for: auth deliberately
-// turned off, mapped to this app's 'none'. Collapsing both to 'none' (the
-// previous behavior) meant importing any real-world collection that sets
-// auth once at the folder/collection level — the ordinary way to do it in
-// Postman — silently dropped it from every request inside.
+// A missing `auth` means the item inherits from its parent folder or
+// the collection (this app's 'inherit'); `type: 'noauth'` means auth is
+// deliberately off ('none'). Collection-level auth is the usual Postman
+// setup, so the two must stay distinct.
 function importAuth(auth: PmAuth | undefined, warn: (msg: string) => void): Auth {
   const base = newAuth();
   if (!auth) return { ...base, type: 'inherit' };
@@ -385,13 +376,9 @@ export function exportPostman(collection: Collection): unknown {
       name: collection.name,
       schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json',
     },
-    // Folder/collection-level auth (this app's own Bruno-style inheritance,
-    // set from the Auth tab in NodeSettingsDialog) has a direct Postman
-    // equivalent — the same optional `auth` block a request carries, applied
-    // to a folder/collection item instead. Without this, exporting a
-    // collection that uses it silently dropped it: every request importing
-    // that file back would have nothing to inherit, since importAuth only
-    // ever reads it from here.
+    // Folder/collection auth (inherited by requests) maps to Postman's
+    // `auth` block on the folder/collection item, so it survives a round
+    // trip.
     auth: exportAuth(collection.auth ?? newAuth()),
     item: exportItems(collection.items),
   };

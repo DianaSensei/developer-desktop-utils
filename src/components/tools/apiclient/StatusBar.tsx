@@ -3,6 +3,7 @@
 
 import { AlertTriangle, Cookie, Search } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { t } from './i18n';
 
 export function StatusBar({ onSearch, onCookies, cookieCount, sandboxDegraded }: {
   onSearch: () => void;
@@ -16,11 +17,11 @@ export function StatusBar({ onSearch, onCookies, cookieCount, sandboxDegraded }:
         <span className="font-medium tracking-wide">API Client</span>
         {sandboxDegraded && (
           <span
-            title="The script sandbox worker failed to load, so scripts, vars and assertions are being skipped. They are not run on the main thread, where a script from an imported collection could read local files and send them out. Retrying periodically."
+            title={t('status.sandboxDown')}
             className="flex items-center gap-1"
           >
             <Badge tone="danger" variant="soft" className="flex items-center gap-1">
-              <AlertTriangle className="h-3 w-3" /> Scripts paused — no sandbox
+              <AlertTriangle className="h-3 w-3" /> {t('status.scriptsPaused')}
             </Badge>
           </span>
         )}
@@ -28,18 +29,18 @@ export function StatusBar({ onSearch, onCookies, cookieCount, sandboxDegraded }:
       <div className="flex items-center gap-3">
         <button
           onClick={onSearch}
-          title="Focus collection search (⌘F)"
+          title={t('status.focusSearch')}
           className="flex items-center gap-1 transition-colors hover:text-fg"
         >
-          <Search className="h-3 w-3" /> Search
+          <Search className="h-3 w-3" /> {t('status.search')}
         </button>
         <span className="h-3 w-px bg-line" />
         <button
           onClick={onCookies}
-          title="Manage cookies"
+          title={t('status.manageCookies')}
           className="flex items-center gap-1 transition-colors hover:text-fg"
         >
-          <Cookie className="h-3 w-3" /> Cookies
+          <Cookie className="h-3 w-3" /> {t('status.cookies')}
           {cookieCount > 0 && (
             <Badge tone="warning" pill className="ml-0.5">{cookieCount}</Badge>
           )}

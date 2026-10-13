@@ -13,8 +13,7 @@ describe('CORNER_STYLES khớp đúng preset trong design/tokens.css', () => {
   });
 
   it('mỗi preset đặt lại ĐỦ thang bán kính', () => {
-    // Thiếu một bậc thì bậc đó giữ giá trị mặc định — thang gãy ở đúng chỗ đó
-    // và chỉ lộ ra khi nhìn tận mắt một component dùng bậc bị bỏ quên.
+    // A missing step keeps its default and breaks the scale in one place.
     const steps = ['--r-default', '--r-xs', '--r-sm', '--r-md', '--r-lg', '--r-xl'];
     for (const [, body] of tokens.matchAll(/\[data-corner="\w+"\]\s*\{([^}]*)\}/g)) {
       for (const step of steps) expect(body).toContain(`${step}:`);

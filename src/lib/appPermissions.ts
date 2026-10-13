@@ -1,9 +1,8 @@
 import capabilities from '../../src-tauri/capabilities/default.json';
 
 /**
- * Single source of truth for the Settings "App Permissions" panel: this
- * module derives its output directly from src-tauri/capabilities/default.json
- * so the UI can never drift from what's actually declared/granted.
+ * Data for the Settings "App Permissions" panel, derived directly from
+ * src-tauri/capabilities/default.json so the UI matches what is granted.
  */
 
 type RawPermission =
@@ -60,12 +59,10 @@ const PERMISSION_DESCRIPTIONS: Record<string, string> = {
   'updater:allow-download-and-install': 'Download and install app updates',
   'store:default': 'Save app settings and preferences to local storage',
   'window-state:default': 'Remember window size and position between launches',
-  // Danh sách dưới đây có cả `http://**` và `https://**`, tức trên thực tế là
-  // "mọi nơi". Không thu hẹp được ở tầng này: capability của Tauri gắn theo
-  // WEBVIEW, mà mọi tool dùng chung một webview, nên nó buộc phải đủ rộng cho
-  // API Client — một HTTP workbench tồn tại để gọi tới URL người dùng gõ vào.
-  // Giới hạn theo từng tool nằm ở tầng Platform: mỗi plugin khai `hosts` trong
-  // manifest và `sdk.http` chặn ngoài danh sách đó (xem Settings → Plugin).
+  // This grant includes `http://**` and `https://**`, i.e. any host.
+  // Tauri capabilities apply per webview, and all tools share one, so it
+  // must cover the API Client. Per-tool limits are the `hosts` allowlists
+  // enforced by `sdk.http` (see Settings → Plugins).
   'http:default':
     'Send HTTP requests. The patterns below include wildcards, so this grant is app-wide; per-tool limits are declared in each plugin manifest and shown under Plugins',
   'core:default': 'Baseline Tauri IPC access (window, app, path, events) the app needs to run',

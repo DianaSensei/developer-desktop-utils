@@ -2,35 +2,20 @@ import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useMessages } from '@/contexts/LocaleContext';
+import UI from '@/components/ui/ui.messages';
 
 /**
- * Centered modal chrome — backdrop, panel, labelled header, close button.
+ * Centered modal chrome: backdrop, panel, labelled header, close button.
+ * Provides what hand-rolled modals kept missing: `role`/`aria-modal`, an
+ * accessible name, a labelled close button, Escape, and a focus trap.
  *
- * The connection forms and info modals in the broker tools each hand-rolled
- * this, and each copy was missing a different part of what makes a dialog a
- * dialog: no `role`/`aria-modal`, no accessible name, an unlabelled `<X>`
- * close button, Escape doing nothing, and focus free to wander into the page
- * behind the overlay. Those are the pieces this centralises, so a tool only
- * has to supply its title and body.
+ * Use Radix `Dialog` (ui/dialog.tsx) when there is a trigger element; this is
+ * for modals the parent renders conditionally (`{open && <Form/>}`).
  *
- * Radix `Dialog` (`ui/dialog.tsx`) remains the right choice for a dialog with
- * a trigger element. These modals are rendered conditionally by their parent
- * with no trigger to bind to, which is the case this covers.
- *
- * ── Vì sao có animation vào mà không có animation ra ────────────────────────
- * Đây là 7 form kết nối/info modal của mọi broker trong app (Kafka, RabbitMQ,
- * Redis, Container) — và tất cả đều được cha mount kiểu `{open && <Form/>}`.
- * Khi `onClose` gọi `setOpen(false)`, React gỡ `ModalShell` khỏi cây NGAY LẬP
- * TỨC — chưa kịp phát khung hình animation nào. Kết quả: mở ra thì mượt
- * (`fade-in` + `zoom-in-95`), đóng thì BIẾN MẤT, đúng lỗi từng có ở
- * `DropdownMenu` trước khi sửa (xem ghi chú ở đó).
- *
- * `ModalShell` không sở hữu biến `open` — cha nó sở hữu — nên hướng sửa phải
- * NGƯỢC với DropdownMenu: thay vì tự trì hoãn việc gỡ khỏi DOM, nó phải trì
- * hoãn việc BÁO cho cha biết là đã đóng. Mọi đường đóng (Escape, bấm ra ngoài,
- * nút X) đi qua `requestClose()`: bật `closing` để panel chạy animation ra
- * ngay, rồi mới gọi `onClose` thật sau `--dur-exit` — lúc đó cha mới gỡ nó, và
- * animation đã kịp chạy xong.
+ * Because the parent unmounts the modal as soon as `onClose` runs, every
+ * close path (Escape, backdrop, X) goes through `requestClose()`: it plays
+ * the exit animation first and calls `onClose` after `--dur-exit`.
  */
 export interface ModalShellProps {
   /** Called on Escape, backdrop click, and the header close button. */
@@ -73,6 +58,7 @@ export function ModalShell({
   overlayClassName,
   children,
 }: ModalShellProps) {
+  const ui = useMessages(UI);
   const panelRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
   const descId = useId();
@@ -83,9 +69,8 @@ export function ModalShell({
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
 
-  // 130ms = `--dur-exit`. Chạy animation trước, rồi mới báo cho cha — cha gỡ
-  // component ngay khi `onClose` chạy, nên gọi sớm hơn là cắt animation giữa
-  // chừng.
+  // 130ms = `--dur-exit`. Animate first, then tell the parent, which
+  // unmounts immediately.
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
 
@@ -93,9 +78,7 @@ export function ModalShell({
     if (closingRef.current) return;
     closingRef.current = true;
     setClosing(true);
-    // Dọn timer nếu chính component bị gỡ vì lý do khác (route đổi, StrictMode
-    // double-invoke lúc dev) trước khi kịp tự bắn — nếu không, `onClose` gọi
-    // vào một cha đã unmount thì vô hại nhưng vẫn là một timer treo lơ lửng.
+    // Cleared on unmount (route change, StrictMode) so no timer lingers.
     timerRef.current = setTimeout(() => closeRef.current(), 130);
   }, []);
 
@@ -131,9 +114,8 @@ export function ModalShell({
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
     panelRef.current?.focus({ preventScroll: true });
-    // Trả tiêu điểm lại sau khi component THẬT SỰ bị gỡ (cleanup này chạy lúc
-    // đó, không phải lúc `closing` bật) — nên trình đọc màn hình không nhảy
-    // tiêu điểm ngay giữa lúc panel còn đang mờ dần.
+    // Restore focus on real unmount, not when `closing` starts, so focus
+    // does not jump while the panel is still fading.
     return () => previous?.focus?.({ preventScroll: true });
   }, []);
 
@@ -179,7 +161,8 @@ export function ModalShell({
           <button
             type="button"
             onClick={requestClose}
-            aria-label="Close"
+            aria-label={ui('close')}
+            title={ui('close')}
             className="shrink-0 rounded p-1 text-fg-mute transition-colors hover:bg-bg-2 hover:text-fg focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus"
           >
             <X className="h-4 w-4" />

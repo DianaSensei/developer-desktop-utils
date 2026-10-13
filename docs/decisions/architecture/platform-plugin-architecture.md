@@ -204,6 +204,13 @@ từ chối y hệt hiện tại nếu tên đó không nằm trong `ALLOWED_SER
 `devtool-svc-redis` (và sau đó bỏ nó khỏi `bundle.externalBin` mặc định) là một quyết
 định code riêng, chưa làm trong đợt thêm cơ chế cài đặt này.
 
+*(Cập nhật 2026-10: mô hình trên đã được thay hai lần. Đầu tiên `service_trust.rs`
+cho phép mọi tên `devtool-svc-*` chạy sau khi người dùng đồng ý; sau đó
+`ALLOWED_SERVICES` bị bỏ hẳn vì nó tin theo TÊN, trong khi bản cài từ URL lại thắng
+bản cạnh exe. Hiện tại chỉ đúng file `BUNDLED_SERVICES` nằm cạnh file chạy của app
+được miễn hỏi; mọi binary khác cần đồng ý theo SHA-256, và file đã duyệt được băm
+lại ngay trước khi spawn. Xem docs/AUDIT.md.)*
+
 **`sidecar_path()` giờ nhận `AppHandle`, đọc phần `kind=service` của
 `extensions/index.json` TRƯỚC, cạnh-exe (bundle.externalBin) SAU** — bản tải-về LUÔN
 thắng nếu có cả hai. Xem "Cài đặt tiện ích từ bên ngoài" bên dưới cho toàn bộ cơ chế
@@ -334,6 +341,8 @@ tất cả vì chúng khác hẳn nhau về THỨ đang bị cô lập khỏi c�
   giờ đọc HAI thư mục khác nhau (`plugin-data/redis-client/` và
   `service-data/devtool-svc-redis/`) — đúng ý, vì đây là hai bản triển khai
   song song cho tới khi Phase 2 cắt hẳn và xoá `redis_tool.rs`.
+  *(Cập nhật 2026-10: cả bốn module đã chuyển ra sidecar Tier B, không còn
+  ai gọi `plugin_data_dir`, nên `plugin_data.rs` đã bị xoá.)*
   `mcp_bridge.rs`'s `mcp-bridge.json` là ngoại lệ ĐÚNG, không đổi: nó không
   phải dữ liệu của MỘT plugin, mà là cấu hình của chính cầu nối MCP (cổng
   loopback), dùng chung cho MỌI bridge của MỌI plugin — không có `pluginId`

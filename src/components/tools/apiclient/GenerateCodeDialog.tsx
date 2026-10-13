@@ -11,6 +11,8 @@ import { Switch } from '@/components/ui/switch';
 import { CodeViewer } from '@/design-system';
 import { CODE_TARGETS, generateCode } from './codegen';
 import type { ApiRequest, KeyValue, VarMap } from './types';
+// Imported as `tr` because this file uses `t` as a loop variable.
+import { t as tr } from './i18n';
 
 interface Props {
   open: boolean;
@@ -53,7 +55,7 @@ export function GenerateCodeDialog({ open, onClose, request, vars, inheritedHead
           switch language or variant. */}
       <DialogContent size="viewport" scrollable className="min-h-[60vh]">
         <div className="flex items-center justify-between border-b px-4 py-3">
-          <DialogTitle className="text-base">Generate Code</DialogTitle>
+          <DialogTitle className="text-base">{tr('addr.generateCode')}</DialogTitle>
         </div>
 
         {/* toolbar */}
@@ -73,7 +75,7 @@ export function GenerateCodeDialog({ open, onClose, request, vars, inheritedHead
             value={variant}
             onValueChange={setVariant}
             size="sm"
-            aria-label="Variant"
+            aria-label={tr('code.variant')}
             options={target.variants.map((v) => ({ value: v.id, label: v.label }))}
           />
 
@@ -81,23 +83,18 @@ export function GenerateCodeDialog({ open, onClose, request, vars, inheritedHead
               checkbox primitive, and every other on/off in the tool (Settings
               tab, Runner, cookie jar) is a Switch. */}
           <Label className="ml-auto flex cursor-pointer items-center gap-2 text-xs">
-            Interpolate variables
-            <Switch checked={interpolate} onCheckedChange={setInterpolate} aria-label="Interpolate variables" />
+            {tr('code.interpolate')}
+            <Switch checked={interpolate} onCheckedChange={setInterpolate} aria-label={tr('code.interpolate')} />
           </Label>
         </div>
 
-        {/* Code preview. The height floor that used to live here
-            (`min-h-[22rem]`) was load-bearing — `scrollable` gives the dialog
-            no definite height, so this pane's `flex-1` collapsed to zero and
-            the dialog rendered as a header and a toolbar with no code under
-            it. That floor now sits on the dialog itself as a viewport
-            fraction, which fixes the same collapse *and* lets the pane grow
-            with the window instead of stopping at a fixed 352px. */}
+        {/* Code preview. The height floor lives on the dialog: `scrollable` gives
+            no definite height, so without it this `flex-1` pane collapses to zero. */}
         <div className="relative flex min-h-0 flex-1 flex-col border-t">
           <CodeViewer value={code} language="text" />
           <CopyButton
             value={() => code}
-            title="Copy"
+            title={tr('copy')}
             variant="ghost"
             size="icon"
             className="absolute right-3 top-3 h-ctl w-ctl text-fg-mute"

@@ -3,10 +3,8 @@ import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 import { ModalShell } from '@/components/ui/modal-shell';
 
 /**
- * Every one of these assertions corresponds to something a hand-rolled copy of
- * this modal was missing: the broker connection forms and info modals each
- * portalled a bare <div> with an unlabelled `<X>`, no dialog role, no name, and
- * no Escape handling.
+ * Each assertion covers something hand-rolled modals lacked: dialog role,
+ * accessible name, labelled close button, Escape handling.
  */
 
 afterEach(cleanup);
@@ -44,11 +42,8 @@ describe('ModalShell', () => {
     expect(screen.getByRole('dialog').getAttribute('aria-describedby')).toBeNull();
   });
 
-  // `onClose` giờ chạy trễ 130ms (`--dur-exit`) sau mỗi đường đóng, để panel
-  // kịp chạy animation ra trước khi cha gỡ nó khỏi cây — xem ghi chú "Vì sao
-  // có animation vào mà không có animation ra" ở đầu `modal-shell.tsx`. Ba
-  // test dưới đây giữ nguyên Ý ĐỊNH cũ (mỗi đường đóng phải gọi `onClose`
-  // đúng một lần) nhưng phải đợi qua độ trễ đó.
+  // `onClose` runs 130ms (`--dur-exit`) after each close path, so these
+  // tests wait past that delay.
   it('gives the close button an accessible name, and closes after the exit animation', () => {
     vi.useFakeTimers();
     const { onClose } = renderShell();
@@ -86,21 +81,19 @@ describe('ModalShell', () => {
   });
 
   it('plays the exit animation instead of vanishing in one frame, and ignores a second close request mid-exit', () => {
-    // Đây chính là lỗi đã sửa: bản trước gọi `onClose` NGAY, cha gỡ component
-    // khỏi cây trong cùng khung hình, nên panel không kịp chạy animation ra —
-    // giống hệt lỗi từng có ở `DropdownMenu` trước khi sửa.
+    // `onClose` used to run immediately, so the parent removed the panel
+    // before its exit animation.
     vi.useFakeTimers();
     const { onClose } = renderShell();
     const dialog = screen.getByRole('dialog');
     fireEvent.keyDown(dialog, { key: 'Escape' });
 
-    // Vẫn còn trong DOM ngay sau khi đóng — animation ra cần một khung hình.
+    // Still in the DOM right after closing; the exit animation needs time.
     expect(screen.getByRole('dialog')).toBeTruthy();
     expect(dialog.className).toContain('animate-out');
     expect(onClose).not.toHaveBeenCalled();
 
-    // Một lần đóng thứ hai giữa lúc đang chạy animation ra không được xếp
-    // thêm một lượt gọi `onClose` nữa.
+    // A second close during the exit must not queue another `onClose`.
     fireEvent.keyDown(dialog, { key: 'Escape' });
 
     vi.advanceTimersByTime(130);

@@ -7,7 +7,7 @@ import { useLiveConnection, usePluginConfig, usePluginMcpBridgeActive } from '@/
 import { storageRemove } from '@/lib/persistentStore';
 
 const apiClient = createPluginSdk(getPlugin('api-client')!);
-// 'qrcode' cố tình nằm ngoài MCP_TOOL_IDS — 'json' thì CÓ trong đó.
+// 'qrcode' is not in MCP_TOOL_IDS; 'json' is.
 const qrcode = createPluginSdk(getPlugin('qrcode')!);
 
 afterEach(() => {
@@ -63,7 +63,7 @@ describe('useLiveConnection', () => {
     const { result } = renderHook(() => useLiveConnections());
     expect(result.current).toContain('api-client');
 
-    // dọn lại cho ca sau
+    // Reset for the next case.
     render(<ProbeOff />);
     function ProbeOff() {
       useLiveConnection(apiClient, false);

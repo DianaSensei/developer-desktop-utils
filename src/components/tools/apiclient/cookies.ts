@@ -19,9 +19,8 @@ export interface Cookie {
 }
 
 // Stable identity of a cookie for upsert/replace (RFC 6265 §5.3).
-// Ký tự phân tách là NUL — viết bằng escape `\u0000`, KHÔNG nhúng byte 00
-// thật vào file: một byte NUL khiến git/grep/diff coi cả file là nhị phân
-// (`Binary files differ`), nên mọi review và tìm kiếm trong file này mù hẳn.
+// The separator is NUL written as the `\u0000` escape; a literal NUL byte
+// would make git/grep/diff treat the file as binary.
 const keyOf = (c: Cookie) => `${c.domain}\u0000${c.path}\u0000${c.name}`;
 
 function hostOf(url: string): string {
@@ -89,13 +88,9 @@ export function parseSetCookie(raw: string, url: string): Cookie | null {
     }
   }
   // Max-Age takes precedence over Expires (RFC 6265 §5.2.2).
-  // Max-Age <= 0 nghĩa là XOÁ, và phải neo vào mốc 0 chứ không phải `Date.now()`.
-  // Bản cũ: `expires = Date.now() + 0`. Nhưng `applySetCookies` đọc `now` của nó
-  // TRƯỚC khi gọi hàm này, nên nếu đồng hồ nhích một mili-giây giữa hai lời gọi
-  // thì `expires > now` → cookie đọc ra là CHƯA hết hạn → lệnh xoá bị bỏ qua và
-  // cookie ở lại jar. Hiếm, nhưng có thật, và phụ thuộc tải máy — đúng kiểu lỗi
-  // chỉ hiện ra một lần rồi không dựng lại được. `cookies.test.ts` bắt được nó
-  // khi chạy song song cả bộ test.
+  // Max-Age <= 0 deletes: anchor to 0, not `Date.now()`, because
+  // `applySetCookies` reads its own `now` first and a 1ms tick in between
+  // would keep the cookie alive.
   if (maxAge !== null) cookie.expires = maxAge <= 0 ? 0 : Date.now() + maxAge * 1000;
   return cookie;
 }

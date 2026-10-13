@@ -5,6 +5,8 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { MOD_KEY } from '@/lib/platform';
+import { useLocale } from '@/contexts/LocaleContext';
+import type { TranslationKey } from '@/lib/i18n';
 
 // Per-tool "how to use" guides shown by the header help (?) button. Tools listed
 // here get a hand-written guide; any tool not listed falls back to a generic
@@ -14,14 +16,14 @@ const mod = MOD_KEY;
 
 export function GuideSection({
   icon: Icon, title, tone, children,
-}: { icon: typeof Send; title: string; tone?: 'caveat'; children: ReactNode }) {
+}: { icon: typeof Send; title: ReactNode; tone?: 'caveat'; children: ReactNode }) {
   return (
     <section className="space-y-1.5">
       <h3 className="flex items-center gap-2 text-xs font-semibold text-fg">
         <Icon className={cn('h-3.5 w-3.5', tone === 'caveat' ? 'text-warn' : 'text-acc-ink')} />
         {title}
       </h3>
-      <div className="space-y-1 pl-5 text-[12px] leading-relaxed text-fg-mute">{children}</div>
+      <div className="space-y-1 pl-5 text-xs leading-relaxed text-fg-mute">{children}</div>
     </section>
   );
 }
@@ -45,13 +47,21 @@ function List({ items, tone }: { items: ReactNode[]; tone?: 'caveat' }) {
   );
 }
 
+// Translated text inside the guide constants below. TOOL_GUIDES is built
+// once at import, so a plain t() call would freeze the locale; a component
+// reads it when the guide renders.
+function Tr({ k }: { k: TranslationKey }) {
+  const { t } = useLocale();
+  return <>{t(k)}</>;
+}
+
 // Most tools follow the same shape: how to use, things to know, and heads-up.
 function makeGuide(g: { use: ReactNode[]; know?: ReactNode[]; caveat?: ReactNode[] }): ReactNode {
   return (
     <>
-      <GuideSection icon={ListChecks} title="How to use"><List items={g.use} /></GuideSection>
-      {g.know && <GuideSection icon={Lightbulb} title="Good to know"><List items={g.know} /></GuideSection>}
-      {g.caveat && <GuideSection icon={AlertTriangle} title="Heads up" tone="caveat"><List items={g.caveat} tone="caveat" /></GuideSection>}
+      <GuideSection icon={ListChecks} title={<Tr k="guide.howToUse" />}><List items={g.use} /></GuideSection>
+      {g.know && <GuideSection icon={Lightbulb} title={<Tr k="guide.goodToKnow" />}><List items={g.know} /></GuideSection>}
+      {g.caveat && <GuideSection icon={AlertTriangle} title={<Tr k="guide.headsUp" />} tone="caveat"><List items={g.caveat} tone="caveat" /></GuideSection>}
     </>
   );
 }
@@ -59,16 +69,17 @@ function makeGuide(g: { use: ReactNode[]; know?: ReactNode[]; caveat?: ReactNode
 // Generic guide for tools without a dedicated entry: their own description plus
 // the conventions shared across the app's tools.
 export function GenericGuide({ description }: { description: string }) {
+  const { t } = useLocale();
   return (
     <>
-      {description && <p className="text-[12px] leading-relaxed text-fg-mute">{description}</p>}
-      <GuideSection icon={Lightbulb} title="Good to know">
+      {description && <p className="text-xs leading-relaxed text-fg-mute">{description}</p>}
+      <GuideSection icon={Lightbulb} title={t('guide.goodToKnow')}>
         <List items={[
-          'Most tools update their output live as you type — no “run” button needed.',
-          <>Paste instantly with <Key>{mod}</Key>+<Key>V</Key>; undo / redo with <Key>{mod}</Key>+<Key>Z</Key> / <Key>{mod}</Key>+<Key>⇧</Key>+<Key>Z</Key>.</>,
-          'Copy results with the copy button next to the output.',
-          'Your input is saved locally and restored next time you open the tool.',
-          'Everything runs on your device — nothing is sent anywhere unless a tool’s whole purpose is a network lookup.',
+          t('guide.generic.live'),
+          <>{t('guide.generic.pasteBefore')} <Key>{mod}</Key>+<Key>V</Key>; {t('guide.generic.undo')} <Key>{mod}</Key>+<Key>Z</Key> / <Key>{mod}</Key>+<Key>⇧</Key>+<Key>Z</Key>.</>,
+          t('guide.generic.copy'),
+          t('guide.generic.saved'),
+          t('guide.generic.local'),
         ]} />
       </GuideSection>
     </>
@@ -165,6 +176,7 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
       'Type a cron expression, or build it field-by-field with the per-field inputs and suggestions.',
       'Apply a preset (every minute, hourly, daily…) as a starting point.',
       'Read the plain-English explanation to confirm what it will do.',
+      'Check “Next runs”: the next five fire times in your local time zone.',
     ],
     know: [
       'Linux uses 5 fields; Quartz 6–7 (adds seconds + optional year); Spring uses 6.',
@@ -185,6 +197,8 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
     ],
     know: [
       '“Array” outputs a JSON array; case modes treat _ and - as word boundaries.',
+      'Case modes (camelCase, PascalCase, snake_case, CONSTANT_CASE, kebab-case, Title Case) convert each line on its own — paste a list of identifiers and get a list back.',
+      '“All cases at once” shows every case side by side, each with its own Copy button.',
       'VN phone converts between the old 11-digit and new 10-digit formats (handles 0, +84 and separators).',
     ],
     caveat: ['VN phone leaves unrecognized prefixes unchanged.'],
@@ -196,7 +210,7 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
       'Expand sections for byte size (UTF-8/16/32), encoding fit, and Unicode character composition.',
     ],
     know: [
-      'Words split on whitespace, paragraphs on blank lines, sentences on . ! ?; reading time = words ÷ 200 (rounded up).',
+      'Words split on whitespace, paragraphs on blank lines, sentences on . ! ?; reading time = words ÷ 200, shown as “< 1 min” below one minute.',
       'Emoji and surrogate pairs are counted correctly as single code points.',
     ],
     caveat: ['Sentence detection is naive — abbreviations and ellipses aren’t special-cased.'],
@@ -255,6 +269,8 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
       'Paste JSON — lenient input is allowed (single quotes, unquoted keys, trailing commas, comments).',
       'Switch mode: Beautify (interactive tree), Minify, or JSON String (escaped for pasting into code).',
       'In Beautify, click nodes to collapse/expand, search to filter, and copy the selected path.',
+      'Search shows a match count — press Enter / ⇧Enter (or the arrows) to jump between matches.',
+      'Keyboard: focus the tree, then ↑/↓ to move, → / ← to expand or collapse, Enter to toggle.',
       'Choose indent (2/4/tab) and quote style; collapse the input pane for more room.',
     ],
     know: ['The status bar flags parse errors; the tree shows item/field counts and a breadcrumb path.'],
@@ -265,9 +281,22 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
   }),
 
   jwt: makeGuide({
-    use: ['Paste a JWT (header.payload.signature) — the decoded header and payload show as formatted JSON instantly.'],
-    know: ['Decoding happens entirely on your machine; nothing is sent anywhere.'],
-    caveat: ['This decodes only — it does NOT verify the signature, so don’t trust a token’s contents based on this alone.'],
+    use: [
+      'Decode: paste a JWT (header.payload.signature) — header and payload show as formatted JSON instantly, with exp / nbf / iat rendered as real times and flagged when expired.',
+      <>Verify: pick the algorithm you <strong className="text-fg">expect</strong>, paste the key (shared secret for <Tok>HS*</Tok>; PEM public key, X.509 certificate, JWK or a whole JWK Set for the rest), and optionally require an issuer / audience.</>,
+      <>Sign: edit the claims, set an expiry like <Tok>1h</Tok> or <Tok>7d</Tok>, paste a private key — or press <strong className="text-fg">Generate pair</strong> to get a fresh one, which also fills the public key for the Verify side.</>,
+      <>Algorithms: <Tok>HS256/384/512</Tok>, <Tok>RS256/384/512</Tok>, <Tok>PS256/384/512</Tok>, <Tok>ES256/384/512</Tok>, <Tok>EdDSA</Tok>, and unsigned <Tok>none</Tok>.</>,
+    ],
+    know: [
+      'Everything runs on your machine through the OS webview’s own Web Crypto — no key, token or claim is ever sent anywhere.',
+      <>For <Tok>HS*</Tok>, pick how the secret is written down (plain text / base64 / base64url / hex). A secret from <Tok>openssl rand -base64 32</Tok> is <em>bytes</em>, and HMAC-ing its printed characters instead produces a token the real service rejects.</>,
+      'Tokens and keys are held in the OS secret store, not in ordinary app storage.',
+    ],
+    caveat: [
+      <>Verify never reads the algorithm off the token’s own <Tok>alg</Tok> header — trusting it is exactly how algorithm-confusion attacks work — so a token whose header disagrees with your choice is rejected as a mismatch.</>,
+      <>Web Crypto only imports PKCS#8 private keys (<Tok>-----BEGIN PRIVATE KEY-----</Tok>). Convert a PKCS#1 or SEC1 key with <Tok>openssl pkcs8 -topk8 -nocrypt</Tok>.</>,
+      <>Ed25519 is missing from some webviews; unavailable algorithms are greyed out in the picker. A token signed with <Tok>none</Tok> carries no signature and proves nothing.</>,
+    ],
   }),
 
   regex: makeGuide({
@@ -424,4 +453,10 @@ export const TOOL_GUIDE_VERSIONS: Record<string, number> = {
   settings: 1,
   // 5 — script review when importing a collection.
   'api-client': 5,
+  // 2 — case modes work per line; PascalCase/CONSTANT/kebab/Title + "All cases" view.
+  'text-transform': 2,
+  // 2 — "Next runs" preview.
+  'cron-generator': 2,
+  // 2 — match count + jump, keyboard tree navigation.
+  json: 2,
 };

@@ -2,11 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { cn, pad2 } from '@/lib/utils';
 
 /**
- * `cn()` là điểm nối trung tâm của MỌI class Tailwind có điều kiện trong app —
- * toàn bộ các đợt "gom công thức về một chỗ" trước đây (vòng focus, easing,
- * bóng) đều dựa vào việc nó merge đúng theo luật của tailwind-merge (class sau
- * thắng class trước nếu cùng nhóm thuộc tính). Một bản nâng cấp `tailwind-merge`
- * đổi hành vi ở đây thì hỏng lặng lẽ khắp app — test này là chỉ báo sớm.
+ * `cn()` merges every conditional Tailwind class in the app; a tailwind-merge
+ * upgrade that changes its rules would break styling everywhere.
  */
 describe('cn', () => {
   it('gộp nhiều chuỗi class thành một', () => {

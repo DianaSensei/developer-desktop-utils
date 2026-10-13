@@ -1,18 +1,10 @@
-// Kiểm chứng đường end-to-end THẬT của tier B: build binary thật
-// (`devtool-svc-echo`), spawn nó như một tiến trình con, và nói chuyện qua
-// đúng khung JSONL mà `service_host.rs` dùng — không mô phỏng bằng công cụ có
-// sẵn của OS như các test trong `service_host.rs` vẫn làm với `cat`/`sh`.
+// End-to-end test of a real tier-B sidecar: builds `devtool-svc-echo`,
+// spawns it, and speaks the JSONL protocol `service_host.rs` uses.
 //
-// Đây phải là integration test (`tests/`, không phải `#[cfg(test)]` trong
-// `src/`): `CARGO_BIN_EXE_<name>` — biến môi trường Cargo trỏ tới đường dẫn
-// binary đã build — chỉ được set cho integration test, không cho unit test
-// bên trong một bin crate (đã kiểm chứng thủ công trước khi viết file này).
-//
-// `service_host.rs` không phải `pub`, nên không gọi thẳng `running_from`/
-// `exchange` của nó từ đây được — khung JSONL vì vậy được lặp lại ở mức tối
-// thiểu. Đó là đánh đổi chấp nhận được: cái cần kiểm ở đây là HÀNH VI CỦA
-// BINARY THẬT theo đúng hợp đồng, không phải logic điều phối phía host (đã có
-// unit test riêng).
+// This must be an integration test because Cargo only sets
+// `CARGO_BIN_EXE_<name>` for tests under `tests/`. `service_host` is not
+// public, so the framing is repeated minimally here; host-side dispatch has
+// its own unit tests.
 
 use std::io::{BufRead, BufReader, Write};
 use std::process::{Command, Stdio};
@@ -22,8 +14,8 @@ use serde_json::{json, Value};
 
 const SERVICE_PROTOCOL: u32 = 1;
 
-/// Gửi một dòng JSON, đọc đúng một dòng phản hồi. `None` nếu tiến trình đóng
-/// stdout trước khi kịp trả lời (dùng để kiểm hành vi thoát theo EOF).
+/// Sends one JSON line and reads one response line. `None` if the process
+/// closed stdout first (used to check exit on EOF).
 fn round_trip(child: &mut std::process::Child, request: &Value) -> Option<Value> {
     let mut stdin = child.stdin.take().unwrap();
     writeln!(stdin, "{request}").unwrap();
@@ -49,7 +41,7 @@ fn spawn() -> std::process::Child {
 }
 
 #[test]
-fn ping_tra_ve_pong() {
+fn ping_returns_pong() {
     let mut child = spawn();
     let res = round_trip(
         &mut child,
@@ -66,7 +58,7 @@ fn ping_tra_ve_pong() {
 }
 
 #[test]
-fn echo_tra_ve_dung_params_da_gui() {
+fn echo_returns_params() {
     let mut child = spawn();
     let payload = json!({ "so": 7, "chu": "xin chào" });
     let res = round_trip(
@@ -81,7 +73,7 @@ fn echo_tra_ve_dung_params_da_gui() {
 }
 
 #[test]
-fn method_khong_ho_tro_tra_loi_bang_error_khong_phai_panic() {
+fn unknown_method_returns_error() {
     let mut child = spawn();
     let res = round_trip(
         &mut child,
@@ -96,7 +88,7 @@ fn method_khong_ho_tro_tra_loi_bang_error_khong_phai_panic() {
 }
 
 #[test]
-fn lech_protocol_thi_tu_choi() {
+fn protocol_mismatch_is_rejected() {
     let mut child = spawn();
     let res = round_trip(
         &mut child,
@@ -105,15 +97,15 @@ fn lech_protocol_thi_tu_choi() {
     .expect("phải có phản hồi");
 
     assert!(res["error"].as_str().unwrap().contains("lệch protocol"));
-    // Sidecar vẫn trả lời bằng ĐÚNG protocol của chính nó, để host biết bên
-    // nào đang lệch chứ không chỉ biết là có lệch.
+    // The sidecar answers with its own protocol version so the host can tell
+    // which side is out of date.
     assert_eq!(res["protocol"], SERVICE_PROTOCOL);
 
     let _ = child.kill();
 }
 
 #[test]
-fn json_hong_khong_lam_sidecar_chet_va_khong_ghi_gi_khac_len_stdout() {
+fn malformed_json_gets_error_and_sidecar_keeps_running() {
     let mut child = spawn();
     let mut stdin = child.stdin.take().unwrap();
     writeln!(stdin, "{{khong-phai-json").unwrap();
@@ -126,8 +118,7 @@ fn json_hong_khong_lam_sidecar_chet_va_khong_ghi_gi_khac_len_stdout() {
     let res: Value = serde_json::from_str(line.trim()).expect("dòng trả về vẫn phải là JSON hợp lệ");
     assert!(res["error"].as_str().unwrap().contains("JSON không hợp lệ"));
 
-    // Vẫn sống và trả lời tiếp cho request kế — một dòng hỏng không được phép
-    // làm hỏng cả phiên.
+    // One bad line must not break the session.
     let res2 = round_trip(
         &mut child,
         &json!({ "protocol": SERVICE_PROTOCOL, "id": "5", "plugin": "demo", "method": "ping", "params": null }),
@@ -138,11 +129,10 @@ fn json_hong_khong_lam_sidecar_chet_va_khong_ghi_gi_khac_len_stdout() {
     let _ = child.kill();
 }
 
-/// Đúng vế "thoát khi stdin đóng" của hợp đồng — đây là cách tiến trình con
-/// được host dọn khi app bị kill mà không kịp chạy hàm dọn nào (xem `kill()`
-/// trong service_host.rs, vốn đóng stdin trước khi mới SIGKILL).
+/// The "exit when stdin closes" part of the contract, which is how the host
+/// cleans up sidecars (`kill()` closes stdin before killing).
 #[test]
-fn dong_stdin_thi_sidecar_tu_thoat() {
+fn sidecar_exits_when_stdin_closes() {
     let mut child = spawn();
     drop(child.stdin.take().unwrap());
 
@@ -151,11 +141,9 @@ fn dong_stdin_thi_sidecar_tu_thoat() {
     assert!(status.success());
 }
 
-/// `tick-stream` là method DUY NHẤT phát nhiều dòng cho cùng một request —
-/// hành vi mà `sh`/`cat` (dùng ở test của service_host.rs) không mô phỏng
-/// được đầy đủ theo đúng nghĩa "một binary thật, đóng gói thật".
+/// `tick-stream` emits several lines for one request.
 #[test]
-fn tick_stream_phat_dung_so_su_kien_roi_ket_bang_done() {
+fn tick_stream_emits_count_events_then_done() {
     let mut child = spawn();
     let mut stdin = child.stdin.take().unwrap();
     writeln!(
@@ -189,7 +177,7 @@ fn tick_stream_phat_dung_so_su_kien_roi_ket_bang_done() {
 }
 
 #[test]
-fn tick_stream_khong_truyen_count_thi_dung_mac_dinh_ba_su_kien() {
+fn tick_stream_defaults_to_three_events() {
     let mut child = spawn();
     let mut stdin = child.stdin.take().unwrap();
     writeln!(stdin, r#"{{"protocol":1,"id":"t2","plugin":"demo","method":"tick-stream","params":null}}"#).unwrap();
@@ -211,11 +199,9 @@ fn tick_stream_khong_truyen_count_thi_dung_mac_dinh_ba_su_kien() {
     let _ = child.kill();
 }
 
-/// Sau khi trả hết N sự kiện của MỘT request stream, sidecar vẫn phải sống và
-/// trả lời đúng cho request KẾ TIẾP — một method stream không được phép để
-/// lại trạng thái làm hỏng những lời gọi sau nó.
+/// After a stream completes, the sidecar must still answer the next request.
 #[test]
-fn sau_khi_stream_xong_sidecar_van_tra_loi_binh_thuong_cho_request_ke_tiep() {
+fn sidecar_answers_after_a_stream_completes() {
     let mut child = spawn();
     let mut stdin = child.stdin.take().unwrap();
     writeln!(stdin, r#"{{"protocol":1,"id":"t3","plugin":"demo","method":"tick-stream","params":{{"count":1}}}}"#).unwrap();

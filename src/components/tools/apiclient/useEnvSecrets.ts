@@ -4,16 +4,10 @@ import { hasInlineEnvSecrets, mergeEnvSecrets, splitEnvSecrets, type EnvSecretMa
 import type { Environment } from './types';
 
 /**
- * `environments` với giá trị của biến `secret` nằm trong kho bí mật đã mã hoá,
- * phần còn lại vẫn ở store thường.
- *
- * Bên ngoài hook này không ai phải biết chuyện đó: `environments` trả ra đã
- * ghép đủ, và `setEnvironments` nhận updater y như `usePersistentState` trước
- * đây — nên bảy chỗ gọi trong store.ts không đổi một dòng nào.
- *
- * Phần lưu trữ thường được TRUYỀN VÀO chứ không do hook tự tạo: store.ts vốn đã
- * quản lý mọi khoá khác của tool ở cùng một chỗ, nên để nó giữ nốt khoá này thì
- * bố cục nhất quán hơn, hook thành một phép ghép thuần và dễ kiểm thử hơn.
+ * `environments` whose `secret` values live in the encrypted secret store and
+ * everything else in the regular store. Callers see merged environments and a
+ * `setEnvironments` with the same updater API as `usePersistentState`. The
+ * regular storage is passed in so store.ts keeps owning all of its keys.
  */
 export function useEnvSecrets(
   sdk: PluginSdk,
@@ -41,16 +35,15 @@ export function useEnvSecrets(
   );
 
   useEffect(() => {
-    // Di trú một lần cho người nâng cấp: bản cũ ghi giá trị bí mật thẳng vào
-    // `devtool:apiclient:environments`. Chỉ chạy SAU khi kho đọc xong — chạy
-    // sớm hơn sẽ ghi một bản đồ rỗng đè lên bí mật thật đang có.
+    // One-time migration of secrets stored inline by older versions. Runs only
+    // after the secret store has loaded; earlier would overwrite real secrets
+    // with an empty map.
     if (!ready) return;
     if (!hasInlineEnvSecrets(stripped)) return;
 
     const split = splitEnvSecrets(stripped);
     setStripped(split.stripped);
-    // Gộp chứ không thay: giá trị đã nằm sẵn trong kho là bản mới hơn, giá trị
-    // inline chỉ là tàn dư của bản cũ, nên nó không được phép đè lên.
+    // Merge, don't replace: values already in the store are newer than inline leftovers.
     setSecrets((prev) => ({ ...split.secrets, ...prev }));
   }, [ready, stripped, setStripped, setSecrets]);
 

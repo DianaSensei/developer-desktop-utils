@@ -2,11 +2,8 @@ import { createContext, createElement, useContext, type ComponentType, type Reac
 import type { PluginSdk } from './sdk';
 
 /**
- * Danh tính + SDK của plugin đang được render.
- *
- * Registry bọc component của mỗi plugin bằng provider này, nên bên trong plugin
- * chỉ cần `usePluginSdk()` là có đúng SDK của CHÍNH nó — không truyền id qua
- * props, và cũng không có cách nào cầm nhầm SDK của plugin khác.
+ * The SDK of the plugin being rendered. The registry wraps each plugin in
+ * this provider, so `usePluginSdk()` always returns the plugin's own SDK.
  */
 const PluginContext = createContext<PluginSdk | null>(null);
 
@@ -25,12 +22,12 @@ export function usePluginSdk(): PluginSdk {
   return sdk;
 }
 
-/** SDK khi có, `null` khi đang ở phần shell của app — không ném. */
+/** The SDK, or `null` in the app shell. Does not throw. */
 export function usePluginSdkOptional(): PluginSdk | null {
   return useContext(PluginContext);
 }
 
-/** Bọc component gốc của plugin bằng provider. Gọi một lần lúc dựng registry. */
+/** Wraps a plugin's root component in the provider. */
 export function withPluginSdk(sdk: PluginSdk, Component: ComponentType): ComponentType {
   const Wrapped = (props: Record<string, unknown>) =>
     createElement(PluginProvider, { sdk, children: createElement(Component, props) });

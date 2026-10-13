@@ -4,12 +4,11 @@ import { MemoryRouter } from 'react-router-dom';
 import { CommandPalette } from '@/components/CommandPalette';
 import { FeatureProvider } from '@/contexts/FeatureContext';
 import { LocaleProvider } from '@/contexts/LocaleContext';
+import { WorkspaceProvider } from '@/contexts/WorkspaceContext';
 
 /**
- * ⌘K là điểm điều hướng trung tâm — hỏng lặng lẽ ở đây ảnh hưởng cả app. Test
- * tập trung vào ba thứ grep không bắt được: phím tắt mở/đóng, luồng đọc
- * clipboard bất đồng bộ, và việc chọn một tool đang TẮT thì phải bật nó lên
- * trước khi điều hướng.
+ * Covers the open/close shortcut, the async clipboard read, and that picking
+ * a disabled tool enables it before navigating.
  */
 
 vi.mock('@/lib/clipboard', () => ({
@@ -17,13 +16,16 @@ vi.mock('@/lib/clipboard', () => ({
 }));
 
 import { readTextFromClipboard } from '@/lib/clipboard';
+import { setPaletteClipboardEnabled } from '@/lib/paletteClipboard';
 
 function renderPalette() {
   return render(
     <MemoryRouter>
       <LocaleProvider>
         <FeatureProvider>
-          <CommandPalette />
+          <WorkspaceProvider>
+            <CommandPalette />
+          </WorkspaceProvider>
         </FeatureProvider>
       </LocaleProvider>
     </MemoryRouter>,
@@ -31,6 +33,7 @@ function renderPalette() {
 }
 
 beforeEach(() => {
+  vi.mocked(readTextFromClipboard).mockClear();
   vi.mocked(readTextFromClipboard).mockResolvedValue(null);
 });
 
@@ -64,8 +67,7 @@ describe('CommandPalette — tìm kiếm', () => {
     const input = await screen.findByPlaceholderText(/tool|command/i);
 
     fireEvent.change(input, { target: { value: 'cron' } });
-    // Nhãn xuất hiện HAI LẦN theo đúng thiết kế — dòng danh sách và tiêu đề
-    // xem trước cùng hiện "Cron Generator", nên dùng getAllByText.
+    // The label appears in the list row and the preview title.
     await waitFor(() => expect(screen.getAllByText('Cron Generator').length).toBeGreaterThan(0));
     expect(screen.queryByText('JWT Debugger')).toBeNull();
   });
@@ -99,12 +101,12 @@ describe('CommandPalette — bật tool đang tắt khi chọn', () => {
     fireEvent.keyDown(window, { key: 'k', ctrlKey: true });
     const input = await screen.findByPlaceholderText(/tool|command/i);
 
-    // Regex Tester tắt theo mặc định (xem FeatureContext DEFAULT_FEATURES).
+    // Regex Tester is disabled by default (FeatureContext DEFAULT_FEATURES).
     fireEvent.change(input, { target: { value: 'regex tester' } });
     const rows = await screen.findAllByText('Regex Tester');
     fireEvent.click(rows[0]);
 
-    // Không ném lỗi, palette đóng lại — nghĩa là toggleFeature + navigate đã chạy.
+    // No error and the palette closed: toggleFeature and navigate ran.
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
   });
 });
@@ -119,6 +121,18 @@ describe('CommandPalette — gợi ý clipboard', () => {
 
     await waitFor(() => expect(screen.getByText(/JWT/i)).toBeTruthy());
     expect(screen.getByText(/dấu chấm|dots/i)).toBeTruthy();
+  });
+
+  it('tắt "Gợi ý tool từ clipboard" thì không đọc clipboard', async () => {
+    setPaletteClipboardEnabled(false);
+    try {
+      renderPalette();
+      fireEvent.keyDown(window, { key: 'k', ctrlKey: true });
+      await waitFor(() => expect(screen.getByRole('dialog')).toBeTruthy());
+      expect(readTextFromClipboard).not.toHaveBeenCalled();
+    } finally {
+      setPaletteClipboardEnabled(true);
+    }
   });
 
   it('không gợi ý gì khi clipboard không đoán được', async () => {
@@ -145,5 +159,18 @@ describe('CommandPalette — gợi ý clipboard', () => {
       expect(screen.queryByText('Từ clipboard')).toBeNull();
       expect(screen.queryByText('From clipboard')).toBeNull();
     });
+  });
+});
+
+describe('CommandPalette — workspace', () => {
+  it('gõ "workspace" hiện lệnh tạo workspace mới, Enter mở hộp đặt tên', async () => {
+    renderPalette();
+    fireEvent.keyDown(window, { key: 'k', ctrlKey: true });
+    const input = await screen.findByPlaceholderText(/tool|lệnh|command/i);
+    fireEvent.change(input, { target: { value: 'workspace' } });
+    expect(screen.getByText(/New workspace|Workspace mới/)).toBeTruthy();
+    fireEvent.keyDown(input, { key: 'Enter' });
+    // The palette closes and the naming dialog opens.
+    await waitFor(() => expect(screen.getByRole('dialog', { name: /New workspace|Workspace mới/ })).toBeTruthy());
   });
 });

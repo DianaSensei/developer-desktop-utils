@@ -12,13 +12,18 @@ import {
 } from '@/components/ui/dialog';
 import {
   ShieldCheck, Check, Plus, Trash2, Eye, EyeOff,
-  RefreshCw, KeyRound, ChevronDown, ChevronUp, ArrowRight,
+  RefreshCw, ChevronDown, ChevronUp, ArrowRight,
   Upload, Download, QrCode, FileText, ClipboardPaste,
 } from 'lucide-react';
 import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { EmptyState } from '@/components/ui/empty-state';
+import { saveTextFile } from '@/lib/fileio';
 import { usePluginSdk, useSecretState } from '@/platform';
 import { base32Decode, parseOtpImport, type ParsedOtp } from '@/lib/otpauth';
+import { useMessages } from '@/contexts/LocaleContext';
+import MESSAGES from '@/components/tools/TwoFactorAuth.messages';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -39,10 +44,9 @@ interface Account {
 
 // ─── Avatar helpers ───────────────────────────────────────────────────────────
 
-// Màu avatar suy từ HASH CỦA TÊN, không phải bảng 12 class cố định: cùng một
-// tài khoản luôn ra cùng màu, và số màu phân biệt được là 360 thay vì 12.
-// Đây là màu ĐỊNH DANH (như avatar GitHub) — không mang nghĩa tốt/xấu, nên
-// xoay hue tự do là đúng. Độ bão hoà/sáng cố định để chữ trắng luôn đọc được.
+// Avatar color from a hash of the name: stable per account and 360 hues
+// instead of 12 classes. An identity color (like GitHub avatars), with
+// fixed saturation/lightness so white text stays readable.
 function avatarStyle(name: string): { backgroundColor: string } {
   let h = 0;
   for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h);
@@ -83,9 +87,8 @@ function timeRemaining(period: number): number {
   return period - (Math.floor(Date.now() / 1000) % period);
 }
 
-/** Số thứ tự của cửa sổ TOTP hiện tại — cùng công thức `computeTOTP` dùng làm
- *  counter. Đổi số này ⇔ mã đã hết hạn, nên nó là tín hiệu đáng tin để làm mới,
- *  thay cho việc rình đúng một giây ranh giới. */
+/** Index of the current TOTP window (the counter `computeTOTP` uses). A
+ *  change means the code expired, which is a reliable refresh signal. */
 function totpWindow(period: number): number {
   return Math.floor(Date.now() / 1000 / period);
 }
@@ -158,6 +161,7 @@ interface OTPCardProps {
 }
 
 function OTPCard({ account, onDelete, onCounterIncrement }: OTPCardProps) {
+  const m = useMessages(MESSAGES);
   const [code, setCode] = useState('');
   const [remaining, setRemaining] = useState(account.period);
   const [showSecret, setShowSecret] = useState(false);
@@ -175,7 +179,7 @@ function OTPCard({ account, onDelete, onCounterIncrement }: OTPCardProps) {
       setError('');
     } catch (e) {
       setCode('');
-      setError(e instanceof Error ? e.message : 'Invalid secret');
+      setError(e instanceof Error ? e.message : m('invalidSecret'));
     }
   }, [account]);
 
@@ -183,13 +187,9 @@ function OTPCard({ account, onDelete, onCounterIncrement }: OTPCardProps) {
     generate();
     if (account.type === 'totp') {
       setRemaining(timeRemaining(account.period));
-      // Làm mới khi CỬA SỔ TOTP đổi, không phải khi đồng hồ đếm ngược chạm đúng
-      // `period`. `setInterval(…, 1000)` không đảm bảo rơi vào mọi giây: webview
-      // bị hãm nhịp lúc ẩn cửa sổ, máy ngủ dậy, hay chỉ là trôi nhịp thông
-      // thường đều có thể nhảy cóc qua đúng giây ranh giới — và khi đó điều
-      // kiện cũ `r === period` không bao giờ đúng, thẻ tiếp tục hiển thị một mã
-      // ĐÃ HẾT HẠN cho tới tận chu kỳ sau ngẫu nhiên nào đó khớp lại. So sánh
-      // số cửa sổ thì bỏ lỡ bao nhiêu nhịp cũng vẫn phát hiện được.
+      // Refresh when the TOTP window changes rather than when the countdown
+      // hits `period`: a 1s interval can skip seconds (throttled hidden
+      // webview, sleep, drift), which would leave an expired code on screen.
       let lastWindow = totpWindow(account.period);
       timerRef.current = setInterval(() => {
         setRemaining(timeRemaining(account.period));
@@ -219,7 +219,7 @@ function OTPCard({ account, onDelete, onCounterIncrement }: OTPCardProps) {
           {initials(account.name)}
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold leading-tight truncate">{account.name || 'Account'}</p>
+          <p className="text-sm font-semibold leading-tight truncate">{account.name || m('account')}</p>
           {account.issuer && (
             <p className="text-[11px] text-fg-mute truncate leading-tight mt-0.5">{account.issuer}</p>
           )}
@@ -251,7 +251,8 @@ function OTPCard({ account, onDelete, onCounterIncrement }: OTPCardProps) {
                 size="icon"
                 className="h-ctl w-ctl"
                 iconClassName="h-4 w-4"
-                title="Copy code"
+                title={m('copyCode')}
+                aria-label={m('copyCode')}
               />
             </div>
           </div>
@@ -281,7 +282,7 @@ function OTPCard({ account, onDelete, onCounterIncrement }: OTPCardProps) {
             onClick={() => onCounterIncrement(account.id)}
           >
             <RefreshCw className="h-3 w-3" />
-            Generate Next Code
+            {m('nextCode')}
             <ArrowRight className="h-3 w-3 ml-auto" />
           </Button>
         </div>
@@ -290,7 +291,7 @@ function OTPCard({ account, onDelete, onCounterIncrement }: OTPCardProps) {
       {/* ── Footer ── */}
       <div className="flex items-center gap-1.5 px-3 py-2 border-t bg-bg-2/20 shrink-0">
         <div className="flex flex-wrap gap-1 flex-1">
-          {([account.algorithm, `${account.digits} digits`, isTotp ? `${account.period}s` : null] as (string | null)[])
+          {([account.algorithm, m('digitsTag', { n: account.digits }), isTotp ? `${account.period}s` : null] as (string | null)[])
             .filter(Boolean)
             .map((tag) => (
               <span key={tag} className="text-[11px] px-1.5 py-0.5 rounded bg-bg-2 text-fg-mute font-mono">
@@ -302,7 +303,9 @@ function OTPCard({ account, onDelete, onCounterIncrement }: OTPCardProps) {
           variant="ghost" size="icon"
           className="h-ctl w-ctl text-fg-mute hover:text-fg"
           onClick={() => setShowSecret((s) => !s)}
-          title={showSecret ? 'Hide secret' : 'Reveal secret'}
+          title={showSecret ? m('hideSecret') : m('revealSecret')}
+          aria-label={showSecret ? m('hideSecret') : m('revealSecret')}
+          aria-pressed={showSecret}
         >
           {showSecret ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
         </Button>
@@ -310,7 +313,8 @@ function OTPCard({ account, onDelete, onCounterIncrement }: OTPCardProps) {
           variant="ghost" size="icon"
           className="h-ctl w-ctl text-fg-mute hover:text-bad"
           onClick={() => onDelete(account.id)}
-          title="Remove account"
+          title={m('removeAccount')}
+          aria-label={m('removeAccount')}
         >
           <Trash2 className="h-3.5 w-3.5" />
         </Button>
@@ -333,6 +337,7 @@ function OTPCard({ account, onDelete, onCounterIncrement }: OTPCardProps) {
 function LivePreview({ secret, type, period, digits, algorithm, counter }: {
   secret: string; type: OTPType; period: number; digits: number; algorithm: Algorithm; counter: number;
 }) {
+  const m = useMessages(MESSAGES);
   const [preview, setPreview] = useState('');
   const [err, setErr] = useState(false);
 
@@ -361,10 +366,10 @@ function LivePreview({ secret, type, period, digits, algorithm, counter }: {
       err ? 'bg-bad-tint text-bad' : 'bg-ok-tint text-ok',
     )}>
       {err ? (
-        <span>Invalid Base32 secret</span>
+        <span>{m('invalidBase32')}</span>
       ) : (
         <>
-          <span className="text-fg-mute">Preview:</span>
+          <span className="text-fg-mute">{m('preview')}</span>
           <span className="font-mono font-bold tracking-widest">{preview}</span>
         </>
       )}
@@ -380,6 +385,7 @@ interface AddAccountFormProps {
 }
 
 function AddAccountForm({ onAdd, onCancel }: AddAccountFormProps) {
+  const m = useMessages(MESSAGES);
   const [name, setName] = useState('');
   const [issuer, setIssuer] = useState('');
   const [secret, setSecret] = useState('');
@@ -393,16 +399,16 @@ function AddAccountForm({ onAdd, onCancel }: AddAccountFormProps) {
   useEffect(() => { secretRef.current?.focus(); }, []);
 
   const handleAdd = () => {
-    if (!secret.trim()) { setError('Secret key is required'); return; }
+    if (!secret.trim()) { setError(m('secretRequired')); return; }
     try {
       base32Decode(secret);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Invalid Base32 secret');
+      setError(e instanceof Error ? e.message : m('invalidBase32'));
       return;
     }
     onAdd({
       id: crypto.randomUUID(),
-      name: name.trim() || 'Account',
+      name: name.trim() || m('account'),
       issuer: issuer.trim(),
       secret: secret.trim().replace(/\s/g, '').toUpperCase(),
       algorithm, digits, period, type,
@@ -423,7 +429,7 @@ function AddAccountForm({ onAdd, onCancel }: AddAccountFormProps) {
       <div className="flex items-center justify-between px-4 py-3 border-b bg-bg-2/20">
         <div className="flex items-center gap-2">
           <Plus className="h-4 w-4 text-fg-mute" />
-          <span className="text-sm font-semibold">Add Account</span>
+          <span className="text-sm font-semibold">{m('addAccount')}</span>
         </div>
         {/* Type pill toggle */}
         <div className="flex rounded-md border bg-bg-2/50 p-0.5 gap-0.5">
@@ -451,20 +457,20 @@ function AddAccountForm({ onAdd, onCancel }: AddAccountFormProps) {
         {/* Name + Issuer */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="space-y-1.5">
-            <Label className="text-xs">Account Name</Label>
+            <Label className="text-xs">{m('accountName')}</Label>
             <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder={isTotp ? 'e.g. GitHub, AWS, Google' : 'e.g. FIDO key'}
+              placeholder={isTotp ? m('namePlaceholderTotp') : m('namePlaceholderHotp')}
               className="h-ctl text-sm"
             />
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs">Issuer <span className="text-fg-mute">(optional)</span></Label>
+            <Label className="text-xs">{m('issuer')} <span className="text-fg-mute">{m('optional')}</span></Label>
             <Input
               value={issuer}
               onChange={(e) => setIssuer(e.target.value)}
-              placeholder="e.g. github.com"
+              placeholder={m('issuerPlaceholder')}
               className="h-ctl text-sm"
             />
           </div>
@@ -472,7 +478,7 @@ function AddAccountForm({ onAdd, onCancel }: AddAccountFormProps) {
 
         {/* Secret */}
         <div className="space-y-2">
-          <Label className="text-xs">Secret Key <span className="text-fg-mute">(Base32)</span></Label>
+          <Label className="text-xs">{m('secretKey')} <span className="text-fg-mute">(Base32)</span></Label>
           <Input
             ref={secretRef}
             value={secret}
@@ -491,7 +497,7 @@ function AddAccountForm({ onAdd, onCancel }: AddAccountFormProps) {
         {/* Options row */}
         <div className={cn('grid gap-3', isTotp ? 'grid-cols-3' : 'grid-cols-2')}>
           <div className="space-y-1.5">
-            <Label className="text-xs">Algorithm</Label>
+            <Label className="text-xs">{m('algorithm')}</Label>
             <Select value={algorithm} onValueChange={(v) => setAlgorithm(v as Algorithm)}>
               <SelectTrigger className="h-ctl text-sm"><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -502,23 +508,23 @@ function AddAccountForm({ onAdd, onCancel }: AddAccountFormProps) {
             </Select>
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs">Digits</Label>
+            <Label className="text-xs">{m('digits')}</Label>
             <Select value={String(digits)} onValueChange={(v) => setDigits(Number(v) as 6 | 8)}>
               <SelectTrigger className="h-ctl text-sm"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="6">6 digits</SelectItem>
-                <SelectItem value="8">8 digits</SelectItem>
+                <SelectItem value="6">{m('digitsOption', { n: 6 })}</SelectItem>
+                <SelectItem value="8">{m('digitsOption', { n: 8 })}</SelectItem>
               </SelectContent>
             </Select>
           </div>
           {isTotp && (
             <div className="space-y-1.5">
-              <Label className="text-xs">Period</Label>
+              <Label className="text-xs">{m('period')}</Label>
               <Select value={String(period)} onValueChange={(v) => setPeriod(Number(v) as 30 | 60)}>
                 <SelectTrigger className="h-ctl text-sm"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="30">30 seconds</SelectItem>
-                  <SelectItem value="60">60 seconds</SelectItem>
+                  <SelectItem value="30">{m('seconds', { n: 30 })}</SelectItem>
+                  <SelectItem value="60">{m('seconds', { n: 60 })}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -527,10 +533,10 @@ function AddAccountForm({ onAdd, onCancel }: AddAccountFormProps) {
 
         {/* Actions */}
         <div className="flex gap-2 justify-end pt-1">
-          <Button variant="ghost" size="sm" onClick={onCancel}>Cancel</Button>
+          <Button variant="ghost" size="sm" onClick={onCancel}>{m('cancel')}</Button>
           <Button size="sm" onClick={handleAdd} className="gap-1.5">
             <Plus className="h-3.5 w-3.5" />
-            Add Account
+            {m('addAccount')}
           </Button>
         </div>
       </div>
@@ -540,61 +546,32 @@ function AddAccountForm({ onAdd, onCancel }: AddAccountFormProps) {
 
 // ─── Empty state ──────────────────────────────────────────────────────────────
 
-function EmptyState({ onAdd }: { onAdd: () => void }) {
-  return (
-    <div className="flex flex-col items-center justify-center py-20 text-center gap-4 px-4">
-      <div className="relative">
-        <div className="w-16 h-16 rounded-lg bg-bg-2 flex items-center justify-center">
-          <ShieldCheck className="h-ctl w-ctl text-fg-mute/40" />
-        </div>
-        <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-acc flex items-center justify-center">
-          <KeyRound className="h-3 w-3 text-acc-fg" />
-        </div>
-      </div>
-      <div className="space-y-1">
-        <p className="text-sm font-semibold">No accounts yet</p>
-        <p className="text-xs text-fg-mute max-w-[240px]">
-          Add a TOTP or HOTP account using the Base32 secret from your authenticator app setup.
-        </p>
-      </div>
-      <Button size="sm" onClick={onAdd} className="gap-1.5 mt-1">
-        <Plus className="h-3.5 w-3.5" />
-        Add First Account
-      </Button>
-    </div>
-  );
-}
-
 // ─── Info panel ───────────────────────────────────────────────────────────────
 
 function InfoPanel() {
+  const m = useMessages(MESSAGES);
   return (
     <div className="rounded-lg border bg-bg-2/30 p-4 text-xs space-y-3 text-fg-mute leading-relaxed">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div className="space-y-1">
           <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--cat-4)]">
-            TOTP — Time-based (RFC 6238)
+            {m('totpTitle')}
           </p>
           <p>
-            Generates a new code every 30 or 60 seconds.
-            Used by Google Authenticator, Authy, 1Password, and most sites.
-            Counter = <code className="bg-bg-2 px-1 rounded font-mono">⌊time / period⌋</code>.
+            {m('totpBody')} <code className="bg-bg-2 px-1 rounded font-mono">⌊time / period⌋</code>.
           </p>
         </div>
         <div className="space-y-1">
           <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--cat-3)]">
-            HOTP — Counter-based (RFC 4226)
+            {m('hotpTitle')}
           </p>
           <p>
-            Generates a code from a monotonic counter you advance manually.
-            Each tap of "Generate Next Code" increments the counter and produces a new code.
+            {m('hotpBody')}
           </p>
         </div>
       </div>
       <p className="border-t pt-2">
-        Secrets are kept in the app's <strong className="text-fg">separate secret store</strong>, apart from
-        ordinary app settings — nothing leaves your device.
-        Secrets must be Base32-encoded (A–Z and 2–7, case-insensitive, spaces ignored).
+        {m('storeBefore')} <strong className="text-fg">{m('storeStrong')}</strong>{m('storeAfter')}
       </p>
     </div>
   );
@@ -641,17 +618,12 @@ function buildOtpauthUri(a: Account): string {
   return `otpauth://${a.type}/${label}?${params.toString()}`;
 }
 
-function exportAccounts(accounts: Account[]) {
+// Saved with `saveTextFile` (the OS Save dialog on desktop), because
+// `<a download>` writes nothing in the Tauri webview (see lib/fileio.ts).
+// This export is the only backup of the secrets.
+function exportAccounts(sdk: Parameters<typeof saveTextFile>[0], accounts: Account[]) {
   const body = accounts.map(buildOtpauthUri).join('\n') + '\n';
-  const blob = new Blob([body], { type: 'text/plain' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `2fa-export-${new Date().toISOString().slice(0, 10)}.txt`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
+  return saveTextFile(sdk, `2fa-export-${new Date().toISOString().slice(0, 10)}.txt`, body);
 }
 
 // ─── Import dialog ──────────────────────────────────────────────────────────────
@@ -663,6 +635,8 @@ interface ImportDialogProps {
 }
 
 function ImportDialog({ open, onOpenChange, onImport }: ImportDialogProps) {
+  const sdk = usePluginSdk();
+  const m = useMessages(MESSAGES);
   const [rawText, setRawText] = useState('');
   const [busy, setBusy] = useState(false);
   const [fileError, setFileError] = useState('');
@@ -694,23 +668,25 @@ function ImportDialog({ open, onOpenChange, onImport }: ImportDialogProps) {
       if (joined.trim()) {
         setRawText((prev) => (prev.trim() ? prev + '\n' : '') + joined);
       } else if (imageWithoutQr) {
-        setFileError('No QR code found in the selected image.');
+        setFileError(m('noQrInImage'));
       } else {
-        setFileError('No OTP data found in the selected file(s).');
+        setFileError(m('noOtpData'));
       }
     } catch {
-      setFileError('Could not read one or more files.');
+      setFileError(m('readFilesFailed'));
     } finally {
       setBusy(false);
     }
   };
 
+  // Through the SDK (Tauri clipboard plugin): navigator.clipboard in
+  // WKWebView shows a "Paste" permission bubble first.
   const handlePasteClipboard = async () => {
     try {
-      const text = await navigator.clipboard.readText();
+      const text = await sdk.clipboard.readText();
       if (text) setRawText((prev) => (prev.trim() ? prev + '\n' : '') + text);
     } catch {
-      setFileError('Clipboard access was blocked. Paste into the box instead.');
+      setFileError(m('clipboardBlocked'));
     }
   };
 
@@ -733,11 +709,10 @@ function ImportDialog({ open, onOpenChange, onImport }: ImportDialogProps) {
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Upload className="h-4 w-4" /> Import Accounts
+            <Upload className="h-4 w-4" /> {m('importAccounts')}
           </DialogTitle>
           <DialogDescription>
-            Import a Google Authenticator export QR, or <code className="font-mono text-[11px]">otpauth://</code> URIs
-            from any app (2FAS, Aegis, Authy, Raivo…). Everything is parsed locally.
+            {m('importDescBefore')} <code className="font-mono text-[11px]">otpauth://</code> {m('importDescAfter')}
           </DialogDescription>
         </DialogHeader>
 
@@ -764,9 +739,9 @@ function ImportDialog({ open, onOpenChange, onImport }: ImportDialogProps) {
             </div>
           )}
           <p className="text-xs font-medium">
-            {busy ? 'Reading…' : 'Drop QR image or export file here'}
+            {busy ? m('reading') : m('dropHere')}
           </p>
-          <p className="text-[11px] text-fg-mute">PNG · JPG · .txt · .json — or click to browse</p>
+          <p className="text-[11px] text-fg-mute">{m('dropFormats')}</p>
           <input
             ref={fileInputRef}
             type="file"
@@ -780,9 +755,9 @@ function ImportDialog({ open, onOpenChange, onImport }: ImportDialogProps) {
         {/* Paste box */}
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
-            <Label className="text-xs">Or paste URIs</Label>
+            <Label className="text-xs">{m('orPaste')}</Label>
             <Button variant="ghost" size="sm" className="h-6 text-[11px] gap-1 px-2" onClick={handlePasteClipboard}>
-              <ClipboardPaste className="h-3 w-3" /> Paste
+              <ClipboardPaste className="h-3 w-3" /> {m('paste')}
             </Button>
           </div>
           <TextEditor
@@ -799,10 +774,10 @@ function ImportDialog({ open, onOpenChange, onImport }: ImportDialogProps) {
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-xs font-medium">
-                Found {parsed.length} account{parsed.length === 1 ? '' : 's'}
+                {m(parsed.length === 1 ? 'foundOne' : 'found', { n: parsed.length })}
               </span>
               <button type="button" onClick={toggleAll} className="text-[11px] text-acc hover:underline">
-                {allSelected ? 'Deselect all' : 'Select all'}
+                {allSelected ? m('deselectAll') : m('selectAll')}
               </button>
             </div>
             <div className="max-h-44 overflow-y-auto rounded-md border divide-y">
@@ -846,10 +821,10 @@ function ImportDialog({ open, onOpenChange, onImport }: ImportDialogProps) {
         )}
 
         <DialogFooter>
-          <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>{m('cancel')}</Button>
           <Button size="sm" onClick={confirm} disabled={selected.size === 0} className="gap-1.5">
             <Download className="h-3.5 w-3.5" />
-            Import {selected.size > 0 ? selected.size : ''}
+            {selected.size > 0 ? m('importN', { n: selected.size }) : m('import')}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -860,10 +835,10 @@ function ImportDialog({ open, onOpenChange, onImport }: ImportDialogProps) {
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export function TwoFactorAuth() {
-  // Seed TOTP/HOTP sống trong kho bí mật riêng, không phải mặt phẳng khoá dùng
-  // chung mà `storageGet()` đọc được từ bất cứ đâu trong webview. Kho là bất
-  // đồng bộ nên có `ready`: trước khi đọc xong, tuyệt đối không render "chưa có
-  // tài khoản nào" — người dùng sẽ tưởng mất hết dữ liệu.
+  const m = useMessages(MESSAGES);
+  // TOTP/HOTP seeds live in the secret vault, not the shared store. The
+  // vault is async: until `ready`, never render "no accounts", which
+  // would look like data loss.
   const sdk = usePluginSdk();
   const [accounts, setAccounts, accountsReady] = useSecretState<Account[]>(sdk, 'accounts', []);
   const [showForm, setShowForm] = useState(false);
@@ -887,8 +862,15 @@ export function TwoFactorAuth() {
     setShowForm(false);
   };
 
+  // Deleting an account loses its secret for good (no undo) and can lock
+  // the user out of the real account, so always confirm.
+  const [pendingDelete, setPendingDelete] = useState<Account | null>(null);
   const handleDelete = (id: string) => {
-    setAccounts((prev) => prev.filter((a) => a.id !== id));
+    setPendingDelete(accounts.find((a) => a.id === id) ?? null);
+  };
+  const confirmDelete = () => {
+    if (pendingDelete) setAccounts((prev) => prev.filter((a) => a.id !== pendingDelete.id));
+    setPendingDelete(null);
   };
 
   const handleCounterIncrement = (id: string) => {
@@ -919,8 +901,8 @@ export function TwoFactorAuth() {
       }
       flashNotice(
         added > 0
-          ? `Imported ${added} account${added === 1 ? '' : 's'}${skipped ? ` · ${skipped} duplicate${skipped === 1 ? '' : 's'} skipped` : ''}.`
-          : `No new accounts — ${skipped} already exist${skipped === 1 ? 's' : ''}.`,
+          ? (skipped ? m('importedSkipped', { n: added, skipped }) : m(added === 1 ? 'importedOne' : 'imported', { n: added }))
+          : m('noneNew', { skipped }),
       );
       return next;
     });
@@ -947,8 +929,8 @@ export function TwoFactorAuth() {
           <div className="flex items-center gap-2">
             <ShieldCheck className="h-5 w-5 text-ok shrink-0" />
             <div>
-              <h2 className="text-sm font-semibold leading-tight">2FA Authenticator</h2>
-              <p className="text-[11px] text-fg-mute">TOTP · HOTP · SHA-1/256/512 · 6 or 8 digits</p>
+              <h2 className="text-sm font-semibold leading-tight">{m('title')}</h2>
+              <p className="text-[11px] text-fg-mute">{m('subtitle')}</p>
             </div>
           </div>
 
@@ -959,14 +941,17 @@ export function TwoFactorAuth() {
               onClick={() => setShowInfo((s) => !s)}
             >
               {showInfo ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-              Info
+              {m('info')}
             </Button>
             {accounts.length > 0 && (
               <Button
                 variant="ghost" size="icon"
                 className="h-ctl w-ctl text-fg-mute"
-                onClick={() => exportAccounts(accounts)}
-                title="Export all accounts (otpauth URIs)"
+                onClick={() => {
+                  exportAccounts(sdk, accounts).catch((e) => flashNotice(m('exportFailed', { error: (e as Error).message })));
+                }}
+                title={m('exportAll')}
+                aria-label={m('exportAll')}
               >
                 <Download className="h-3.5 w-3.5" />
               </Button>
@@ -977,7 +962,7 @@ export function TwoFactorAuth() {
               onClick={() => setShowImport(true)}
             >
               <Upload className="h-3.5 w-3.5" />
-              Import
+              {m('import')}
             </Button>
             <Button
               size="sm"
@@ -985,7 +970,7 @@ export function TwoFactorAuth() {
               onClick={() => { setShowForm((s) => !s); }}
             >
               <Plus className="h-3.5 w-3.5" />
-              Add
+              {m('add')}
             </Button>
           </div>
         </div>
@@ -1015,7 +1000,7 @@ export function TwoFactorAuth() {
             {totpCount > 0 && hotpCount > 0 && (
               <div className="flex items-center gap-1">
                 {([
-                  { key: 'all', label: `All (${accounts.length})` },
+                  { key: 'all', label: m('all', { n: accounts.length }) },
                   { key: 'totp', label: `TOTP (${totpCount})` },
                   { key: 'hotp', label: `HOTP (${hotpCount})` },
                 ] as { key: typeof filter; label: string }[]).map(({ key, label }) => (
@@ -1038,7 +1023,7 @@ export function TwoFactorAuth() {
               <SearchInput
                 value={search}
                 onChange={setSearch}
-                placeholder="Search accounts…"
+                placeholder={m('searchPlaceholder')}
                 className="h-ctl text-xs"
                 containerClassName="ml-auto w-full sm:w-56"
               />
@@ -1059,22 +1044,36 @@ export function TwoFactorAuth() {
             ))}
           </div>
         ) : !accountsReady ? (
-          <div className="py-8 text-center text-xs text-fg-mute">Loading accounts…</div>
+          <div className="py-8 text-center text-xs text-fg-mute">{m('loadingAccounts')}</div>
         ) : accounts.length === 0 && !showForm ? (
-          <EmptyState onAdd={() => setShowForm(true)} />
+          <EmptyState
+            icon={ShieldCheck}
+            title={m('emptyTitle')}
+            description={m('emptyDesc')}
+            action={{ label: m('emptyAction'), onClick: () => setShowForm(true) }}
+          />
         ) : filtered.length === 0 && accounts.length > 0 ? (
           <div className="text-center py-8 text-xs text-fg-mute">
             {search.trim() ? (
-              <>No accounts match "{search}".{' '}
-                <button className="underline hover:text-fg" onClick={() => setSearch('')}>Clear search</button></>
+              <>{m('noMatch', { q: search })}{' '}
+                <button type="button" className="underline hover:text-fg" onClick={() => setSearch('')}>{m('clearSearch')}</button></>
             ) : (
-              <>No {filter.toUpperCase()} accounts.{' '}
-                <button className="underline hover:text-fg" onClick={() => setFilter('all')}>Show all</button></>
+              <>{m('noType', { type: filter.toUpperCase() })}{' '}
+                <button type="button" className="underline hover:text-fg" onClick={() => setFilter('all')}>{m('showAll')}</button></>
             )}
           </div>
         ) : null}
 
       </div>
+      <ConfirmDialog
+        open={!!pendingDelete}
+        onOpenChange={(open) => { if (!open) setPendingDelete(null); }}
+        title={m('removeTitle')}
+        description={m('removeDesc', { name: pendingDelete ? [pendingDelete.issuer, pendingDelete.name].filter(Boolean).join(' · ') : m('thisAccount') })}
+        confirmLabel={m('remove')}
+        destructive
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 }

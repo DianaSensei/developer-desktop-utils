@@ -338,15 +338,10 @@ function resolveEnvsForRequest(
   return { collectionEnv, globalEnv };
 }
 
-// One-time migration from the old single "active environment" selection
-// (`devtool:apiclient:activeEnv`, one id shared across the whole app) into
-// the new per-collection-memory + separate-global model. Reads the legacy
-// key directly (bypassing usePersistentState, which only ever reads a key
-// once per fresh state) so an upgrading user's current choice survives
-// instead of silently resetting to "No Environment" everywhere. Only
-// consulted when the *new* key is still empty (see the `initial` argument
-// at each usePersistentState call below) — a no-op once migrated, and a
-// no-op for anyone whose legacy selection was already cleared or unknown.
+// One-time migration from the single app-wide active environment
+// (`devtool:apiclient:activeEnv`) to per-collection memory plus a separate
+// global choice. Reads the legacy key directly and only applies while the
+// new keys are still empty.
 function migrateLegacyActiveEnv(environments: Environment[]): { byCollection: Record<string, string>; global: string | null } {
   try {
     const raw = storageGet('devtool:apiclient:activeEnv');
@@ -408,17 +403,15 @@ export function useApiStore() {
   // The collections tree is edited on every keystroke, so debounce its (large)
   // serialization rather than writing the whole tree to localStorage each time.
   const [collections, setCollections] = usePluginState<Collection[]>(sdk, 'apiclient:collections', seedCollections, { debounceMs: 400, legacyKey: 'devtool:apiclient:collections' });
-  // Giá trị của biến `secret` sống trong kho bí mật đã mã hoá; cấu trúc
-  // environments vẫn ở store thường. Xem envSecrets.ts cho lý do không bê cả
-  // tài liệu sang kho.
+  // Values of `secret` variables live in the encrypted vault; the
+  // environment structure stays in the regular store (see envSecrets.ts).
   const [strippedEnvironments, setStrippedEnvironments] = usePluginState<Environment[]>(sdk, 'apiclient:environments', [], { debounceMs: 300, legacyKey: 'devtool:apiclient:environments' });
   const [environments, setEnvironments] = useEnvSecrets(
     sdk, strippedEnvironments, setStrippedEnvironments,
   );
-  // Per-collection remembered choice (collectionId -> envId) and the single,
-  // collection-independent global choice — replaces the old single
-  // `activeEnvId`. Both `initial` args only ever run once, and only when
-  // their own key has never been written — see migrateLegacyActiveEnv.
+  // Per-collection remembered choice (collectionId -> envId) and the global
+  // choice. The `initial` args run once, only while their key is unset
+  // (see migrateLegacyActiveEnv).
   const [activeEnvByCollection, setActiveEnvByCollection] = usePluginState<Record<string, string>>(
     sdk, 'apiclient:activeEnvByCollection', () => migrateLegacyActiveEnv(environments).byCollection,
     { legacyKey: 'devtool:apiclient:activeEnvByCollection' },
@@ -431,12 +424,10 @@ export function useApiStore() {
   // Cookie jar: captured from responses, auto-sent to matching requests.
   const [cookies, setCookies] = usePluginState<Cookie[]>(sdk, 'apiclient:cookies', [], { debounceMs: 300, legacyKey: 'devtool:apiclient:cookies' });
   const [cookiesEnabled, setCookiesEnabled] = usePluginState<boolean>(sdk, 'apiclient:cookiesEnabled', true, { legacyKey: 'devtool:apiclient:cookiesEnabled' });
-  // Local-only secret store, kept separate from environments (Postman's
-  // "Vault"). Never touched by import/export or collection scripts — only
-  // resolved into the actual outgoing request at send time (see engine.ts).
-  //
-  // Toàn bộ nội dung là bí mật theo đúng định nghĩa của nó, nên nó nằm trọn
-  // trong kho đã mã hoá chứ không phải store thường.
+  // Local-only secret store, separate from environments (Postman's
+  // "Vault"). Never touched by import/export or scripts; only resolved
+  // into the outgoing request at send time (see engine.ts). Stored in the
+  // encrypted vault.
   const [vault, setVault] = useSecretState<KeyValue[]>(sdk, 'vault', []);
 
   // Vault secrets namespaced as `vault.<key>` for {{ }} substitution.

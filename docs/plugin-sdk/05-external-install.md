@@ -146,6 +146,95 @@ shasum -a 256 bundle.mjs
 # hoặc: python3 -c "import hashlib; print(hashlib.sha256(open('bundle.mjs','rb').read()).hexdigest())"
 ```
 
+### UI: dùng bộ component của app chủ — `__DEVTOOL_VENDOR__.ui` (SDK ≥ 1.1.0)
+
+Đừng tự chép Button/Input/Select vào bundle. Từ SDK 1.1.0, app chủ gắn sẵn toàn bộ
+design system lên `window.__DEVTOOL_VENDOR__.ui` **trước khi** thân bundle của bạn chạy
+(nạp lười trong `installer.ts`'s `ensureVendorUi()`), nên đọc nó đồng bộ ở top-level là an
+toàn:
+
+```tsx
+const { Button, Input, Segmented, EmptyState, ToolToolbar, ToolPanes, ToolPane, PaneHeader,
+  CopyButton, useQuickPaste, useInputHistory, useLocale, ToolHeaderActions, cn } =
+  window.__DEVTOOL_VENDOR__.ui!;
+```
+
+`ui` = mọi export của `@/design-system` + `useQuickPaste`/`quickPasteHint`,
+`useInputHistory`, `useImagePaste`, `useLocale`, `useMessages` + `defineMessages` (song ngữ
+VI/EN cho chữ của chính plugin — cùng cách các tool có sẵn làm), `ToolHeaderActions` (danh sách đầy đủ:
+`src/platform/vendorUi.ts`). Khai `sdk: '^1.1.0'` trong manifest — app chủ cũ hơn sẽ từ chối
+cài thay vì để plugin vỡ lúc chạy vì `ui` là `undefined`.
+
+Lợi ích ngoài việc nhẹ bundle: class Tailwind của các component này **luôn có rule** (chính
+app chủ dùng chúng), nên phần lớn rắc rối ở mục CSS dưới đây không còn áp dụng cho UI dựng
+bằng `ui.*`. Chỉ class bạn tự viết thêm mới cần tuân theo mục đó.
+
+### CSS: bundle plugin KHÔNG mang stylesheet của riêng nó
+
+Bundle plugin chỉ là **JavaScript** — không có file CSS nào đi kèm, và toàn
+bộ giao diện ăn theo stylesheet Tailwind mà app chủ đã biên dịch sẵn.
+Stylesheet đó sinh ra bằng cách quét `src/**` của **app chủ**
+(`tailwind.config.js` → `content`), vốn không bao giờ chứa mã nguồn plugin
+(plugin được cài lúc chạy từ một URL, không có mặt lúc app build). Hệ quả:
+một class chỉ xuất hiện trong mã plugin sẽ nằm trong DOM mà **không có rule
+nào phía sau** — im lặng không làm gì cả.
+
+- **Utility có tên** (`flex`, `p-2`, `text-xs`, `h-ctl`, token design-system):
+  an toàn trên thực tế — app chủ dùng chung bộ kit nên rule đã có sẵn.
+- **Giá trị tuỳ ý (arbitrary value)** — `h-[68vh]`, `max-h-[70vh]`,
+  `grid-cols-[1fr_auto]`… — **không an toàn**: mỗi class là một rule riêng,
+  chỉ được phát sinh nếu tình cờ có file nào trong `src/**` của app chủ viết
+  y hệt từng ký tự.
+
+Vì vậy kích thước theo viewport hoặc theo pixel phải viết bằng inline
+`style`, thứ không build step nào bỏ đi được:
+
+```tsx
+// có thể không có rule nào trong stylesheet của app chủ
+<div className="flex h-[68vh] max-h-[calc(100vh-13rem)] flex-col" />
+
+// luôn áp dụng
+<div className="flex flex-col" style={{ height: '68vh', maxHeight: 'calc(100vh - 13rem)' }} />
+```
+
+**Đã có một cơ chế cho việc này từ trước:**
+`src/styles/externalPluginClassnamesSafelist.ts` — bản chụp class trích ra MỘT
+LẦN lúc bốn tool tách khỏi repo app chủ, tồn tại chỉ để Tailwind quét thấy. Nó
+không hỏng, nó **cũ**: chính comment của nó đã báo trước "no automated
+re-sync", và mã plugin đi tiếp sau ngày đó. Nếu bạn thêm class mới vào một
+plugin, đừng cho rằng nó đã được phủ.
+
+**Utility có tên cũng không miễn nhiễm.** Rà soát cả bốn plugin bằng đúng
+file CSS app chủ biên dịch ra cho thấy `bottom-3`, `pl-1.5`, `-ml-1.5`,
+`py-5`, `h-64`, `m-4`, `mx-5`, `min-h-16`, `min-h-20`, `-mt-2.5`,
+`align-top`, `translate-x-full` đều KHÔNG có rule — trong khi `max-h-64` nằm
+ngay cạnh `h-64` thì có. Vì thế `src/styles/plugin-utilities.css` dùng
+`@source inline(...)` ép Tailwind phát sinh sẵn các thang đo chung (spacing,
+kích thước, vị trí, lưới, canh dọc) cho plugin dựa vào, dù không file nào
+trong `src/**` dùng tới. Nó liệt kê theo THANG ĐO chứ không theo cách dùng,
+nên không cần đọc mã plugin và không cũ đi được — bù đúng điểm yếu của bản
+chụp. Hai file bổ sung nhau: bản chụp vẫn là thứ duy nhất phủ được các giá trị
+tuỳ ý plugin đang dùng.
+
+Safelist đó chỉ có ở bản app chủ từ đây trở đi. **Plugin cài vào bản app chủ
+nào người dùng đang có**, nên mã plugin vẫn phải chạy đúng trên bản cũ — và
+không safelist nào phủ nổi giá trị tuỳ ý. Repo plugin
+(`developer-desktop-miniapp`) kiểm bằng `scripts/check-host-classes.mjs`:
+nó phân giải mọi class plugin viết ra dựa trên một file CSS app chủ thật,
+chạy với bản phát hành cũ nhất còn hỗ trợ.
+
+```bash
+# trong checkout app chủ
+npm run build
+# trong repo plugin
+node scripts/check-host-classes.mjs ../developer-desktop-utils/dist/assets/*.css
+```
+
+Đây không phải lo xa: dialog xem log của Container Manager đã mất đúng hai
+class kích thước, hộp log rơi về `height: auto`, phình theo từng dòng log đổ
+về và đẩy dialog tràn khỏi cả trên lẫn dưới màn hình — thanh công cụ của
+chính nó không với tới được.
+
 ## Build một sidecar đúng chuẩn để publish
 
 Xem [04-tier-b-sidecars.md](./04-tier-b-sidecars.md) cho cách viết sidecar.
@@ -157,13 +246,13 @@ Xem [04-tier-b-sidecars.md](./04-tier-b-sidecars.md) cho cách viết sidecar.
 3. Host mỗi binary ở một URL `https://` (GitHub Release asset là lựa chọn
    đơn giản — public, ổn định, không cần hạ tầng riêng).
 4. Viết manifest `kind: "service"` liệt kê từng target-triple → `{url, sha256}`.
-5. Tên bin trong manifest (`bin`) phải khớp một tên đã có sẵn trong
-   `ALLOWED_SERVICES` của app đang cài — **cài qua URL KHÔNG tự cấp quyền
-   chạy cho một tên bin mới**; đây là ranh giới tin cậy cố ý (xem
-   01-architecture.md). Sidecar bạn tự viết cho DevTool của chính mình thì
-   bạn cũng là người thêm tên vào `ALLOWED_SERVICES` khi build app — cơ chế
-   URL chỉ thay đổi CHỖ LẤY BYTES, không thay đổi AI QUYẾT ĐỊNH tên nào
-   được phép chạy.
+5. Tên bin trong manifest (`bin`) phải có dạng `devtool-svc-<kebab-case>`.
+   **Cài qua URL KHÔNG tự cấp quyền chạy** — manifest do webview đọc nên không
+   thể là nơi cấp quyền. Mọi binary cài qua URL (kể cả khi trùng tên một
+   sidecar đóng gói sẵn) đều được hỏi lần đầu được gọi, qua hộp thoại native
+   (đường dẫn + SHA-256), rồi app nhớ quyết định
+   trong keychain gắn với mã băm. Không cần phát hành lại app cho mỗi plugin
+   mới; xem 01-architecture.md.
 
 ## Nơi lưu và độ ưu tiên lúc chạy
 

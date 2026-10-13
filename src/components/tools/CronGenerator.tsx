@@ -7,11 +7,16 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { HelpCircle, Lightbulb, RotateCcw } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
+import { useQuickPaste, useQuickPasteHint } from '@/hooks/useQuickPaste';
 import { useInputHistory } from '@/hooks/useInputHistory';
 import { CopyButton } from '@/components/ui/copy-button';
 import { ExplainBand } from '@/components/ui/explain-band';
 import { Tooltip } from '@/components/ui/tooltip';
+import { nextCronRuns } from '@/lib/cronNext';
+import { useMessages } from '@/contexts/LocaleContext';
+import COMMON from '@/components/tools/common.messages';
+import MESSAGES from '@/components/tools/CronGenerator.messages';
+import { ToolToolbar } from '@/components/ui/tool-layout';
 
 type CronMode = 'linux' | 'quartz' | 'spring';
 type FieldKey = 'seconds' | 'minute' | 'hour' | 'dayOfMonth' | 'month' | 'dayOfWeek' | 'year';
@@ -318,16 +323,26 @@ function expressionFromFields(mode: CronMode, fields: CronFields) {
     .join(' ');
 }
 
+/**
+ * Valid field counts run from the required count to the total; Quartz's
+ * trailing year field is optional.
+ */
+function acceptsFieldCount(mode: CronMode, count: number) {
+  const rules = getRules(mode);
+  const required = rules.filter((r) => !r.optional).length;
+  return count >= required && count <= rules.length;
+}
+
 function fieldsFromExpression(mode: CronMode, expression: string) {
   const parts = normalizeExpression(expression).split(' ').filter(Boolean);
   const rules = getRules(mode);
 
-  if (parts.length !== rules.length) return null;
+  if (!acceptsFieldCount(mode, parts.length)) return null;
 
   return rules.reduce<CronFields>(
     (nextFields, rule, index) => ({
       ...nextFields,
-      [rule.key]: parts[index],
+      [rule.key]: parts[index] ?? '',
     }),
     { ...DEFAULT_FIELDS, year: '' }
   );
@@ -345,6 +360,16 @@ function inferMode(expression: string, fallback: CronMode): CronMode {
   return fallback;
 }
 
+/** Translator passed to pure helpers (validation, explanation), which can't call hooks. */
+type T = (key: keyof typeof MESSAGES, params?: Record<string, string | number>) => string;
+
+const fieldName = (rule: FieldRule, t: T) => t(`field.${rule.key}`);
+const rangeText = (rule: FieldRule, t: T) =>
+  rule.range === 'optional' ? t('optional') : rule.range.replace(/ or /g, ` ${t('or')} `);
+/** Translates a hint/preset label; the dictionary key is the English label, used as fallback. */
+const labelText = (label: string, t: T) =>
+  `label.${label}` in MESSAGES ? t(`label.${label}` as keyof typeof MESSAGES) : label;
+
 function aliasValue(value: string, aliases?: Record<string, number>) {
   if (!aliases) return value;
   return aliases[value.toUpperCase()]?.toString() ?? value;
@@ -361,65 +386,67 @@ function isNumberInRange(value: string, rule: FieldRule) {
   );
 }
 
-function validateBaseToken(token: string, rule: FieldRule): string | null {
+function validateBaseToken(token: string, rule: FieldRule, t: T): string | null {
+  const p = { field: fieldName(rule, t), range: rangeText(rule, t) };
   if (token === '*') return null;
   if (token === '?' && rule.allowQuestion) return null;
   if (token === 'L' && rule.allowLast) return null;
   if (rule.allowWeekday && /^LW$/i.test(token)) return null;
   if (rule.allowWeekday && /^\d+W$/i.test(token)) {
-    return isNumberInRange(token.slice(0, -1), rule) ? null : `${rule.label} weekday value is outside ${rule.range}.`;
+    return isNumberInRange(token.slice(0, -1), rule) ? null : t('weekdayOutside', p);
   }
   if (rule.allowLast && /^[A-Z0-9]+L$/i.test(token)) {
-    return isNumberInRange(token.slice(0, -1), rule) ? null : `${rule.label} last value is outside ${rule.range}.`;
+    return isNumberInRange(token.slice(0, -1), rule) ? null : t('lastOutside', p);
   }
   if (rule.allowNth && /^[A-Z0-9]+#[1-5]$/i.test(token)) {
-    return isNumberInRange(token.split('#')[0], rule) ? null : `${rule.label} nth value is outside ${rule.range}.`;
+    return isNumberInRange(token.split('#')[0], rule) ? null : t('nthOutside', p);
   }
 
   if (token.includes('-')) {
     const [start, end, extra] = token.split('-');
-    if (extra !== undefined || !start || !end) return `${rule.label} range is malformed.`;
+    if (extra !== undefined || !start || !end) return t('rangeMalformed', p);
     if (!isNumberInRange(start, rule) || !isNumberInRange(end, rule)) {
-      return `${rule.label} range must be ${rule.range}.`;
+      return t('rangeMustBe', p);
     }
     return null;
   }
 
-  return isNumberInRange(token, rule) ? null : `${rule.label} must be ${rule.range}.`;
+  return isNumberInRange(token, rule) ? null : t('mustBe', p);
 }
 
-function validateField(value: string, rule: FieldRule) {
+function validateField(value: string, rule: FieldRule, t: T) {
+  const p = { field: fieldName(rule, t) };
   const trimmed = value.trim();
 
   if (!trimmed) {
-    return rule.optional ? [] : [`${rule.label} is required.`];
+    return rule.optional ? [] : [t('required', p)];
   }
 
   return trimmed
     .split(',')
     .map((item) => {
       const [base, step, extra] = item.split('/');
-      if (extra !== undefined || !base) return `${rule.label} step is malformed.`;
+      if (extra !== undefined || !base) return t('stepMalformed', p);
       if (step !== undefined && (!/^\d+$/.test(step) || Number(step) <= 0)) {
-        return `${rule.label} step must be a positive number.`;
+        return t('stepPositive', p);
       }
-      return validateBaseToken(base, rule);
+      return validateBaseToken(base, rule, t);
     })
     .filter(Boolean) as string[];
 }
 
-function modeRuleTooltip(mode: CronMode) {
+function modeRuleTooltip(mode: CronMode, t: T) {
   if (mode === 'linux') {
-    return 'Linux cron uses 5 fields: minute, hour, day of month, month, day of week. Use *, values, ranges, lists, and steps like */5.';
+    return t('linuxRule');
   }
   if (mode === 'spring') {
-    return 'Spring @Scheduled uses 6 fields: second, minute, hour, day of month, month, day of week. Use ? in either day field, plus L, W, and # where supported. Day of week: 0-7 (0 and 7 = Sunday).';
+    return t('springRule');
   }
 
-  return 'Quartz cron uses 6 fields plus optional year: second, minute, hour, day of month, month, day of week, year. Use ? in either day field, plus L, W, and # where supported.';
+  return t('quartzRule');
 }
 
-function validateExpression(mode: CronMode, expression: string) {
+function validateExpression(mode: CronMode, expression: string, t: T) {
   const normalized = normalizeExpression(expression);
   const parts = normalized.split(' ').filter(Boolean);
   const rules = getRules(mode);
@@ -427,15 +454,15 @@ function validateExpression(mode: CronMode, expression: string) {
   const warnings: string[] = [];
 
   if (!normalized) {
-    return { normalized, fields: null, errors: ['Enter or generate a cron expression.'], warnings };
+    return { normalized, fields: null, errors: [t('enterExpression')], warnings };
   }
 
-  if (parts.length !== rules.length) {
+  if (!acceptsFieldCount(mode, parts.length)) {
     const fieldCountMsg = mode === 'linux'
-      ? 'Linux cron must have 5 fields: minute hour day-of-month month day-of-week.'
+      ? t('linuxFields')
       : mode === 'spring'
-        ? 'Spring @Scheduled must have 6 fields: second minute hour day-of-month month day-of-week.'
-        : 'Quartz cron must have 6 fields, or 7 fields when year is included.';
+        ? t('springFields')
+        : t('quartzFields');
     errors.push(fieldCountMsg);
     return { normalized, fields: null, errors, warnings };
   }
@@ -443,12 +470,12 @@ function validateExpression(mode: CronMode, expression: string) {
   const fields = fieldsFromExpression(mode, normalized);
 
   if (!fields) {
-    errors.push('Unable to read cron fields.');
+    errors.push(t('unreadable'));
     return { normalized, fields: null, errors, warnings };
   }
 
   rules.forEach((rule) => {
-    errors.push(...validateField(fields[rule.key], rule));
+    errors.push(...validateField(fields[rule.key], rule, t));
   });
 
   if (mode === 'quartz' || mode === 'spring') {
@@ -456,78 +483,100 @@ function validateExpression(mode: CronMode, expression: string) {
     const dow = fields.dayOfWeek;
     if (dom !== '?' && dow !== '?') {
       const prefix = mode === 'spring' ? 'Spring' : 'Quartz';
-      warnings.push(`${prefix} usually uses ? in either day-of-month or day-of-week to avoid conflicting schedules.`);
+      warnings.push(t('dayConflict', { flavor: prefix }));
     }
   }
 
   return { normalized, fields, errors, warnings };
 }
 
-function phraseForValue(value: string, label: string) {
-  if (!value || value === '*') return `every ${label}`;
-  if (value === '?') return `no specific ${label}`;
+type Unit = 'second' | 'minute' | 'hour' | 'dayOfMonth' | 'month' | 'dayOfWeek' | 'year';
+
+function phraseForValue(value: string, unitKey: Unit, t: T) {
+  const unit = t(`unit.${unitKey}`);
+  if (!value || value === '*') return t('phraseEvery', { unit });
+  if (value === '?') return t('phraseNoSpecific', { unit });
 
   const every = value.match(/^\*\/(\d+)$/);
-  if (every) return `every ${every[1]} ${label}${every[1] === '1' ? '' : 's'}`;
+  if (every) return every[1] === '1' ? t('phraseEveryOne', { unit }) : t('phraseEveryN', { n: every[1], unit });
 
-  if (/^\d+$/.test(value) || /^[A-Z]{3}$/i.test(value)) return `${label} ${value}`;
-  if (value.includes(',')) return `${label}s ${value}`;
-  if (value.includes('-')) return `${label}s ${value}`;
+  if (/^\d+$/.test(value) || /^[A-Z]{3}$/i.test(value)) return t('phraseValue', { unit, value });
+  if (value.includes(',') || value.includes('-')) return t('phraseValues', { unit, value });
 
-  return `${label} ${value}`;
+  return t('phraseValue', { unit, value });
 }
 
-function explainExpression(mode: CronMode, fields: CronFields | null, errors: string[]) {
-  if (!fields || errors.length > 0) return 'Fix validation issues to see the schedule explanation.';
+function explainExpression(mode: CronMode, fields: CronFields | null, errors: string[], t: T) {
+  if (!fields || errors.length > 0) return t('fixFirst');
 
   const minuteStep = fields.minute.match(/^\*\/(\d+)$/);
   const secondStep = fields.seconds.match(/^\*\/(\d+)$/);
 
   if (mode === 'linux') {
     if (minuteStep && fields.hour === '*' && fields.dayOfMonth === '*' && fields.month === '*' && fields.dayOfWeek === '*') {
-      return `Every ${minuteStep[1]} minutes.`;
+      return t('everyNMinutes', { n: minuteStep[1] });
     }
     if (fields.minute === '*' && fields.hour === '*' && fields.dayOfMonth === '*' && fields.month === '*' && fields.dayOfWeek === '*') {
-      return 'Every minute.';
+      return t('everyMinute');
     }
     if (fields.minute === '0' && fields.hour === '*' && fields.dayOfMonth === '*' && fields.month === '*' && fields.dayOfWeek === '*') {
-      return 'Every hour.';
+      return t('everyHour');
     }
   }
 
   if (mode === 'quartz' || mode === 'spring') {
     if (secondStep && fields.minute === '*' && fields.hour === '*' && fields.dayOfMonth === '?' && fields.month === '*' && fields.dayOfWeek === '*') {
-      return `Every ${secondStep[1]} seconds.`;
+      return t('everyNSeconds', { n: secondStep[1] });
     }
     if (minuteStep && fields.seconds === '0' && fields.hour === '*' && fields.month === '*') {
-      return `Every ${minuteStep[1]} minutes.`;
+      return t('everyNMinutes', { n: minuteStep[1] });
     }
   }
 
   const parts =
     mode === 'linux'
       ? [
-          phraseForValue(fields.minute, 'minute'),
-          phraseForValue(fields.hour, 'hour'),
-          phraseForValue(fields.dayOfMonth, 'day of month'),
-          phraseForValue(fields.month, 'month'),
-          phraseForValue(fields.dayOfWeek, 'day of week'),
+          phraseForValue(fields.minute, 'minute', t),
+          phraseForValue(fields.hour, 'hour', t),
+          phraseForValue(fields.dayOfMonth, 'dayOfMonth', t),
+          phraseForValue(fields.month, 'month', t),
+          phraseForValue(fields.dayOfWeek, 'dayOfWeek', t),
         ]
       : [
-          phraseForValue(fields.seconds, 'second'),
-          phraseForValue(fields.minute, 'minute'),
-          phraseForValue(fields.hour, 'hour'),
-          phraseForValue(fields.dayOfMonth, 'day of month'),
-          phraseForValue(fields.month, 'month'),
-          phraseForValue(fields.dayOfWeek, 'day of week'),
-          fields.year ? phraseForValue(fields.year, 'year') : '',
+          phraseForValue(fields.seconds, 'second', t),
+          phraseForValue(fields.minute, 'minute', t),
+          phraseForValue(fields.hour, 'hour', t),
+          phraseForValue(fields.dayOfMonth, 'dayOfMonth', t),
+          phraseForValue(fields.month, 'month', t),
+          phraseForValue(fields.dayOfWeek, 'dayOfWeek', t),
+          fields.year ? phraseForValue(fields.year, 'year', t) : '',
         ].filter(Boolean);
 
-  return `Runs at ${parts.join(', ')}.`;
+  return t('runsAt', { parts: parts.join(', ') });
+}
+
+function formatRun(d: Date, withSeconds: boolean) {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const day = d.toLocaleDateString(undefined, { weekday: 'short' });
+  const time = `${pad(d.getHours())}:${pad(d.getMinutes())}${withSeconds ? `:${pad(d.getSeconds())}` : ''}`;
+  return `${day} ${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${time}`;
+}
+
+function relativeFromNow(d: Date, t: T) {
+  const sec = Math.round((d.getTime() - Date.now()) / 1000);
+  if (sec < 60) return t('inSeconds', { n: Math.max(sec, 0) });
+  const min = Math.round(sec / 60);
+  if (min < 60) return t('inMinutes', { n: min });
+  const hr = Math.round(min / 60);
+  if (hr < 48) return t('inHours', { n: hr });
+  return t('inDays', { n: Math.round(hr / 24) });
 }
 
 export function CronGenerator() {
   const sdk = usePluginSdkFor('cron-generator');
+  const m = useMessages(MESSAGES);
+  const c = useMessages(COMMON);
+  const quickPasteHint = useQuickPasteHint();
   const [mode, setMode] = usePluginState<CronMode>(sdk, 'cron:mode', 'linux', { legacyKey: 'devtool:cron:mode' });
   const [fields, setFields] = usePluginState<CronFields>(sdk, 'cron:fields', DEFAULT_FIELDS, { legacyKey: 'devtool:cron:fields' });
   const [expression, setExpression] = usePluginState(sdk, 'cron:expression', () =>
@@ -536,10 +585,15 @@ export function CronGenerator() {
 
   const inferredMode = inferMode(expression, mode);
   const rules = getRules(mode);
-  const analysis = useMemo(() => validateExpression(mode, expression), [mode, expression]);
+  const analysis = useMemo(() => validateExpression(mode, expression, m), [mode, expression, m]);
   const explanation = useMemo(
-    () => explainExpression(mode, analysis.fields, analysis.errors),
-    [analysis.errors, analysis.fields, mode]
+    () => explainExpression(mode, analysis.fields, analysis.errors, m),
+    [analysis.errors, analysis.fields, mode, m]
+  );
+  // The next five runs: the quickest check that the expression means what you intended.
+  const nextRuns = useMemo(
+    () => (analysis.fields && analysis.errors.length === 0 ? nextCronRuns(mode, analysis.fields) : null),
+    [analysis.fields, analysis.errors.length, mode]
   );
 
   const syncExpression = (nextMode: CronMode, nextFields: CronFields) => {
@@ -607,7 +661,7 @@ export function CronGenerator() {
   return (
     <div className="flex flex-col h-full">
       {/* Toolbar */}
-      <div className="shrink-0 header-chrome px-4 py-2.5 flex items-center gap-3">
+      <ToolToolbar className="flex items-center gap-3">
         <Segmented
           value={mode}
           onValueChange={changeMode}
@@ -615,26 +669,26 @@ export function CronGenerator() {
             value: item,
             label: item.charAt(0).toUpperCase() + item.slice(1),
           }))}
-          aria-label="Cron flavor"
+          aria-label={m('flavorLabel')}
         />
-        <Tooltip label={`${mode} cron rule`} description={modeRuleTooltip(mode)} side="bottom" width={288}>
+        <Tooltip label={m('ruleTitle', { flavor: mode })} description={modeRuleTooltip(mode, m)} side="bottom" width={288}>
           <button
             type="button"
-            aria-label={`${mode} cron rule`}
+            aria-label={m('ruleTitle', { flavor: mode })}
             className="inline-flex h-ctl w-ctl items-center justify-center rounded-sm text-fg-mute hover:bg-bg-2 hover:text-fg focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus"
           >
             <HelpCircle className="h-4 w-4" />
           </button>
         </Tooltip>
-      </div>
+      </ToolToolbar>
 
       <div className="flex-1 min-h-0 overflow-y-auto">
       <div className="p-4 space-y-4">
         <div className="space-y-2">
           <div className="flex items-center justify-between gap-2">
-            <Label htmlFor="cron-expression">Expression</Label>
+            <Label htmlFor="cron-expression">{m('expression')}</Label>
             {inferredMode !== mode ? (
-              <span className="text-xs text-fg-mute">Looks like {inferredMode} cron</span>
+              <span className="text-xs text-fg-mute">{m('looksLike', { flavor: inferredMode })}</span>
             ) : (
               <span className="text-xs text-fg-mute">{quickPasteHint}</span>
             )}
@@ -651,11 +705,12 @@ export function CronGenerator() {
               value={() => normalizeExpression(expression)}
               variant="outline"
               size="sm"
-              title="Copy expression"
+              title={m('copyExpression')}
+              aria-label={m('copyExpression')}
               className="h-ctl px-2"
               iconClassName="h-4 w-4"
             />
-            <Button onClick={reset} size="sm" variant="ghost" title="Reset" className="h-ctl px-2">
+            <Button onClick={reset} size="sm" variant="ghost" title={c('reset')} aria-label={c('reset')} className="h-ctl px-2">
               <RotateCcw className="h-4 w-4" />
             </Button>
           </div>
@@ -664,20 +719,20 @@ export function CronGenerator() {
         <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
           {rules.map((rule) => {
             const suggestions = SUGGESTIONS[mode][rule.key] ?? [];
-            const fieldErrors = validateField(fields[rule.key], rule);
+            const fieldErrors = validateField(fields[rule.key], rule, m);
 
             return (
               <div key={rule.key} className="space-y-2 rounded-lg border border-line bg-bg/50 px-3 py-2.5">
                 <div className="flex items-center justify-between gap-2">
-                  <Label htmlFor={`cron-${rule.key}`}>{rule.label}</Label>
-                  <span className="text-xs text-fg-mute">{rule.range}</span>
+                  <Label htmlFor={`cron-${rule.key}`}>{fieldName(rule, m)}</Label>
+                  <span className="text-xs text-fg-mute">{rangeText(rule, m)}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <Input
                     id={`cron-${rule.key}`}
                     value={fields[rule.key]}
                     onChange={(event) => updateField(rule.key, event.target.value)}
-                    placeholder={rule.optional ? 'optional' : '*'}
+                    placeholder={rule.optional ? m('optional') : '*'}
                     className={cn(
                       'h-ctl min-w-0 flex-1 font-mono',
                       fieldErrors.length > 0 && 'border-bad'
@@ -688,20 +743,20 @@ export function CronGenerator() {
                     onValueChange={(value) => updateField(rule.key, value === '__empty' ? '' : value)}
                   >
                     <SelectTrigger
-                      aria-label={`${rule.label} suggestions`}
-                      title="Suggestions"
+                      aria-label={m('suggestions', { field: fieldName(rule, m) })}
+                      title={m('suggestionsShort')}
                       className="group relative h-ctl w-9 flex-none justify-center rounded-sm px-0 text-fg-mute hover:text-fg [&>span]:hidden [&>svg:last-child]:hidden"
                     >
                       <Lightbulb className="h-4 w-4" />
-                      <SelectValue className="sr-only" placeholder="Suggestions" />
+                      <SelectValue className="sr-only" placeholder={m('suggestionsShort')} />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="__placeholder" disabled>
-                        Choose value
+                        {m('chooseValue')}
                       </SelectItem>
                       {suggestions.map((suggestion) => (
                         <SelectItem key={`${rule.key}-${suggestion.value}`} value={suggestion.value || '__empty'}>
-                          {suggestion.label} ({suggestion.value || 'blank'})
+                          {labelText(suggestion.label, m)} ({suggestion.value || m('blank')})
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -716,31 +771,25 @@ export function CronGenerator() {
         </div>
 
         <div className="space-y-2">
-          <Label>Presets</Label>
+          <Label>{m('presets')}</Label>
           <div className="flex flex-wrap gap-1.5">
             {PRESETS[mode].map((preset) => (
               <Button key={preset.value} variant="outline" size="sm" onClick={() => applyPreset(preset.value)} className="h-ctl text-xs">
-                {preset.label}
+                {labelText(preset.label, m)}
               </Button>
             ))}
           </div>
         </div>
 
-        {/*
-          Bản cũ: viền/nền dùng border-acc/bg-acc (tức là ACCENT, đổi
-          theo tone chủ đạo) trong khi icon lại cứng text-green-500 — đúng lỗi
-          trộn hai hệ màu mà design/RULES.md cảnh báo. Đổi tone chủ đạo sang đỏ
-          thì cả khối "hợp lệ" sẽ nhuộm đỏ trong khi icon vẫn xanh lá. ExplainBand
-          lấy màu từ hệ trạng thái cố định nên không còn lệch được nữa.
-        */}
+        {/* ExplainBand uses the fixed status palette, so "valid" never follows the accent tone. */}
         <ExplainBand
           tone={analysis.errors.length > 0 ? 'bad' : 'ok'}
           title={
             analysis.errors.length > 0
-              ? 'Invalid expression'
+              ? m('invalidExpression')
               : mode === 'spring'
-                ? 'Valid Spring @Scheduled'
-                : `Valid ${mode} cron`
+                ? m('validSpring')
+                : m('validCron', { flavor: mode })
           }
         >
           {explanation}
@@ -755,6 +804,39 @@ export function CronGenerator() {
             </span>
           ))}
         </ExplainBand>
+
+        {nextRuns && (
+          <div className="space-y-2">
+            <Label>{m('nextRuns')} <span className="font-normal text-fg-mute">{m('localTime')}</span></Label>
+            {'unsupported' in nextRuns ? (
+              <p className="text-xs text-fg-mute">
+                {m('previewUnsupported')} <code className="font-mono">{nextRuns.unsupported}</code> {m('previewUnsupportedAfter')}
+              </p>
+            ) : nextRuns.runs.length === 0 ? (
+              <p className="text-xs text-fg-mute">
+                {nextRuns.searchedYears === null ? m('noFutureRuns') : m('neverFires', { years: nextRuns.searchedYears })}
+              </p>
+            ) : (
+              <ol className="divide-y divide-line rounded-sm border border-line bg-card">
+                {nextRuns.runs.map((run) => (
+                  <li key={run.getTime()} className="flex items-center justify-between gap-3 px-3 py-1.5">
+                    <span className="font-mono text-sm tabular-nums">{formatRun(run, mode !== 'linux')}</span>
+                    <span className="text-xs text-fg-mute">{relativeFromNow(run, m)}</span>
+                  </li>
+                ))}
+                {/* Sparse schedules (Feb 29, pinned year) can have fewer than 5 runs in the
+                    scan window; say so instead of looking truncated. */}
+                {nextRuns.runs.length < 5 && (
+                  <li className="px-3 py-1.5 text-[11px] text-fg-mute">
+                    {nextRuns.searchedYears === null
+                      ? m('allRemainingRuns')
+                      : m('fewRuns', { n: nextRuns.runs.length, years: nextRuns.searchedYears })}
+                  </li>
+                )}
+              </ol>
+            )}
+          </div>
+        )}
       </div>
       </div>
     </div>

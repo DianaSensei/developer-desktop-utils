@@ -56,10 +56,8 @@ describe('environments-io — import', () => {
   });
 
   it('a secret lock survives an export/import round trip in either format', () => {
-    // The lock gates masking in the UI, exclusion from generated code, and
-    // History's redaction list (see KeyValueEditor's lock toggle) — losing it
-    // on the way back in silently exposes a value the user deliberately
-    // protected, with nothing in the UI saying it happened.
+    // The `secret` flag drives masking, codegen exclusion and History redaction;
+    // losing it on import would silently expose a protected value.
     const original = newEnvironment('S', null, [{ ...newKeyValue('apiKey', 'sk-live'), enabled: true, secret: true }]);
     expect(importEnvironment(exportEnvironmentNative(original)).variables[0].secret).toBe(true);
     expect(importEnvironment(exportEnvironmentPostman(original)).variables[0].secret).toBe(true);

@@ -1,10 +1,25 @@
+/**
+ * Platform SDK: the only surface plugins use to reach outside themselves.
+ *
+ * Every call goes through one checkpoint: check the declared permission,
+ * record an audit entry, then execute. Exceptions: `storage.key()` (a
+ * namespaced key for `usePersistentState`) and `env` are unchecked. This
+ * guards against mistakes, not hostile code: plugins share the webview's JS
+ * realm (see docs/AUDIT.md). An SDK is created per plugin
+ * (`createPluginSdk(manifest)`), so storage namespaces and command
+ * allowlists are bound to the plugin's identity.
+ */
+
 import {
   copyImageToClipboard,
   copyToClipboard,
   readImageFromClipboard,
   readTextFromClipboard,
 } from '@/lib/clipboard';
+import { IS_MAC, MOD_KEY, isTauri } from '@/lib/platform';
 import { storageGet, storageRemove, storageSet } from '@/lib/persistentStore';
+import * as audit from './audit';
+import { SDK_VERSION, type PluginManifest, type PluginPermission } from './types';
 import { secretDelete, secretGet, secretKeys, secretSet } from './secrets';
 import { createPluginService, type PluginService } from './service';
 import { hostAllowed } from './manifest';
@@ -12,33 +27,14 @@ import type { Channel } from '@tauri-apps/api/core';
 import type { DangerousSettings } from '@tauri-apps/plugin-http';
 
 /**
- * `RequestInit` cộng các tuỳ chọn chỉ có ở tầng HTTP của Tauri.
- *
- * Cần vì chúng là thứ một HTTP workbench không thể thiếu: `maxRedirections` để
- * người dùng tự quyết có đi theo redirect hay không, `danger` để gọi được tới
- * endpoint dùng chứng chỉ tự ký. `fetch` của trình duyệt không có cả hai, và ở
- * bản web chúng đơn giản bị bỏ qua.
+ * `RequestInit` plus options only Tauri's HTTP layer supports:
+ * `maxRedirections` and `danger` (self-signed certificates). Ignored by the
+ * browser `fetch` used in web builds.
  */
 export type PluginFetchInit = RequestInit & {
   maxRedirections?: number;
   danger?: DangerousSettings;
 };
-import { IS_MAC, MOD_KEY, isTauri } from '@/lib/platform';
-import * as audit from './audit';
-import { SDK_VERSION, type PluginManifest, type PluginPermission } from './types';
-
-/**
- * Platform SDK — bề mặt DUY NHẤT plugin được phép dùng để chạm ra ngoài chính nó.
- *
- * Mọi kênh ở đây đều đi qua một điểm thắt: kiểm quyền đã khai trong manifest →
- * ghi audit → mới thực thi. Đó là lý do SDK tồn tại thay vì để plugin import
- * thẳng `@/lib/clipboard` hay `@tauri-apps/api`: không có điểm thắt thì không
- * có gì để kiểm toán, và "quyền" trong manifest chỉ là chú thích.
- *
- * SDK được cấp THEO PLUGIN (`createPluginSdk(manifest)`), không phải singleton
- * toàn cục — nhờ vậy namespace storage và allowlist lệnh gắn chặt với danh tính
- * plugin, plugin không tự khai mình là plugin khác được.
- */
 
 export class PluginPermissionError extends Error {
   constructor(
@@ -78,14 +74,13 @@ export interface PluginStorage {
   get(key: string): string | null;
   set(key: string, value: string): void;
   remove(key: string): void;
-  /** Khoá đầy đủ (đã gắn namespace) — để truyền cho `usePersistentState`. */
+  /** Fully namespaced key, for `usePersistentState`. */
   key(key: string): string;
 }
 
 /**
- * Kho bí mật của plugin. Bất đồng bộ, khác hẳn `storage` đồng bộ ở trên — và đó
- * là chủ ý: nó nằm ở một file riêng, ngoài cache trong RAM mà mọi module đọc
- * được. Chấp nhận `await` chính là cái giá của việc tách mặt phẳng khoá.
+ * Plugin secrets, stored in the encrypted vault rather than the shared
+ * in-memory settings cache; hence asynchronous.
  */
 export interface PluginSecrets {
   get(key: string): Promise<string | null>;
@@ -94,17 +89,16 @@ export interface PluginSecrets {
   keys(): Promise<string[]>;
 }
 
-/** Thông tin môi trường mà tool nào cũng hỏi. Chỉ đọc, không có quyền nào gác:
- *  nó không tiết lộ gì mà `navigator.userAgent` không nói sẵn. */
+/** Environment info. Not gated: it reveals nothing beyond the user agent. */
 export interface PluginEnv {
-  /** Đang chạy trong webview của Tauri, không phải trình duyệt thường. */
+  /** Running in the Tauri webview rather than a plain browser. */
   readonly isTauri: boolean;
   readonly isMac: boolean;
-  /** Phím lệnh theo hệ điều hành, để hiển thị phím tắt: '⌘' hoặc 'Ctrl'. */
+  /** Modifier key label for shortcuts: '⌘' or 'Ctrl'. */
   readonly modKey: string;
 }
 
-/** Trạng thái kéo-thả ở cấp cửa sổ. `paths` chỉ có ở pha 'drop'. */
+/** Window-level drag state. `paths` is only set on 'drop'. */
 export interface FileDropEvent {
   type: 'enter' | 'over' | 'drop' | 'leave';
   paths?: string[];
@@ -112,17 +106,17 @@ export interface FileDropEvent {
 
 export interface PluginFileFilter {
   name: string;
-  /** Đuôi file, KHÔNG kèm dấu chấm: ['json', 'yaml']. */
+  /** Extensions without the dot: ['json', 'yaml']. */
   extensions: string[];
 }
 
 export interface PluginFiles {
-  /** Hộp thoại mở file của hệ điều hành. `null` khi người dùng huỷ. */
+  /** OS open dialog; `null` when cancelled. */
   pickOpen(options?: { title?: string; multiple?: boolean; filters?: PluginFileFilter[] }): Promise<string[] | null>;
-  /** Hộp thoại lưu file. `null` khi người dùng huỷ. */
+  /** OS save dialog; `null` when cancelled. */
   pickSave(options?: { title?: string; defaultPath?: string; filters?: PluginFileFilter[] }): Promise<string | null>;
   readText(path: string): Promise<string>;
-  /** `append` để ghi nối, dùng cho export lớn ghi theo từng khối. */
+  /** `append` supports large exports written in chunks. */
   writeText(path: string, contents: string, options?: { append?: boolean }): Promise<void>;
   readBytes(path: string): Promise<Uint8Array>;
   writeBytes(path: string, data: Uint8Array): Promise<void>;
@@ -130,67 +124,53 @@ export interface PluginFiles {
 
 export interface PluginSdk {
   readonly id: string;
-  /** Nguồn cài — xem `PluginManifest.group`. Metadata, không ảnh hưởng khoá
-   *  storage/audit (vẫn theo `id` một mình). */
+  /** Install source (see `PluginManifest.group`). */
   readonly group: string;
   readonly sdkVersion: string;
   readonly permissions: readonly PluginPermission[];
   readonly env: PluginEnv;
   files: PluginFiles;
-  /** Mở URL bằng trình duyệt mặc định của người dùng. */
+  /** Opens a URL in the default browser. */
   openExternal(url: string): Promise<void>;
   storage: PluginStorage;
   secrets: PluginSecrets;
   clipboard: {
     readText(): Promise<string | null>;
     writeText(text: string): Promise<void>;
-    /** Ảnh trong clipboard dưới dạng data URL PNG, `null` khi không có ảnh. */
+    /** Clipboard image as a PNG data URL, or `null`. */
     readImage(): Promise<string | null>;
     writeImage(source: Blob | string): Promise<void>;
   };
-  /** `fetch` tương thích chuẩn, đi qua tauri-plugin-http khi chạy trong app. */
+  /** Standard `fetch`, routed through tauri-plugin-http in the app. */
   http: { fetch(input: string, init?: PluginFetchInit): Promise<Response> };
   native: {
     invoke<T>(command: string, args?: Record<string, unknown>): Promise<T>;
     /**
-     * Kênh streaming của Tauri, để truyền vào một lệnh nhận `Channel` (log
-     * container, consumer Kafka/RabbitMQ, pub/sub Redis).
-     *
-     * SDK cần hàm này vì nếu không, mọi tool có luồng dữ liệu buộc phải import
-     * thẳng `@tauri-apps/api/core` và nằm ngoài điểm thắt — tức bốn tool nặng
-     * nhất của app vĩnh viễn không đi qua được lớp quyền/audit.
-     *
-     * `label` chỉ dùng cho nhật ký: một kênh không mang tên lệnh nào, nên nó là
-     * cách duy nhất để đọc log biết luồng này của thứ gì.
+     * Creates a Tauri `Channel` for commands that stream data. Gated by
+     * 'native' so streaming tools stay behind the SDK checkpoint. `label`
+     * names the stream in the audit log.
      */
     channel<T>(onMessage: (message: T) => void, label?: string): Promise<Channel<T>>;
     /**
-     * Nghe một sự kiện phát từ phía Rust. Trả về hàm huỷ đăng ký — plugin PHẢI
-     * gọi nó lúc unmount, đúng như mọi listener khác trong repo này.
+     * Listens to an event emitted by Rust. Call the returned function on
+     * unmount.
      */
     listen<T>(event: string, handler: (payload: T) => void): Promise<() => void>;
     /**
-     * Sự kiện kéo-thả file ở cấp CỬA SỔ (Tauri chặn chúng trước webview, nên
-     * `ondrop` của HTML không bao giờ nhận được).
-     *
-     * Gác sau quyền `files:read` chứ không phải 'native': thứ nó trao cho plugin
-     * là đường dẫn file của người dùng: nhận được chúng đã là bước đầu của việc
-     * đọc file, dù việc đọc thật có diễn ra qua lệnh nào đi nữa.
-     *
-     * Trả về hàm huỷ đăng ký — plugin PHẢI gọi nó lúc unmount.
+     * Window-level file drag events (Tauri intercepts them before the
+     * webview, so HTML `ondrop` never fires). Gated by 'files:read' because
+     * it hands the plugin file paths. Call the returned function on unmount.
      */
     onFileDrop(handler: (event: FileDropEvent) => void): Promise<() => void>;
   };
-  /** Tier B: gọi sidecar của plugin. Xem `service.ts`. */
+  /** Tier B: calls the plugin's sidecar. See service.ts. */
   service: PluginService;
   log(message: string, detail?: string): void;
 }
 
 /**
- * Namespace khoá storage. Cố ý giữ nguyên tiền tố `devtool:<id>:` mà các tool
- * hiện có đã dùng với `usePersistentState`, nên một tool chuyển sang SDK vẫn
- * đọc đúng dữ liệu người dùng đang có — đổi tiền tố ở đây là im lặng vứt đi
- * toàn bộ collection, lịch sử và cấu hình đã lưu của họ.
+ * Storage key namespace. The `devtool:<id>:` prefix matches existing saved
+ * data; changing it would orphan users' collections, history and settings.
  */
 export function storageKey(pluginId: string, key: string): string {
   return `devtool:${pluginId}:${key}`;
@@ -209,7 +189,7 @@ function ensure(manifest: PluginManifest, permission: PluginPermission, channel:
   if (!granted) throw new PluginPermissionError(manifest.id, permission, action);
 }
 
-/** Lệnh khớp allowlist khi trùng khít, hoặc khi một mục allowlist là tiền tố của nó. */
+/** A command is allowed when it equals an allowlist entry or starts with one. */
 function commandAllowed(manifest: PluginManifest, command: string): boolean {
   return (manifest.commands ?? []).some((c) => command === c || command.startsWith(c));
 }
@@ -240,8 +220,7 @@ export function createPluginSdk(manifest: PluginManifest): PluginSdk {
       },
     },
 
-    // Audit của kênh này chỉ ghi TÊN khoá, không bao giờ ghi giá trị — một
-    // nhật ký làm rò seed TOTP thì tệ hơn hẳn việc không có nhật ký.
+    // Audit entries record key names only, never values.
     secrets: {
       async get(key) {
         ensure(manifest, 'secrets', 'secrets', 'get', key);
@@ -280,9 +259,8 @@ export function createPluginSdk(manifest: PluginManifest): PluginSdk {
       },
     },
 
-    // Đọc và ghi file tách thành hai quyền, cùng lý do như clipboard: một tool
-    // chỉ cần nhập file (API Client import collection) không nên vì thế mà có
-    // luôn quyền ghi đè lên bất cứ file nào người dùng chọn.
+    // Read and write are separate permissions: importing a file should not
+    // grant overwriting any file the user picks.
     files: {
       async pickOpen(options) {
         ensure(manifest, 'files:read', 'files', 'pickOpen', options?.title);
@@ -345,9 +323,8 @@ export function createPluginSdk(manifest: PluginManifest): PluginSdk {
           });
           throw new PluginHostError(id, audit.describeUrl(input));
         }
-        // tauri-plugin-http bỏ qua sandbox của webview (CORS, cookie của
-        // trang) — đó là lý do nó tồn tại — nhưng chỉ có trong app thật, nên
-        // bản web/test rơi về `fetch` của trình duyệt.
+        // tauri-plugin-http bypasses webview restrictions (CORS, page cookies)
+        // but only exists in the app; web builds and tests use `fetch`.
         if (isTauri) {
           const { fetch: tauriFetch } = await import('@tauri-apps/plugin-http');
           return tauriFetch(input, init);
@@ -358,9 +335,7 @@ export function createPluginSdk(manifest: PluginManifest): PluginSdk {
 
     native: {
       async invoke<T>(command: string, args?: Record<string, unknown>): Promise<T> {
-        // Hai điều kiện, một bản ghi: lệnh phải vừa có quyền 'native' vừa nằm
-        // trong allowlist. Ghi riêng từng điều kiện sẽ sinh hai dòng audit cho
-        // cùng một lời gọi và làm nhật ký khó đọc.
+        // One audit entry covering both the permission and the allowlist.
         const granted = manifest.permissions?.includes('native') ?? false;
         const allowed = granted && commandAllowed(manifest, command);
         audit.record({
@@ -393,9 +368,8 @@ export function createPluginSdk(manifest: PluginManifest): PluginSdk {
       },
 
       async channel<T>(onMessage: (message: T) => void, label?: string): Promise<Channel<T>> {
-        // Không có tên lệnh để đối chiếu allowlist ở đây — allowlist bám vào
-        // lời gọi `invoke` sẽ dùng kênh này. Nên chỗ này chỉ kiểm quyền, và ghi
-        // lại việc mở luồng để nhật ký không bỏ sót một kênh dữ liệu dài hạn.
+        // No command name to check yet; the allowlist applies to the
+        // `invoke` that uses this channel. Record the stream opening.
         ensure(manifest, 'native', 'native', `channel:${label ?? 'unnamed'}`);
         const { Channel: TauriChannel } = await import('@tauri-apps/api/core');
         const channel = new TauriChannel<T>();

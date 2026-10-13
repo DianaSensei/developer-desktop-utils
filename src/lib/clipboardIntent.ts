@@ -1,17 +1,12 @@
 /**
- * Đoán người dùng sắp làm gì với nội dung đang có trên clipboard.
+ * Guesses what the user wants to do with the clipboard contents.
  *
- * ⌘K đọc clipboard và, nếu đoán được, xếp một tool lên đầu danh sách kèm LÝ DO
- * — không chỉ đoán âm thầm. "Trông giống JWT — ba đoạn base64url ngăn bằng dấu
- * chấm" cho người dùng cơ sở để tin hoặc bỏ qua gợi ý, thay vì một phép màu khó
- * hiểu khi tool bỗng dưng nhảy lên đầu.
+ * ⌘K reads the clipboard and, when it can tell, puts a tool first along with
+ * the reason (e.g. "Looks like a JWT"), so the suggestion is explainable.
  *
- * Hàm ở đây THUẦN — không đọc clipboard, không đụng React. `readTextFromClipboard`
- * trong `lib/clipboard.ts` mới là nơi làm việc đó; tách ra để logic đoán test
- * được mà không cần giả lập clipboard hay DOM.
- *
- * Thứ tự kiểm tra đi từ ĐẶC THÙ đến CHUNG CHUNG — bắt buộc, vì JSON hợp lệ và
- * URL hợp lệ đều có thể vô tình khớp một mẫu chung chung hơn ở phía dưới.
+ * Pure functions: reading the clipboard happens in lib/clipboard.ts. Checks
+ * run from most to least specific, since valid JSON or URLs can also match
+ * the looser patterns further down.
  */
 
 import type { TranslationKey } from '@/lib/i18n';
@@ -26,20 +21,20 @@ export type ClipboardIntentKind =
   | 'hex'
   | 'base64';
 
-/** Chỉ những khoá `clipboard.reason.*` — ràng buộc kiểu để không lệch với i18n.ts. */
+/** `clipboard.reason.*` keys only, so reasons stay in sync with i18n.ts. */
 export type ClipboardReasonKey = Extract<TranslationKey, `clipboard.reason.${string}`>;
 
 export interface ClipboardIntent {
   kind: ClipboardIntentKind;
-  /** id trong TOOL_DEFS — tool để mở. */
+  /** TOOL_DEFS id of the tool to open. */
   toolId: string;
-  /** Khoá dịch trong lib/i18n.ts — không phải chuỗi hiển thị. */
+  /** Translation key in lib/i18n.ts, not display text. */
   reasonKey: ClipboardReasonKey;
 }
 
 const B64URL = /^[A-Za-z0-9_-]+$/;
 
-/** Giải base64url không cần đệm — dùng cho phần header của JWT. */
+/** Decodes unpadded base64url (the JWT header). */
 function decodeBase64Url(segment: string): string | null {
   try {
     const padded = segment.replace(/-/g, '+').replace(/_/g, '/');
@@ -54,8 +49,8 @@ function isJwt(text: string): boolean {
   const parts = text.split('.');
   if (parts.length !== 3) return false;
   if (!parts.every((p) => p.length > 0 && B64URL.test(p))) return false;
-  // Header phải giải mã ra JSON có khoá "alg" — đó là dấu hiệu chắc chắn nhất,
-  // vì ba đoạn base64url ngăn bằng chấm không hiếm gặp ngoài JWT.
+  // The header must decode to JSON with an "alg" key; three dot-separated
+  // base64url segments alone are common outside JWTs.
   const header = decodeBase64Url(parts[0]);
   if (!header) return false;
   try {
@@ -80,9 +75,8 @@ function isJson(text: string): boolean {
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
- * Cron 5 hoặc 6 trường, mỗi trường chỉ gồm ký tự cú pháp cron. Yêu cầu ít nhất
- * một trường có `*`, `/` hoặc `,` — nếu không thì "1 2 3 4 5" (năm số cách nhau
- * bằng dấu cách) cũng khớp, và đó gần như chắc chắn không phải cron thật.
+ * A 5- or 6-field cron expression of cron characters, with at least one
+ * `*`, `/` or `,` (otherwise "1 2 3 4 5" would match).
  */
 function isCron(text: string): boolean {
   const fields = text.trim().split(/\s+/);
@@ -91,7 +85,7 @@ function isCron(text: string): boolean {
   return fields.some((f) => /[*/,]/.test(f));
 }
 
-/** 10 chữ số (giây) hoặc 13 chữ số (mili giây), nằm trong khoảng năm 2001–2100. */
+/** 10 digits (seconds) or 13 (milliseconds), between years 2001 and 2100. */
 function isTimestamp(text: string): boolean {
   const t = text.trim();
   if (!/^\d+$/.test(t)) return false;
@@ -103,7 +97,7 @@ function isTimestamp(text: string): boolean {
 
 const URL_RE = /^https?:\/\/\S+$/i;
 
-/** Cần ít nhất một chữ a–f để tách khỏi chuỗi toàn số (đã bắt ở isTimestamp). */
+/** Requires a letter a–f to differ from all-digit strings (see isTimestamp). */
 function isHex(text: string): boolean {
   const t = text.trim().replace(/^0x/i, '');
   if (t.length < 6 || t.length % 2 !== 0) return false;
@@ -112,7 +106,7 @@ function isHex(text: string): boolean {
 
 const BASE64_RE = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=|[A-Za-z0-9+/]{4})$/;
 
-/** Cần dấu `+`, `/` hoặc `=`, hoặc cả chữ hoa lẫn thường — để tách khỏi hex thuần. */
+/** Requires `+`, `/`, `=`, or mixed case, to differ from plain hex. */
 function isBase64(text: string): boolean {
   const t = text.trim();
   if (t.length < 8 || t.length % 4 !== 0) return false;
@@ -130,8 +124,7 @@ export function detectClipboardIntent(rawText: string | null | undefined): Clipb
   if (UUID_RE.test(text)) return { kind: 'uuid', toolId: 'generator', reasonKey: 'clipboard.reason.uuid' };
   if (isCron(text)) return { kind: 'cron', toolId: 'cron-generator', reasonKey: 'clipboard.reason.cron' };
   if (isTimestamp(text)) return { kind: 'timestamp', toolId: 'unix-time', reasonKey: 'clipboard.reason.timestamp' };
-  // URL gợi ý QR Code chứ không phải trình duyệt — đây là app tiện ích ngoại
-  // tuyến, việc hợp lý nhất để làm với một URL vừa copy là biến nó thành QR.
+  // A copied URL suggests QR Code: the most useful offline action for it.
   if (URL_RE.test(text)) return { kind: 'url', toolId: 'qrcode', reasonKey: 'clipboard.reason.url' };
   if (isHex(text)) return { kind: 'hex', toolId: 'base64', reasonKey: 'clipboard.reason.hex' };
   if (isBase64(text)) return { kind: 'base64', toolId: 'base64', reasonKey: 'clipboard.reason.base64' };

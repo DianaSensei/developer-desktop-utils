@@ -5,10 +5,8 @@ import { ACCENT_TONES } from '@/lib/accentPreference';
 import { storageGet, storageRemove } from '@/lib/persistentStore';
 
 /**
- * Section Appearance mới trong Settings (task G3b) — bộ chọn tone và ngôn ngữ
- * đầu tiên dùng thật `SettingRow`/`SettingGroup` của design kit. Test tập
- * trung vào việc CHỌN thật sự đổi trạng thái và được LƯU LẠI, chứ không chỉ
- * "có render không" (build đã bắt việc đó).
+ * Appearance section: choosing a tone or language changes state and is
+ * saved.
  */
 
 afterEach(() => {
@@ -40,8 +38,7 @@ describe('Settings — Appearance — ngôn ngữ', () => {
 describe('Settings — Appearance — tone chủ đạo', () => {
   it('hiện đủ 4 swatch, đúng số preset của kit', () => {
     renderSettings();
-    // Mỗi radio không có aria-label riêng nên tên truy cập của nó rơi về
-    // `title` (tên tone) — "Accent tone" là tên của cả NHÓM, không phải từng nút.
+    // "Accent tone" names the group; each radio is named by its `title`.
     expect(screen.getByRole('radiogroup', { name: 'Accent tone' })).toBeTruthy();
     expect(screen.getAllByRole('radio')).toHaveLength(ACCENT_TONES.length);
   });

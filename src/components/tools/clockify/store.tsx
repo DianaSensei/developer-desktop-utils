@@ -172,7 +172,7 @@ export function ClockifyProvider({ children }: { children: ReactNode }) {
   // before the migration effect runs.
   const settings = useMemo(() => ({ ...DEFAULT_SETTINGS, ...settingsRaw }), [settingsRaw]);
 
-  // --- one-time migration from the old single Task Tracker tool ---
+  // --- one-time migration from the former standalone Task Tracker ---
   const migrated = useRef(false);
   useEffect(() => {
     if (migrated.current) return;
@@ -180,7 +180,7 @@ export function ClockifyProvider({ children }: { children: ReactNode }) {
     try {
       if (storageGet('devtool:clockify:migrated')) return;
 
-      // normalize tasks loaded from the old key (add projectId if absent)
+      // Normalize tasks from the legacy key (add projectId if missing).
       setTasks((prev) =>
         prev.map((t) => ({
           ...t,

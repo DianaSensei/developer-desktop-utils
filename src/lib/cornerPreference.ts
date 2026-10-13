@@ -1,17 +1,12 @@
 import { storageGet, storageSet } from '@/lib/persistentStore';
 
 /**
- * Kiểu bo góc — ba preset khai báo trong `design/tokens.css` dưới dạng
- * `[data-corner="…"]`. Áp dụng bằng cách gán
- * `document.documentElement.dataset.corner`; cả thang `--r-default`…`--r-xl`
- * (và mọi `rounded-*` đọc từ thang đó) tự đổi theo qua CSS, không cần JS.
+ * Corner style: three presets in design/tokens.css (`[data-corner="…"]`),
+ * applied through `document.documentElement.dataset.corner`. The `--r-*`
+ * scale and every `rounded-*` reading it follow via CSS. Radii must use the
+ * tokens (guard.test.ts rule `hardcodedRadius`).
  *
- * Cùng cơ chế với `accentPreference` — và cùng điều kiện: mọi bán kính trong
- * app phải đọc từ token. Một chỗ viết cứng `rounded-[12px]` là một chỗ ở lại
- * khi đổi preset; `guard.test.ts` (rule `hardcodedRadius`) canh việc đó.
- *
- * Danh sách này PHẢI khớp đúng các khối `[data-corner="…"]` trong tokens.css —
- * `cornerPreference.test.ts` đối chiếu cả hai để không lệch nhau.
+ * Must match tokens.css (checked by cornerPreference.test.ts).
  */
 export type CornerStyle = 'sharp' | 'default' | 'round';
 
@@ -33,7 +28,7 @@ export function setCornerPreference(style: CornerStyle): void {
   storageSet(CORNER_KEY, style);
 }
 
-/** Ghi lựa chọn lên `<html data-corner>` — nguồn CSS mà thang `--r-*` đọc. */
+/** Sets `<html data-corner>`, which the `--r-*` scale reads. */
 export function applyCornerToDocument(style: CornerStyle): void {
   document.documentElement.dataset.corner = style;
 }

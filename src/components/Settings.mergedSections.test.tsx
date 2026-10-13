@@ -3,10 +3,8 @@ import { screen, cleanup } from '@testing-library/react';
 import { renderSettings } from '@/testSupport/renderSettings';
 
 /**
- * "Plugin" (quyền + nhật ký của tool biên dịch sẵn) và "Data & Storage" (vị
- * trí thư mục dữ liệu) không còn là mục riêng trong nav trái — Plugin gộp
- * vào Tools, Storage gộp vào About. Test này khẳng định nội dung thật sự có
- * mặt ở mục mới, và hai mục cũ không còn xuất hiện trong nav.
+ * Built-in plugin permissions live under Tools and storage location under
+ * About; neither has its own nav entry.
  */
 
 afterEach(() => {
@@ -23,11 +21,11 @@ describe('Settings — Plugin/Storage đã gộp, không còn mục riêng', () 
   it('mục Tools hiện cả danh sách bật/tắt LẪN bảng quyền plugin (trước đây tách ở mục Plugin)', () => {
     renderSettings([{ pathname: '/settings', state: { section: 'tools' } }]);
     expect(screen.getByRole('heading', { name: 'Tools', level: 2 })).toBeTruthy();
-    // Bảng quyền của SettingsPlugins.tsx — mô tả này chỉ có ở đó.
+    // This description only exists in SettingsPlugins.tsx's table.
     expect(
       screen.getByText(/Every tool already COMPILED INTO the app|Mỗi tool BIÊN DỊCH SẴN trong app/),
     ).toBeTruthy();
-    // Nhật ký hoạt động vẫn theo đúng quy tắc "đóng theo mặc định".
+    // The activity log is still collapsed by default.
     expect(screen.getByRole('button', { name: /Show activity log/ })).toBeTruthy();
   });
 

@@ -1,12 +1,8 @@
-// Shared request-running logic for the API Client — split out of
-// ApiClient.tsx so it can be instantiated once at the app root (see
-// `mcpRuntimeContext.tsx`) and reused both by the mounted tool UI and, when the user
-// opts into the background MCP bridge (Settings → MCP), by a call that comes
-// in while the tool isn't on screen. Both consumers must share the exact
-// same `store` and the same `runRequest`/`persistResult` pair — instantiating
-// this hook twice against two different `store` instances would let a UI
-// edit and a concurrent MCP edit silently clobber each other's localStorage
-// write (see mcpRuntimeContext.tsx for the full explanation).
+// Shared request-running logic for the API Client, instantiated once at the
+// app root (`mcpRuntimeContext.tsx`) so the tool UI and background MCP calls
+// share the same `store` and `runRequest`/`persistResult`. Two instances
+// against different stores would overwrite each other's saved state (see
+// mcpRuntimeContext.tsx).
 
 import { useCallback, useRef } from 'react';
 import type { ApiStore } from './store';

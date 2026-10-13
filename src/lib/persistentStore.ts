@@ -1,17 +1,11 @@
-// Native (Tauri-side) replacement for the webview's localStorage.
+// Tauri-backed replacement for localStorage with the same synchronous API.
 //
-// @tauri-apps/plugin-store's JS API is entirely async, but most of the app
-// (usePersistentState + a handful of direct call sites) expects synchronous
-// reads/writes, matching localStorage's contract, so there's no loading
-// flicker on first render. The fix: load the whole store into an in-memory
-// string cache once at boot (see initPersistentStore, awaited in main.tsx
-// before the app's module graph is even evaluated), then serve every read
-// from that cache. Writes update the cache synchronously and persist to disk
-// in the background via the store's autoSave debounce, with an explicit
-// flush on app hide/close.
-//
-// Every key/value is treated as an opaque string, exactly like localStorage,
-// so existing JSON.parse/JSON.stringify call sites need no changes.
+// The store plugin is async, but usePersistentState and other callers read
+// synchronously, so the whole store is loaded into an in-memory string cache
+// at boot (initPersistentStore, awaited in main.tsx) and every read is served
+// from it. Writes update the cache immediately and are saved by the store's
+// autoSave debounce, with an explicit flush when the app is hidden or closed.
+// Values are opaque strings, as with localStorage.
 
 import { load, type Store } from '@tauri-apps/plugin-store';
 import { isTauri } from '@/lib/platform';
@@ -29,10 +23,8 @@ const VALID_THEME_VALUES: ThemePreference[] = ['light', 'dark', 'system'];
 let store: Store | null = null;
 const cache = new Map<string, string>();
 
-// Captured once, at the end of initPersistentStore — before any React provider
-// has mounted and had a chance to write its own defaults to the store. `true`
-// means the on-disk store was empty at boot, i.e. this is a brand-new install
-// rather than an existing user upgrading to a version that added a new key.
+// Set once at the end of initPersistentStore, before any provider writes
+// its defaults: `true` means the store was empty at boot (a new install).
 let freshInstall = false;
 
 async function migrateFromLocalStorage(s: Store): Promise<void> {
@@ -52,10 +44,8 @@ async function migrateFromLocalStorage(s: Store): Promise<void> {
   for (const key of keys) localStorage.removeItem(key);
 }
 
-// One-time migration of the old boolean `devtool-dark-mode` key into the new
-// 3-state `devtool-theme` key. Independent of MIGRATION_FLAG (which tracks
-// the earlier localStorage -> Tauri store migration, already complete by
-// the time this app-level feature migration ships).
+// One-time migration of the boolean `devtool-dark-mode` key to the
+// three-state `devtool-theme` key.
 async function migrateThemeKey(s: Store): Promise<void> {
   if (await s.get(THEME_MIGRATION_FLAG)) return;
 
@@ -79,12 +69,8 @@ async function migrateThemeKey(s: Store): Promise<void> {
 }
 
 export async function initPersistentStore(): Promise<void> {
-  // Web (`npm run dev`/`vite preview`, no Tauri IPC bridge): the store plugin
-  // has nothing to invoke and throws before ever resolving — there's also no
-  // *need* for it, since plain `localStorage` already does the job natively
-  // in a real browser. Read it straight into the cache and skip the
-  // Tauri-store migrations entirely (they exist to move data *into* the
-  // store this build doesn't have).
+  // Web build: no Tauri IPC, and localStorage already works, so load it
+  // into the cache and skip the store migrations.
   if (!isTauri) {
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
@@ -111,13 +97,15 @@ export async function initPersistentStore(): Promise<void> {
   await migrateThemeKey(s);
 }
 
-// True only for a brand-new install (nothing was on disk at boot). False for
-// an existing user, even one upgrading to a version that ships new features —
-// use this to seed one-time defaults so upgrades don't retroactively trigger
-// "first run" behavior (e.g. onboarding, per-tool intro guides) for people
-// who already know the app.
+// True only for a new install. Use it for one-time defaults (onboarding,
+// tool intros) so upgrades do not re-trigger first-run behavior.
 export function wasFreshInstall(): boolean {
   return freshInstall;
+}
+
+/** Every key currently in the store (e.g. to clear one plugin's namespace). */
+export function storageKeys(): string[] {
+  return [...cache.keys()];
 }
 
 export function storageGet(key: string): string | null {
@@ -151,15 +139,11 @@ export async function clearPersistentStore(): Promise<void> {
   }
 }
 
-// --- Theme preference (single source of truth: `devtool-theme`) ---
+// --- Theme preference (`devtool-theme`) ---
 //
-// All reads/writes of the theme preference MUST go through these two
-// wrappers — never call storageGet/storageSet('devtool-theme', ...) directly
-// elsewhere. setThemePreference also mirrors the value into a plain
-// localStorage key (`devtool-theme-shadow`) so index.html's pre-React
-// bootstrap script can apply the right theme class before first paint
-// without needing to touch the async Tauri store. That shadow key is
-// write-only from every module except the bootstrap script, which only reads it.
+// Always use these two functions. setThemePreference also mirrors the value
+// to localStorage (`devtool-theme-shadow`) so index.html's pre-React script
+// can apply the theme before first paint; only that script reads the shadow.
 
 export function setThemePreference(value: ThemePreference): void {
   if (!VALID_THEME_VALUES.includes(value)) {
@@ -169,15 +153,15 @@ export function setThemePreference(value: ThemePreference): void {
   try {
     localStorage.setItem(THEME_SHADOW_KEY, value);
   } catch {
-    // localStorage may be unavailable (e.g. some test/SSR environments) —
-    // the Tauri store write above is the source of truth regardless.
+    // localStorage may be unavailable (some test environments); the store
+    // write above is authoritative.
   }
 }
 
 export function getThemePreference(): ThemePreference {
   const raw = storageGet(THEME_KEY);
   if (raw === 'light' || raw === 'dark' || raw === 'system') return raw;
-  // Corrupt or missing value — self-heal by writing back a valid default.
+  // Missing or invalid value: write back a valid default.
   setThemePreference('system');
   return 'system';
 }

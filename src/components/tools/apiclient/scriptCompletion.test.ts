@@ -1,11 +1,6 @@
-// Guards scriptCompletion.ts's hand-maintained autocomplete shapes against
-// drifting from the real runtime.ts API. There's no static way to derive the
-// shapes (their real shape depends on closures built at call time — see
-// scriptCompletion.ts's own header comment), so instead: build a real
-// instance of each factory, walk its own-enumerable-key paths, and assert
-// every one of them exists in the corresponding shadow shape. A future
-// rename/addition to makeDt/makeReq/makeRes/makePm/makeAssert/makeConsole
-// that isn't mirrored here now fails a test instead of silently going stale.
+// Keeps scriptCompletion.ts's hand-written autocomplete shapes in sync with
+// runtime.ts: builds a real instance of each factory and asserts every
+// own-enumerable key path exists in the matching shadow shape.
 
 import { describe, expect, it } from 'vitest';
 import { scriptCompletionShapes } from './scriptCompletion';

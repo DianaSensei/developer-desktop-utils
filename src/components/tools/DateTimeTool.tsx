@@ -23,6 +23,9 @@ import {
 import { useQuickPaste } from '@/hooks/useQuickPaste';
 import { CollapsibleSection } from '@/components/ui/collapsible-section';
 import { cn } from '@/lib/utils';
+import { useMessages } from '@/contexts/LocaleContext';
+import { Tooltip } from '@/components/ui/tooltip';
+import MESSAGES from '@/components/tools/DateTimeTool.messages';
 
 // ─── constants ────────────────────────────────────────────────────────────
 
@@ -56,7 +59,8 @@ function tzOffsetMinutes(date: Date, tz: string): number {
   try {
     const p = intlParts(date, tz);
     const wallMs = Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second);
-    return (wallMs - date.getTime()) / 60000;
+    // `intlParts` has no milliseconds, so compare against the whole second.
+    return Math.round((wallMs - Math.floor(date.getTime() / 1000) * 1000) / 60000);
   } catch { return 0; }
 }
 
@@ -119,7 +123,7 @@ function parseInTz(str: string, tz: string): Date | null {
   return new Date(utcGuess.getTime() - offset * 60000);
 }
 
-function formatRFC3339InTz(date: Date, tz: string): string {
+export function formatRFC3339InTz(date: Date, tz: string): string {
   const offset = tzOffsetMinutes(date, tz);
   const wall = formatInTz(date, tz, "yyyy-MM-dd'T'HH:mm:ss");
   if (offset === 0) return `${wall}Z`;
@@ -139,37 +143,39 @@ function tryFormatInTz(date: Date, tz: string, fmt: string): string | null {
   } catch { return null; }
 }
 
-function humanReadableDuration(a: Date, b: Date): string {
+type T = (key: keyof typeof MESSAGES, params?: Record<string, string | number>) => string;
+
+const DURATION_UNITS = ['year', 'month', 'day', 'hour', 'minute', 'second'] as const;
+
+/** Localized parts such as "3 years", "2 hours". */
+function durationParts(a: Date, b: Date, t: T): string[] {
   const [earlier, later] = a <= b ? [a, b] : [b, a];
   const dur = intervalToDuration({ start: earlier, end: later });
-  const parts = [
-    dur.years   && `${dur.years} year${dur.years !== 1 ? 's' : ''}`,
-    dur.months  && `${dur.months} month${dur.months !== 1 ? 's' : ''}`,
-    dur.days    && `${dur.days} day${dur.days !== 1 ? 's' : ''}`,
-    dur.hours   && `${dur.hours} hour${dur.hours !== 1 ? 's' : ''}`,
-    dur.minutes && `${dur.minutes} minute${dur.minutes !== 1 ? 's' : ''}`,
-    dur.seconds && `${dur.seconds} second${dur.seconds !== 1 ? 's' : ''}`,
-  ].filter(Boolean);
-  return parts.length ? parts.join(', ') : '0 seconds';
+  return DURATION_UNITS.flatMap((u) => {
+    const n = dur[`${u}s`] ?? 0;
+    return n ? [t(n === 1 ? `dur.${u}` : `dur.${u}s`, { n })] : [];
+  });
 }
 
-// Bản cũ tô mỗi đơn vị một màu cầu vồng (years=tím, months=xanh dương,
-// days=sky…) dù chữ "years"/"months" đã tự nói lên đơn vị, và dấu `·` đã ngăn
-// cách rõ ràng. Màu không thêm thông tin nào — chỉ trọng lượng (bold+mono) +
-// dấu ngăn là đủ, đúng nguyên tắc "hierarchy qua weight/size, không phải màu".
-function DurationParts({ a, b }: { a: Date; b: Date }) {
-  const [earlier, later] = a <= b ? [a, b] : [b, a];
-  const dur = intervalToDuration({ start: earlier, end: later });
-  const parts = [
-    dur.years   && `${dur.years} ${dur.years !== 1 ? 'years' : 'year'}`,
-    dur.months  && `${dur.months} ${dur.months !== 1 ? 'months' : 'month'}`,
-    dur.days    && `${dur.days} ${dur.days !== 1 ? 'days' : 'day'}`,
-    dur.hours   && `${dur.hours} ${dur.hours !== 1 ? 'hours' : 'hour'}`,
-    dur.minutes && `${dur.minutes} ${dur.minutes !== 1 ? 'minutes' : 'minute'}`,
-    dur.seconds && `${dur.seconds} ${dur.seconds !== 1 ? 'seconds' : 'second'}`,
-  ].filter(Boolean) as string[];
+function humanReadableDuration(a: Date, b: Date, t: T): string {
+  const parts = durationParts(a, b, t);
+  return parts.length ? parts.join(', ') : t('zeroSeconds');
+}
 
-  if (!parts.length) return <span className="font-semibold font-mono">0 sec</span>;
+/** Fills `{{x}}` slots in a template with React nodes, keeping each locale's word order. */
+function richText(template: string, slots: Record<string, React.ReactNode>) {
+  return template.split(/(\{\{\w+\}\})/).map((part, i) => {
+    const key = /^\{\{(\w+)\}\}$/.exec(part)?.[1];
+    return key && key in slots ? <span key={i}>{slots[key]}</span> : part;
+  });
+}
+
+// Units are distinguished by weight and separators, not color: the words
+// already name the unit.
+function DurationParts({ a, b, t }: { a: Date; b: Date; t: T }) {
+  const parts = durationParts(a, b, t);
+
+  if (!parts.length) return <span className="font-semibold font-mono">{t('zeroSeconds')}</span>;
   return (
     <>
       {parts.map((text, i) => (
@@ -188,7 +194,7 @@ interface FormatRow {
   label: string;
   description: string;
   tzSensitive: boolean;
-  value: (d: Date, tz: string) => string;
+  value: (d: Date, tz: string, t: T) => string;
 }
 
 const FORMAT_ROWS: FormatRow[] = [
@@ -255,15 +261,15 @@ const FORMAT_ROWS: FormatRow[] = [
   {
     label: 'Week of year', tzSensitive: true,
     description: 'ISO week number (1–53). Week 1 is the week containing the first Thursday of the year (Mon-first weeks).',
-    value: (d, tz) => `Week ${formatInTz(d, tz, 'w')} of ${formatInTz(d, tz, 'yyyy')}`,
+    value: (d, tz, t) => t('weekOf', { w: formatInTz(d, tz, 'w'), period: formatInTz(d, tz, 'yyyy') }),
   },
   {
     label: 'Week of month', tzSensitive: true,
     description: 'Which week within the month the date falls in (1–5), counting Mon-first weeks.',
-    value: (d, tz) => {
+    value: (d, tz, t) => {
       const wall = new Date(formatInTz(d, tz, 'yyyy-MM-dd HH:mm:ss'));
       const w = getWeekOfMonth(wall, { weekStartsOn: 1 });
-      return `Week ${w} of ${formatInTz(d, tz, 'MMMM yyyy')}`;
+      return t('weekOf', { w, period: formatInTz(d, tz, 'MMMM yyyy') });
     },
   },
 ];
@@ -277,17 +283,14 @@ const BOUNDARY_PAIRS: [string, (d: Date) => Date, (d: Date) => Date][] = [
 
 // ─── sub-components ────────────────────────────────────────────────────────
 
-function InfoTip({ text }: { text: string }) {
+// Kit Tooltip: opens on keyboard focus and is not clipped at edges.
+function InfoTip({ text, label }: { text: string; label: string }) {
   return (
-    <span className="relative group/tip inline-flex items-center">
-      <Info className="h-2.5 w-2.5 text-fg-mute/40 hover:text-fg-mute cursor-help transition-colors" />
-      <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50
-        hidden group-hover/tip:block w-52 rounded-md border bg-card px-2.5 py-2
-        text-[11px] leading-relaxed text-fg shadow-md">
-        {text}
-        <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-line" />
-      </span>
-    </span>
+    <Tooltip label={label} description={text} side="top" width={240}>
+      <button type="button" aria-label={label} className="inline-flex items-center rounded-xs text-fg-mute/40 hover:text-fg-mute focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus">
+        <Info className="h-2.5 w-2.5" />
+      </button>
+    </Tooltip>
   );
 }
 
@@ -333,6 +336,7 @@ function TzSelect({ label, value, onChange, availableTzs }: {
 function DiffDateInput({ value, onChange, tz }: {
   value: string; onChange: (v: string) => void; tz: string;
 }) {
+  const m = useMessages(MESSAGES);
   const [showPicker, setShowPicker] = useState(false);
   const [snapshot, setSnapshot] = useState<Date | null>(null);
   const ref = useRef<HTMLDivElement>(null);
@@ -356,10 +360,13 @@ function DiffDateInput({ value, onChange, tz }: {
       <Input
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder="Unix timestamp, ISO 8601, YYYY-MM-DD HH:mm:ss, …"
+        placeholder={m('inputPlaceholder')}
         className={cn('font-mono text-xs h-ctl pr-9', hasError && 'border-bad')}
       />
       <button
+        type="button"
+        aria-label={m('pickDate')}
+        title={m('pickDate')}
         onClick={() => {
           if (showPicker) { setShowPicker(false); return; }
           setSnapshot(parsed ?? new Date());
@@ -391,6 +398,7 @@ function DiffDateInput({ value, onChange, tz }: {
 
 export function DateTimeTool() {
   const sdk = usePluginSdkFor('unix-time');
+  const m = useMessages(MESSAGES);
   const [rawInput, setRawInput] = usePluginState(sdk, 'datetime:raw', '', { legacyKey: 'devtool:datetime:raw' });
   const [inputTz, setInputTz] = usePluginState(sdk, 'datetime:inputTz', LOCAL_TZ || 'UTC', { legacyKey: 'devtool:datetime:inputTz' });
   const [outputTz, setOutputTz] = usePluginState(sdk, 'datetime:outputTz', LOCAL_TZ || 'UTC', { legacyKey: 'devtool:datetime:outputTz' });
@@ -537,11 +545,11 @@ export function DateTimeTool() {
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Label className="text-xs">Date / Time</Label>
+              <Label className="text-xs">{m('dateTime')}</Label>
               {isLive && (
                 <span className="flex items-center gap-1 text-[11px] text-acc font-medium">
                   <span className="inline-block h-1.5 w-1.5 rounded-full bg-acc animate-pulse" />
-                  LIVE
+                  {m('live')}
                 </span>
               )}
             </div>
@@ -550,7 +558,7 @@ export function DateTimeTool() {
               className="flex items-center gap-1 text-xs text-fg-mute hover:text-fg transition-colors"
             >
               <RotateCcw className="h-3 w-3" />
-              Reset to now
+              {m('resetToNow')}
             </button>
           </div>
 
@@ -558,10 +566,13 @@ export function DateTimeTool() {
             <Input
               value={rawInput}
               onChange={(e) => handleRawChange(e.target.value)}
-              placeholder="Unix timestamp, ISO 8601, YYYY-MM-DD HH:mm:ss, June 14 2026, …"
+              placeholder={m('mainPlaceholder')}
               className={cn('font-mono text-sm pr-9', parseError && 'border-bad')}
             />
             <button
+              type="button"
+              aria-label={m('pickDate')}
+              title={m('pickDate')}
               onClick={() => showPicker ? cancelPicker() : openPicker()}
               className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-bg-2 text-fg-mute hover:text-fg transition-colors"
             >
@@ -582,7 +593,7 @@ export function DateTimeTool() {
 
           {parseError && (
             <p className="text-xs text-bad">
-              Could not parse — try a unix timestamp, ISO 8601, or "June 14 2026 14:30"
+              {m('parseError')}
             </p>
           )}
           {showHint && parsedDate && (
@@ -590,14 +601,12 @@ export function DateTimeTool() {
           )}
         </div>
 
-        {/* Timezone selectors — nhãn "input tz" dùng text-info, "output tz" dùng
-            text-warn TRONG SUỐT component này. Không phải thông báo lỗi/cảnh báo —
-            tái dùng hai hue sẵn có (gần đúng sky/amber của bản gốc) làm cặp phân
-            biệt input/output nhất quán qua toàn bộ bảng Formats bên dưới, thay vì
-            thêm hai token --tz-in/--tz-out gần trùng hue với info/warn. */}
+        {/* Timezone selectors. Input labels use text-info and output labels
+            text-warn throughout, as a consistent input/output pair (not a
+            warning). */}
         <div className="flex items-start gap-3">
           <div className="flex-1 space-y-0.5">
-            <TzSelect label="Input TZ" value={inputTz} onChange={setInputTz} availableTzs={availableTzs} />
+            <TzSelect label={m('inputTz')} value={inputTz} onChange={setInputTz} availableTzs={availableTzs} />
             {tzsDiffer && parsedDate && (
               <p className="text-[11px] font-mono text-fg-mute">
                 {formatInTz(parsedDate, inputTz, 'yyyy-MM-dd HH:mm:ss')}{' '}
@@ -607,7 +616,7 @@ export function DateTimeTool() {
           </div>
           <ChevronRight className="h-3.5 w-3.5 text-fg-mute shrink-0 mt-2" />
           <div className="flex-1 space-y-0.5">
-            <TzSelect label="Output TZ" value={outputTz} onChange={setOutputTz} availableTzs={availableTzs} />
+            <TzSelect label={m('outputTz')} value={outputTz} onChange={setOutputTz} availableTzs={availableTzs} />
             {tzsDiffer && parsedDate && (
               <p className="text-[11px] font-mono text-fg-mute">
                 {formatInTz(parsedDate, outputTz, 'yyyy-MM-dd HH:mm:ss')}{' '}
@@ -618,27 +627,27 @@ export function DateTimeTool() {
         </div>
 
         {/* ── Formats ── */}
-        <CollapsibleSection variant="bordered" eyebrow title="Formats" open={showFormats} onOpenChange={setShowFormats}>
+        <CollapsibleSection variant="bordered" eyebrow title={m('formats')} open={showFormats} onOpenChange={setShowFormats}>
           <div className="grid grid-cols-2 gap-x-4">
             {FORMAT_ROWS.map((row) => {
               const showDual = row.tzSensitive && tzsDiffer;
-              const inVal  = parsedDate ? row.value(parsedDate, inputTz)  : '—';
-              const outVal = parsedDate ? row.value(parsedDate, outputTz) : '—';
+              const inVal  = parsedDate ? row.value(parsedDate, inputTz, m)  : '—';
+              const outVal = parsedDate ? row.value(parsedDate, outputTz, m) : '—';
 
               return (
                 <div key={row.label} className="py-1.5 space-y-0.5 border-b last:border-b-0 [&:nth-last-child(2)]:border-b-0">
                   <div className="flex items-center gap-1">
-                    <span className="text-[11px] text-fg-mute">{row.label}</span>
-                    <InfoTip text={row.description} />
+                    <span className="text-[11px] text-fg-mute">{m(`fmt.${row.label}` as 'fmt.Date')}</span>
+                    <InfoTip label={m(`fmt.${row.label}` as 'fmt.Date')} text={m(`desc.${row.label}` as 'desc.Date')} />
                   </div>
                   {showDual ? (
                     <>
                       <div className="flex items-center gap-1.5">
-                        <span className="text-[11px] w-10 shrink-0 text-info">{getLocalTzLabel(inputTz) || 'In'}</span>
+                        <span className="text-[11px] w-10 shrink-0 text-info">{getLocalTzLabel(inputTz) || m('in')}</span>
                         <CopyValue value={inVal} dim={!parsedDate} />
                       </div>
                       <div className="flex items-center gap-1.5">
-                        <span className="text-[11px] w-10 shrink-0 text-warn">{getLocalTzLabel(outputTz) || 'Out'}</span>
+                        <span className="text-[11px] w-10 shrink-0 text-warn">{getLocalTzLabel(outputTz) || m('out')}</span>
                         <CopyValue value={outVal} dim={!parsedDate} />
                       </div>
                     </>
@@ -652,11 +661,11 @@ export function DateTimeTool() {
           {/* Custom format */}
           <div className="border-t mt-0.5 pt-2 space-y-0.5">
             <div className="flex items-center gap-2">
-              <span className="text-[11px] text-fg-mute shrink-0 w-10">Custom</span>
+              <span className="text-[11px] text-fg-mute shrink-0 w-10">{m('custom')}</span>
               <Input
                 value={customFmt}
                 onChange={(e) => setCustomFmt(e.target.value)}
-                placeholder="date-fns format, e.g. HH:mm:ss.SSS"
+                placeholder={m('customPlaceholder')}
                 className="h-6 text-[11px] font-mono py-0"
               />
             </div>
@@ -664,16 +673,16 @@ export function DateTimeTool() {
               const inVal  = tryFormatInTz(parsedDate, inputTz,  customFmt);
               const outVal = tryFormatInTz(parsedDate, outputTz, customFmt);
               if (inVal === null) return (
-                <p className="text-[11px] text-bad pl-12">invalid format string</p>
+                <p className="text-[11px] text-bad pl-12">{m('invalidFormat')}</p>
               );
               return tzsDiffer ? (
                 <>
                   <div className="flex items-center gap-1.5">
-                    <span className="text-[11px] w-10 shrink-0 text-info">{getLocalTzLabel(inputTz) || 'In'}</span>
+                    <span className="text-[11px] w-10 shrink-0 text-info">{getLocalTzLabel(inputTz) || m('in')}</span>
                     <CopyValue value={inVal} />
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <span className="text-[11px] w-10 shrink-0 text-warn">{getLocalTzLabel(outputTz) || 'Out'}</span>
+                    <span className="text-[11px] w-10 shrink-0 text-warn">{getLocalTzLabel(outputTz) || m('out')}</span>
                     <CopyValue value={outVal ?? inVal} />
                   </div>
                 </>
@@ -687,12 +696,12 @@ export function DateTimeTool() {
         </CollapsibleSection>
 
         {/* ── Boundaries ── */}
-        <CollapsibleSection variant="bordered" eyebrow title="Boundaries" open={showBoundaries} onOpenChange={setShowBoundaries}>
+        <CollapsibleSection variant="bordered" eyebrow title={m('boundaries')} open={showBoundaries} onOpenChange={setShowBoundaries}>
           <div className="pt-1">
             <div className="grid grid-cols-[4rem_1fr_1fr] gap-2 pb-1">
               <span />
-              <span className="text-[11px] font-medium text-fg-mute">Start</span>
-              <span className="text-[11px] font-medium text-fg-mute">End</span>
+              <span className="text-[11px] font-medium text-fg-mute">{m('start')}</span>
+              <span className="text-[11px] font-medium text-fg-mute">{m('end')}</span>
             </div>
             {BOUNDARY_PAIRS.map(([label, startFn, endFn]) => {
               // Compute boundary in the inputTz context
@@ -725,7 +734,7 @@ export function DateTimeTool() {
 
               return (
                 <div key={label} className="grid grid-cols-[4rem_1fr_1fr] gap-2 py-1.5 border-t">
-                  <span className="text-xs text-fg-mute self-start pt-0.5">{label}</span>
+                  <span className="text-xs text-fg-mute self-start pt-0.5">{m(`boundary.${label}` as 'boundary.Day')}</span>
                   {renderCell(s)}
                   {renderCell(e)}
                 </div>
@@ -735,18 +744,18 @@ export function DateTimeTool() {
         </CollapsibleSection>
 
         {/* ── Time Diff ── */}
-        <CollapsibleSection variant="bordered" eyebrow title="Time Difference" icon={<Timer className="h-3.5 w-3.5" />} open={showDiff} onOpenChange={setShowDiff}>
+        <CollapsibleSection variant="bordered" eyebrow title={m('timeDifference')} icon={<Timer className="h-3.5 w-3.5" />} open={showDiff} onOpenChange={setShowDiff}>
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-2">
-              {([['From', diffA, setDiffA], ['To', diffB, setDiffB]] as const).map(([lbl, val, set]) => (
+              {([['from', diffA, setDiffA], ['to', diffB, setDiffB]] as const).map(([lbl, val, set]) => (
                 <div key={lbl} className="space-y-1">
                   <div className="flex items-center justify-between">
-                    <SectionLabel>{lbl}</SectionLabel>
+                    <SectionLabel>{m(lbl)}</SectionLabel>
                     <button
                       onClick={() => set(formatInTz(new Date(), inputTz, "yyyy-MM-dd'T'HH:mm:ss"))}
                       className="text-[11px] text-fg-mute hover:text-fg transition-colors"
                     >
-                      now
+                      {m('now')}
                     </button>
                   </div>
                   <DiffDateInput value={val} onChange={set} tz={inputTz} />
@@ -757,30 +766,31 @@ export function DateTimeTool() {
               const aDate = parseInTz(diffA, inputTz)!;
               const bDate = parseInTz(diffB, inputTz)!;
               const isForward = bDate >= aDate;
-              const duration = humanReadableDuration(aDate, bDate);
+              const duration = humanReadableDuration(aDate, bDate, m);
               return (
                 <div className="space-y-2">
                   <div className="rounded-lg border border-line px-3 py-2.5 space-y-2.5">
                     {/* Timeline visual */}
                     <div className="flex items-center gap-2">
-                      <span className="text-[11px] font-semibold text-fg shrink-0">From</span>
+                      <span className="text-[11px] font-semibold text-fg shrink-0">{m('from')}</span>
                       <div className="flex flex-1 items-center gap-1.5 min-w-0">
                         <div className={cn('h-0.5 flex-1 rounded-full', isForward ? 'bg-ok' : 'bg-bad')} />
-                        <span className="shrink-0 text-xs"><DurationParts a={aDate} b={bDate} /></span>
+                        <span className="shrink-0 text-xs"><DurationParts a={aDate} b={bDate} t={m} /></span>
                         <div className={cn('h-0.5 flex-1 rounded-full', isForward ? 'bg-ok' : 'bg-bad')} />
                       </div>
                       <div className={cn('flex items-center gap-0.5 shrink-0', isForward ? 'text-ok' : 'text-bad')}>
                         {isForward ? <ChevronRight className="h-4 w-4 stroke-[2.5]" /> : <ChevronLeft className="h-4 w-4 stroke-[2.5]" />}
-                        <span className="text-[11px] font-semibold text-fg">To</span>
+                        <span className="text-[11px] font-semibold text-fg">{m('to')}</span>
                       </div>
                     </div>
                     {/* Plain-language explanation */}
                     <p className="text-[11px] text-fg-mute leading-relaxed">
-                      {isForward ? (
-                        <>The first date is <span className="font-semibold text-fg">{duration}</span> <span className="font-semibold text-ok">earlier</span> than the second.</>
-                      ) : (
-                        <>The first date is <span className="font-semibold text-fg">{duration}</span> <span className="font-semibold text-bad">later</span> than the second.</>
-                      )}
+                      {richText(m('diffSentence'), {
+                        dur: <span className="font-semibold text-fg">{duration}</span>,
+                        rel: isForward
+                          ? <span className="font-semibold text-ok">{m('earlier')}</span>
+                          : <span className="font-semibold text-bad">{m('later')}</span>,
+                      })}
                     </p>
                   </div>
                   <div className="grid grid-cols-2 gap-x-4 border border-line rounded-lg px-3 py-1">
@@ -788,7 +798,7 @@ export function DateTimeTool() {
                       .filter(([, val]) => val !== 0)
                       .map(([label, val]) => (
                         <div key={label} className="flex flex-col py-1.5 border-b [&:nth-last-child(-n+2)]:border-b-0">
-                          <span className="text-[11px] text-fg-mute">{label}</span>
+                          <span className="text-[11px] text-fg-mute">{m(`unit.${label}` as 'unit.Days')}</span>
                           <CopyValue value={val.toLocaleString()} />
                         </div>
                       ))}
@@ -796,7 +806,7 @@ export function DateTimeTool() {
                 </div>
               );
             })() : (
-              <p className="text-xs text-fg-mute">Enter two dates above to calculate the difference.</p>
+              <p className="text-xs text-fg-mute">{m('enterTwoDates')}</p>
             )}
           </div>
         </CollapsibleSection>

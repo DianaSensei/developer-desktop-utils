@@ -1,20 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-// 130ms = `--dur-exit` trong `design/tokens.css`. Trùng lặp con số ở đây thay
-// vì đọc CSS lúc chạy: nó chỉ quyết định khi nào panel được phép rời DOM
-// (animation đã chạy xong từ trước), nên lệch vài ms là vô hại.
+// 130ms = `--dur-exit` in design/tokens.css. Only decides when the panel
+// may leave the DOM, so a few ms of drift is harmless.
 const EXIT_MS = 130;
 
 /**
- * Trạng thái mở/đóng CÓ ANIMATION RA cho một popover tự quản lý `open` của
- * chính nó — `ColorPicker`, `DatePicker`, `TimePicker` đều là kiểu này (khác
- * `DropdownMenu`/`ModalShell`/`ContextMenu`, nơi CHA sở hữu `open`).
- *
- * Cả ba trước đây render panel kiểu `{open && <div>…</div>}` và KHÔNG CÓ animation
- * nào — không vào, không ra, panel bật/tắt trong một khung hình. Đây là hình
- * thức thứ tư của đúng một lỗi: xem `dropdown-menu.tsx`, `modal-shell.tsx`,
- * `context-menu.tsx` để biết vì sao nó luôn xảy ra ở dạng "mount có điều
- * kiện" — và rút ra hook thay vì chép lại 15 dòng lần thứ tư.
+ * Open state with an exit animation, for popovers that own their `open`
+ * state (ColorPicker, DatePicker, TimePicker). Parent-owned overlays use
+ * the same idea in dropdown-menu.tsx, modal-shell.tsx and context-menu.tsx.
  *
  *   const { visible, closing, open, show, close, toggle } = useAnimatedOpen();
  *   const wrapRef = useDismissable(open, close);
@@ -23,9 +16,9 @@ const EXIT_MS = 130;
  *     <div className={closing ? 'motion-safe:animate-pop-out' : 'motion-safe:animate-pop-in'}>
  *   )}
  *
- * `open` là trạng thái LOGIC (còn tương tác được, `useDismissable` còn lắng
- * nghe click-ngoài/Escape); `visible` là trạng thái DOM (còn render, vì đang
- * chạy animation ra). Panel luôn dùng `visible`, không bao giờ dùng `open`.
+ * `open` is the logical state (interactive, dismiss listeners active);
+ * `visible` is the DOM state (still rendered during the exit animation).
+ * Render the panel from `visible`.
  */
 export function useAnimatedOpen(initial = false) {
   const [open, setOpen] = useState(initial);
@@ -50,9 +43,8 @@ export function useAnimatedOpen(initial = false) {
     });
   }, []);
 
-  // Đóng rồi mở lại nhanh (trong đúng cửa sổ 130ms) phải huỷ animation ra dở
-  // dang chứ không để nó chạy tiếp bên dưới cái mới — `show()` đã tự làm việc
-  // đó (huỷ timer, tắt `closing`) nên không cần thêm gì ở đây.
+  // Reopening within the exit window cancels it; `show()` already does
+  // that.
   const toggle = useCallback(() => { if (open) close(); else show(); }, [open, close, show]);
 
   return { open, closing, visible: open || closing, show, close, toggle };

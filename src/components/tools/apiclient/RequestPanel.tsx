@@ -36,6 +36,7 @@ import {
   type ApiRequest, type Assertion, type AssertOperator, type BodyMode,
   type VarMap, ASSERT_OPERATORS, UNARY_ASSERT_OPERATORS, newAssertion, newKeyValue,
 } from './types';
+import { t } from './i18n';
 
 export type RequestPanelTab =
   | 'params' | 'body' | 'auth' | 'script' | 'tests' | 'settings';
@@ -51,10 +52,8 @@ interface Props {
   onTabChange: (tab: Tab) => void;
 }
 
-// A count (muted number) and/or a "has content" dot (green, à la the
-// Postman-style reference) — replaces the old plain-text " (n)"/" •" suffixes
-// baked into the label string itself, which read as part of the tab's name
-// rather than as a status indicator.
+// A count (muted number) and/or a "has content" dot shown after a tab
+// label.
 function tabBadge(count: number | undefined, hasContent: boolean | undefined): ReactNode {
   if (!count && !hasContent) return undefined;
   return (
@@ -72,16 +71,15 @@ export function RequestPanel({ request, onChange, vars, tab, onTabChange }: Prop
   const hasScript = !!(request.script.req.trim() || request.script.res.trim());
   const enabledAsserts = request.assertions.filter((a) => a.enabled && a.expr).length;
 
-  // Số đếm chỉ tính Query — Path chưa từng tính vào đây (số path param đã lộ
-  // rõ ngay trên URL), và giờ Headers cũng theo cùng lý đó: đếm riêng ngay
-  // tại nhãn "Headers" bên trong, không gộp vào một con số duy nhất mơ hồ.
+  // The count covers Query only: path params are visible in the URL, and
+  // Headers shows its own count next to its label.
   const tabs: { id: Tab; label: string; badge?: ReactNode }[] = [
-    { id: 'params', label: 'Params', badge: tabBadge(enabledParams, false) },
-    { id: 'body', label: 'Body', badge: tabBadge(undefined, request.body.mode !== 'none') },
-    { id: 'auth', label: 'Auth', badge: tabBadge(undefined, request.auth.type !== 'none') },
-    { id: 'script', label: 'Script', badge: tabBadge(undefined, hasScript) },
-    { id: 'tests', label: 'Tests', badge: tabBadge(enabledAsserts, !!request.tests.trim()) },
-    { id: 'settings', label: 'Settings', badge: tabBadge(undefined, request.settings.verifyTls === false) },
+    { id: 'params', label: t('req.tab.params'), badge: tabBadge(enabledParams, false) },
+    { id: 'body', label: t('req.tab.body'), badge: tabBadge(undefined, request.body.mode !== 'none') },
+    { id: 'auth', label: t('req.tab.auth'), badge: tabBadge(undefined, request.auth.type !== 'none') },
+    { id: 'script', label: t('req.tab.script'), badge: tabBadge(undefined, hasScript) },
+    { id: 'tests', label: t('req.tab.tests'), badge: tabBadge(enabledAsserts, !!request.tests.trim()) },
+    { id: 'settings', label: t('req.tab.settings'), badge: tabBadge(undefined, request.settings.verifyTls === false) },
   ];
 
   return (
@@ -105,7 +103,8 @@ export function RequestPanel({ request, onChange, vars, tab, onTabChange }: Prop
                 onClick={() => onChange({ body: { ...request.body, raw: prettyBody(request.body.raw, 'application/json') } })}
                 disabled={!request.body.raw.trim()}
                 className="flex items-center gap-1 py-2 text-xs font-medium text-fg-mute transition-colors hover:text-fg disabled:pointer-events-none disabled:opacity-40"
-                title="Format JSON"
+                title={t('req.formatJson')}
+                aria-label={t('req.formatJson')}
               >
                 <Wand2 className="h-3.5 w-3.5" /> Format
               </button>
@@ -119,22 +118,13 @@ export function RequestPanel({ request, onChange, vars, tab, onTabChange }: Prop
 
       {/* tab body */}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        {/* Headers từng là tab riêng — di chuyển vào đây làm phần thứ ba, cùng
-            hình dạng với Query/Path (nhãn nhỏ + bảng), thay vì buộc người dùng
-            nhảy tab để thấy trọn bộ những gì gắn liền với request này. */}
-        {/* No section-level max-w here (there used to be one, `max-w-5xl`):
-            in the stacked layout the request pane spans the whole window, and
-            capping the whole section left a dead block of empty space beside
-            a table that could otherwise have used that width — worse than the
-            problem it was solving. The actual fix is on the table's own
-            columns (see KeyValueEditor's `gridCols`, capped at the Name/Value
-            level), so the table still fills whatever width the pane has, it
-            just doesn't hand a 7-character value like `profile` a 600px-wide
-            input. */}
+        {/* Query, Path and Headers share one tab, each as a small label plus
+            a table. No section-level max width: the table's own column caps
+            (KeyValueEditor `gridCols`) handle wide panes. */}
         {tab === 'params' && (
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-3">
             <div className="space-y-2">
-              <SectionLabel>Query</SectionLabel>
+              <SectionLabel>{t('req.query')}</SectionLabel>
               {/* Editing params rewrites the URL's query string (kept in sync). */}
               <KeyValueEditor rows={request.params} onChange={(params) => onChange({ params, url: urlWithParams(request.url, params) })} vars={vars} duplicateKeyHint="params" />
               <AuthQueryParamRow request={request} />
@@ -142,7 +132,7 @@ export function RequestPanel({ request, onChange, vars, tab, onTabChange }: Prop
             <PathParamsEditor request={request} onChange={onChange} vars={vars} />
             <div className="space-y-2">
               <div className="flex items-center gap-1.5">
-                <SectionLabel>Headers</SectionLabel>
+                <SectionLabel>{t('headers')}</SectionLabel>
                 {enabledHeaders > 0 && <Badge tone="neutral" pill>{enabledHeaders}</Badge>}
               </div>
               <KeyValueEditor rows={request.headers} onChange={(headers) => onChange({ headers })} keyPlaceholder="Header" vars={vars} duplicateKeyHint="headers" />
@@ -156,16 +146,16 @@ export function RequestPanel({ request, onChange, vars, tab, onTabChange }: Prop
         {tab === 'tests' && (
           <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3">
             <div className="shrink-0 space-y-1.5">
-              <Label className="text-xs">Assertions</Label>
+              <Label className="text-xs">{t('req.assertions')}</Label>
               <AssertEditor request={request} onChange={onChange} />
             </div>
             <div className="flex min-h-0 flex-1 flex-col gap-1.5">
               <div className="flex items-center justify-between gap-2">
-                <Label className="text-xs">Test Script</Label>
+                <Label className="text-xs">{t('req.testScript')}</Label>
                 <SnippetMenu snippets={POST_RESPONSE_SNIPPETS} onInsert={(s) => onChange({ tests: appendSnippet(request.tests, s) })} />
               </div>
               <p className="text-[11px] text-fg-mute">
-                Post-response — use <code className="rounded bg-bg-2 px-1">test()</code> and <code className="rounded bg-bg-2 px-1">expect()</code> with <code className="rounded bg-bg-2 px-1">res</code>, <code className="rounded bg-bg-2 px-1">dt</code>.
+                {t('req.testHintA')} <code className="rounded bg-bg-2 px-1">test()</code> {t('req.and')} <code className="rounded bg-bg-2 px-1">expect()</code> {t('req.with')} <code className="rounded bg-bg-2 px-1">res</code>, <code className="rounded bg-bg-2 px-1">dt</code>.
               </p>
               <JavaScriptEditor
                 value={request.tests}
@@ -189,8 +179,7 @@ export function RequestPanel({ request, onChange, vars, tab, onTabChange }: Prop
 function NetworkCallNotice() {
   return (
     <Callout tone="warning" size="sm">
-      This script can make its own network request, separate from the Send button — review it
-      before running scripts from a source you don't fully trust.
+      {t('req.networkNotice')}
     </Callout>
   );
 }
@@ -205,8 +194,8 @@ function McpScriptingHint() {
   return (
     <p className="flex shrink-0 items-center gap-1.5 px-3 pt-2 text-[11px] text-fg-mute">
       <Sparkles className="h-3 w-3 shrink-0" />
-      Ask Claude to write or verify this — connect it to DevTool first via{' '}
-      <strong className="font-medium text-fg">Sidebar → More ⋮ → MCP for Claude Code…</strong>
+      {t('req.mcpHint')}{' '}
+      <strong className="font-medium text-fg">{t('req.mcpPath')}</strong>
     </p>
   );
 }
@@ -214,13 +203,8 @@ function McpScriptingHint() {
 
 type ScriptPhase = 'req' | 'res';
 
-// Pre-request và post-response từng đứng CHỒNG NHAU, mỗi bên full-height (chia
-// đôi khung dọc) — hai Label, hai đoạn giải thích, hai VarsSection, hai editor
-// đều hiện cùng lúc dù người dùng chỉ nhìn một bên tại một thời điểm. Giờ dùng
-// Segmented để chuyển pha (đúng công cụ chuyển-chế-độ của kit, xem
-// ui/segmented.tsx), một khung nội dung duy nhất được TOÀN BỘ chiều cao — và
-// hàng tiêu đề gọn lại giống "Path" ở tab Params: một nhãn nhỏ, không đoạn văn
-// luôn hiện.
+// Pre-request and post-response scripts share one full-height editor,
+// switched with a Segmented control, instead of stacking both.
 function ScriptEditor({ request, onChange }: { request: ApiRequest; onChange: (p: Partial<ApiRequest>) => void }) {
   const { script } = request;
   const [phase, setPhase] = useState<ScriptPhase>('req');
@@ -237,10 +221,10 @@ function ScriptEditor({ request, onChange }: { request: ApiRequest; onChange: (p
           value={phase}
           onValueChange={setPhase}
           size="sm"
-          aria-label="Script phase"
+          aria-label={t('req.scriptPhase')}
           options={[
-            { value: 'req', label: 'Pre-request' },
-            { value: 'res', label: 'Post-response' },
+            { value: 'req', label: t('req.preRequest') },
+            { value: 'res', label: t('req.postResponse') },
           ]}
         />
         <SnippetMenu
@@ -250,8 +234,8 @@ function ScriptEditor({ request, onChange }: { request: ApiRequest; onChange: (p
       </div>
       <p className="text-[11px] text-fg-mute">
         {isReq
-          ? <>Runs before send; mutate <code className="rounded bg-bg-2 px-1">req</code>, set <code className="rounded bg-bg-2 px-1">dt</code> vars.</>
-          : <>Runs after response; read <code className="rounded bg-bg-2 px-1">res</code>, set <code className="rounded bg-bg-2 px-1">dt</code> vars.</>}
+          ? <>{t('req.preHintA')} <code className="rounded bg-bg-2 px-1">req</code>{t('req.hintSet')} <code className="rounded bg-bg-2 px-1">dt</code> {t('req.hintVars')}</>
+          : <>{t('req.postHintA')} <code className="rounded bg-bg-2 px-1">res</code>{t('req.hintSet')} <code className="rounded bg-bg-2 px-1">dt</code> {t('req.hintVars')}</>}
       </p>
       <JavaScriptEditor
         key={phase}
@@ -305,9 +289,9 @@ function AssertEditor({ request, onChange }: { request: ApiRequest; onChange: (p
           tables a request shows (Query, Headers, Assertions) read as one
           family instead of two styles. */}
       <div className="grid grid-cols-[minmax(0,28rem)_9.5rem_minmax(0,28rem)_2rem] border-b bg-bg-2/40 text-[11px] font-semibold uppercase tracking-wide text-fg-mute">
-        <div className="border-r px-3 py-1.5">Expression</div>
-        <div className="border-r px-3 py-1.5">Operator</div>
-        <div className="border-r px-3 py-1.5">Value</div>
+        <div className="border-r px-3 py-1.5">{t('req.expression')}</div>
+        <div className="border-r px-3 py-1.5">{t('req.operator')}</div>
+        <div className="border-r px-3 py-1.5">{t('value')}</div>
         <div />
       </div>
 
@@ -325,7 +309,7 @@ function AssertEditor({ request, onChange }: { request: ApiRequest; onChange: (p
                   'flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-sm border transition-colors',
                   isGhost ? 'invisible' : a.enabled ? 'border-acc bg-acc text-acc-fg' : 'border-line',
                 )}
-                title={a.enabled ? 'Enabled' : 'Disabled'}
+                title={a.enabled ? t('enabled') : t('req.disabled')}
               >
                 {!isGhost && a.enabled && <Check className="h-2.5 w-2.5" />}
               </button>
@@ -364,7 +348,7 @@ function AssertEditor({ request, onChange }: { request: ApiRequest; onChange: (p
             {/* action cell */}
             <div className="flex items-center justify-center">
               {!isGhost && (
-                <button type="button" onClick={() => removeRow(a.id)} title="Remove" className="rounded p-1 text-fg-mute/40 opacity-0 transition-all group-hover:opacity-100 focus-visible:opacity-100 hover:text-bad">
+                <button type="button" onClick={() => removeRow(a.id)} title={t('remove')} aria-label={t('remove')} className="rounded p-1 text-fg-mute/40 opacity-0 transition-all group-hover:opacity-100 focus-visible:opacity-100 hover:text-bad">
                   <Trash2 className="h-3 w-3" />
                 </button>
               )}
@@ -389,13 +373,13 @@ function AuthQueryParamRow({ request }: { request: ApiRequest }) {
     <div className="overflow-hidden rounded-md border text-xs">
       <div className="grid grid-cols-[1rem_minmax(0,1fr)_minmax(0,1fr)_2rem] border-b bg-bg-2/40 text-[11px] font-semibold uppercase tracking-wide text-fg-mute/70">
         <div />
-        <div className="border-r px-3 py-1.5">From Auth (query)</div>
+        <div className="border-r px-3 py-1.5">{t('req.fromAuth')}</div>
         <div className="px-3 py-1.5" />
         <div />
       </div>
       <div className="grid grid-cols-[1rem_minmax(0,1fr)_minmax(0,1fr)_2rem]">
         <div className="flex items-center justify-center">
-          <span className="h-2 w-2 shrink-0 rounded-full bg-acc" title="Sent, derived from the Auth tab" />
+          <span className="h-2 w-2 shrink-0 rounded-full bg-acc" title={t('req.derivedFromAuth')} />
         </div>
         {/* min-w-0 + truncate: these cells hold raw text, and a grid `1fr`
             track's automatic minimum is its content's width — an API key long
@@ -408,7 +392,7 @@ function AuthQueryParamRow({ request }: { request: ApiRequest }) {
         <div className="flex h-ctl min-w-0 items-center px-2.5 font-mono text-fg-mute">
           {derived.value
             ? <span className="truncate" title={derived.value}>{derived.value}</span>
-            : <span className="opacity-50">(empty)</span>}
+            : <span className="opacity-50">{t('req.empty')}</span>}
         </div>
         <div />
       </div>
@@ -428,10 +412,9 @@ function PathParamsEditor({ request, onChange, vars }: { request: ApiRequest; on
     return found;
   }, [request.url]);
 
-  // Drop pathParams rows whose :name no longer appears in the URL — otherwise
-  // a renamed/removed placeholder leaves a stale row behind forever (it just
-  // stops rendering, unlike query params, which paramsFromUrl already
-  // reconciles the same way on every URL edit).
+  // Drop pathParams rows whose :name is no longer in the URL, so renamed
+  // placeholders leave no stale rows (query params are reconciled the
+  // same way by paramsFromUrl).
   useEffect(() => {
     if (request.pathParams.every((p) => names.includes(p.key))) return;
     onChange({ pathParams: request.pathParams.filter((p) => names.includes(p.key)) });
@@ -464,7 +447,7 @@ function PathParamsEditor({ request, onChange, vars }: { request: ApiRequest; on
 
   return (
     <div className="space-y-2">
-      <SectionLabel>Path</SectionLabel>
+      <SectionLabel>{t('req.path')}</SectionLabel>
       {/* Same four-track grid as KeyValueEditor (the trailing 2rem is
           empty here — path params can't be removed, only disabled) so this
           table's Value column starts at exactly the same x as the Query and
@@ -473,9 +456,9 @@ function PathParamsEditor({ request, onChange, vars }: { request: ApiRequest; on
       <div className="overflow-hidden rounded-md border text-xs">
         <div className={cn('grid border-b bg-bg-2/40 text-[11px] font-semibold uppercase tracking-wide text-fg-mute', gridCols)}>
           <div />
-          <div className="border-r px-3 py-1.5">Name</div>
-          <div className="border-r px-3 py-1.5">Value</div>
-          {showResolved && <div className="border-r px-3 py-1.5">Resolved</div>}
+          <div className="border-r px-3 py-1.5">{t('name')}</div>
+          <div className="border-r px-3 py-1.5">{t('value')}</div>
+          {showResolved && <div className="border-r px-3 py-1.5">{t('req.resolved')}</div>}
           <div />
         </div>
         {names.map((name, i) => {
@@ -495,7 +478,7 @@ function PathParamsEditor({ request, onChange, vars }: { request: ApiRequest; on
                   aria-label={`:${name} — ${enabled ? 'enabled' : 'disabled'}`}
                   onClick={() => toggleEnabled(name)}
                   className="group/toggle flex w-full cursor-pointer items-center justify-center transition-colors hover:bg-bg-2/60 focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-inset focus-visible:ring-focus"
-                  title={enabled ? 'Disable' : 'Enable'}
+                  title={enabled ? t('req.disable') : t('req.enable')}
                 >
                   <span
                     className={cn(
@@ -514,7 +497,7 @@ function PathParamsEditor({ request, onChange, vars }: { request: ApiRequest; on
                   row and leave the Value field unusably narrow. */}
               <div
                 onClick={() => toggleEnabled(name)}
-                title={enabled ? 'Disable this path param' : 'Enable this path param'}
+                title={enabled ? t('req.disablePathParam') : t('req.enablePathParam')}
                 className={cn(
                   'flex min-w-0 cursor-pointer select-none items-center border-r px-3 py-1 font-mono text-fg-mute transition-colors hover:bg-bg-2/60',
                   !enabled && 'opacity-40 line-through',
@@ -527,7 +510,7 @@ function PathParamsEditor({ request, onChange, vars }: { request: ApiRequest; on
                   value={valueOf(name)}
                   onChange={(v) => setValue(name, v)}
                   vars={vars}
-                  placeholder="Value"
+                  placeholder={t('value')}
                 />
               </div>
               {showResolved && (
@@ -558,20 +541,16 @@ function SettingsEditor({ request, onChange }: { request: ApiRequest; onChange: 
   };
 
   return (
-    // SettingGroup + SettingRow, the app's own shape for a panel of
-    // configuration, instead of the hand-rolled label/hint/Switch row this
-    // pane used to repeat. The rows now sit on one surface separated by
-    // hairlines rather than floating free in a column, and they read the
-    // same as the app's Settings page — which is what this pane is, scoped
-    // to one request.
+    // SettingGroup + SettingRow: the app's standard settings panel shape,
+    // as on the Settings page, scoped to this request.
     <div className="max-w-xl space-y-5">
       <div className="space-y-2">
-        <Label className="flex items-center gap-1.5 text-xs"><Tag className="h-3.5 w-3.5" /> Tags</Label>
+        <Label className="flex items-center gap-1.5 text-xs"><Tag className="h-3.5 w-3.5" /> {t('req.tags')}</Label>
         <div className="flex flex-wrap items-center gap-1.5 rounded-md border bg-bg px-2 py-1.5 focus-within:ring-[3px] focus-within:ring-focus">
-          {settings.tags.map((t) => (
-            <span key={t} className="flex items-center gap-1 rounded bg-bg-2 px-1.5 py-0.5 text-[11px]">
-              {t}
-              <button onClick={() => set({ tags: settings.tags.filter((x) => x !== t) })} className="text-fg-mute hover:text-bad" title={`Remove ${t}`}>
+          {settings.tags.map((tag) => (
+            <span key={tag} className="flex items-center gap-1 rounded bg-bg-2 px-1.5 py-0.5 text-[11px]">
+              {tag}
+              <button onClick={() => set({ tags: settings.tags.filter((x) => x !== tag) })} className="text-fg-mute hover:text-bad" title={t('req.removeTag', { tag })} aria-label={t('req.removeTag', { tag })}>
                 <X className="h-3 w-3" />
               </button>
             </span>
@@ -591,41 +570,40 @@ function SettingsEditor({ request, onChange }: { request: ApiRequest; onChange: 
         </div>
       </div>
 
-      <SettingGroup title="Request">
+      <SettingGroup title={t('req.groupRequest')}>
         <SettingRow
-          title="URL encoding"
-          description="Percent-encode query parameters before sending."
-          control={<Switch checked={settings.encodeUrl} onCheckedChange={(encodeUrl) => set({ encodeUrl })} aria-label="URL encoding" />}
+          title={t('req.urlEncoding')}
+          description={t('req.urlEncodingDesc')}
+          control={<Switch checked={settings.encodeUrl} onCheckedChange={(encodeUrl) => set({ encodeUrl })} aria-label={t('req.urlEncoding')} />}
         />
         <SettingRow
-          title="Follow redirects"
-          description="Follow 3xx responses automatically instead of returning them."
-          control={<Switch checked={settings.followRedirects} onCheckedChange={(followRedirects) => set({ followRedirects })} aria-label="Follow redirects" />}
+          title={t('req.followRedirects')}
+          description={t('req.followRedirectsDesc')}
+          control={<Switch checked={settings.followRedirects} onCheckedChange={(followRedirects) => set({ followRedirects })} aria-label={t('req.followRedirects')} />}
         />
         <SettingRow
-          title="Max redirects"
-          description="How many hops to follow before giving up."
+          title={t('req.maxRedirects')}
+          description={t('req.maxRedirectsDesc')}
           disabled={!settings.followRedirects}
-          control={<NumberField value={settings.maxRedirects} onChange={(maxRedirects) => set({ maxRedirects })} label="Max redirects" />}
+          control={<NumberField value={settings.maxRedirects} onChange={(maxRedirects) => set({ maxRedirects })} label={t('req.maxRedirects')} />}
         />
         <SettingRow
-          title="Timeout"
-          description="Milliseconds to wait before aborting. 0 waits forever."
-          control={<NumberField value={settings.timeout} onChange={(timeout) => set({ timeout })} label="Timeout in milliseconds" clearable />}
+          title={t('req.timeout')}
+          description={t('req.timeoutDesc')}
+          control={<NumberField value={settings.timeout} onChange={(timeout) => set({ timeout })} label={t('req.timeoutMs')} clearable />}
         />
       </SettingGroup>
 
-      <SettingGroup title="Security">
+      <SettingGroup title={t('req.security')}>
         <SettingRow
-          title="SSL certificate verification"
-          description="Reject a self-signed, expired, or hostname-mismatched certificate. Turn off only for a local/dev server you trust — anyone on the network can impersonate the server while this is off."
-          control={<Switch checked={settings.verifyTls} onCheckedChange={(verifyTls) => set({ verifyTls })} aria-label="SSL certificate verification" />}
+          title={t('req.sslVerify')}
+          description={t('req.sslVerifyDesc')}
+          control={<Switch checked={settings.verifyTls} onCheckedChange={(verifyTls) => set({ verifyTls })} aria-label={t('req.sslVerify')} />}
         />
       </SettingGroup>
       {!settings.verifyTls && (
         <Callout tone="warning" size="sm">
-          Certificate errors are being ignored for this request — including a real man-in-the-middle
-          on an untrusted network. Turn this back on once you're done testing against the self-signed server.
+          {t('req.sslOffWarning')}
         </Callout>
       )}
     </div>
@@ -650,7 +628,7 @@ function NumberField({ value, onChange, label, clearable }: {
         className="h-ctl text-xs"
       />
       {clearable && value > 0 && (
-        <button onClick={() => onChange(0)} title="Clear" className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-fg-mute hover:text-fg">
+        <button onClick={() => onChange(0)} title={t('req.clear')} aria-label={t('req.clear')} className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-fg-mute hover:text-fg">
           <X className="h-3.5 w-3.5" />
         </button>
       )}
@@ -660,18 +638,18 @@ function NumberField({ value, onChange, label, clearable }: {
 
 // ─── body ───────────────────────────────────────────────────────────────────
 
-const BODY_LABEL: Record<BodyMode, string> = {
-  none: 'No Body',
+// A function, not a constant: reads the locale at render (see apiclient/i18n.ts).
+const bodyLabel = (mode: BodyMode): string => ({
+  none: t('req.noBody'),
   json: 'JSON', xml: 'XML', text: 'TEXT', sparql: 'SPARQL',
   graphql: 'GraphQL',
-  multipart: 'Multipart Form', urlencoded: 'Form URL Encoded',
-  file: 'File / Binary',
-};
+  multipart: t('req.multipartForm'), urlencoded: t('req.formUrlEncoded'),
+  file: t('req.fileBinary'),
+} satisfies Record<BodyMode, string>)[mode];
 
 const RAW_PLACEHOLDER: Partial<Record<BodyMode, string>> = {
   json: '{\n  "key": "value"\n}',
   xml: '<root>\n  <key>value</key>\n</root>',
-  text: 'Raw request body',
   sparql: 'SELECT * WHERE { ?s ?p ?o } LIMIT 10',
 };
 
@@ -687,12 +665,12 @@ function BodyModeDropdown({ body, onChange }: { body: ApiRequest['body']; onChan
   return (
     <DropdownMenu>
       <DropdownMenuTrigger className="flex items-center gap-1.5 py-2 text-xs font-medium text-acc-ink transition-colors hover:text-acc">
-        {BODY_LABEL[body.mode]} <ChevronDown className="h-3.5 w-3.5" />
+        {bodyLabel(body.mode)} <ChevronDown className="h-3.5 w-3.5" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56 p-1.5">
         {BODY_GROUPS.map((group) => (
           <div key={group.label} className="py-1">
-            <DropdownMenuLabel>{group.label}</DropdownMenuLabel>
+            <DropdownMenuLabel>{t(`req.group.${group.label}` as 'req.group.Raw')}</DropdownMenuLabel>
             {group.items.map(({ id, icon: Icon }) => {
               const active = body.mode === id;
               return (
@@ -703,7 +681,7 @@ function BodyModeDropdown({ body, onChange }: { body: ApiRequest['body']; onChan
                   icon={<Icon className="h-3.5 w-3.5 shrink-0" />}
                 >
                   <span className="flex w-full items-center justify-between gap-2">
-                    {BODY_LABEL[id]}
+                    {bodyLabel(id)}
                     {active && <Check className="h-3.5 w-3.5 text-acc-ink" />}
                   </span>
                 </DropdownMenuItem>
@@ -729,10 +707,10 @@ function BodyEditor({ request, onChange, vars }: { request: ApiRequest; onChange
     return (
       <EmptyState
         icon={FileQuestion}
-        title="No request body"
-        description="GET and DELETE usually send none. To add one, start here or pick another type from the menu above."
+        title={t('req.noRequestBody')}
+        description={t('req.noRequestBodyDesc')}
         action={{ label: 'JSON', onClick: () => setBody({ mode: 'json' }) }}
-        secondaryAction={{ label: 'Form data', onClick: () => setBody({ mode: 'multipart' }) }}
+        secondaryAction={{ label: t('req.formData'), onClick: () => setBody({ mode: 'multipart' }) }}
         className="px-4 py-10"
       />
     );
@@ -760,11 +738,11 @@ function BodyEditor({ request, onChange, vars }: { request: ApiRequest; onChange
     return (
       <div className="flex min-h-0 flex-1 flex-col gap-3">
         <div className="flex min-h-0 flex-[2] flex-col gap-1.5">
-          <SectionLabel>Query</SectionLabel>
+          <SectionLabel>{t('req.query')}</SectionLabel>
           <TextEditor value={g.query} onChange={(query) => setG({ query })} placeholder={'query {\n  field\n}'} vars={vars} />
         </div>
         <div className="flex min-h-0 flex-1 flex-col gap-1.5">
-          <SectionLabel>Variables</SectionLabel>
+          <SectionLabel>{t('req.variables')}</SectionLabel>
           <JsonEditor value={g.variables} onChange={(variables) => setG({ variables })} placeholder={'{\n  "id": 1\n}'} vars={vars} />
         </div>
       </div>
@@ -779,7 +757,7 @@ function BodyEditor({ request, onChange, vars }: { request: ApiRequest; onChange
       <RawEditor
         value={body.raw}
         onChange={(raw) => setBody({ raw })}
-        placeholder={RAW_PLACEHOLDER[body.mode]}
+        placeholder={body.mode === 'text' ? t('req.rawBody') : RAW_PLACEHOLDER[body.mode]}
         vars={vars}
       />
     </div>
@@ -811,18 +789,19 @@ function FileBody({ body, setBody }: { body: ApiRequest['body']; setBody: (p: Pa
           <span className="truncate font-medium">{body.fileName}</span>
           {body.fileType && <span className="text-fg-mute">{body.fileType}</span>}
           <div className="ml-auto flex items-center gap-1">
-            <Button variant="outline" size="sm" className="h-ctl" onClick={pick}>Change</Button>
+            <Button variant="outline" size="sm" className="h-ctl" onClick={pick}>{t('req.change')}</Button>
             <button
               onClick={() => setBody({ fileName: undefined, fileType: undefined, fileContent: undefined })}
               className="rounded p-1 text-fg-mute/60 hover:text-bad"
-              title="Remove"
+              title={t('remove')}
+              aria-label={t('remove')}
             >
               <Trash2 className="h-3.5 w-3.5" />
             </button>
           </div>
         </div>
       ) : (
-        <Button variant="outline" size="sm" onClick={pick}>Choose file…</Button>
+        <Button variant="outline" size="sm" onClick={pick}>{t('req.chooseFile')}</Button>
       )}
     </div>
   );

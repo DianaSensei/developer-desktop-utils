@@ -2,10 +2,7 @@ import { describe, expect, it, vi, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 
 /**
- * Registry toàn cục cho "tool nào đang có kết nối live" (chấm xanh trên
- * sidebar). Không còn bước seed lúc module nạp — xem file-level comment của
- * liveConnections.ts cho lý do (mọi tool từng seed ở đây giờ là plugin cài
- * từ bên ngoài).
+ * Global registry of tools with a live connection (the sidebar dot).
  */
 
 afterEach(() => {

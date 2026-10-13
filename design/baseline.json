@@ -1,7 +1,7 @@
 {
-  "_": "Ngưỡng vi phạm thiết kế trong src/. Chỉ được GIẢM, không được tăng.",
-  "_how": "Dọn xong một đợt thì hạ số tương ứng — guard.test.ts sẽ nhắc khi số thực thấp hơn ngưỡng.",
-  "_phase": "G5 xong — cả 5 chỉ số về 0. Lớp bắc cầu từ vựng màu cũ đã xoá (G5b.4).",
+  "_": "Design-violation ceilings for src/. They may only go down, never up.",
+  "_how": "After a cleanup, lower the matching number; guard.test.ts reports when the actual count drops below the ceiling.",
+  "_phase": "All counts are at 0.",
   "limits": {
     "rawColors": 0,
     "tinyText": 0,
@@ -9,6 +9,7 @@
     "premiumUtilities": 0,
     "hardcodedRadius": 0,
     "hoverLift": 0,
-    "handRolledTooltip": 0
+    "handRolledTooltip": 0,
+    "offScaleText": 0
   }
 }

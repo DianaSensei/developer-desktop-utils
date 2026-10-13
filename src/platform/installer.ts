@@ -1,52 +1,23 @@
-// Cài đặt "artifact" từ bên ngoài — nửa TS của cơ chế; nửa Rust
-// (`src-tauri/src/artifact_installer.rs`) tải, kiểm checksum và lưu artifact
-// xuống đĩa. File này: gọi các lệnh Rust (đổi tên từ `plugin_installer_*`
-// sang `artifact_installer_*` — xem docs/plans/native-sidecar-install.md),
-// đổi hình dạng snake_case trả về thành camelCase, và là API mà
-// SettingsExtensionInstaller dùng để xem trước/cài/gỡ/cập nhật.
+// TypeScript side of external artifact installation. The Rust side
+// (src-tauri/src/artifact_installer.rs) downloads, verifies and stores
+// artifacts; this module calls its commands, converts snake_case records to
+// camelCase, and is the API used by the Extensions settings.
 //
-// GIỮ TÊN FILE `installer.ts` (không đổi thành `artifactInstaller.ts`): file
-// này đã tổng quát đúng mức cần — "cài một thứ từ bên ngoài" vẫn là đúng một
-// việc file này làm, chỉ thêm một nhánh `kind` mới, không phải một trách
-// nhiệm khác hẳn đòi một cái tên khác. Đổi tên chỉ tạo thêm một chỗ import
-// phải sửa mà không có lợi ích tương xứng.
+// Two API layers:
+//   - kind-agnostic: `fetchArtifactManifestPreview`, `installArtifact`,
+//     `listInstalledArtifacts`, `uninstallArtifact` (Settings lists both kinds);
+//   - per kind: `fetchManifestPreview`, `installPlugin`, `listInstalledPlugins`,
+//     `uninstallPlugin`, `checkForUpdate` for plugins and the matching
+//     `*Service` functions for sidecars (used by registry.ts and tests).
 //
-// HAI TẦNG API có chủ đích:
-//   - `fetchArtifactManifestPreview`/`installArtifact`/`listInstalledArtifacts`/
-//     `uninstallArtifact` — tầng TỔNG QUÁT, trả `kind` tường minh, dùng bởi
-//     `SettingsExtensionInstaller.tsx` (biết cả hai kind trong cùng một danh
-//     sách).
-//   - `fetchManifestPreview`/`installPlugin`/`listInstalledPlugins`/
-//     `uninstallPlugin`/`checkForUpdate` (nhánh PLUGIN) và
-//     `installService`/`listInstalledServices`/`uninstallService`/
-//     `checkForServiceUpdate` (nhánh SERVICE) — tầng THEO KIND, hành vi/hình
-//     dạng giữ NGUYÊN như Phase 1 đã có cho plugin (chỉ đổi tên lệnh Rust gọi
-//     xuống), mirror cho service. `registry.ts`'s `initInstalledPlugins()`
-//     (không quan tâm gì tới service) tiếp tục dùng đúng những hàm này không
-//     cần sửa.
+// Plugin bundles are a single ESM file. They are loaded from a `blob:` URL,
+// which has no base for relative imports, so authors must bundle everything
+// into one file. React must be external: bundles read it from
+// `window.__DEVTOOL_VENDOR__` (set in main.tsx), since a second React copy
+// breaks hooks. See docs/decisions/architecture/platform-plugin-architecture.md.
 //
-// MỘT FILE BUNDLE DUY NHẤT, KHÔNG PHẢI MỘT THƯ MỤC (nhánh plugin): `entry`
-// trong manifest trỏ tới đúng một file JS (ESM). Không hỗ trợ import tương
-// đối bên trong nó (`import './helper.js'`) — bundle được nạp qua URL kiểu
-// `blob:` (xem `loadInstalled` dưới), và một URL blob không có "thư mục chứa
-// nó" nào để trình duyệt phân giải import tương đối. Plugin tác giả phải
-// build ra đúng một file đã gộp hết (Vite/esbuild với `build.lib`/`bundle:
-// true`).
-//
-// REACT DÙNG CHUNG (nhánh plugin): một bundle plugin mang theo bản React
-// riêng của nó sẽ vỡ hook (hai bản React trong cùng một cây component là lỗi
-// "Invalid hook call" kinh điển). `main.tsx` gắn `window.__DEVTOOL_VENDOR__`
-// ngay sau khi import React — bundle phải cấu hình build của nó coi
-// `react`/`react-dom` là external, đọc từ đó thay vì tự bundle. Đây là HỢP
-// ĐỒNG TÁC GIẢ, không phải thứ nạp lúc chạy có thể tự kiểm tra được — ghi lại
-// ở docs/decisions/architecture/platform-plugin-architecture.md.
-//
-// NHÁNH SERVICE KHÔNG CÓ BLOB/IMPORT(): một binary native không chạy trong
-// webview — nó được cài xuống đĩa rồi SPAWN như tiến trình con (xem
-// `service_host.rs`'s `sidecar_path`/`get_or_spawn`). Vì vậy không có hàm
-// "loadInstalledService" tương đương `loadInstalled` — `service_call` tự tìm
-// đúng binary đã cài qua `sidecar_path`, TS không cần (và không nên) tự tay
-// nạp/thực thi gì thêm ở đây.
+// Services are native binaries spawned by the host (service_host.rs); there
+// is nothing to load in the webview for them.
 
 import type { LucideIcon } from 'lucide-react';
 import {
@@ -58,13 +29,10 @@ import { isTauri } from '@/lib/platform';
 import type { PluginManifest, PluginPermission } from './types';
 import type { ServiceDescriptor } from './service';
 
-// ---------------------------------------------------------------------------
-// Manifest thô tải từ URL — khớp `RemoteArtifactManifest` phía Rust
-// ---------------------------------------------------------------------------
+// Remote manifests (mirror `RemoteArtifactManifest` in Rust)
 
-/** Nhánh plugin — hình dạng giữ NGUYÊN từ Phase 1. JSON không mang được
- *  component React hay closure, nên `icon` là TÊN tra trong `ICONS_BY_NAME`
- *  dưới, và không có `load` (thay bằng `entry`). */
+/** Plugin manifest. JSON cannot carry components or closures, so `icon` is a
+ *  name looked up in `ICONS_BY_NAME` and `entry` replaces `load`. */
 export interface RemotePluginManifest {
   id: string;
   version: string;
@@ -80,32 +48,21 @@ export interface RemotePluginManifest {
   commands: string[];
   hosts: string[];
   /**
-   * Tier B — sidecar mà plugin này gọi tới, khi `permissions` khai `'service'`.
-   * Cùng hình dạng `ServiceDescriptor` compile-time; đây là bổ sung so với
-   * Phase 1 (khi nhánh plugin external-install chỉ hỗ trợ Tier A) — không có
-   * trường này, `validateManifest()` từ chối mọi plugin cài từ URL có khai
-   * `'service'` (mismatch `hasService`/`m.service`), tức bản trước KHÔNG cài
-   * được một plugin gọi sidecar qua URL dù chính sidecar đó (`kind: "service"`)
-   * cài được. `bin` ở đây vẫn phải nằm trong `ALLOWED_SERVICES` phía Rust —
-   * trường này chỉ mang theo allowlist METHOD của plugin, không tự cấp quyền
-   * chạy một bin mới (xem docs/plugin-sdk/05-external-install.md).
+   * Sidecar this plugin calls when `permissions` includes `'service'`. Only
+   * carries the method allowlist; `bin` must still be allowed by the host
+   * (see docs/plugin-sdk/05-external-install.md).
    */
   service?: ServiceDescriptor;
 }
 
-/** Một target khả dụng của một service — địa chỉ tải + checksum riêng cho
- *  một target triple cụ thể (vd `x86_64-apple-darwin`). Khớp `ServiceTarget`
- *  phía Rust. */
+/** Download URL and checksum of a service build for one target triple. */
 export interface ServiceTarget {
   url: string;
   sha256: string;
 }
 
-/** Nhánh service — mô tả một phiên bản của một sidecar native. `bin` là TÊN
- *  TRẦN, không đuôi mở rộng, không target triple — đuôi `.exe` cho Windows do
- *  host tự thêm khi đặt tên file cuối cùng trên đĩa. Khớp
- *  `RemoteServiceManifest` phía Rust; `targets` là map target-triple →
- *  `ServiceTarget` (Rust `HashMap` tuần tự hoá thành object JSON thường). */
+/** One version of a native sidecar. `bin` is the bare name; the host adds
+ *  `.exe` on Windows. `targets` maps target triple to build. */
 export interface RemoteServiceManifest {
   bin: string;
   version: string;
@@ -113,28 +70,20 @@ export interface RemoteServiceManifest {
   targets: Record<string, ServiceTarget>;
 }
 
-/** Manifest tổng quát — khớp `RemoteArtifactManifest` phía Rust
- *  (internally-tagged theo `kind`, `rename_all = "snake_case"` → chuỗi
- *  `"plugin"`/`"service"`). Rust ghi phẳng: `{ kind, ...các trường riêng của
- *  kind đó }`, không lồng dưới một khoá "Plugin"/"Service" — union type dưới
- *  đây khớp đúng hình dạng phẳng đó. */
+/** Remote manifest, flat and tagged by `kind` as serialized by Rust. */
 export type RemoteArtifactManifest =
   | ({ kind: 'plugin' } & RemotePluginManifest)
   | ({ kind: 'service' } & RemoteServiceManifest);
 
-// ---------------------------------------------------------------------------
-// Bản ghi đã cài — khớp `InstalledArtifactRecord` phía Rust (camelCase hoá)
-// ---------------------------------------------------------------------------
+// Installed records (mirror `InstalledArtifactRecord` in Rust, camelCased)
 
 export interface InstalledPluginRecord {
   manifest: RemotePluginManifest;
   sourceUrl: string;
   bundlePath: string;
   installedAt: number;
-  /** Market (SettingsMarketplace) đã cài plugin này từ, nếu có — `undefined`
-   *  cho một cài đặt qua URL dán tay hoặc từ trước khi market tồn tại. Đây là
-   *  DANH TÍNH thật của bản ghi, không chỉ để hiển thị: xem
-   *  `artifact_installer.rs`'s `InstalledPluginRecord::market_id`. */
+  /** Marketplace the plugin came from; `undefined` for a pasted URL. Part of
+   *  the plugin's identity (see `InstalledPluginRecord::market_id` in Rust). */
   marketId?: string;
 }
 
@@ -143,37 +92,24 @@ export interface InstalledServiceRecord {
   sourceUrl: string;
   binPath: string;
   installedAt: number;
-  /** Chỉ để hiển thị — xem giải thích ở `artifact_installer.rs`'s
-   *  `InstalledServiceRecord::market_id` (không dùng để so khớp/dedupe, khác
-   *  nhánh plugin). */
+  /** Display only; services are matched by `bin`. */
   marketId?: string;
 }
 
-/** Bản ghi tổng quát — `InstalledArtifactRecord` phía Rust cũng ghi phẳng
- *  (`{ kind, manifest, source_url, ... }`, không lồng), camelCase hoá ở TS
- *  qua `toCamelArtifactRecord` bên dưới. */
+/** Installed record, flat and tagged by `kind`. */
 export type InstalledArtifactRecord =
   | ({ kind: 'plugin' } & InstalledPluginRecord)
   | ({ kind: 'service' } & InstalledServiceRecord);
 
-/** Hình dạng thô (snake_case) nhận trực tiếp từ `invoke` — chỉ dùng nội bộ
- *  file này, không export: mọi nơi khác trong app chỉ nên thấy bản camelCase
- *  ở trên. */
-// `market_id` phía Rust là `Option<String>` KHÔNG có `skip_serializing_if` —
-// một record không market ghi ra JSON `"market_id": null`, không phải vắng
-// hẳn trường này. `?: string | null` phản ánh đúng cả hai khả năng (thiếu
-// hẳn trường, cho index.json rất cũ; hoặc `null`, cho bản ghi bình thường
-// không market) — `toCamelArtifactRecord` bên dưới chuẩn hoá cả hai về
-// `undefined` một lần duy nhất, để KHÔNG chỗ nào khác trong TS phải nhớ so
-// `=== null` thay vì `=== undefined`.
+/** Raw snake_case record from `invoke`. Rust writes `market_id: null` when
+ *  there is no market (older indexes omit it); `toCamelArtifactRecord`
+ *  normalizes both to `undefined`. */
 type RawInstalledArtifactRecord =
   | { kind: 'plugin'; manifest: RemotePluginManifest; source_url: string; bundle_path: string; installed_at: number; market_id?: string | null }
   | { kind: 'service'; manifest: RemoteServiceManifest; source_url: string; bin_path: string; installed_at: number; market_id?: string | null };
 
-/** Bảng tên → icon cố định. Một plugin cài từ bên ngoài không thể `import`
- *  thẳng một icon component (JSON không mang code) — tác giả chọn TÊN, host
- *  tra trong bảng này. Tên lạ rơi về `Puzzle`, không chặn cài đặt: một icon
- *  sai không đáng để từ chối cả plugin. */
+/** Icon names available to installed plugins. Unknown names fall back to
+ *  `Puzzle` rather than failing the install. */
 const ICONS_BY_NAME: Record<string, LucideIcon> = {
   puzzle: Puzzle, package: Package, boxes: Boxes, globe: Globe,
   'calendar-clock': CalendarClock, clock: Clock, timer: Timer,
@@ -209,57 +145,27 @@ function toCamelArtifactRecord(record: RawInstalledArtifactRecord): InstalledArt
   };
 }
 
-/** `PluginManifest.group` hiệu lực của một `marketId` — `"url"` khi không có
- *  market (URL dán tay), chính `marketId` khi có. Một hàm DÙNG CHUNG giữa
- *  `installedPluginManifests()` (đọc group cho registry) và
- *  `assertNoConflictingInstall()` (so group cũ/mới lúc cài) để hai chỗ không
- *  bao giờ lệch công thức nhau. */
+/** Registry group for an installed plugin: its market id, or "url" for a
+ *  pasted URL. Shared by the registry and the conflict check. */
 function installGroup(marketId: string | null | undefined): string {
   return marketId ?? 'url';
 }
 
 /**
- * Chặn cài một plugin nếu `id` của nó đã bị MỘT GROUP KHÁC chiếm — vd đã cài
- * "container-manager" qua URL dán tay (group "url"), giờ cài lại đúng plugin
- * đó nhưng từ market "official" (group "official"). Cùng `id` khác `group`
- * cùng đăng ký được vào registry (`registry.ts` không cấm — mô hình là "id
- * chỉ cần duy nhất TRONG group"), nhưng `usePluginSdkFor`/`getPluginSdk` gọi
- * MODULE-SCOPE (không qua React context, dùng bởi store nền của Kafka/
- * RabbitMQ) chỉ nhận được đúng chuỗi `id`, không có `group` — hai bản ghi
- * cùng tồn tại sẽ khiến lời gọi đó không biết nên trả bản nào, âm thầm gán
- * nhầm storage/audit/quyền của bản NÀY cho plugin BẢN KIA.
+ * Rejects installing plugin `id` when a different group already owns that
+ * id (e.g. installed from a pasted URL, now installing from a market).
+ * Module-scope SDK lookups (`usePluginSdkFor`, `getPluginSdk`) only know the
+ * id, so two groups with the same id would share storage, audit entries and
+ * permissions.
  *
- * Chặn ở ĐÂY (trước khi Rust ghi xuống đĩa) thay vì chỉ phát hiện ở
- * `registry.ts` lúc khởi động app lần sau: người dùng thấy lỗi NGAY khi bấm
- * cài, kèm hướng dẫn gỡ bản cũ trước — không phải một dòng ẩn trong
- * `PLUGIN_ERRORS` họ phải tự tìm ra sau khi thắc mắc sao plugin mới cài
- * không lên.
+ * Call before `installArtifact`/`installPlugin`; callers already have the
+ * id from the preview they showed. Applies to plugins only.
  *
- * GỌI TRƯỚC `installArtifact`/`installPlugin`, không phải bên trong chúng —
- * mọi lối gọi (ExtensionInstallDialog, SettingsExtensionInstaller) đều ĐÃ xem
- * trước manifest (`fetchArtifactManifestPreview`/`fetchManifestPreview`) để
- * hiển thị màn xác nhận trước khi cho bấm Install, nên `id` đã có sẵn trong
- * tay — fetch lại lần hai bên trong `installArtifact` chỉ để lấy đúng cái nó
- * vừa có là lãng phí không cần thiết. Chỉ áp dụng cho `kind: "plugin"` —
- * service khoá theo `bin` qua `ALLOWED_SERVICES`, không thuộc mô hình
- * group/id này.
- *
- * `registeredGroup` — group của một bản ghi ĐANG TRONG REGISTRY (không phải
- * trên đĩa) đã chiếm đúng `id` này, nếu có. Lớp gọi tự tra bằng
- * `getPlugin(id)?.group` (đã có sẵn qua `@/platform`) rồi truyền vào — hàm
- * này KHÔNG tự tra được, vì `registry.ts` đã import `installer.ts` (nạp
- * ngược lại sẽ vòng lặp).
- *
- * CHỈ chặn sớm ở đây khi `registeredGroup === 'core'` (một trong 26 plugin
- * compile-time — không bao giờ "biến mất" khỏi registry trong lúc app đang
- * chạy, nên registry luôn đúng cho trường hợp này). Mọi `registeredGroup`
- * khác 'core' bị BỎ QUA ở đây, rơi xuống quét đĩa bên dưới thay vì tự chặn
- * — registry chỉ nạp MỘT LẦN lúc bootstrap (`registry.ts`), không cập nhật
- * khi cài/gỡ trong phiên đang chạy, nên một bản ghi non-core ở đây có thể
- * đã STALE (người dùng vừa gỡ nó, chưa restart) và tự chặn nhầm một lượt
- * cài lại hợp lệ. Đĩa (`listInstalledPlugins()`) luôn phản ánh đúng trạng
- * thái hiện tại nên là nguồn xác thực duy nhất đáng tin cho mọi trường hợp
- * không phải compile-time.
+ * `registeredGroup` is the group currently registered under `id`
+ * (`getPlugin(id)?.group`), passed in because registry.ts imports this
+ * module. Only a built-in ('core') registration is trusted here; other
+ * registrations may be stale within the session, so installed records on
+ * disk are checked instead.
  */
 export async function assertNoConflictingInstall(
   id: string,
@@ -276,8 +182,7 @@ export async function assertNoConflictingInstall(
   try {
     installed = await listInstalledPlugins();
   } catch {
-    // Đọc index lỗi — không phải việc của bước kiểm tra này; để lời gọi cài
-    // thật sự bên dưới tự báo lỗi đọc/ghi đĩa nếu có, rõ ràng hơn.
+    // An unreadable index is reported by the install call itself.
     return;
   }
   const conflict = installed.find((r) => r.manifest.id === id && installGroup(r.marketId) !== newGroup);
@@ -290,29 +195,16 @@ export async function assertNoConflictingInstall(
   }
 }
 
-// ---------------------------------------------------------------------------
-// Tầng tổng quát — dùng bởi SettingsExtensionInstaller (cả hai kind)
-// ---------------------------------------------------------------------------
+// Kind-agnostic API (Settings → Extensions)
 
-/** Xem trước MỘT manifest (chưa biết trước kind) — UI tự rẽ nhánh hiển thị
- *  theo `manifest.kind`. Không tải bundle/binary, chỉ tải + kiểm hình dạng
- *  JSON manifest. */
+/** Fetches and validates a manifest without downloading the artifact. */
 export async function fetchArtifactManifestPreview(url: string): Promise<RemoteArtifactManifest> {
   return invokeCommand<RemoteArtifactManifest>('artifact_installer_fetch_manifest', { url });
 }
 
-/** Tải, kiểm checksum, lưu xuống đĩa — dùng chung cho cả hai kind (Rust tự
- *  rẽ nhánh theo `kind` khai trong manifest tại `url`). `marketId` đi kèm khi
- *  URL này tới từ một thẻ trong SettingsMarketplace (xem `pendingInstall.ts`)
- *  — `undefined` cho một URL dán tay/deep link, giữ nguyên hành vi "một id
- *  luôn thay bản cũ" như trước tính năng market.
- *
- *  KHÔNG tự xem trước manifest ở đây để kiểm xung đột group/id — mọi lối gọi
- *  (ExtensionInstallDialog, SettingsExtensionInstaller) đều ĐÃ xem trước
- *  manifest để hiển thị màn xác nhận trước khi cho bấm Install, nên đã có sẵn
- *  `id`/`kind` trong tay. Gọi lại `assertNoConflictingInstall` bằng thông tin
- *  đó TRƯỚC khi gọi hàm này, thay vì fetch lại lần hai ở đây — xem
- *  `assertNoConflictingInstall`'s doc comment. */
+/** Downloads, verifies and stores the artifact at `url` (Rust branches on
+ *  `kind`). `marketId` is set when the URL comes from a marketplace card.
+ *  Call `assertNoConflictingInstall` first. */
 export async function installArtifact(url: string, marketId?: string): Promise<InstalledArtifactRecord> {
   const raw = await invokeCommand<RawInstalledArtifactRecord>('artifact_installer_install', {
     sourceUrl: url,
@@ -327,31 +219,20 @@ export async function listInstalledArtifacts(): Promise<InstalledArtifactRecord[
   return raw.map(toCamelArtifactRecord);
 }
 
-/** `key` là id (plugin) hoặc bin (service) — cùng tham số `key` mà
- *  `artifact_installer_uninstall` phía Rust nhận, phân biệt kind bằng cách
- *  tìm trong index chứ không cần client khai trước. `marketId` PHẢI khớp
- *  đúng `record.marketId` của bản ghi muốn gỡ khi đó là một plugin (xem
- *  `recordKey`/`SettingsExtensionInstaller.tsx`) — thiếu nó khi bản ghi thật
- *  sự có market sẽ khiến Rust không tìm thấy mục nào để gỡ (lỗi rõ ràng,
- *  không gỡ nhầm bản của market khác). */
+/** Uninstalls by plugin id or service bin. For a plugin, `marketId` must
+ *  match the record's, or nothing is found. */
 export async function uninstallArtifact(key: string, marketId?: string): Promise<void> {
   await invokeCommand<void>('artifact_installer_uninstall', { key, marketId });
 }
 
-/** Target triple của máy đang chạy app, TÍNH Ở RUST — hiển thị cho người
- *  dùng khi xem trước một manifest `kind=service`, để họ tự xác nhận có
- *  target khớp trước khi bấm cài (không đoán/tính lại ở phía webview). */
+/** Target triple computed by the host, shown when previewing a service. */
 export async function currentTargetTriple(): Promise<string> {
   return invokeCommand<string>('artifact_installer_current_target_triple');
 }
 
-// ---------------------------------------------------------------------------
-// Nhánh PLUGIN — hành vi/hình dạng giữ NGUYÊN từ Phase 1
-// ---------------------------------------------------------------------------
+// Plugins
 
-/** Xem trước một manifest PLUGIN trước khi cài. Ném lỗi rõ ràng nếu URL này
- *  thật ra khai `kind=service` — gọi nhầm hàm theo kind là lỗi của lớp gọi,
- *  không phải thứ nên âm thầm trả kết quả sai hình dạng. */
+/** Previews a plugin manifest; throws if the URL declares another kind. */
 export async function fetchManifestPreview(url: string): Promise<RemotePluginManifest> {
   const manifest = await fetchArtifactManifestPreview(url);
   if (manifest.kind !== 'plugin') {
@@ -361,8 +242,8 @@ export async function fetchManifestPreview(url: string): Promise<RemotePluginMan
   return rest;
 }
 
-/** Tải, kiểm checksum, lưu xuống đĩa. Ném lỗi (đã là tiếng Việt dễ đọc, từ
- *  phía Rust) khi mạng lỗi, JSON sai hình dạng, hoặc checksum không khớp. */
+/** Downloads, verifies and stores a plugin. Throws the host's message on
+ *  network, format or checksum errors. */
 export async function installPlugin(url: string, marketId?: string): Promise<InstalledPluginRecord> {
   const record = await installArtifact(url, marketId);
   if (record.kind !== 'plugin') {
@@ -383,10 +264,8 @@ export async function uninstallPlugin(id: string, marketId?: string): Promise<vo
   await uninstallArtifact(id, marketId);
 }
 
-/** So version đã cài với version manifest tại `sourceUrl` hiện đang khai. So
- *  sánh SỐ theo thứ tự semver (major.minor.patch, mỗi phần một số) — cùng
- *  quy mô tối giản với `satisfiesSdk` ở manifest.ts: đủ cho version tác giả
- *  tự tăng tuần tự, không cần kéo một thư viện semver đầy đủ cho ba con số. */
+/** Compares the installed version with the one at `sourceUrl`, numerically
+ *  per dot-separated part (no pre-release handling). */
 export async function checkForUpdate(
   record: InstalledPluginRecord,
 ): Promise<{ available: boolean; remote?: RemotePluginManifest }> {
@@ -404,10 +283,7 @@ function compareVersions(a: string, b: string): number {
   return 0;
 }
 
-// ---------------------------------------------------------------------------
-// Nhánh SERVICE — mirror nhánh plugin, bỏ blob/import() (không áp dụng cho
-// một binary native chạy như tiến trình riêng, xem lời giải thích đầu file)
-// ---------------------------------------------------------------------------
+// Services
 
 export async function installService(url: string, marketId?: string): Promise<InstalledServiceRecord> {
   const record = await installArtifact(url, marketId);
@@ -440,55 +316,30 @@ export async function checkForServiceUpdate(
   return { available: compareVersions(remote.version, record.manifest.version) > 0, remote };
 }
 
-// ---------------------------------------------------------------------------
-// Kiểm TẤT CẢ artifact đã cài — dùng bởi ExtensionUpdateContext để tự kiểm
-// lúc app khởi động, không đợi người dùng bấm "Check for update" từng dòng.
-// ---------------------------------------------------------------------------
+// Update check for every installed artifact (ExtensionUpdateContext)
 
 export interface ArtifactUpdateAvailable {
-  /** Cùng khoá `recordKey` dùng ở SettingsExtensionInstaller.tsx — id/bin
-   *  cho một bản ghi không market, hoặc `<marketId>::<id>` cho một plugin cài
-   *  qua market (xem `recordKey` ở đó cho lý do cần phân biệt). */
+  /** `recordKey(record)`; matches the rows in SettingsExtensionInstaller. */
   key: string;
   record: InstalledArtifactRecord;
   remoteVersion: string;
 }
 
-/** Khoá định danh MỘT bản ghi trong danh sách "đã cài" — id/bin trần cho một
- *  bản ghi không gắn market (dán tay, hoặc từ trước tính năng market — giữ
- *  đúng khoá cũ để không phá vỡ gì đang hoạt động), `<marketId>::<id>` khi có
- *  market. Chỉ có Ý NGHĨA phân biệt cho kind=plugin (hai market có thể cùng
- *  id); service dùng `bin` trần dù có `marketId` hiển thị — market của một
- *  service chỉ mang tính thông tin (xem `InstalledServiceRecord::market_id`
- *  phía Rust), `bin` vẫn là một allowlist toàn cục duy nhất.
- *  DÙNG CHUNG bởi `checkAllForUpdates` (dưới) và
- *  `SettingsExtensionInstaller.tsx` — hai nơi phải tính RA CÙNG một khoá cho
- *  cùng một bản ghi, nếu không badge "có bản mới" sẽ không khớp được dòng nào
- *  trong danh sách.
- */
+/** Identifies a record in the installed list: the bare id or bin, or
+ *  `<marketId>::<id>` for a plugin from a market (two markets may share an
+ *  id). Services always use `bin`. Shared with SettingsExtensionInstaller so
+ *  update badges match rows. */
 export function recordKey(record: InstalledArtifactRecord): string {
   if (record.kind === 'service') return record.manifest.bin;
   return record.marketId ? `${record.marketId}::${record.manifest.id}` : record.manifest.id;
 }
 
 /**
- * Một plugin Tier B khai `service: { bin, ... }` trong manifest của nó CÓ
- * THỂ đi kèm một sidecar cài riêng (`kind: "service"`, cùng `bin`) — hai bản
- * ghi cài đặt khác nhau cho cùng MỘT "tiện ích" theo mắt người dùng. Khi cả
- * hai đang cùng cài và không ai khác phụ thuộc sidecar đó, chúng LIÊN QUAN
- * đến nhau — gỡ một bên mà không gỡ bên kia để lại một sidecar mồ côi
- * (không tool nào gọi tới) hoặc một plugin gọi `sdk.service.call` vào một
- * bin đã biến mất.
- *
- * Trả về bản ghi PHÍA BÊN KIA nếu, và chỉ nếu, quan hệ này ĐỘC QUYỀN — nghĩa
- * là không có bản ghi plugin ĐÃ CÀI nào khác cùng khai `service.bin` này.
- * Một sidecar dùng chung bởi ≥2 plugin, hoặc một service cài riêng không
- * plugin nào phụ thuộc, là hai phần ĐỘC LẬP — gỡ bên này không kéo theo bên
- * kia, để người dùng tự quyết từng phần.
- *
- * Đối xứng hai chiều: gọi với một bản ghi plugin trả về sidecar của nó (nếu
- * có, độc quyền); gọi với một bản ghi service trả về plugin PHỤ THUỘC DUY
- * NHẤT vào nó (nếu có).
+ * A plugin that declares `service.bin` and the service record with that bin
+ * belong together. Returns the other half when the pairing is exclusive: for
+ * a plugin, its sidecar if no other installed plugin uses it; for a service,
+ * its only dependent plugin. Shared sidecars and unused services are left
+ * for the user to manage separately.
  */
 export function findCoupledRecord(
   record: InstalledArtifactRecord,
@@ -514,16 +365,9 @@ export function findCoupledRecord(
   return dependents.length === 1 ? dependents[0] : undefined;
 }
 
-/** Kiểm từng artifact đã cài, TUẦN TỰ (không Promise.all) — best-effort, một
- *  nguồn lỗi (mạng, URL đã đổi/chết) chỉ loại đúng mục đó khỏi kết quả, không
- *  chặn việc kiểm các mục còn lại hay ném lỗi ra ngoài (lời gọi này chạy nền
- *  lúc khởi động, không có UI nào chờ nó để hiện lỗi). Tuần tự thay vì song
- *  song có chủ đích, không chỉ để đơn giản: kiểm N mục cùng lúc là N request
- *  HTTP đồng thời lúc app vừa mở — không có gì cần gấp ở đây (kết quả chỉ
- *  hiện thành badge, không chặn UI nào), nên tránh dồn tải mạng không cần
- *  thiết. Đọc index thất bại (file hỏng, quyền đĩa…) cũng không được ném ra
- *  ngoài — cùng nguyên tắc `installedPluginManifests()` ở registry.ts: coi
- *  như "chưa cài gì" thay vì kéo cả app xuống. */
+/** Checks each installed artifact one at a time (this runs in the background
+ *  at startup, so there is no need for parallel requests). A failing source
+ *  only drops that entry; an unreadable index returns no updates. */
 export async function checkAllForUpdates(): Promise<ArtifactUpdateAvailable[]> {
   let records: InstalledArtifactRecord[];
   try {
@@ -542,26 +386,22 @@ export async function checkAllForUpdates(): Promise<ArtifactUpdateAvailable[]> {
         if (available && remote) updates.push({ key: recordKey(record), record, remoteVersion: remote.version });
       }
     } catch {
-      // Bỏ qua mục này, tiếp tục kiểm các mục còn lại.
+      // Skip this entry and keep checking the rest.
     }
   }
   return updates;
 }
 
 /**
- * Nạp mã nguồn bundle đã cài (Rust kiểm lại checksum trước khi trả về — xem
- * `artifact_installer_read_bundle`) và chạy nó như một ES module qua URL
- * `blob:`. Đây là lý do CSP có thêm `blob:` trong `script-src`
- * (`src-tauri/tauri.conf.json`): `import()` một URL không phải 'self' bị CSP
- * chặn mặc định, và `blob:` là cách hẹp nhất để cho phép đúng trường hợp này
- * mà không mở toang `script-src` cho mọi nguồn. Chỉ áp dụng cho nhánh plugin
- * — service không có khái niệm "đọc lại để webview `import()`".
- *
- * Thu hồi URL blob ngay sau khi `import()` xong: một khi promise resolve,
- * thân module đã chạy và export đã nằm trong tay — không cần blob sống thêm.
+ * Loads an installed bundle (the host re-verifies its checksum) and imports
+ * it from a `blob:` URL. This is why the CSP allows `blob:` in `script-src`
+ * (tauri.conf.json). The URL is revoked once the module has evaluated.
  */
 async function loadInstalled(id: string, marketId: string | undefined): Promise<React.ComponentType> {
-  const source = await invokeCommand<string>('artifact_installer_read_bundle', { id, marketId });
+  const [source] = await Promise.all([
+    invokeCommand<string>('artifact_installer_read_bundle', { id, marketId }),
+    ensureVendorUi(),
+  ]);
   const blob = new Blob([source], { type: 'text/javascript' });
   const url = URL.createObjectURL(blob);
   try {
@@ -572,15 +412,19 @@ async function loadInstalled(id: string, marketId: string | undefined): Promise<
   }
 }
 
-/** Installed plugin luôn xếp SAU mọi plugin compile-time, theo thứ tự cài —
- *  không cạnh tranh vị trí đã sắp tay trong manifest compile-time (order tối
- *  đa hiện dùng chưa tới 300). `initInstalledPlugins()` chỉ chạy đúng một lần
- *  mỗi phiên app (xem registry.ts), nên không cần giữ trạng thái giữa các
- *  lần gọi để tránh trùng số. */
+/**
+ * Sets `window.__DEVTOOL_VENDOR__.ui` (see vendorUi.ts) before a bundle runs,
+ * since bundles read it synchronously at top level. Loads once.
+ */
+export async function ensureVendorUi(): Promise<void> {
+  if (typeof window === 'undefined' || !window.__DEVTOOL_VENDOR__ || window.__DEVTOOL_VENDOR__.ui) return;
+  window.__DEVTOOL_VENDOR__.ui = await import('./vendorUi');
+}
+
+/** Installed plugins sort after every built-in plugin, in install order. */
 const INSTALLED_ORDER_BASE = 100_000;
 
-/** Đổi mọi `RemotePluginManifest` đã cài thành `PluginManifest` mà registry
- *  đăng ký được — dùng bởi `registry.ts`'s `initInstalledPlugins()`. */
+/** Converts installed plugin records to registry manifests. */
 export async function installedPluginManifests(): Promise<
   Array<{ manifest: PluginManifest; source: string }>
 > {
@@ -589,8 +433,7 @@ export async function installedPluginManifests(): Promise<
   try {
     records = await listInstalledPlugins();
   } catch {
-    // Đọc index lỗi (file hỏng, quyền đĩa…) không được phép chặn cả app khởi
-    // động — coi như chưa cài gì, giống hệt "chưa cài plugin nào bao giờ".
+    // An unreadable index must not block startup; treat it as empty.
     return [];
   }
 
@@ -599,31 +442,19 @@ export async function installedPluginManifests(): Promise<
     return {
       source: `installed:${group}:${record.manifest.id}@${record.manifest.version}`,
       manifest: {
-        // Bundle của plugin gọi `usePluginSdkFor(record.manifest.id)`/
-        // `getPluginSdk(record.manifest.id)` bằng đúng chuỗi này — KHÔNG tiền
-        // tố market, xem `PluginManifest.group`. `installArtifact()` chặn cài
-        // nếu id này đã bị một group khác chiếm, nên tại registry nó vẫn
-        // nhất quán duy nhất toàn app dù không ép kiểu ở đây.
-        //
-        // Namespace storage/secrets (sdk.ts's storageKey/secrets.ts's
-        // vaultKey) khoá theo ĐÚNG field này — với một bản cài qua market,
-        // trước bản sửa này nó là registry id đã tiền tố (`<marketId>-<id>`),
-        // giờ là `id` trần. KHÔNG coi là cần migrate: mọi bản cài qua market
-        // trước bản sửa này chưa từng đọc/ghi được sdk.storage/sdk.secrets
-        // dù chỉ một lần — chính `usePluginSdkFor(record.manifest.id)` ở trên
-        // đã ném lỗi ngay khi gọi (root cause của toàn bộ chuỗi PR này), nên
-        // component không bao giờ chạy tới bất kỳ lời gọi storage/secrets
-        // nào trước khi crash. Không có dữ liệu thật nào tồn tại dưới
-        // namespace cũ để mất.
+        // Plugin bundles call `usePluginSdkFor(id)` with the bare id, so
+        // that is the registry id. The install UI runs
+        // `assertNoConflictingInstall` on the previewed id, but nothing
+        // enforces uniqueness at install time. Storage and secret namespaces
+        // are keyed by it too.
         id: record.manifest.id,
         group,
         label: record.manifest.label,
         icon: ICONS_BY_NAME[record.manifest.icon] ?? Puzzle,
         description: record.manifest.description,
         keywords: record.manifest.keywords,
-        // Thống nhất cho MỌI plugin cài lúc chạy (URL trần lẫn market) — route
-        // riêng plugin tự khai (`record.manifest.route`) không còn dùng nữa,
-        // route hiển thị luôn phản ánh đúng group đã cài.
+        // Installed plugins always use this route form; the manifest's
+        // own `route` is ignored.
         route: `/installed/${group}/${record.manifest.id}`,
         order: INSTALLED_ORDER_BASE + i,
         defaultEnabled: true,

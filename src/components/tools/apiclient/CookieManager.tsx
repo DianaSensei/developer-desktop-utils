@@ -11,6 +11,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import type { ApiStore } from './store';
 import { type Cookie, groupByDomain } from './cookies';
+import { t } from './i18n';
 
 interface Props {
   store: ApiStore;
@@ -19,7 +20,7 @@ interface Props {
 }
 
 const fmtExpires = (c: Cookie) =>
-  c.expires === undefined ? 'Session' : new Date(c.expires).toLocaleString();
+  c.expires === undefined ? t('cookie.session') : new Date(c.expires).toLocaleString();
 
 export function CookieManager({ store, open, onClose }: Props) {
   const groups = groupByDomain(store.cookies);
@@ -29,14 +30,14 @@ export function CookieManager({ store, open, onClose }: Props) {
       <DialogContent size="lg" scrollable>
         <DialogHeader className="border-b px-4 py-3">
           <DialogTitle className="flex items-center justify-between">
-            <span className="flex items-center gap-2"><CookieIcon className="h-4 w-4" /> Cookies</span>
+            <span className="flex items-center gap-2"><CookieIcon className="h-4 w-4" /> {t('cookie.title')}</span>
             <div className="flex items-center gap-4 text-xs font-normal">
               <label className="flex items-center gap-2 text-fg-mute">
-                Enabled
-                <Switch checked={store.cookiesEnabled} onCheckedChange={store.setCookiesEnabled} aria-label="Cookie jar enabled" />
+                {t('enabled')}
+                <Switch checked={store.cookiesEnabled} onCheckedChange={store.setCookiesEnabled} aria-label={t('cookie.jarEnabled')} />
               </label>
               {store.cookies.length > 0 && (
-                <button onClick={store.clearCookies} className="text-bad hover:underline">Clear all</button>
+                <button onClick={store.clearCookies} className="text-bad hover:underline">{t('cookie.clearAll')}</button>
               )}
             </div>
           </DialogTitle>
@@ -44,7 +45,7 @@ export function CookieManager({ store, open, onClose }: Props) {
 
         {!store.cookiesEnabled && (
           <div className="border-b bg-warn-tint px-4 py-1.5 text-[11px] text-warn">
-            The cookie jar is off — cookies below won't be sent or captured until you enable it.
+            {t('cookie.jarOff')}
           </div>
         )}
 
@@ -55,8 +56,8 @@ export function CookieManager({ store, open, onClose }: Props) {
             // search with no matches, no request body) already uses it.
             <EmptyState
               icon={CookieIcon}
-              title="No cookies yet"
-              description="Cookies are captured automatically from a response's Set-Cookie header. You can also add one by hand below."
+              title={t('cookie.none')}
+              description={t('cookie.noneDesc')}
               className="px-4 py-10"
             />
           ) : (
@@ -66,7 +67,8 @@ export function CookieManager({ store, open, onClose }: Props) {
                   <span className="font-mono text-xs font-semibold">{domain}</span>
                   <button
                     onClick={() => store.clearDomainCookies(domain)}
-                    title="Remove all cookies for this domain"
+                    title={t('cookie.removeDomain')}
+                    aria-label={t('cookie.removeDomain')}
                     className="rounded p-1 text-fg-mute/60 hover:text-bad"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
@@ -118,12 +120,12 @@ function CookieRow({ cookie, store }: { cookie: Cookie; store: ApiStore }) {
           {cookie.value}
         </span>
       )}
-      <span className="shrink-0 font-mono text-[11px] text-fg-mute/70" title="Path">{cookie.path}</span>
-      <span className="w-36 shrink-0 text-right text-[11px] text-fg-mute/70" title="Expires">{fmtExpires(cookie)}</span>
+      <span className="shrink-0 font-mono text-[11px] text-fg-mute/70" title={t('cookie.path')}>{cookie.path}</span>
+      <span className="w-36 shrink-0 text-right text-[11px] text-fg-mute/70" title={t('cookie.expires')}>{fmtExpires(cookie)}</span>
       <div className="flex shrink-0 items-center gap-1">
         {cookie.secure && <span className="rounded bg-bg-2 px-1 text-[11px] uppercase text-fg-mute">secure</span>}
         {cookie.httpOnly && <span className="rounded bg-bg-2 px-1 text-[11px] uppercase text-fg-mute">http</span>}
-        <button onClick={() => store.deleteCookie(cookie)} title="Delete" className="rounded p-1 text-fg-mute/50 hover:text-bad">
+        <button onClick={() => store.deleteCookie(cookie)} title={t('delete')} aria-label={t('delete')} className="rounded p-1 text-fg-mute/50 hover:text-bad">
           <X className="h-3.5 w-3.5" />
         </button>
       </div>
@@ -148,10 +150,10 @@ function AddCookie({ store }: { store: ApiStore }) {
   const cls = 'h-ctl text-xs font-mono';
   return (
     <div className="flex items-end gap-2 border-t px-4 py-3">
-      <Field label="Domain" className="flex-1"><Input value={domain} onChange={(e) => setDomain(e.target.value)} placeholder="api.example.com" className={cls} /></Field>
-      <Field label="Name" className="w-32"><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="session" className={cls} /></Field>
-      <Field label="Value" className="flex-1"><Input value={value} onChange={(e) => setValue(e.target.value)} placeholder="…" className={cls} /></Field>
-      <Field label="Path" className="w-20"><Input value={path} onChange={(e) => setPath(e.target.value)} className={cls} /></Field>
+      <Field label={t('cookie.domain')} className="flex-1"><Input value={domain} onChange={(e) => setDomain(e.target.value)} placeholder="api.example.com" className={cls} /></Field>
+      <Field label={t('name')} className="w-32"><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="session" className={cls} /></Field>
+      <Field label={t('value')} className="flex-1"><Input value={value} onChange={(e) => setValue(e.target.value)} placeholder="…" className={cls} /></Field>
+      <Field label={t('cookie.path')} className="w-20"><Input value={path} onChange={(e) => setPath(e.target.value)} className={cls} /></Field>
       <Button size="sm" onClick={add} disabled={!domain.trim() || !name.trim()} className="h-ctl gap-1.5">
         <Plus className="h-3.5 w-3.5" /> Add
       </Button>

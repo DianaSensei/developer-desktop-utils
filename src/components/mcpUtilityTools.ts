@@ -94,8 +94,44 @@ export const JWT_MCP_TOOLS: McpToolDef[] = [
         // gated by the `jwt` tool id.
         {
             "name": "jwt_decode",
-            "description": "Decode a JWT's header and payload. Decode-only — does NOT verify the signature (no verification key available).",
+            "description": "Decode a JWT's header and payload, plus `expired`/`notYetValid` computed from exp/nbf. Does NOT check the signature — use jwt_verify for that.",
             "inputSchema": { "type": "object", "properties": { "token": { "type": "string" } }, "required": ["token"] }
+        },
+        {
+            "name": "jwt_verify",
+            "description": "Verify a JWT's signature (and optionally iss/aud/sub) with a key you supply. `algorithm` is the one you EXPECT — the token's own `alg` header is never trusted to choose, so a token whose header disagrees is rejected with reason \"alg\". A failed check is a normal result, not an error: returns { valid, reason, message, header, payload }, where reason is one of format/key/alg/signature/expired/nbf/claim. `key` is the shared secret for HS*, or a PEM SPKI public key, X.509 certificate, JWK or JWK Set for the rest. `keyEncoding` says how an HS* secret is written down (utf8 default, base64, base64url, hex) — getting it wrong changes the bytes and fails the signature.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "token": { "type": "string" },
+                    "algorithm": { "type": "string", "enum": ["HS256", "HS384", "HS512", "RS256", "RS384", "RS512", "PS256", "PS384", "PS512", "ES256", "ES384", "ES512", "EdDSA", "none"] },
+                    "key": { "type": "string" },
+                    "keyEncoding": { "type": "string", "enum": ["utf8", "base64", "base64url", "hex"] },
+                    "issuer": { "type": "string" },
+                    "audience": { "type": "string" },
+                    "subject": { "type": "string" },
+                    "clockTolerance": { "type": "number", "description": "Seconds of leeway on exp/nbf." }
+                },
+                "required": ["token", "algorithm", "key"]
+            }
+        },
+        {
+            "name": "jwt_sign",
+            "description": "Sign claims into a JWT. `key` is the shared secret for HS*, or a PEM PKCS#8 private key or private JWK for RS*/PS*/ES*/EdDSA (PKCS#1 \"BEGIN RSA PRIVATE KEY\" is not accepted — convert with `openssl pkcs8 -topk8`). `expiresIn`/`notBefore` take a duration (\"1h\", \"7d\", or plain seconds), never an absolute timestamp. `iat` is set unless issuedAt is false. Algorithm \"none\" produces an UNSIGNED token that proves nothing — only for testing how a server reacts to one.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "payload": { "type": "object", "description": "Claims object. A JSON string is also accepted." },
+                    "algorithm": { "type": "string", "enum": ["HS256", "HS384", "HS512", "RS256", "RS384", "RS512", "PS256", "PS384", "PS512", "ES256", "ES384", "ES512", "EdDSA", "none"] },
+                    "key": { "type": "string" },
+                    "keyEncoding": { "type": "string", "enum": ["utf8", "base64", "base64url", "hex"] },
+                    "expiresIn": { "type": "string" },
+                    "notBefore": { "type": "string" },
+                    "kid": { "type": "string" },
+                    "issuedAt": { "type": "boolean" }
+                },
+                "required": ["payload", "algorithm"]
+            }
         },
 ];
 

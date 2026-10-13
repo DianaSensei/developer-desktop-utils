@@ -1,11 +1,13 @@
+import type * as React from 'react';
 import { Button, type ButtonProps } from '@/components/ui/button';
 import type { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface EmptyStateProps {
   icon: LucideIcon;
-  title: string;
-  description?: string;
+  /** Omit when the `description` says enough (e.g. a hint of what to do). */
+  title?: string;
+  description?: React.ReactNode;
   action?: {
     label: string;
     onClick: () => void;
@@ -42,7 +44,7 @@ export function EmptyState({
       </div>
 
       <div className="space-y-2">
-        <h3 className="text-base font-medium text-fg">{title}</h3>
+        {title && <h3 className="text-base font-medium text-fg">{title}</h3>}
         {description && (
           <p className="max-w-xs text-sm text-fg-mute">{description}</p>
         )}

@@ -1,16 +1,12 @@
-// Thông báo viền — bậc GIỮA trong ba bậc trạng thái.
+// Outline notice: the middle of the three status levels.
 //
-//   <StatusChip>     liếc là thấy, không giải thích
-//   <OutlineNotice>  việc đang chờ xử lý, kèm một hành động   ← đây
-//   <ExplainBand>    cần giải thích và cho ví dụ sửa được
+//   <StatusChip>     glanceable, no explanation
+//   <OutlineNotice>  pending item with one action   ← this
+//   <ExplainBand>    explanation and fixable examples
 //
-// Chỉ có VIỀN, không nền. Đó là toàn bộ điểm khác biệt: nó đủ rõ để không bị bỏ
-// qua, nhưng không tô một mảng màu vào giữa panel cho một việc không khẩn cấp.
-// Học từ MoMo — thẻ "Chia/Trả tiền · Đang chờ" viền cam, nền trong suốt.
-//
-// Dùng cho trạng thái THƯỜNG TRỰC còn treo: consumer chưa đóng, bản nháp chưa
-// lưu, kết nối mất từ phiên trước. Không dùng cho lỗi vừa xảy ra — cái đó là
-// <ExplainBand tone="bad">.
+// Border only, no fill: noticeable without painting the panel for something
+// that is not urgent. For standing states (open consumer, unsaved draft,
+// connection lost earlier), not fresh errors (<ExplainBand tone="bad">).
 
 import * as React from 'react';
 import { cn } from '@/lib/utils';
@@ -26,10 +22,10 @@ const TONE: Record<OutlineNoticeTone, { edge: string; label: string; pip: string
 
 export interface OutlineNoticeProps {
   tone: OutlineNoticeTone;
-  /** Nhãn trạng thái ngắn — "Đang chờ", "Chưa lưu". */
+  /** Short status label: "Pending", "Unsaved". */
   label?: React.ReactNode;
   children: React.ReactNode;
-  /** Hành động ở mép phải — thường là một <Button variant="ghost" size="sm">. */
+  /** Action on the right, usually <Button variant="ghost" size="sm">. */
   action?: React.ReactNode;
   className?: string;
 }
@@ -52,7 +48,7 @@ export function OutlineNotice({
       )}
     >
       <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full', t.pip)} />
-      <p className="min-w-0 flex-1 text-[13px] leading-snug">
+      <p className="min-w-0 flex-1 text-dense leading-snug">
         {label && <span className={cn('font-medium', t.label)}>{label} · </span>}
         {children}
       </p>

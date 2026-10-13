@@ -7,27 +7,16 @@ import { usePluginState, migrateLegacyKey } from './platform/usePluginState';
 import { usePluginConfig, useLiveConnection, usePluginMcpBridgeActive } from './platform/services';
 import { usePluginSdkFor, getPluginSdk } from './platform/usePluginSdkFor';
 
-// Bản React/ReactDOM DÙNG CHUNG cho plugin cài từ bên ngoài (xem
-// `src/platform/installer.ts`, phần "REACT DÙNG CHUNG"). Một bundle plugin
-// mang theo bản React RIÊNG của nó sẽ vỡ hook: hai bản React trong cùng một
-// cây component là lỗi "Invalid hook call" kinh điển, vì hook đọc trạng thái
-// nội bộ gắn với ĐÚNG một instance của React. Gán TRƯỚC bất cứ import động
-// nào của một plugin có thể chạy — nghĩa là ngay ở đây, phần trên cùng của
-// file được evaluate sớm nhất trong toàn bộ app.
+// Shared React/ReactDOM for installed plugins. A bundle with its own React
+// copy would break hooks ("Invalid hook call"), so plugins mark `react`,
+// `react-dom` and `react/jsx-runtime` as external and read them from here.
+// Set before any plugin can load.
 //
-// `platform.usePluginSdk`/`usePluginState`/`usePluginConfig` cùng lý do: một
-// plugin cài từ URL được `registry.ts` bọc bằng `withPluginSdk` (Provider) từ
-// CHÍNH module `context.ts` này, nhưng bundle của plugin không `import` được
-// module đó (module riêng, không nằm trong build của nó) — expose thẳng ba
-// hook qua vendor object là cách duy nhất để code trong bundle đọc được đúng
-// React Context instance mà `withPluginSdk` đã set giá trị vào. Không hàm nào
-// trong ba hàm này tự nới quyền: `usePluginSdk()` vẫn ném nếu gọi ngoài cây
-// plugin, và `sdk.*` bên trong vẫn kiểm đúng `permissions` plugin đã khai ở
-// manifest kind="plugin" của nó — xem docs/plugin-sdk/05-external-install.md.
-//
-// Tác giả plugin cấu hình build của mình coi `react`/`react-dom`/
-// `react/jsx-runtime` là "external", trỏ ba module đó về đây thay vì tự
-// bundle — xem hướng dẫn tác giả plugin trong
+// `platform.usePluginSdk`/`usePluginState`/`usePluginConfig` are exposed for
+// the same reason: a bundle cannot import the host's context module, so this
+// is how it reaches the context `withPluginSdk` provides. None of them grants
+// anything: `sdk.*` still enforces the plugin's declared permissions. See
+// docs/plugin-sdk/05-external-install.md and
 // docs/decisions/architecture/platform-plugin-architecture.md.
 declare global {
   interface Window {
@@ -36,6 +25,8 @@ declare global {
       reactDom: typeof ReactDOM;
       reactDomFull: typeof ReactDOMFull;
       jsxRuntime: { jsx: typeof jsx; jsxs: typeof jsxs; Fragment: typeof Fragment };
+      /** Host UI kit, loaded lazily before a plugin bundle runs. SDK ≥ 1.1.0. */
+      ui?: typeof import('./platform/vendorUi');
       platform: {
         usePluginSdk: typeof usePluginSdk;
         usePluginSdkFor: typeof usePluginSdkFor;
@@ -65,23 +56,10 @@ window.__DEVTOOL_VENDOR__ = {
     usePluginMcpBridgeActive,
   },
 };
-// Self-hosted fonts — bundled by Vite, work offline, render identically on
-// macOS / Windows / Linux.
-//
-// Be Vietnam Pro, chosen over Inter after comparing both in the real webview at
-// the sizes the app actually uses. It has no variable build on fontsource, so
-// each weight is loaded individually. The `vietnamese` subset carries the
-// stacked diacritics (ế ộ ữ) that the latin subset does not.
-//
-// 700 is loaded alongside 400/500/600 because `font-bold` is real Tailwind
-// weight 700, not an alias for 600 — every one of the app's ~20 `font-bold`
-// usages (Stat's headline number, tab counts, method badges, …) had no
-// matching @font-face at that weight, so the browser fell back to synthetic
-// bold: skewing/thickening the 600 outline instead of drawing the type
-// designer's actual 700 glyphs. That's the harshest on exactly the letterforms
-// Be Vietnam Pro was chosen for — stacked Vietnamese diacritics distort worst
-// under synthesis — so it reads as "unbalanced/broken" precisely where the
-// font was supposed to be the strong point.
+// Self-hosted fonts, bundled so they work offline and look the same on
+// every OS. Be Vietnam Pro has no variable build, so each weight is loaded;
+// the `vietnamese` subset carries stacked diacritics. Weight 700 is loaded
+// so `font-bold` uses real glyphs instead of synthetic bold.
 import '@fontsource/be-vietnam-pro/latin-400.css';
 import '@fontsource/be-vietnam-pro/latin-500.css';
 import '@fontsource/be-vietnam-pro/latin-600.css';
@@ -90,29 +68,21 @@ import '@fontsource/be-vietnam-pro/vietnamese-400.css';
 import '@fontsource/be-vietnam-pro/vietnamese-500.css';
 import '@fontsource/be-vietnam-pro/vietnamese-600.css';
 import '@fontsource/be-vietnam-pro/vietnamese-700.css';
-// IBM Plex Mono — the first real monospace the app has ever had. `font-mono` is
-// used in 356 places but `fontFamily.mono` was never declared, so every one of
-// them fell back to Courier New on Windows and Linux. Same synthetic-bold gap
-// as above for any `font-mono font-bold` combination (status code chips,
-// header names) — 700 closes it here too.
+// IBM Plex Mono, the default code font (700 for `font-mono font-bold`).
 import '@fontsource/ibm-plex-mono/latin-400.css';
 import '@fontsource/ibm-plex-mono/latin-500.css';
 import '@fontsource/ibm-plex-mono/latin-600.css';
 import '@fontsource/ibm-plex-mono/latin-700.css';
-// Fira Code — the alternative code font (opt-in, Settings → Code font). Loaded
-// unconditionally alongside IBM Plex Mono like every other self-hosted face
-// here: switching the preference just flips `--mono` (see monoFontPreference.ts
-// / tokens.css's `[data-mono-font]`), so the face has to already be on the
-// page before that switch can take effect.
+// Fira Code, the alternative code font. Loaded up front because switching
+// only changes `--mono` (monoFontPreference.ts).
 import '@fontsource/fira-code/latin-400.css';
 import '@fontsource/fira-code/latin-500.css';
 import '@fontsource/fira-code/latin-600.css';
 import '@fontsource/fira-code/latin-700.css';
 import './styles/globals.css';
 import { clearPersistentStore, initPersistentStore } from './lib/persistentStore';
-// Nhập thẳng từ module kho, KHÔNG qua barrel '@/platform': barrel kéo theo
-// registry và toàn bộ manifest plugin vào đồ thị module chạy trước bootstrap,
-// đúng thứ ghi chú ở trên đang cố tránh.
+// Imported from the module directly, not the '@/platform' barrel, which
+// would pull the registry and every plugin manifest in before bootstrap.
 import {
   clearSecrets,
   migrateSecretsFromPlainStore,
@@ -124,54 +94,33 @@ import { applyFontToDocument, getFontPreference } from './lib/fontPreference';
 import { applyMonoFontToDocument, getMonoFontPreference } from './lib/monoFontPreference';
 import { isTauri } from './lib/platform';
 
-// The app's module graph (App.tsx and everything it imports, e.g.
-// src/lib/liveConnections.ts) reads persisted state synchronously at
-// module-load time in places, so it must not be evaluated until the
-// persistent store's in-memory cache is hydrated. A static `import App from
-// './App'` at the top of this file would run before the awaits below —
-// deferring it to a dynamic import() inside bootstrap() is what guarantees
-// the ordering.
+// Parts of the app read persisted state synchronously at module load, so
+// App is imported dynamically after the store cache is hydrated.
 async function bootstrap() {
   await initPersistentStore();
 
-  // DEV ONLY: wipe all persisted app state on each `npm run tauri:dev` launch
-  // so features can be tested from a clean slate. Stripped from production
-  // builds (import.meta.env.DEV is false), and skipped on the web dev server.
+  // Dev only: start each `npm run tauri:dev` with clean persisted state.
   if (import.meta.env.DEV && isTauri) {
     await clearPersistentStore();
-    // Kho bí mật là file riêng nên `clearPersistentStore()` không chạm tới:
-    // thiếu dòng này, "chạy dev từ trạng thái sạch" vẫn còn nguyên seed 2FA cũ.
+    // The secret vault is separate, so clear it too.
     await clearSecrets();
   }
 
-  // Dời bí mật ra khỏi mặt phẳng khoá dùng chung. Phải chạy SAU
-  // `initPersistentStore()` (nguồn đọc từ cache của nó) và TRƯỚC khi nạp App —
-  // nếu không, tool đọc bí mật có thể mount trước lúc dữ liệu kịp sang kho và
-  // hiển thị trạng thái rỗng cho tới lần mở app sau.
-  // Hai bước, đúng thứ tự này: bản trung gian đã tách mặt phẳng khoá nhưng để
-  // kho ở dạng trần, nên dọn nó trước; rồi mới kéo phần còn sót trong store
-  // dùng chung của những máy nhảy thẳng từ bản cũ hơn.
+  // Move secrets out of the shared store after initPersistentStore() and
+  // before App loads, so tools never mount with empty secrets. The plain
+  // legacy vault is migrated first, then leftovers in the shared store.
   await migrateSecretsFromPlainStore();
   await migrateSecretsFromSharedStore();
 
-  // Áp dụng tone chủ đạo TRƯỚC lần vẽ đầu tiên — nếu không, người dùng đã chọn
-  // teal sẽ thấy đúng một khung hình azure mặc định trước khi kịp đổi.
-  // Không cần hook: tone không có tín hiệu bên ngoài nào để theo dõi liên tục
-  // như dark-mode hệ thống, chỉ cần áp một lần lúc khởi động; đổi tại chỗ về
-  // sau do Settings tự set thẳng lên <html> khi người dùng bấm chọn.
+  // Apply the accent before first paint to avoid a flash of the default.
   applyAccentToDocument(getAccentPreference());
   applyCornerToDocument(getCornerPreference());
   applyFontToDocument(getFontPreference());
   applyMonoFontToDocument(getMonoFontPreference());
 
-  // Nạp plugin đã cài từ bên ngoài TRƯỚC khi App đọc `PLUGINS` lần đầu — một
-  // plugin cài từ mạng chỉ đọc được lúc chạy (từ đĩa máy người dùng), không
-  // sớm hơn, khác hẳn 26 plugin compile-time đã có sẵn lúc build. Import động
-  // (không phải `import { initInstalledPlugins } from './platform/registry'`
-  // ở đầu file) vì cùng lý do App được nạp động bên dưới: registry.ts quét
-  // toàn bộ `src/plugins/*/plugin.ts` ngay khi module của nó được evaluate,
-  // và cái đó không nên nằm trên đường import đồng bộ, chặn-render-đầu-tiên
-  // của chính file bootstrap này.
+  // Register installed plugins before App first reads `PLUGINS`. Imported
+  // dynamically, like App, so the registry's manifest scan stays off this
+  // file's synchronous import path.
   const { initInstalledPlugins } = await import('./platform/registry');
   await initInstalledPlugins();
 

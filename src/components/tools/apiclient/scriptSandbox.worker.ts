@@ -1,13 +1,8 @@
-// Sandbox worker for API Client user scripts.
-//
-// Running scripts here rather than on the main thread means a script that never
-// returns — `while (true) {}`, a runaway loop — can be killed by terminating the
-// worker. On the main thread there is no way to interrupt synchronous JavaScript,
-// so such a script froze the entire app until it was force-quit.
-//
-// As a side effect scripts no longer reach `window`, `document`, or the app's
-// storage: they get the same `dt`/`req`/`res`/`pm` surface as before, plus the
-// bundled `require()` modules, and nothing else.
+// Sandbox worker for API Client user scripts. A script that never returns is
+// stopped by terminating the worker. Scripts get `dt`/`req`/`res`/`pm` and the
+// bundled `require()` modules and can't reach `window`, `document` or app
+// storage, but worker globals (`fetch`, `WebSocket`, `importScripts`,
+// `postMessage`, …) remain reachable, subject to the CSP.
 
 import { runPhase, type PhaseInput, type PhaseOutput } from './scriptPhases';
 

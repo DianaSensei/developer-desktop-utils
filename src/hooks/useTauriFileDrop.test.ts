@@ -2,13 +2,9 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 
 /**
- * `isTauri` (từ `@/lib/platform`) là hằng số tính MỘT LẦN lúc module nạp, dựa
- * trên `'__TAURI_INTERNALS__' in window` — nên để test được nhánh Tauri thật
- * (toàn bộ logic hit-test vị trí thả file + gọi callback), phải đặt
- * `window.__TAURI_INTERNALS__` TRƯỚC KHI import, rồi `vi.resetModules()` để
- * buộc nạp lại `platform.ts` với giá trị mới. Không làm vậy thì `isTauri`
- * luôn `false` trong jsdom và toàn bộ effect return sớm — không test được gì
- * ngoài phần vỏ (chưa có test nào trước đây, kể cả phần vỏ đó).
+ * `isTauri` is computed once at module load from `'__TAURI_INTERNALS__' in
+ * window`. To test the Tauri path (drop hit-testing and callbacks), set it
+ * before importing and reset modules.
  */
 
 const onDragDropEvent = vi.fn();
@@ -158,9 +154,8 @@ describe('useTauriFileDrop — nền Tauri desktop (window.__TAURI_INTERNALS__ c
     const { useTauriFileDrop } = await import('@/hooks/useTauriFileDrop');
     const { unmount } = renderHook(() => useTauriFileDrop(vi.fn()));
 
-    // Đợi tới đúng khoảnh khắc `onDragDropEvent` đã được GỌI (nên `resolve` đã
-    // có giá trị) nhưng promise nó trả về CHƯA resolve — đúng cửa sổ race mà
-    // cờ `cancelled` trong nguồn phải xử lý.
+    // Wait until `onDragDropEvent` was called but its promise has not
+    // resolved: the race the `cancelled` flag handles.
     await waitFor(() => expect(onDragDropEvent).toHaveBeenCalledTimes(1));
     unmount(); // huỷ trong lúc promise còn treo
     act(() => resolve(unlisten));

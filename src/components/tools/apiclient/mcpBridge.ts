@@ -115,15 +115,10 @@ function requireString(v: unknown, name: string): string {
   return v;
 }
 
-// update_request/set_node_script/set_node_auth all accept either a full
-// replacement object or a partial patch for these nested fields (script,
-// auth, body, settings) — store.updateRequest/setNodeScript/setNodeAuth
-// themselves do a shallow top-level merge, which would otherwise silently
-// drop sibling fields a caller didn't mention (e.g. patching only
-// script.req would wipe out script.res). These merge one level deeper so a
-// caller can touch req without resending res, or one auth/body/settings
-// field without resending the rest — while a full object still produces the
-// same result as a plain replace.
+// update_request/set_node_script/set_node_auth accept a full object or a
+// partial patch for these nested fields (script, auth, body, settings).
+// The store merges only top-level fields, so these merge one level deeper:
+// patching script.req keeps script.res. A full object still replaces.
 
 function mergeScript(current: RequestScript | undefined, patch: unknown): RequestScript {
   const base = current ?? { req: '', res: '' };
@@ -502,9 +497,8 @@ export function useMcpBridge(store: ApiStore, runRequest: RunRequestFn, enabled 
       // here is what makes its tools show up in `list_tools` at all. Same
       // 'native' + allowlist gate as `mcp_respond` below.
       await sdk.native.invoke('mcp_register_tools', { pluginId: sdk.id, tools: API_CLIENT_MCP_TOOLS });
-      // Qua SDK: sự kiện `mcp:call` và lệnh `mcp_respond` đều nằm trong quyền
-      // 'native' + allowlist của plugin, nên cầu nối này cũng hiện trong nhật ký
-      // như mọi lời gọi khác thay vì là một đường đi vòng.
+      // Through the SDK: the `mcp:call` event and `mcp_respond` are covered
+      // by the plugin's 'native' permission and allowlist, so they are audited.
       const fn = await sdk.native.listen<McpCallEvent>('mcp:call', async (payload) => {
         const { id, tool, args } = payload;
         const handler = handlersRef.current[tool];

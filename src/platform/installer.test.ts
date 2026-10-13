@@ -2,11 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Puzzle, Regex } from 'lucide-react';
 
 /**
- * `isTauri` được đọc MỘT LẦN lúc `@/lib/platform` được nạp — cùng cái bẫy đã
- * ghi ở mcpBridge.test.ts của các tool khác. `vi.resetModules()` + gán
- * `__TAURI_INTERNALS__` TRƯỚC khi `await import('./installer')` là cách duy
- * nhất để `isTauri` bên trong installer.ts đọc đúng giá trị test này cần,
- * thay vì giá trị đã đóng băng từ lần import đầu tiên của tiến trình test.
+ * `isTauri` is read once when `@/lib/platform` loads. Reset modules and set
+ * `__TAURI_INTERNALS__` before importing './installer' so it sees Tauri.
  */
 
 const invokeMock = vi.fn();
@@ -31,9 +28,7 @@ function remoteManifest(overrides: Partial<Record<string, unknown>> = {}) {
   };
 }
 
-/** Hình dạng THÔ y hệt những gì `artifact_installer_fetch_manifest` phía
- *  Rust thực sự trả về cho nhánh plugin — internally-tagged theo `kind`,
- *  ghi phẳng. */
+/** The raw plugin manifest shape returned by `artifact_installer_fetch_manifest`. */
 function remotePluginManifestRaw(overrides: Partial<Record<string, unknown>> = {}) {
   return { kind: 'plugin', ...remoteManifest(overrides) };
 }
@@ -213,11 +208,9 @@ describe('fetchArtifactManifestPreview / installArtifact / listInstalledArtifact
     expect(invokeMock).toHaveBeenCalledWith('artifact_installer_uninstall', { key: 'devtool-svc-demo' });
   });
 
-  // pullfrog bắt đúng ở review #145: `market_id` phía Rust là `Option<String>`
-  // KHÔNG có `skip_serializing_if`, nên một bản ghi không market ghi ra JSON
-  // `"market_id": null` — KHÔNG phải vắng hẳn trường (`undefined`). So sánh
-  // `=== undefined` ở phía TS (SettingsMarketplace's "đã cài" match) sẽ không
-  // bao giờ khớp một bản ghi thật từ Rust, mời cài chồng thêm một bản nữa.
+  // Rust serializes a record without a market as `"market_id": null`, not
+  // an absent field. TS must treat it as undefined, or marketplace "installed"
+  // matching would miss real records.
   it('market_id: null (bản ghi không market, ĐÚNG hình dạng Rust thật gửi) chuẩn hoá thành marketId: undefined', async () => {
     const installer = await loadInTauri();
     invokeMock.mockResolvedValueOnce([
@@ -274,11 +267,8 @@ describe('assertNoConflictingInstall — gọi TRƯỚC installArtifact/installP
 
   it('registeredGroup="core" (id trùng một plugin compile-time, lớp gọi tự tra bằng getPlugin) — ném lỗi riêng, không nhắc "gỡ bản đó" (không gỡ được tool có sẵn)', async () => {
     const installer = await loadInTauri();
-    // KHÔNG mock invoke ở đây: registeredGroup !== newGroup phải chặn NGAY,
-    // trước khi kịp gọi listInstalledPlugins() — nếu lỡ gọi, invokeMock
-    // (chưa mock resolved value nào) sẽ trả undefined, không phải mảng, và
-    // test sẽ thất bại vì lý do sai (TypeError .find trên undefined), không
-    // phải vì đúng lỗi mong đợi.
+    // No invoke mock: a different core group must be rejected before
+    // listInstalledPlugins() is called.
     await expect(installer.assertNoConflictingInstall('json', 'official', 'core')).rejects.toThrow(/json/);
     await expect(installer.assertNoConflictingInstall('json', 'official', 'core')).rejects.not.toThrow(/gỡ bản đó/i);
     expect(invokeMock).not.toHaveBeenCalled();
@@ -293,12 +283,8 @@ describe('assertNoConflictingInstall — gọi TRƯỚC installArtifact/installP
 
   it('registeredGroup khác "core" (bản ghi registry, có thể đã STALE nếu người dùng vừa gỡ trong phiên này) — KHÔNG tự chặn, luôn rơi xuống quét đĩa', async () => {
     const installer = await loadInTauri();
-    // registry chỉ nạp một lần lúc bootstrap (registry.ts), không cập nhật
-    // khi cài/gỡ trong lúc app đang chạy — một registeredGroup non-core ở
-    // đây có thể là bản ghi CŨ của một plugin người dùng vừa gỡ, chưa
-    // restart. Tự chặn bằng registeredGroup ở trường hợp này sẽ chặn nhầm
-    // một lượt cài lại hợp lệ — phải luôn quét đĩa (nguồn xác thực đúng
-    // trạng thái hiện tại) để biết còn conflict thật hay không.
+    // A non-core registered group may be stale (uninstalled this session),
+    // so the check must read the disk.
     invokeMock.mockResolvedValueOnce([]); // đĩa: không còn bản nào — plugin cũ đã bị gỡ thật
     await expect(
       installer.assertNoConflictingInstall('container-manager', 'custom-fork', 'official'),
@@ -405,9 +391,7 @@ describe('checkForServiceUpdate', () => {
 });
 
 describe('checkAllForUpdates', () => {
-  // Kiểm TUẦN TỰ theo đúng thứ tự mảng trả về từ `artifact_installer_list`
-  // (không Promise.all — xem lý do ở comment của hàm) — nên mock theo THỨ TỰ
-  // GỌI, cùng khuôn với mọi test khác trong file này, là đủ.
+  // Records are checked sequentially, so mocks are queued in call order.
   it('trả về mọi artifact có bản mới, cả plugin lẫn service, bỏ qua mục đã up-to-date', async () => {
     const installer = await loadInTauri();
     const pluginUpToDate = installedPluginRaw({ manifest: remoteManifest({ id: 'up-to-date' }) });
@@ -519,13 +503,8 @@ describe('installedPluginManifests — đổi RemotePluginManifest thành Plugin
     await expect(installer.installedPluginManifests()).resolves.toEqual([]);
   });
 
-  // `load` của mỗi manifest đổi ra ở đây gọi `artifact_installer_read_bundle`
-  // rồi `import()` một URL `blob:` — jsdom không thực thi ES module qua
-  // blob: URL thật (không có pipeline load/parse script như một trình duyệt
-  // thật), nên phần NẠP THẬT của bundle KHÔNG được kiểm ở đây. Đây là khoảng
-  // trống test đã biết, ghi lại chứ không giấu: cần một lần xác nhận thủ công
-  // trên app thật (cài một plugin ví dụ, xác nhận nó thật sự render) trước
-  // khi coi cơ chế này là đã kiểm chứng đầy đủ.
+  // jsdom cannot evaluate an ES module from a blob: URL, so actually
+  // loading a bundle is not covered here and needs a manual check in the app.
 
   it('không có marketId (dán tay/bản cài từ trước) thì group là "url", id giữ nguyên trần', async () => {
     const installer = await loadInTauri();
@@ -544,10 +523,7 @@ describe('installedPluginManifests — đổi RemotePluginManifest thành Plugin
     ]);
 
     const [a] = await installer.installedPluginManifests();
-    // Mất dòng group ở installer.ts thì id vẫn đúng (không tiền tố), nên
-    // usePluginSdkFor/getPluginSdk vẫn hoạt động — group chỉ ảnh hưởng route
-    // hiển thị và việc phát hiện xung đột lúc CÀI (assertNoConflictingInstall),
-    // không phải danh tính SDK của plugin.
+    // `group` affects routes and install conflicts, not the SDK identity.
     expect(a.manifest.id).toBe('demo');
     expect(a.manifest.group).toBe('official');
     expect(a.manifest.route).toBe('/installed/official/demo');

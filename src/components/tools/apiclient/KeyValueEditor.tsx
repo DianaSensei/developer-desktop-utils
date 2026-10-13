@@ -16,6 +16,7 @@ import { InlineCodeField, SearchInput, TextEditor } from '@/design-system';
 import { copyToClipboard } from '@/lib/clipboard';
 import { type KeyValue, type VarMap, newKeyValue } from './types';
 import { ResolvedValue, showsResolvedColumn } from './ResolvedValue';
+import { t } from './i18n';
 
 interface Props {
   rows: KeyValue[];
@@ -43,12 +44,10 @@ interface Props {
   // explains that only the last one wins (a plain object assignment) — real
   // HTTP semantics, not a bug, so this only makes the divergence visible.
   duplicateKeyHint?: 'params' | 'headers';
-  // Hides rows whose key/value don't match (case-insensitive substring) —
-  // for a large table (an environment with dozens of variables). This only
-  // narrows what's *rendered*: `onChange` still always receives every row,
-  // filtered or not, so editing while filtered can never silently drop the
-  // rows currently hidden from view. The trailing ghost row is never hidden,
-  // so a new row can still be added while filtered.
+  // Hides rows whose key/value do not match (case-insensitive substring)
+  // for large tables. Only affects rendering: `onChange` always receives
+  // every row, so hidden rows are never dropped. The trailing ghost row
+  // stays visible.
   filterQuery?: string;
 }
 
@@ -58,21 +57,14 @@ const isFilled = (r: KeyValue) => r.key !== '' || r.value !== '';
  *  the list by eye is faster than typing a filter. */
 const FILTER_THRESHOLD = 8;
 
-const DUPLICATE_KEY_TEXT: Record<'params' | 'headers', string> = {
-  params: 'Both values are sent — repeated query params are all included.',
-  headers: 'Only the last value is sent — a repeated header name overwrites earlier ones.',
-};
+const duplicateKeyText = (kind: 'params' | 'headers') =>
+  kind === 'params' ? t('kv.dupParams') : t('kv.dupHeaders');
 
 /**
- * Whether two enabled rows collide on name, by the rules of the thing being
- * edited — exported for its own test.
- *
- * Header names are case-insensitive (RFC 7230) and request.ts's `buildHeaders`
- * folds them that way: `Accept` and `accept` are one header and only the last
- * survives. A case-only difference is precisely the collision hardest to spot
- * by eye, and the exact-match check this used to do stayed silent for it.
- * Query parameters are the opposite — `id` and `ID` really are two different
- * params — so those keep comparing exactly.
+ * Whether two enabled rows collide on name. Header names are
+ * case-insensitive (RFC 7230), and `buildHeaders` in request.ts folds them,
+ * so `Accept` and `accept` collide; query parameter names are compared
+ * exactly. Exported for its own test.
  */
 export function hasDuplicateNames(rows: KeyValue[], kind: 'params' | 'headers'): boolean {
   const seen = new Set<string>();
@@ -86,9 +78,8 @@ export function hasDuplicateNames(rows: KeyValue[], kind: 'params' | 'headers'):
 }
 
 /**
- * Rows → the `key: value` text shown in bulk mode. Disabled rows round-trip
- * with a leading `//` (Postman's convention), so toggling a row off and then
- * editing in bulk doesn't silently re-enable it.
+ * Rows → the `key: value` text of bulk mode. Disabled rows keep a leading
+ * `//` (Postman's convention), so bulk editing does not re-enable them.
  */
 export function toBulkText(rows: KeyValue[]): string {
   return rows.map((r) => `${r.enabled ? '' : '//'}${r.key}:${r.value}`).join('\n');
@@ -117,10 +108,10 @@ export function parseBulkText(text: string): KeyValue[] {
 export function KeyValueEditor({
   rows,
   onChange,
-  keyPlaceholder = 'Name',
-  valuePlaceholder = 'Value',
-  nameLabel = 'Name',
-  valueLabel = 'Value',
+  keyPlaceholder = t('name'),
+  valuePlaceholder = t('value'),
+  nameLabel = t('name'),
+  valueLabel = t('value'),
   bulkEdit = true,
   vars,
   masked = false,
@@ -214,18 +205,8 @@ export function KeyValueEditor({
 
   if (bulk) {
     return (
-      // The mode toggle keeps the same corner and the same weight in both
-      // modes. It used to sit *below* the table and *above* the textarea, and
-      // switch from a muted label to an accent link — so the one control you
-      // need to get back moved ~200px and changed appearance the moment you
-      // used it.
-      //
-      // `h-full` + `flex-1` on the editor, and a viewport-fraction floor
-      // rather than CodeSurface's fixed `min-h-[180px]`: bulk edit is where
-      // someone pastes or reworks a whole set of params at once, and 180px
-      // (about 9 lines) stayed 180px no matter how large the window got. Now
-      // it fills whatever height the pane gives it, and never less than a
-      // third of the viewport.
+      // The mode toggle stays in the same place and style in both modes.
+      // The bulk editor fills the pane, with at least a third of the viewport.
       <div className="flex h-full min-h-0 flex-col gap-1.5">
         <TextEditor
           value={bulkText}
@@ -236,42 +217,28 @@ export function KeyValueEditor({
         />
         <div className="flex shrink-0 items-center justify-between">
           <span className="text-[11px] text-fg-mute">
-            One <code className="rounded bg-bg-2 px-1">{keyPlaceholder.toLowerCase()}: {valuePlaceholder.toLowerCase()}</code> per line
+            {t('kv.onePerLine')} <code className="rounded bg-bg-2 px-1">{keyPlaceholder.toLowerCase()}: {valuePlaceholder.toLowerCase()}</code> {t('kv.perLine')}
             {/* `{'//'}`, not a bare `//`: as raw JSX children those two
                 characters read as the start of a comment to anything parsing
                 this file (a linter flagged exactly that), even though React
                 renders them as the literal text we want here. */}
-            {' · '}prefix <code className="rounded bg-bg-2 px-1">{'//'}</code> to disable a row
+            {' · '}{t('kv.prefixToDisable')} <code className="rounded bg-bg-2 px-1">{'//'}</code> {t('kv.toDisableRow')}
           </span>
           <button onClick={() => setBulk(false)} className="text-[11px] text-fg-mute transition-colors hover:text-fg">
-            Key-Value Edit
+            {t('kv.keyValueEdit')}
           </button>
         </div>
       </div>
     );
   }
 
-  // Never a bare `1fr` — every row here is its OWN grid container, so track
-  // sizes are computed per row, and `1fr` is shorthand for `minmax(auto, 1fr)`,
-  // whose `auto` floor is the cell's min-content width. A row holding
-  // something that can't shrink (a JWT in the CodeMirror value cell) would
-  // otherwise resize that row alone: its Name column collapsed to 21px while
-  // Value ballooned to 1149px in a 438px table, so the columns stopped lining
-  // up with every other row. Pinning the floor to 0 on every column below
-  // makes all rows agree whatever they contain.
-  //
-  // The max side is bounded too (16rem for Name, 40rem for Value/Resolved),
-  // not left as `1fr`: this table is used inside panes that can span the
-  // whole window width (the stacked/no-split layout has no per-section
-  // max-width any more — see RequestPanel.tsx), and an unbounded `1fr` there
-  // used to hand a 7-character value like `profile` a 600px-wide input. The
-  // floor of 0 means both columns still shrink together at a narrow pane
-  // exactly as before; only a genuinely wide pane sees the caps kick in,
-  // leaving a small unused strip beside the table instead of one covering
-  // the whole thing.
-  // The leading column is 2rem, not 1rem: the whole cell is the enable/disable
-  // target (see the row below), so this width is the target's width. The dot
-  // inside stays 8px — the affordance grew, the visual didn't.
+  // Every row is its own grid container, so columns use `minmax(0, …)`
+  // rather than `1fr` (whose `auto` floor is the min-content width):
+  // otherwise a row holding unshrinkable content would size its columns
+  // differently from the others. Max widths (16rem Name, 40rem
+  // Value/Resolved) keep short values from getting huge inputs in wide
+  // panes. The leading 2rem column is the enable/disable target; the dot
+  // inside stays 8px.
   const gridCols = [
     'grid-cols-[2rem_minmax(0,16rem)_minmax(0,40rem)_2rem]',
     'grid-cols-[2rem_minmax(0,16rem)_minmax(0,40rem)_2rem_2rem]',
@@ -286,28 +253,25 @@ export function KeyValueEditor({
           <SearchInput
             value={ownFilter}
             onChange={setOwnFilter}
-            placeholder={`Filter ${realRows.length} rows…`}
+            placeholder={t('kv.filterRows', { n: realRows.length })}
             className="h-ctl text-xs"
             containerClassName="min-w-0 flex-1"
-            aria-label="Filter rows"
+            aria-label={t('kv.filterRowsLabel')}
           />
           <span className="shrink-0 text-[11px] tabular-nums text-fg-mute">
             {ownQ || q ? `${visibleRows.length}/${realRows.length}` : `${realRows.length} rows`}
           </span>
         </div>
       )}
-      {/* Bảng này cố ý sao đúng hình học của `DataTable` (xem ghi chú ở hàng
-          bên dưới) — nên khi `DataTable` đổi thì chỗ này phải đổi theo, nếu
-          không hai bảng cạnh nhau trong cùng một app lại lệch nhau: `--r-sm`
-          thay `rounded-md`, viền đủ độ đục, hàng tiêu đề là `--chrome` đặc
-          thay vì 40% của một tông vốn đã nhạt. */}
+      {/* Mirrors DataTable's geometry (`--r-sm`, opaque border, `--chrome`
+          header); keep the two in sync. */}
       <div className="overflow-hidden rounded-sm border border-line text-xs">
         {/* Header row */}
         <div className={cn('grid border-b border-line bg-chrome text-[11px] font-semibold uppercase tracking-wider text-fg-mute', gridCols)}>
           <div />
           <div className="border-r px-3 py-1.5">{nameLabel}</div>
           <div className="border-r px-3 py-1.5">{valueLabel}</div>
-          {showResolved && <div className="border-r px-3 py-1.5">Resolved</div>}
+          {showResolved && <div className="border-r px-3 py-1.5">{t('req.resolved')}</div>}
           {secretToggle && <div />}
           <div />
         </div>
@@ -345,13 +309,13 @@ export function KeyValueEditor({
       </div>
 
       {hasDuplicateKeys && duplicateKeyHint && (
-        <Callout tone="info" size="sm">Duplicate name — {DUPLICATE_KEY_TEXT[duplicateKeyHint]}</Callout>
+        <Callout tone="info" size="sm">{t('kv.dupName', { detail: duplicateKeyText(duplicateKeyHint) })}</Callout>
       )}
 
       {bulkEdit && (
         <div className="flex justify-end">
           <button onClick={enterBulk} className="text-[11px] text-fg-mute transition-colors hover:text-fg">
-            Bulk Edit
+            {t('kv.bulkEdit')}
           </button>
         </div>
       )}
@@ -412,7 +376,7 @@ function KeyValueRow({
             aria-label={`${row.key || keyPlaceholder} — ${row.enabled ? 'enabled' : 'disabled'}`}
             onClick={() => onEdit({ enabled: !row.enabled })}
             className="group/toggle flex w-full cursor-pointer items-center justify-center transition-colors hover:bg-bg-2/60 focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-inset focus-visible:ring-focus"
-            title={row.enabled ? 'Disable' : 'Enable'}
+            title={row.enabled ? t('req.disable') : t('req.enable')}
           >
             <span
               className={cn(
@@ -470,7 +434,7 @@ function KeyValueRow({
                 'rounded p-1 transition-colors',
                 row.secret ? 'text-acc-ink hover:text-acc' : 'text-fg-mute/40 opacity-0 group-hover:opacity-100 hover:text-fg',
               )}
-              title={row.secret ? 'Marked as secret — masked here and excluded from generated code/export' : 'Mark as secret'}
+              title={row.secret ? t('kv.markedSecret') : t('kv.markSecret')}
             >
               {row.secret ? <Lock className="h-3 w-3" /> : <Unlock className="h-3 w-3" />}
             </button>
@@ -485,7 +449,8 @@ function KeyValueRow({
             type="button"
             onClick={onRemove}
             className="rounded p-1 text-fg-mute/40 opacity-0 transition-all group-hover:opacity-100 hover:text-bad"
-            title="Remove"
+            title={t('remove')}
+            aria-label={t('remove')}
           >
             <Trash2 className="h-3 w-3" />
           </button>
@@ -510,10 +475,8 @@ interface ValueCellProps {
 }
 
 /**
- * The value editor, which is one of three things depending on the table:
- * {{var}}-aware (requests), masked (Vault / secret env vars), or plain text.
- * An if-chain rather than the nested ternary this used to be in JSX — the
- * three branches are unrelated components, not variations of one.
+ * The value editor: {{var}}-aware (requests), masked (Vault / secret env
+ * vars), or plain text.
  */
 function ValueCell({
   row, isGhost, disabled, vars, masked, valuePlaceholder, revealed, copied,
@@ -548,7 +511,7 @@ function ValueCell({
             type="button"
             onClick={onToggleReveal}
             className="shrink-0 rounded p-1 text-fg-mute/50 transition-colors hover:text-fg"
-            title={revealed ? 'Hide value' : 'Reveal value'}
+            title={revealed ? t('auth.hideValue') : t('auth.revealValue')}
           >
             {revealed ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
           </button>
@@ -558,7 +521,7 @@ function ValueCell({
             type="button"
             onClick={onCopy}
             className="shrink-0 rounded p-1 text-fg-mute/50 transition-colors hover:text-fg"
-            title={copied ? 'Copied' : 'Copy value'}
+            title={copied ? t('res.copied') : t('res.copyValue')}
           >
             {copied ? <Check className="h-3 w-3 text-ok" /> : <Copy className="h-3 w-3" />}
           </button>

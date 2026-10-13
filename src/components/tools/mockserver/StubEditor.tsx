@@ -11,6 +11,8 @@ import { KeyValueEditor } from '../apiclient/KeyValueEditor';
 import { newKeyValue, type KeyValue } from '../apiclient/types';
 import { MatcherEditor } from './MatcherEditor';
 import { STUB_METHODS, type BodyType, type ResponseMode, type ScriptResult, type Stub, type StubMethod } from './types';
+import { useMessages } from '@/contexts/LocaleContext';
+import MESSAGES from '@/components/tools/mockserver/MockServer.messages';
 
 interface Props {
   stub: Stub;
@@ -41,6 +43,7 @@ function humanSize(bytes: number): string {
 }
 
 export function StubEditor({ stub, onChange, testScript }: Props) {
+  const m = useMessages(MESSAGES);
   const [result, setResult] = useState<ScriptResult | null>(null);
   const [testing, setTesting] = useState(false);
   const [jsonError, setJsonError] = useState(false);
@@ -90,10 +93,11 @@ export function StubEditor({ stub, onChange, testScript }: Props) {
 
   const delayField = (
     <div className="flex items-center gap-1.5">
-      <span className="text-xs text-fg-mute">Delay</span>
+      <span className="text-xs text-fg-mute">{m('delay')}</span>
       <Input
         type="number"
         value={stub.delayMs}
+        aria-label={m('delay')}
         onChange={(e) => onChange({ delayMs: Math.max(0, Number(e.target.value) || 0) })}
         className="h-ctl w-20 text-xs"
       />
@@ -108,11 +112,11 @@ export function StubEditor({ stub, onChange, testScript }: Props) {
         <Input
           value={stub.name}
           onChange={(e) => onChange({ name: e.target.value })}
-          placeholder="Stub name"
+          placeholder={m('stubName')}
           className="h-ctl flex-1 text-sm font-medium"
         />
         <label className="flex shrink-0 items-center gap-2 text-xs text-fg-mute">
-          {stub.enabled ? 'Enabled' : 'Disabled'}
+          {stub.enabled ? m('enabled') : m('disabled')}
           <Switch checked={stub.enabled} onCheckedChange={(v) => onChange({ enabled: v })} />
         </label>
       </div>
@@ -139,26 +143,26 @@ export function StubEditor({ stub, onChange, testScript }: Props) {
         />
       </div>
       <ToolHint className="-mt-3">
-        Path supports <code>:param</code> captures and <code>*</code> wildcards, e.g. <code>/users/:id</code>.
+        {m('pathHintA')} <code>:param</code> {m('pathHintB')} <code>*</code> {m('pathHintC')} <code>/users/:id</code>.
       </ToolHint>
 
       {/* Matchers */}
       <div className="space-y-2">
-        <ToolLabel>Match when…</ToolLabel>
+        <ToolLabel>{m('matchWhen')}</ToolLabel>
         <MatcherEditor matchers={stub.matchers} onChange={(matchers) => onChange({ matchers })} />
       </div>
 
       {/* Response */}
       <div className="space-y-3">
         <div className="flex items-center justify-between gap-3">
-          <ToolLabel>Response</ToolLabel>
+          <ToolLabel>{m('response')}</ToolLabel>
           <Segmented<ResponseMode>
             size="sm"
             value={stub.mode}
             onValueChange={(mode) => onChange({ mode })}
             options={[
-              { value: 'static', label: 'Static' },
-              { value: 'script', label: 'Script' },
+              { value: 'static', label: m('static') },
+              { value: 'script', label: m('script') },
             ]}
           />
         </div>
@@ -167,10 +171,11 @@ export function StubEditor({ stub, onChange, testScript }: Props) {
           <div className="space-y-3">
             <div className="flex flex-wrap items-center gap-4">
               <div className="flex items-center gap-1.5">
-                <span className="text-xs text-fg-mute">Status</span>
+                <span className="text-xs text-fg-mute">{m('status')}</span>
                 <Input
                   type="number"
                   value={stub.status}
+                  aria-label={m('status')}
                   onChange={(e) => onChange({ status: Number(e.target.value) || 0 })}
                   className="h-ctl w-20 text-xs"
                 />
@@ -179,26 +184,26 @@ export function StubEditor({ stub, onChange, testScript }: Props) {
             </div>
 
             <div className="space-y-1.5">
-              <span className="text-xs text-fg-mute">Headers</span>
+              <span className="text-xs text-fg-mute">{m('headers')}</span>
               <KeyValueEditor rows={stub.headers} onChange={(headers) => onChange({ headers })} />
             </div>
 
             <div className="space-y-1.5">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-fg-mute">Body</span>
+                  <span className="text-xs text-fg-mute">{m('body')}</span>
                   {stub.bodyType === 'json' && (
                     <>
                       <button
                         type="button"
                         onClick={formatJson}
                         className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-fg-mute transition-colors hover:bg-bg-2 hover:text-fg"
-                        title="Pretty-print JSON"
+                        title={m('prettyPrint')}
                       >
                         <Braces className="h-3 w-3" />
-                        Format
+                        {m('format')}
                       </button>
-                      {jsonError && <span className="text-[11px] text-bad">Invalid JSON</span>}
+                      {jsonError && <span className="text-[11px] text-bad">{m('invalidJson')}</span>}
                     </>
                   )}
                 </div>
@@ -207,9 +212,9 @@ export function StubEditor({ stub, onChange, testScript }: Props) {
                   value={stub.bodyType}
                   onValueChange={(bodyType) => onChange({ bodyType })}
                   options={[
-                    { value: 'text', label: 'Text' },
+                    { value: 'text', label: m('text') },
                     { value: 'json', label: 'JSON' },
-                    { value: 'base64', label: 'File' },
+                    { value: 'base64', label: m('file') },
                   ]}
                 />
               </div>
@@ -235,7 +240,7 @@ export function StubEditor({ stub, onChange, testScript }: Props) {
                       onClick={() => fileInput.current?.click()}
                     >
                       <Upload className="mr-1 h-3.5 w-3.5" />
-                      Choose file…
+                      {m('chooseFile')}
                     </Button>
                     {stub.body ? (
                       <span className="flex items-center gap-1.5 text-xs text-fg-mute">
@@ -245,17 +250,18 @@ export function StubEditor({ stub, onChange, testScript }: Props) {
                           type="button"
                           onClick={() => onChange({ body: '', fileName: '' })}
                           className="text-fg-mute hover:text-bad"
-                          aria-label="Clear file"
+                          aria-label={m('clearFile')}
+                          title={m('clearFile')}
                         >
                           <X className="h-3.5 w-3.5" />
                         </button>
                       </span>
                     ) : (
-                      <span className="text-[11px] text-fg-mute">or paste base64 below</span>
+                      <span className="text-[11px] text-fg-mute">{m('orPasteBase64')}</span>
                     )}
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <span className="shrink-0 text-xs text-fg-mute">Download name</span>
+                    <span className="shrink-0 text-xs text-fg-mute">{m('downloadName')}</span>
                     <Input
                       value={stub.fileName}
                       onChange={(e) => onChange({ fileName: e.target.value })}
@@ -266,13 +272,12 @@ export function StubEditor({ stub, onChange, testScript }: Props) {
                   <textarea
                     value={stub.body}
                     onChange={(e) => onChange({ body: e.target.value })}
-                    placeholder="Base64-encoded bytes"
+                    placeholder={m('base64Bytes')}
                     spellCheck={false}
                     className="h-20 w-full resize-y rounded-md border bg-card p-2 font-mono text-[11px] focus:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus"
                   />
                   <ToolHint>
-                    Served as raw bytes with a <code>Content-Disposition: attachment</code> when a download name is
-                    set. Set the MIME type via the <code>Content-Type</code> header above.
+                    {m('fileHintA')} <code>Content-Disposition: attachment</code> {m('fileHintB')} <code>Content-Type</code> {m('fileHintC')}
                   </ToolHint>
                 </div>
               ) : (
@@ -284,7 +289,7 @@ export function StubEditor({ stub, onChange, testScript }: Props) {
                         if (jsonError) setJsonError(false);
                         onChange({ body });
                       }}
-                      placeholder="Response body"
+                      placeholder={m('responseBody')}
                     />
                   ) : (
                     <TextEditor
@@ -293,7 +298,7 @@ export function StubEditor({ stub, onChange, testScript }: Props) {
                         if (jsonError) setJsonError(false);
                         onChange({ body });
                       }}
-                      placeholder="Response body"
+                      placeholder={m('responseBody')}
                     />
                   )}
                   <ToolHint>
@@ -309,15 +314,15 @@ export function StubEditor({ stub, onChange, testScript }: Props) {
           <div className="space-y-3">
             {delayField}
             <ToolHint>
-              <code>req</code> exposes <code>method</code>, <code>path</code>, <code>query</code>,{' '}
-              <code>headers</code>, <code>params</code>, <code>body</code>. Return a string (200 body) or a map{' '}
+              <code>req</code> {m('scriptHintA')} <code>method</code>, <code>path</code>, <code>query</code>,{' '}
+              <code>headers</code>, <code>params</code>, <code>body</code>{m('scriptHintB')}{' '}
               <code>{'#{ status, headers, body }'}</code>.
             </ToolHint>
-            <JavaScriptEditor value={stub.script} onChange={(script) => onChange({ script })} placeholder="Rhai script" />
+            <JavaScriptEditor value={stub.script} onChange={(script) => onChange({ script })} placeholder={m('rhaiScript')} />
             <div className="flex items-center gap-2">
               <Button type="button" variant="outline" size="sm" className="h-ctl text-xs" onClick={runTest} disabled={testing}>
                 <FlaskConical className="mr-1 h-3.5 w-3.5" />
-                {testing ? 'Running…' : 'Test script'}
+                {testing ? m('runningScript') : m('testScript')}
               </Button>
             </div>
             {result && (

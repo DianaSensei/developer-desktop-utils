@@ -1,4 +1,4 @@
-// Prevents additional console window on Windows in release, DO NOT REMOVE!!
+// Prevents an additional console window on Windows in release. Do not remove.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod checksum;
@@ -8,10 +8,11 @@ mod files;
 mod mcp_bridge;
 mod mockserver;
 mod ports;
+mod private_file;
 mod secrets_vault;
 mod service_host;
+mod service_trust;
 mod artifact_installer;
-mod plugin_data;
 
 use tauri::Manager;
 use tauri_plugin_deep_link::DeepLinkExt;
@@ -21,19 +22,12 @@ use tauri::menu::{Menu, PredefinedMenuItem, Submenu};
 
 fn main() {
     tauri::Builder::default()
-        // Đăng ký TRƯỚC hết mọi `.plugin()` khác — yêu cầu của chính plugin
-        // này: nếu người dùng bấm một link `desktop-devtool-app://install?...` thứ hai
-        // trong khi app đã mở, closure dưới đây chạy trên tiến trình ĐANG
-        // CHẠY còn tiến trình mới tự thoát ngay, thay vì mở thêm một cửa sổ
-        // trùng. feature "deep-link" (Cargo.toml) đã tự gọi
-        // `deep_link.handle_cli_arguments(argv)` trước khi chạy closure, và
-        // đó là bước phát ra `deep-link://new-url` mà `onOpenUrl` phía JS
-        // (src/lib/deepLink.ts) đang nghe — nên closure KHÔNG cần tự parse
-        // URL. Nhưng để cửa sổ rỗng là chưa đủ: hệ điều hành không tự đưa cửa
-        // sổ của tiến trình đang chạy ra trước, nên trước bản sửa này, bấm
-        // link thứ hai trong lúc app đã mở (nhất là khi đang bị thu nhỏ hoặc
-        // ở sau cửa sổ khác) trông như không có gì xảy ra — đây là nguyên
-        // nhân chính của lỗi "im lặng" người dùng báo.
+        // Must be registered before any other plugin. A second launch (e.g. a
+        // `desktop-devtool-app://install?...` link clicked while the app is open)
+        // exits and runs this closure in the existing process. The "deep-link"
+        // feature already forwards the URL to `onOpenUrl` (src/lib/deepLink.ts);
+        // the closure only has to bring the window to the front, which the OS
+        // does not do on its own.
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.unminimize();
@@ -43,36 +37,22 @@ fn main() {
         }))
         .plugin(tauri_plugin_deep_link::init())
         .setup(|_app| {
-            // AppImage không có bước cài đặt nào đăng ký URI scheme vào hệ
-            // thống (khác .deb/.msi/.dmg, nơi trình cài đặt làm việc đó) — tự
-            // đăng ký lúc khởi động là cách duy nhất `desktop-devtool-app://` hoạt động
-            // trên bản AppImage. Vô hại khi gọi lại nhiều lần hoặc trên các
-            // bản Linux không phải AppImage.
+            // AppImage has no installer to register the URI scheme, so register
+            // it at startup. Harmless elsewhere and when repeated.
             #[cfg(target_os = "linux")]
             {
                 let _ = _app.deep_link().register_all();
             }
-            // Local-only control channel the MCP stdio sidecar
-            // (src/bin/devtool-mcp-server.rs) talks to, so an MCP client
-            // (Claude Desktop/Code) can drive the API Client tool through
-            // the exact same store/engine the UI uses. See mcp_bridge.rs
-            // for the full design.
+            // Loopback control channel for the MCP stdio sidecar; see
+            // mcp_bridge.rs.
             mcp_bridge::start(_app.handle());
 
-            // On macOS the OS only routes Cmd+Z/X/C/V/A to the webview when a
-            // native Edit menu with PredefinedMenuItems exists. Without it, none
-            // of the standard text-editing shortcuts work in <input>/<textarea>
-            // or CodeMirror — so this menu is macOS-only.
+            // macOS only routes Cmd+Z/X/C/V/A to the webview when a native Edit
+            // menu exists, so add one there.
             //
-            // On Windows/Linux the app draws its own titlebar with
-            // `decorations: false` (see tauri.windows.conf.json /
-            // tauri.linux.conf.json) and standard keyboard shortcuts already
-            // reach the webview without a native menu. Calling `set_menu`
-            // there is NOT harmless as previously assumed — it forces the OS
-            // to keep a native menu bar (and, together with it, some native
-            // window chrome) even with `decorations: false`, producing a
-            // native titlebar/menu stacked on top of the app's own
-            // custom-drawn one.
+            // Windows and Linux draw their own titlebar (`decorations: false`)
+            // and shortcuts already reach the webview. Calling `set_menu` there
+            // would force a native menu bar and chrome on top of the custom one.
             #[cfg(target_os = "macos")]
             {
                 let edit = Submenu::with_items(_app, "Edit", true, &[
@@ -91,24 +71,18 @@ fn main() {
             Ok(())
         })
         .manage(dropped::DroppedPaths::default())
-        // Record what the user drags onto the window, so `read_file_data_url`
-        // and `hash_file` can serve dropped files without accepting any path
-        // the frontend cares to name. `Enter` matters as much as `Drop`: Tauri
-        // notifies the webview before these listeners run, and only `Enter`
-        // reliably precedes the frontend's invoke. See dropped.rs.
+        // Record dragged paths so `read_file_data_url` and `hash_file` only read
+        // files the user dropped. `Enter` is recorded as well as `Drop` because
+        // Tauri notifies the webview before these listeners run. See dropped.rs.
         .on_window_event(|window, event| {
-            if let tauri::WindowEvent::DragDrop(drag) = event {
-                match drag {
-                    tauri::DragDropEvent::Enter { paths, .. }
-                    | tauri::DragDropEvent::Drop { paths, .. } => {
-                        window.state::<dropped::DroppedPaths>().remember(paths);
-                    }
-                    _ => {}
-                }
+            if let tauri::WindowEvent::DragDrop(
+                tauri::DragDropEvent::Enter { paths, .. } | tauri::DragDropEvent::Drop { paths, .. },
+            ) = event
+            {
+                window.state::<dropped::DroppedPaths>().remember(paths);
             }
         })
         .manage(mockserver::MockState::default())
-        // Host cho plugin dịch vụ (tier B) — xem service_host.rs.
         .manage(service_host::ServiceRegistry::default())
         .manage(secrets_vault::VaultState::default())
         .manage(artifact_installer::InstalledIndex::default())
@@ -120,15 +94,9 @@ fn main() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_store::Builder::new().build())
-        // `Builder::default()` tracks + RESTORES every `StateFlags`, including
-        // `DECORATIONS` — mỗi lần mở app nó ghi decorations của cửa sổ về đúng
-        // giá trị đã lưu trong `.window-state.json` từ lần chạy trước, đè lên
-        // `decorations: false` của tauri.windows.conf.json / tauri.linux.conf.json.
-        // App từng chạy với decorations mặc định (true) trước khi có titlebar tự
-        // vẽ, nên file state cũ trên máy người dùng đã có `decorated: true` —
-        // đây là lý do titlebar gốc của Windows vẫn hiện dù config đã đúng.
-        // Loại DECORATIONS khỏi flags theo dõi: decorations luôn do config quyết
-        // định, không phải do trạng thái lưu lại.
+        // Do not restore `DECORATIONS`: older installs saved `decorated: true`
+        // in `.window-state.json`, which would override `decorations: false`
+        // from tauri.windows.conf.json / tauri.linux.conf.json.
         .plugin(
             tauri_plugin_window_state::Builder::new()
                 .with_state_flags(

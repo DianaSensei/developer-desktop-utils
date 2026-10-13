@@ -1,5 +1,5 @@
 import { useDeferredValue, useEffect, useMemo, useState } from 'react';
-import { usePluginSdkFor, usePluginState } from '@/platform';
+import { usePluginSdkFor, usePluginState, useSecretState } from '@/platform';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -12,15 +12,19 @@ import { PasswordHash } from './PasswordHash';
 import { ToolSection, ToolLabel, ToolHint } from '@/components/ui/tool-section';
 import { Segmented } from '@/components/ui/segmented';
 import { Callout } from '@/components/ui/callout';
-import { ToolPanes, ToolPane, PaneHeader } from '@/components/ui/tool-layout';
+import { ToolPanes, ToolPane, PaneHeader, ToolToolbar } from '@/components/ui/tool-layout';
 import CryptoJS from 'crypto-js';
 import { EnvelopeFormatError, decryptAesGcm, encryptAesGcm, isAesGcmEnvelope } from '@/lib/aesGcm';
 import { cn } from '@/lib/utils';
 import { SectionLabel } from '@/components/ui/section-label';
-import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
+import { useQuickPaste, useQuickPasteHint } from '@/hooks/useQuickPaste';
 import { useInputHistory } from '@/hooks/useInputHistory';
 import { CopyButton } from '@/components/ui/copy-button';
 import { Spinner } from '@/components/ui/spinner';
+import { useMessages } from '@/contexts/LocaleContext';
+import COMMON from '@/components/tools/common.messages';
+import MESSAGES from '@/components/tools/EncodeHashEncrypt.messages';
+import { ToggleChip } from '@/components/ui/toggle-chip';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -49,8 +53,22 @@ function base64Encode(input: string) {
   toBytes(input).forEach((byte) => { binary += String.fromCharCode(byte); });
   return btoa(binary);
 }
-function base64Decode(input: string) {
-  const binary = atob(input.replace(/\s+/g, ''));
+// Accepts the forms people actually paste: base64url (`-` `_`, JWT/OAuth),
+// missing `=` padding, line breaks, and a `data:…;base64,` prefix. Errors
+// say what is wrong instead of passing on atob's DOMException.
+export function base64Decode(input: string) {
+  let s = input.replace(/\s+/g, '').replace(/^data:[^,]*;base64,/i, '');
+  s = s.replace(/-/g, '+').replace(/_/g, '/');
+  const bad = s.match(/[^A-Za-z0-9+/=]/);
+  if (bad) throw new Error(`Not valid Base64: unexpected character "${bad[0]}".`);
+  // Trailing padding, stripped without /=+$/ (a backtracking regex).
+  let end = s.length;
+  while (end > 0 && s[end - 1] === '=') end--;
+  s = s.slice(0, end);
+  if (s.includes('=')) throw new Error('Not valid Base64: "=" padding may only appear at the end.');
+  if (s.length % 4 === 1) throw new Error('Not valid Base64: one character too many or too few (truncated input?).');
+  s += '='.repeat((4 - (s.length % 4)) % 4);
+  const binary = atob(s);
   const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
   return fromBytes(bytes);
 }
@@ -518,6 +536,9 @@ export function doDecrypt(algo: CryptoJsAlgo, ciphertext: string, key: string): 
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function EncodeHashEncrypt() {
+  const m = useMessages(MESSAGES);
+  const c = useMessages(COMMON);
+  const quickPasteHint = useQuickPasteHint();
   const sdk = usePluginSdkFor('base64');
   // Top-level tab
   const [tab, setTab] = usePluginState<Tab>(sdk, 'codec:tab', 'encode', { legacyKey: 'devtool:codec:tab' });
@@ -530,14 +551,16 @@ export function EncodeHashEncrypt() {
   // Hash tab
   const [hashInput, setHashInput]     = usePluginState(sdk, 'hash:hashInput', '', { legacyKey: 'devtool:hash:hashInput' });
   const [upperHex, setUpperHex]       = usePluginState(sdk, 'hash:upperHex', false, { legacyKey: 'devtool:hash:upperHex' });
-  const [hmacKey, setHmacKey]         = usePluginState(sdk, 'hash:hmacKey', '', { legacyKey: 'devtool:hash:hmacKey' });
+  // Keys are credentials: they live in the encrypted vault, not in the
+  // plain settings file (platform/secrets.ts migrates the old keys).
+  const [hmacKey, setHmacKey]         = useSecretState(sdk, 'hmac-key', '');
   const [showHmacKey, setShowHmacKey] = useState(false);
   const [verifyAlgo, setVerifyAlgo]   = useState<AlgoId | null>(null);
   const [verifyValue, setVerifyValue] = useState('');
 
   // Encrypt tab
   const [encryptInput, setEncryptInput] = usePluginState(sdk, 'hash:encryptInput', '', { legacyKey: 'devtool:hash:encryptInput' });
-  const [encryptKey, setEncryptKey]     = usePluginState(sdk, 'hash:key', '', { legacyKey: 'devtool:hash:key' });
+  const [encryptKey, setEncryptKey]     = useSecretState(sdk, 'aes-key', '');
   const [cryptoMode, setCryptoMode]     = usePluginState<CryptoMode>(sdk, 'hash:aesMode', 'encrypt', { legacyKey: 'devtool:hash:aesMode' });
   const [encryptAlgo, setEncryptAlgo]   = usePluginState<EncryptAlgo>(sdk, 'hash:encryptAlgo', 'aes-gcm', { legacyKey: 'devtool:hash:encryptAlgo' });
   const [showKey, setShowKey]           = useState(false);
@@ -563,7 +586,7 @@ export function EncodeHashEncrypt() {
       const result = encodeMode === 'encode' ? codec.encode(deferredInput) : codec.decode(deferredInput);
       return { output: result, error: '' };
     } catch (err) {
-      return { output: '', error: err instanceof Error ? err.message : 'Conversion failed' };
+      return { output: '', error: err instanceof Error ? err.message : m('conversionFailed') };
     }
   }, [deferredInput, codec, encodeMode]);
 
@@ -602,10 +625,9 @@ export function EncodeHashEncrypt() {
     [encryptAlgo]
   );
 
-  // AES-GCM is async (WebCrypto) and deliberately slow — 600k PBKDF2 rounds is
-  // the point of it — so the encrypt tab can no longer resolve in a `useMemo`.
-  // The crypto-js modes stay synchronous and land on the very first tick, so
-  // only the GCM path ever shows the busy state.
+  // AES-GCM is async (Web Crypto) and deliberately slow (600k PBKDF2
+  // rounds), so the encrypt tab resolves in state rather than `useMemo`.
+  // The crypto-js modes finish on the first tick; only GCM shows busy.
   const [cryptoResult, setCryptoResult] = useState<{ output: string; error: string }>({ output: '', error: '' });
   const [cryptoBusy, setCryptoBusy] = useState(false);
 
@@ -624,10 +646,10 @@ export function EncodeHashEncrypt() {
           const text = doDecrypt(encryptAlgo, deferredEncrypt, encryptKey);
           setCryptoResult(text
             ? { output: text, error: '' }
-            : { output: '', error: 'Invalid key or ciphertext' });
+            : { output: '', error: m('invalidKeyOrCipher') });
         }
       } catch {
-        setCryptoResult({ output: '', error: 'Decryption failed — check your key and ciphertext' });
+        setCryptoResult({ output: '', error: m('decryptFailedKey') });
       }
       setCryptoBusy(false);
       return;
@@ -652,8 +674,8 @@ export function EncodeHashEncrypt() {
             : isAesGcmEnvelope(deferredEncrypt)
               // The tag failed, and the envelope really is ours — so it is the
               // passphrase or the message, and GCM cannot tell you which.
-              ? 'Wrong passphrase, or the ciphertext has been altered.'
-              : 'Decryption failed — check your passphrase and ciphertext.',
+              ? m('wrongPassphrase')
+              : m('decryptFailedPass'),
         });
       } finally {
         if (!stale) setCryptoBusy(false);
@@ -678,31 +700,23 @@ export function EncodeHashEncrypt() {
   return (
     <div className="tool-full-height">
 
-      {/* ── MỘT vùng công cụ, hai dòng — không phải hai dải ──────────────────
-          Trước đây hàng tab và hàng tuỳ chọn của tab Encode là hai khối riêng,
-          mỗi khối một nền và một đường viền dưới. Cộng với titlebar và dải tab
-          tool ở khung app, đỉnh cửa sổ có BỐN dải xám chồng nhau, mỗi dải một
-          chiều cao — đó là thứ đọc ra "cẩu thả": mắt phải vượt qua bốn đường
-          kẻ ngang trước khi tới nội dung, và không đường nào nói lên điều gì.
-
-          Giờ cả hai nằm trong cùng một `header-chrome`: một nền, một đường
-          viền dưới, hai dòng bên trong. Hàng tuỳ chọn chỉ hiện ở tab nào có,
-          nên sáu tab còn lại vẫn là một dòng như cũ. */}
-      <div className="shrink-0 header-chrome px-4 py-1.5 flex flex-col gap-1.5">
+      {/* One toolbar with two rows (tabs, then the active tab's options)
+          under a single background and border, instead of stacked bands. */}
+      <ToolToolbar className="px-4 py-1.5 flex flex-col gap-1.5">
       <div className="flex items-center gap-3">
         <Segmented
           value={tab}
           onValueChange={setTab}
           options={[
-            { value: 'encode', label: 'Encode', icon: Code },
-            { value: 'image', label: 'Image', icon: ImageIcon },
-            { value: 'hash', label: 'Hash', icon: Lock },
-            { value: 'checksum', label: 'Checksum', icon: FileCheck },
-            { value: 'password', label: 'Password', icon: Fingerprint },
-            { value: 'encrypt', label: 'Encrypt', icon: ArrowLeftRight },
-            { value: 'pipeline', label: 'Pipeline', icon: Workflow },
+            { value: 'encode', label: m('tab.encode'), icon: Code },
+            { value: 'image', label: m('tab.image'), icon: ImageIcon },
+            { value: 'hash', label: m('tab.hash'), icon: Lock },
+            { value: 'checksum', label: m('tab.checksum'), icon: FileCheck },
+            { value: 'password', label: m('tab.password'), icon: Fingerprint },
+            { value: 'encrypt', label: m('tab.encrypt'), icon: ArrowLeftRight },
+            { value: 'pipeline', label: m('tab.pipeline'), icon: Workflow },
           ]}
-          aria-label="Tool tab"
+          aria-label={m('tabLabel')}
         />
       </div>
         {tab === 'encode' && (
@@ -718,38 +732,38 @@ export function EncodeHashEncrypt() {
               onValueChange={setEncodeMode}
               size="sm"
               options={[
-                { value: 'encode', label: 'Encode' },
-                { value: 'decode', label: 'Decode' },
+                { value: 'encode', label: m('encode') },
+                { value: 'decode', label: m('decode') },
               ]}
-              aria-label="Encode mode"
+              aria-label={m('encodeModeLabel')}
             />
-            <span className="text-xs text-fg-mute truncate hidden sm:block">{codec.description}</span>
+            <span className="text-xs text-fg-mute truncate hidden sm:block">{m(`codec.${codec.id}` as 'codec.base64')}</span>
           </div>
         )}
-      </div>
+      </ToolToolbar>
 
       {/* ── Encode tab ───────────────────────────────────────────────────────── */}
       {tab === 'encode' && (
         <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
           <ToolPanes>
             <ToolPane>
-              <PaneHeader label="Input" hint={quickPasteHint} />
+              <PaneHeader label={c('input')} hint={quickPasteHint} />
               <Textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder={encodeMode === 'encode' ? 'Enter text to encode' : `Enter ${codec.label} to decode`}
+                placeholder={encodeMode === 'encode' ? m('encodePlaceholder') : m('decodePlaceholder', { codec: codec.label })}
                 className="flex-1 min-h-0 resize-none rounded-none border-0 focus-visible:ring-0 focus-visible:ring-offset-0 font-mono text-sm p-4"
               />
             </ToolPane>
             <ToolPane>
               <PaneHeader
-                label="Output"
-                action={<CopyButton value={encodeOutput} label="Copy" variant="ghost" size="sm" disabled={!encodeOutput} className="h-6 px-2 text-xs rounded-lg" iconClassName="h-3 w-3" />}
+                label={c('output')}
+                action={<CopyButton value={encodeOutput} label={c('copy')} variant="ghost" size="sm" disabled={!encodeOutput} className="h-6 px-2 text-xs rounded-lg" iconClassName="h-3 w-3" />}
               />
               <Textarea
                 value={encodeError ? `Error: ${encodeError}` : encodeOutput}
                 readOnly
-                placeholder="Result appears here"
+                placeholder={m('resultPlaceholder')}
                 className={cn('flex-1 min-h-0 resize-none rounded-none border-0 focus-visible:ring-0 focus-visible:ring-offset-0 font-mono text-sm p-4', encodeError && 'text-bad')}
               />
             </ToolPane>
@@ -761,41 +775,37 @@ export function EncodeHashEncrypt() {
       {tab === 'hash' && (
         <div className="tool-scrollable tool-padding tool-spacer">
 
-          <Callout tone="info" size="sm" icon={Lock} title="One-way">
-            The same input always produces the same digest, but the original text cannot be recovered.
+          <Callout tone="info" size="sm" icon={Lock} title={m('oneWay')}>
+            {m('oneWayBody')}
           </Callout>
 
           <ToolSection>
-            <ToolLabel>Input Text</ToolLabel>
+            <ToolLabel>{m('inputText')}</ToolLabel>
             <ToolHint>{quickPasteHint}</ToolHint>
             <Textarea
               value={hashInput}
               onChange={(e) => setHashInput(e.target.value)}
-              placeholder="Enter text to hash…"
+              placeholder={m('hashPlaceholder')}
               className="min-h-[100px] font-mono text-sm"
             />
           </ToolSection>
 
           {/* Results header with uppercase toggle */}
           <div className="flex items-center justify-between">
-            <SectionLabel size="sm">Hash Results</SectionLabel>
-            <button
-              type="button"
-              onClick={() => setUpperHex((v) => !v)}
-              title={upperHex ? 'Switch to lowercase' : 'Switch to uppercase'}
-              className={cn(
-                'text-[11px] font-mono px-2 py-0.5 rounded border transition-colors',
-                upperHex
-                  ? 'border-acc/40 bg-acc/10 text-acc'
-                  : 'border-line bg-bg-2/30 text-fg-mute hover:text-fg hover:border-line'
-              )}
+            <SectionLabel size="sm">{m('hashResults')}</SectionLabel>
+            <ToggleChip
+              pressed={upperHex}
+              onPressedChange={setUpperHex}
+              title={upperHex ? m('toLower') : m('toUpper')}
+              aria-label={m('toUpper')}
+              className="px-2 font-mono"
             >
               {upperHex ? 'ABC' : 'abc'}
-            </button>
+            </ToggleChip>
           </div>
 
           <div className="space-y-2">
-            {ALGORITHMS.map(({ id, label, bits, chars, desc }) => {
+            {ALGORITHMS.map(({ id, label, bits, chars }) => {
               const value = hashes[id];
               const isVerifying = verifyAlgo === id;
               return (
@@ -803,33 +813,33 @@ export function EncodeHashEncrypt() {
                   <div className="flex items-center gap-3 px-3 pt-2.5 pb-1 group">
                     <div className="shrink-0 w-24">
                       <p className="text-xs font-semibold text-fg leading-none mb-0.5">{label}</p>
-                      <p className="text-[11px] text-fg-mute">{bits}-bit</p>
+                      <p className="text-[11px] text-fg-mute">{m('bits', { n: bits })}</p>
                     </div>
                     <Input
                       value={value}
                       readOnly
                       className="flex-1 h-ctl font-mono text-xs border-0 bg-transparent p-0 focus-visible:ring-0 text-fg-mute"
-                      placeholder={`${chars} hex chars`}
+                      placeholder={m('hexChars', { n: chars })}
                     />
                     <div className={cn(
                       'shrink-0 flex items-center gap-1 transition-opacity',
                       isVerifying ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
                     )}>
                       <CopyButton value={value} disabled={!value} className="h-ctl w-ctl" iconClassName="h-3 w-3" />
-                      <Button size="icon" variant={isVerifying ? 'secondary' : 'ghost'} disabled={!value} onClick={() => toggleVerify(id)} className="h-ctl w-ctl" title="Verify hash">
+                      <Button size="icon" variant={isVerifying ? 'secondary' : 'ghost'} disabled={!value} onClick={() => toggleVerify(id)} className="h-ctl w-ctl" title={m('verifyHash')} aria-label={m('verifyHash')} aria-pressed={isVerifying}>
                         <Check className="h-3 w-3" />
                       </Button>
                     </div>
                   </div>
-                  <p className="text-[11px] text-fg-mute/60 px-3 pb-2">{desc}</p>
+                  <p className="text-[11px] text-fg-mute/60 px-3 pb-2">{m(`hash.${id}` as 'hash.md5')}</p>
                   {isVerifying && (
                     <div className="px-3 pb-3 border-t border-line-soft pt-2.5 space-y-2">
-                      <p className="text-[11px] text-fg-mute font-medium">Verify {label} hash</p>
+                      <p className="text-[11px] text-fg-mute font-medium">{m('verifyLabel', { algo: label })}</p>
                       <div className="flex items-center gap-2">
                         <Input
                           value={verifyValue}
                           onChange={(e) => setVerifyValue(e.target.value)}
-                          placeholder="Paste a hash to compare…"
+                          placeholder={m('comparePlaceholder')}
                           className="h-ctl font-mono text-xs flex-1"
                           autoFocus
                         />
@@ -839,8 +849,8 @@ export function EncodeHashEncrypt() {
                             verifyMatch ? 'text-ok' : 'text-bad'
                           )}>
                             {verifyMatch
-                              ? <><Check className="h-3.5 w-3.5" /> Match</>
-                              : <><X className="h-3.5 w-3.5" /> No match</>
+                              ? <><Check className="h-3.5 w-3.5" /> {m('match')}</>
+                              : <><X className="h-3.5 w-3.5" /> {m('noMatch')}</>
                             }
                           </div>
                         )}
@@ -856,22 +866,22 @@ export function EncodeHashEncrypt() {
           <ToolSection>
             <div className="flex items-center gap-1.5">
               <KeyRound className="h-3.5 w-3.5 text-fg-mute" />
-              <ToolLabel>HMAC — Keyed Hash</ToolLabel>
+              <ToolLabel>{m('hmacTitle')}</ToolLabel>
             </div>
-            <ToolHint>Combines your text with a secret key · used for API authentication and message signing</ToolHint>
+            <ToolHint>{m('hmacHint')}</ToolHint>
             <div className="relative">
               <Input
                 type={showHmacKey ? 'text' : 'password'}
                 value={hmacKey}
                 onChange={(e) => setHmacKey(e.target.value)}
-                placeholder="Enter HMAC secret key…"
+                placeholder={m('hmacPlaceholder')}
                 className="h-ctl text-sm pr-9 font-mono"
               />
               <button
                 type="button"
                 onClick={() => setShowHmacKey((v) => !v)}
-                aria-label={showHmacKey ? 'Hide HMAC key' : 'Show HMAC key'}
-                title={showHmacKey ? 'Hide HMAC key' : 'Show HMAC key'}
+                aria-label={showHmacKey ? m('hideHmacKey') : m('showHmacKey')}
+                title={showHmacKey ? m('hideHmacKey') : m('showHmacKey')}
                 aria-pressed={showHmacKey}
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded text-fg-mute hover:text-fg transition-colors focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus"
               >
@@ -892,7 +902,7 @@ export function EncodeHashEncrypt() {
                         value={value}
                         readOnly
                         className="flex-1 h-ctl font-mono text-xs border-0 bg-transparent p-0 focus-visible:ring-0 text-fg-mute"
-                        placeholder={`${chars} hex chars`}
+                        placeholder={m('hexChars', { n: chars })}
                       />
                       <CopyButton value={value} disabled={!value} className="h-ctl w-ctl shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" iconClassName="h-3 w-3" />
                     </div>
@@ -901,7 +911,7 @@ export function EncodeHashEncrypt() {
               </div>
             ) : (
               <p className="text-xs text-fg-mute/50 text-center py-2">
-                Enter a key above to generate HMAC signatures
+                {m('hmacEmpty')}
               </p>
             )}
           </ToolSection>
@@ -958,10 +968,10 @@ export function EncodeHashEncrypt() {
               onValueChange={setCryptoMode}
               size="sm"
               options={[
-                { value: 'encrypt', label: 'Encrypt' },
-                { value: 'decrypt', label: 'Decrypt' },
+                { value: 'encrypt', label: m('encrypt') },
+                { value: 'decrypt', label: m('decrypt') },
               ]}
-              aria-label="Crypto mode"
+              aria-label={m('cryptoModeLabel')}
             />
           </div>
 
@@ -970,8 +980,8 @@ export function EncodeHashEncrypt() {
               caveat: they are here so you can exchange ciphertext with a crypto-js
               caller, not because they are a good way to protect something. */}
           {selectedEncryptAlgo.family === 'webcrypto' ? (
-            <Callout tone="success" size="sm" icon={ShieldCheck} title="Authenticated">
-              {selectedEncryptAlgo.desc}
+            <Callout tone="success" size="sm" icon={ShieldCheck} title={m('authenticated')}>
+              {m(`cipher.${selectedEncryptAlgo.id}` as 'cipher.aes-gcm')}
             </Callout>
           ) : (
             <Callout
@@ -979,39 +989,35 @@ export function EncodeHashEncrypt() {
               size="sm"
               icon={selectedEncryptAlgo.weak ? undefined : ArrowLeftRight}
               title={selectedEncryptAlgo.weak
-                ? 'Insecure — and interop-only'
-                : 'Interop mode — not for real secrets'}
+                ? m('insecureInterop')
+                : m('interopOnly')}
             >
               {selectedEncryptAlgo.weak && (
                 <>
-                  ECB encrypts identical 16-byte blocks to the same ciphertext, leaking the
-                  structure of your data.{' '}
+                  {m('ecbWarning')}{' '}
                 </>
               )}
-              crypto-js stretches your passphrase with OpenSSL's EvpKDF: <span className="font-mono">MD5</span>,
-              a single iteration — one guess costs an attacker one MD5 — and nothing here
-              authenticates the ciphertext, so tampering is undetectable. Use{' '}
-              <span className="font-medium text-fg">AES-256 GCM</span> unless you specifically
-              need to interoperate with crypto-js.
+              {m('cryptojsWarningBefore')} <span className="font-mono">MD5</span>{m('cryptojsWarningMid')}{' '}
+              <span className="font-medium text-fg">AES-256 GCM</span> {m('cryptojsWarningAfter')}
             </Callout>
           )}
 
           <ToolSection>
-            <ToolLabel>Encryption Key</ToolLabel>
-            <ToolHint>Use a strong, secret passphrase</ToolHint>
+            <ToolLabel>{m('encryptionKey')}</ToolLabel>
+            <ToolHint>{m('strongPassphrase')}</ToolHint>
             <div className="relative">
               <Input
                 type={showKey ? 'text' : 'password'}
                 value={encryptKey}
                 onChange={(e) => setEncryptKey(e.target.value)}
-                placeholder="Enter passphrase…"
+                placeholder={m('passphrasePlaceholder')}
                 className="h-ctl text-sm pr-9 font-mono"
               />
               <button
                 type="button"
                 onClick={() => setShowKey((v) => !v)}
-                aria-label={showKey ? 'Hide passphrase' : 'Show passphrase'}
-                title={showKey ? 'Hide passphrase' : 'Show passphrase'}
+                aria-label={showKey ? m('hidePassphrase') : m('showPassphrase')}
+                title={showKey ? m('hidePassphrase') : m('showPassphrase')}
                 aria-pressed={showKey}
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded text-fg-mute hover:text-fg transition-colors focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus"
               >
@@ -1021,12 +1027,12 @@ export function EncodeHashEncrypt() {
           </ToolSection>
 
           <ToolSection>
-            <ToolLabel>{cryptoMode === 'encrypt' ? 'Plaintext' : 'Ciphertext'}</ToolLabel>
+            <ToolLabel>{cryptoMode === 'encrypt' ? m('plaintext') : m('ciphertext')}</ToolLabel>
             <ToolHint>{quickPasteHint}</ToolHint>
             <Textarea
               value={encryptInput}
               onChange={(e) => setEncryptInput(e.target.value)}
-              placeholder={cryptoMode === 'encrypt' ? 'Enter text to encrypt…' : 'Paste base64 ciphertext to decrypt…'}
+              placeholder={cryptoMode === 'encrypt' ? m('encryptPlaceholder') : m('decryptPlaceholder')}
               className="min-h-[100px] font-mono text-sm"
             />
           </ToolSection>
@@ -1034,18 +1040,18 @@ export function EncodeHashEncrypt() {
           {(cryptoBusy || cryptoResult.output || cryptoResult.error) && (
             <ToolSection>
               <div className="flex items-center justify-between">
-                <ToolLabel>{cryptoMode === 'encrypt' ? 'Ciphertext' : 'Plaintext'}</ToolLabel>
+                <ToolLabel>{cryptoMode === 'encrypt' ? m('ciphertext') : m('plaintext')}</ToolLabel>
                 {cryptoBusy
                   ? (
                     // 600k PBKDF2 rounds take a beat; say so rather than leaving
                     // the previous answer on screen looking current.
                     <span className="flex items-center gap-1.5 text-[11px] text-fg-mute">
                       <Spinner size="xs" />
-                      Deriving key…
+                      {m('derivingKey')}
                     </span>
                   )
                   : cryptoResult.output && (
-                    <CopyButton value={cryptoResult.output} label="Copy" variant="ghost" size="sm" className="h-6 px-2 text-xs" iconClassName="h-3 w-3" />
+                    <CopyButton value={cryptoResult.output} label={c('copy')} variant="ghost" size="sm" className="h-6 px-2 text-xs" iconClassName="h-3 w-3" />
                   )}
               </div>
               {cryptoResult.error && !cryptoBusy ? (
@@ -1056,7 +1062,7 @@ export function EncodeHashEncrypt() {
                 <Textarea
                   value={cryptoBusy ? '' : cryptoResult.output}
                   readOnly
-                  placeholder={cryptoBusy ? 'Working…' : undefined}
+                  placeholder={cryptoBusy ? m('working') : undefined}
                   className="min-h-[80px] font-mono text-xs"
                 />
               )}

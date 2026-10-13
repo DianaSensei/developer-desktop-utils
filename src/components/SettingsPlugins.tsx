@@ -7,13 +7,12 @@ import { Input } from '@/components/ui/input';
 import { PLUGINS, SDK_VERSION, pluginAudit, vaultStatus, type AuditEntry, type VaultStatus } from '@/platform';
 
 /**
- * Settings → Plugin: quyền của mọi tool ĐÃ BIÊN DỊCH SẴN trong app (không
- * phải tiện ích cài thêm — xem Settings → Extensions cho chuyện đó).
+ * Settings → Plugins: permissions of the built-in tools (installed
+ * extensions are under Settings → Extensions).
  *
- * Hai bảng, trả lời hai câu hỏi khác nhau và cố ý KHÔNG gộp: manifest nói plugin
- * ĐƯỢC PHÉP làm gì (tĩnh, đọc từ code), nhật ký nói nó ĐÃ làm gì (động, theo
- * phiên). Chỉ có bảng thứ nhất thì quyền mãi là lời hứa; chỉ có bảng thứ hai thì
- * không có gì để đối chiếu xem hành vi có vượt khai báo hay không.
+ * Two tables, kept separate: the manifest says what a plugin may do
+ * (static), the audit log says what it did this session. Together they show
+ * whether behavior stays within what was declared.
  */
 
 const MAX_ROWS = 80;
@@ -29,24 +28,20 @@ export function SettingsPlugins() {
   const { isFeatureEnabled } = useFeatures();
   const [entries, setEntries] = useState<AuditEntry[]>(() => pluginAudit.recent(MAX_ROWS));
   const [vault, setVault] = useState<VaultStatus | null>(null);
-  // Đóng theo mặc định: nhật ký này dài (tới MAX_ROWS dòng) và ít khi cần
-  // tra ngay khi mở trang — một mục gấp lại, tự mở khi cần, đỡ chiếm chỗ hơn
-  // hẳn so với luôn hiện sẵn dưới bảng quyền.
+  // Collapsed by default: the log is long and rarely needed right away.
   const [auditOpen, setAuditOpen] = useState(false);
   const [auditQuery, setAuditQuery] = useState('');
 
   useEffect(() => {
-    // Nhật ký được ghi cả khi Settings đang đóng, nên đọc lại một lần lúc mount
-    // rồi mới nghe tiếp — nếu chỉ nghe, panel sẽ mở ra trống trơn dù đã có lịch sử.
+    // Entries are recorded while Settings is closed too, so read them on
+    // mount before subscribing.
     setEntries(pluginAudit.recent(MAX_ROWS));
     return pluginAudit.subscribe(() => setEntries(pluginAudit.recent(MAX_ROWS)));
   }, []);
 
   useEffect(() => {
     let cancelled = false;
-    // Mức bảo vệ của kho bí mật khác nhau giữa các máy (keychain hay file dự
-    // phòng). Người dùng có quyền biết máy mình đang ở chế độ nào thay vì phải
-    // suy đoán, nên nó hiện ngay ở đây chứ không nằm trong log.
+    // Show the vault's protection level (keychain or key file).
     void vaultStatus()
       .then((s) => !cancelled && setVault(s))
       .catch(() => !cancelled && setVault(null));
@@ -57,10 +52,8 @@ export function SettingsPlugins() {
 
   const enabledCount = PLUGINS.filter((p) => isFeatureEnabled(p.id)).length;
 
-  // Khớp theo id tool TRƯỚC HẾT (đúng câu hỏi hay gặp nhất — "tool nào gọi
-  // gì"), nhưng cũng khớp channel/action/detail/quyền thiếu để một từ khoá
-  // bất kỳ (vd tên một lệnh native, hay "denied") cũng lọc được, không chỉ
-  // riêng id.
+  // Match tool id first, but also channel, action, detail and missing
+  // permission, so any keyword (a command name, "denied") filters.
   const auditQueryLower = auditQuery.trim().toLowerCase();
   const filteredEntries = auditQueryLower
     ? entries.filter((e) =>

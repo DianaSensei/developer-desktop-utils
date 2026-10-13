@@ -26,15 +26,19 @@ beforeEach(() => {
 });
 
 describe('useToolGuideTracking', () => {
-  it("auto-shows a tool's guide the first time it is opened on a fresh install", async () => {
+  it("does not pop a tool's guide on its first visit after a fresh install", async () => {
     const { useToolGuideTracking } = await import('./useToolGuideTracking');
     const { result } = renderHook(() => useToolGuideTracking());
-    expect(result.current.shouldAutoShow('json')).toBe(true);
+    expect(result.current.shouldAutoShow('json')).toBe(false);
+    expect(result.current.shouldAutoShow('regex')).toBe(false);
   });
 
   it('stops auto-showing once markSeen has recorded the current version', async () => {
+    store.set('devtool-guide-seen-versions', JSON.stringify({ json: 1, regex: 1 }));
+    versions = { json: 2, regex: 1 };
     const { useToolGuideTracking } = await import('./useToolGuideTracking');
     const { result } = renderHook(() => useToolGuideTracking());
+    expect(result.current.shouldAutoShow('json')).toBe(true);
     act(() => result.current.markSeen('json'));
     expect(result.current.shouldAutoShow('json')).toBe(false);
   });
