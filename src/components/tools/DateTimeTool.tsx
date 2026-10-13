@@ -59,7 +59,8 @@ function tzOffsetMinutes(date: Date, tz: string): number {
   try {
     const p = intlParts(date, tz);
     const wallMs = Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second);
-    return (wallMs - date.getTime()) / 60000;
+    // `intlParts` has no milliseconds, so compare against the whole second.
+    return Math.round((wallMs - Math.floor(date.getTime() / 1000) * 1000) / 60000);
   } catch { return 0; }
 }
 
@@ -122,7 +123,7 @@ function parseInTz(str: string, tz: string): Date | null {
   return new Date(utcGuess.getTime() - offset * 60000);
 }
 
-function formatRFC3339InTz(date: Date, tz: string): string {
+export function formatRFC3339InTz(date: Date, tz: string): string {
   const offset = tzOffsetMinutes(date, tz);
   const wall = formatInTz(date, tz, "yyyy-MM-dd'T'HH:mm:ss");
   if (offset === 0) return `${wall}Z`;
