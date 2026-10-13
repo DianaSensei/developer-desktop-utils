@@ -153,6 +153,31 @@ describe('SettingsMarketplace — tải catalog', () => {
   });
 });
 
+const BETA_URL = 'https://example.com/demo-plugin-beta.json';
+
+/** Catalog whose demo plugin also publishes a beta build. */
+function stubCatalogWithBeta(betaVersion = '1.1.0-beta.1') {
+  manifestByUrl[BETA_URL] = { ...demoPluginManifest(), version: betaVersion };
+  vi.stubGlobal(
+    'fetch',
+    vi.fn().mockResolvedValue(jsonResponse(demoCatalog({ beta: { version: betaVersion, pluginManifestUrl: BETA_URL } }))),
+  );
+}
+
+/** The demo plugin, installed from the official market at `version`. */
+function installDemo(version: string, sourceUrl = 'https://example.com/demo-plugin.json') {
+  installedArtifacts = [
+    {
+      kind: 'plugin',
+      manifest: { ...demoPluginManifest(), version },
+      source_url: sourceUrl,
+      bundle_path: '/tmp/demo/bundle.mjs',
+      installed_at: 1_700_000_000_000,
+      market_id: 'official',
+    },
+  ];
+}
+
 describe('SettingsMarketplace — cài đặt (dialog xác nhận ngay tại trang, không chuyển tab)', () => {
   it('bấm Install mở dialog xem trước CẢ plugin lẫn service, một lần Cài đặt cài cả hai', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(demoCatalog())));
@@ -191,17 +216,7 @@ describe('SettingsMarketplace — cài đặt (dialog xác nhận ngay tại tra
   });
 
   it('plugin có bản beta: chưa cài thì hiện CẢ hai nút Install và Install Beta', async () => {
-    manifestByUrl['https://example.com/demo-plugin-beta.json'] = { ...demoPluginManifest(), version: '1.1.0-beta.1' };
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(
-        jsonResponse(
-          demoCatalog({
-            beta: { version: '1.1.0-beta.1', pluginManifestUrl: 'https://example.com/demo-plugin-beta.json' },
-          }),
-        ),
-      ),
-    );
+    stubCatalogWithBeta();
 
     await renderMarketplace();
     await settle();
@@ -212,17 +227,7 @@ describe('SettingsMarketplace — cài đặt (dialog xác nhận ngay tại tra
   });
 
   it('bấm "Install Beta" mở dialog xem trước ĐÚNG URL của bản beta, không phải bản stable', async () => {
-    manifestByUrl['https://example.com/demo-plugin-beta.json'] = { ...demoPluginManifest(), version: '1.1.0-beta.1' };
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(
-        jsonResponse(
-          demoCatalog({
-            beta: { version: '1.1.0-beta.1', pluginManifestUrl: 'https://example.com/demo-plugin-beta.json' },
-          }),
-        ),
-      ),
-    );
+    stubCatalogWithBeta();
 
     await renderMarketplace();
     await settle();
@@ -243,26 +248,8 @@ describe('SettingsMarketplace — cài đặt (dialog xác nhận ngay tại tra
   });
 
   it('đã cài bản beta thì hiện nút "Switch to Stable", KHÔNG phải "Switch to Beta"', async () => {
-    installedArtifacts = [
-      {
-        kind: 'plugin',
-        manifest: { ...demoPluginManifest(), version: '1.1.0-beta.1' },
-        source_url: 'https://example.com/demo-plugin-beta.json',
-        bundle_path: '/tmp/demo/bundle.mjs',
-        installed_at: 1_700_000_000_000,
-        market_id: 'official',
-      },
-    ];
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(
-        jsonResponse(
-          demoCatalog({
-            beta: { version: '1.1.0-beta.1', pluginManifestUrl: 'https://example.com/demo-plugin-beta.json' },
-          }),
-        ),
-      ),
-    );
+    installDemo('1.1.0-beta.1', BETA_URL);
+    stubCatalogWithBeta();
 
     await renderMarketplace();
     await settle();
@@ -277,27 +264,8 @@ describe('SettingsMarketplace — cài đặt (dialog xác nhận ngay tại tra
   });
 
   it('đã cài bản stable, có beta mới hơn thì hiện nút "Switch to Beta"', async () => {
-    manifestByUrl['https://example.com/demo-plugin-beta.json'] = { ...demoPluginManifest(), version: '1.1.0-beta.1' };
-    installedArtifacts = [
-      {
-        kind: 'plugin',
-        manifest: demoPluginManifest(),
-        source_url: 'https://example.com/demo-plugin.json',
-        bundle_path: '/tmp/demo/bundle.mjs',
-        installed_at: 1_700_000_000_000,
-        market_id: 'official',
-      },
-    ];
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(
-        jsonResponse(
-          demoCatalog({
-            beta: { version: '1.1.0-beta.1', pluginManifestUrl: 'https://example.com/demo-plugin-beta.json' },
-          }),
-        ),
-      ),
-    );
+    installDemo('1.0.0');
+    stubCatalogWithBeta();
 
     await renderMarketplace();
     await settle();
@@ -308,26 +276,8 @@ describe('SettingsMarketplace — cài đặt (dialog xác nhận ngay tại tra
   });
 
   it('an older beta stays on the beta channel and offers the newer beta', async () => {
-    installedArtifacts = [
-      {
-        kind: 'plugin',
-        manifest: { ...demoPluginManifest(), version: '1.1.0-beta.1' },
-        source_url: 'https://example.com/demo-plugin-beta.json',
-        bundle_path: '/tmp/demo/bundle.mjs',
-        installed_at: 1_700_000_000_000,
-        market_id: 'official',
-      },
-    ];
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(
-        jsonResponse(
-          demoCatalog({
-            beta: { version: '1.1.0-beta.2', pluginManifestUrl: 'https://example.com/demo-plugin-beta.json' },
-          }),
-        ),
-      ),
-    );
+    installDemo('1.1.0-beta.1', BETA_URL);
+    stubCatalogWithBeta('1.1.0-beta.2');
 
     await renderMarketplace();
     await settle();
@@ -339,16 +289,7 @@ describe('SettingsMarketplace — cài đặt (dialog xác nhận ngay tại tra
   });
 
   it('an installed version newer than the catalog is not offered a downgrade', async () => {
-    installedArtifacts = [
-      {
-        kind: 'plugin',
-        manifest: { ...demoPluginManifest(), version: '1.2.0' },
-        source_url: 'https://example.com/demo-plugin.json',
-        bundle_path: '/tmp/demo/bundle.mjs',
-        installed_at: 1_700_000_000_000,
-        market_id: 'official',
-      },
-    ];
+    installDemo('1.2.0');
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(demoCatalog())));
 
     await renderMarketplace();
