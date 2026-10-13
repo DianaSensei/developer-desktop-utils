@@ -65,8 +65,7 @@ export function TextCounter() {
       </div>
 
       {/* Right: stats scrollable */}
-      {/* Focusable so the stats can be scrolled from the keyboard. */}
-      <div tabIndex={0} role="region" aria-label={m('statsLabel')} className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4 focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-inset focus-visible:ring-focus">
+      <div role="region" aria-label={m('statsLabel')} className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4">
         {/* All stats use the default tone: colour is reserved for status (design/RULES.md). */}
         <StatGrid columns={4}>
           <Stat variant="compact" label={m('characters')} value={stats.characters} />

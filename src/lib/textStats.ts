@@ -1,4 +1,4 @@
-// Text Counter statistics in one pass over the UTF-16 code units.
+// Text Counter statistics in one pass over the text.
 //
 // The first version did ~8 full scans (several regex splits, Array.from,
 // TextEncoder) and blocked the main thread ~1.8s on a 2.5 MB paste. Counts
@@ -24,7 +24,7 @@ export interface TextStats {
   fitsLatin1: boolean;
 }
 
-/** JavaScript's `\s`, by UTF-16 code unit. */
+/** JavaScript's `\s`, by code point (all of them are in the BMP). */
 export function isJsWhitespace(c: number): boolean {
   if (c <= 0x20) return c === 0x20 || (c >= 0x09 && c <= 0x0d);
   if (c < 0xa0) return false;
@@ -56,25 +56,22 @@ export function computeTextStats(text: string): TextStats {
   let sentenceHasContent = false;
 
   for (let i = 0; i < n; i++) {
-    const c = text.charCodeAt(i);
+    const c = text.codePointAt(i) ?? 0;
 
     // Code points, encodings and Unicode ranges.
-    if (c >= 0xd800 && c <= 0xdbff && i + 1 < n) {
-      const d = text.charCodeAt(i + 1);
-      if (d >= 0xdc00 && d <= 0xdfff) {
-        // A surrogate pair: one astral code point, two code units, no
-        // whitespace or punctuation, so the text counters see one char.
-        codePoints++;
-        utf8Bytes += 4;
-        astral++;
-        if (!inWord) { words++; inWord = true; }
-        if (!sawContent || newlinesInGap >= 2) paragraphs++;
-        sawContent = true;
-        newlinesInGap = 0;
-        sentenceHasContent = true;
-        i++;
-        continue;
-      }
+    if (c > 0xffff) {
+      // A surrogate pair: one astral code point, two code units, no
+      // whitespace or punctuation, so the text counters see one char.
+      codePoints++;
+      utf8Bytes += 4;
+      astral++;
+      if (!inWord) { words++; inWord = true; }
+      if (!sawContent || newlinesInGap >= 2) paragraphs++;
+      sawContent = true;
+      newlinesInGap = 0;
+      sentenceHasContent = true;
+      i++;
+      continue;
     }
     codePoints++;
     if (c < 0x80) { utf8Bytes += 1; ascii++; }

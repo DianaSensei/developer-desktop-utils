@@ -61,7 +61,10 @@ export function base64Decode(input: string) {
   s = s.replace(/-/g, '+').replace(/_/g, '/');
   const bad = s.match(/[^A-Za-z0-9+/=]/);
   if (bad) throw new Error(`Not valid Base64: unexpected character "${bad[0]}".`);
-  s = s.replace(/=+$/, '');
+  // Trailing padding, stripped without /=+$/ (a backtracking regex).
+  let end = s.length;
+  while (end > 0 && s[end - 1] === '=') end--;
+  s = s.slice(0, end);
   if (s.includes('=')) throw new Error('Not valid Base64: "=" padding may only appear at the end.');
   if (s.length % 4 === 1) throw new Error('Not valid Base64: one character too many or too few (truncated input?).');
   s += '='.repeat((4 - (s.length % 4)) % 4);

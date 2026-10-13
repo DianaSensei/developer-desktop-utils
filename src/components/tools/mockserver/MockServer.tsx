@@ -175,9 +175,8 @@ export function MockServer() {
           // the row's action buttons are not nested inside another control.
           <div
             key={s.id}
-            onClick={() => setSelectedId(s.id)}
             className={cn(
-              'group flex cursor-pointer items-center gap-2 border-l-2 px-3 py-2 transition-colors hover:bg-bg-2/40',
+              'group flex items-center gap-2 border-l-2 px-3 py-2 transition-colors hover:bg-bg-2/40',
               s.id === selectedId ? 'border-l-acc bg-bg-2/60' : 'border-l-transparent',
               !s.enabled && 'opacity-50',
             )}
@@ -185,8 +184,8 @@ export function MockServer() {
             <button
               type="button"
               aria-current={s.id === selectedId ? 'true' : undefined}
-              onClick={(e) => { e.stopPropagation(); setSelectedId(s.id); }}
-              className="flex min-w-0 flex-1 items-center gap-2 rounded-xs text-left focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus"
+              onClick={() => setSelectedId(s.id)}
+              className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 self-stretch rounded-xs text-left focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus"
             >
               <span className={cn('w-11 shrink-0 rounded px-1 py-0.5 text-center text-[11px] font-semibold', badgeClass(s.method))}>
                 {s.method}

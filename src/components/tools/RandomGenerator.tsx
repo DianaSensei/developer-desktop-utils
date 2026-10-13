@@ -144,7 +144,7 @@ export function RandomGenerator() {
           <div className="flex items-center gap-1.5">
             <span className="text-xs text-fg-mute">{m('count')}</span>
             <Input type="number" aria-label={m('count')} min={1} max={100} value={count}
-              onChange={(e) => setCount(clamp(parseInt(e.target.value) || 1, 1, 100))}
+              onChange={(e) => setCount(clamp(Number.parseInt(e.target.value, 10) || 1, 1, 100))}
               className="h-ctl text-xs w-20 rounded-sm" />
           </div>
         )}
@@ -165,7 +165,7 @@ export function RandomGenerator() {
             </div>
             <div className="flex items-center gap-1">
               <span className="text-xs text-fg-mute">{m('count')}</span>
-              <Input type="number" aria-label={m('count')} min={1} max={maxNumberCount} value={count} onChange={(e) => setCount(clamp(parseInt(e.target.value) || 1, 1, maxNumberCount))} className="h-ctl text-xs w-20 rounded-sm" />
+              <Input type="number" aria-label={m('count')} min={1} max={maxNumberCount} value={count} onChange={(e) => setCount(clamp(Number.parseInt(e.target.value, 10) || 1, 1, maxNumberCount))} className="h-ctl text-xs w-20 rounded-sm" />
             </div>
           </div>
         )}
@@ -174,11 +174,11 @@ export function RandomGenerator() {
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-1">
               <span className="text-xs text-fg-mute">{m('length')}</span>
-              <Input type="number" min={1} max={maxTextLength} value={textLen} onChange={(e) => setTextLen(clamp(parseInt(e.target.value) || 1, 1, maxTextLength))} className="h-ctl text-xs w-20 rounded-sm" />
+              <Input type="number" min={1} max={maxTextLength} value={textLen} onChange={(e) => setTextLen(clamp(Number.parseInt(e.target.value, 10) || 1, 1, maxTextLength))} className="h-ctl text-xs w-20 rounded-sm" />
             </div>
             <div className="flex items-center gap-1">
               <span className="text-xs text-fg-mute">{m('count')}</span>
-              <Input type="number" aria-label={m('count')} min={1} max={maxTextCount} value={count} onChange={(e) => setCount(clamp(parseInt(e.target.value) || 1, 1, maxTextCount))} className="h-ctl text-xs w-20 rounded-sm" />
+              <Input type="number" aria-label={m('count')} min={1} max={maxTextCount} value={count} onChange={(e) => setCount(clamp(Number.parseInt(e.target.value, 10) || 1, 1, maxTextCount))} className="h-ctl text-xs w-20 rounded-sm" />
             </div>
             <div className="flex gap-1.5">
               {(Object.keys(CHARSETS) as CharsetKey[]).map((k) => (
