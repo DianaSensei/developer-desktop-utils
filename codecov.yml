@@ -1,6 +1,7 @@
 # Codecov configuration.
-# Two flags, one per language, uploaded by .github/workflows/coverage.yml's
-# two jobs: `frontend` (vitest, src/) and `rust` (cargo-llvm-cov, src-tauri/).
+# Two flags, one per language: `frontend` (vitest, src/), uploaded by
+# tests.yml on pull requests and by coverage.yml on pushes to main, and `rust`
+# (cargo-llvm-cov, src-tauri/), uploaded by coverage.yml.
 # Both a Tauri command's glue/network/file I/O and a fair amount of frontend
 # UI wiring can't run in unit tests, so every status stays informational — it
 # never fails CI or blocks a PR, for either flag.

@@ -12,6 +12,15 @@ name: Tests
 # needs a fresh run on main — there's no baseline to keep warm here, so
 # re-running the same commit's typecheck/tests a second time after merge
 # is pure waste.
+#
+# Runs `vitest run --coverage` (not plain `npm test`) and uploads to
+# Codecov itself, under the same `frontend` flag coverage.yml's own
+# `frontend` job used to upload on every PR — that job's `npm ci` + vitest
+# run was a byte-for-byte duplicate of what this workflow already ran on
+# the same PR commit, just to satisfy Codecov's PR-diff comment. Doing it
+# once, here, removes a full redundant runner + install + test run per PR;
+# coverage.yml's `frontend` job now only runs on push:main (see its own
+# comment), to keep the main-branch baseline fresh.
 on:
   pull_request:
     paths-ignore:
@@ -47,5 +56,14 @@ jobs:
       - name: Typecheck
         run: npx tsc --noEmit
 
-      - name: Unit tests
-        run: npm test
+      - name: Unit tests + coverage (lcov, vitest.config.ts's existing coverage block)
+        run: npm run test:coverage
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+        with:
+          files: coverage/lcov.info
+          flags: frontend
+          fail_ci_if_error: false
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}

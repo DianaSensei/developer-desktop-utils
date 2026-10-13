@@ -8,6 +8,10 @@ name: Coverage
 # Kafka/RabbitMQ testing, and the one-off maintenance scripts (icon gen,
 # release verification, MCP-sidecar prep for the desktop build — not the
 # `npm run build` the rust job runs to embed the frontend).
+#
+# `frontend` no longer runs on `pull_request` (see its own `if:`) — tests.yml
+# covers that trigger now, uploading to this same Codecov flag itself. `rust`
+# has no such duplicate anywhere, so it still runs on both triggers.
 on:
   push:
     branches: [main]
@@ -32,12 +36,15 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  # Node-only, no Tauri system deps/Rust toolchain — reports in well under a
-  # minute, independent of the Rust job below. Uploaded under its own
-  # `frontend` flag (see codecov.yml) so it shows as a separate component
-  # from the Rust coverage, instead of one number that mixes two languages'
-  # very different testability.
+  # push:main ONLY (see `if:` below) — tests.yml's own `frontend` job now
+  # runs `vitest run --coverage` and uploads to Codecov under this same
+  # `frontend` flag for every PR (see its comment), so running the
+  # identical npm ci + vitest sequence a second time here, on the exact
+  # same PR commit, was pure waste. This job still runs on push:main to
+  # keep the main-branch baseline fresh — tests.yml is PR-only and never
+  # touches that.
   frontend:
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-22.04
     timeout-minutes: 10
     steps:
