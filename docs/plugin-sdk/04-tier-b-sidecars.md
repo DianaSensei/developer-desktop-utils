@@ -363,8 +363,10 @@ Ba chỗ dưới đây chỉ dành cho sidecar do chính DevTool đóng gói s�
 không hỏi — thiếu một trong ba thì sidecar build được, test được, nhưng KHÔNG
 chạy được từ app thật:
 
-1. **`src-tauri/src/service_host.rs`** — thêm tên bin vào `ALLOWED_SERVICES`
-   (hằng số Rust, ranh giới tin cậy thật — xem 01-architecture.md).
+1. **`src-tauri/src/service_host.rs`** — thêm tên bin vào `BUNDLED_SERVICES`
+   (hằng số Rust, ranh giới tin cậy thật — xem 01-architecture.md). Chỉ bản
+   nằm cạnh file chạy của app được miễn hỏi; bản cài qua URL trùng tên vẫn
+   bị hỏi.
 2. **`src-tauri/tauri.conf.json`** — thêm `"binaries/<ten-bin>"` vào
    `bundle.externalBin`.
 3. **`scripts/prepare-service-sidecars.mjs`** — thêm tên bin vào

@@ -112,8 +112,8 @@ pub struct RemotePluginManifest {
     #[serde(default)]
     pub hosts: Vec<String>,
     /// Sidecar this plugin calls when `permissions` includes `'service'`. Only
-    /// declares the method allowlist; `bin` runs only if it is in
-    /// `ALLOWED_SERVICES` or the user consents to its current hash
+    /// declares the method allowlist; the binary runs only if it is the
+    /// bundled copy or the user consents to its current hash
     /// (service_host.rs, service_trust.rs).
     #[serde(default)]
     pub service: Option<RemoteServiceDescriptor>,

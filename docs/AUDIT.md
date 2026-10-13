@@ -77,12 +77,14 @@ installs any https manifest, `mock_start` binds any host, and
   in fallback mode), and the dialog plugin adds every path picked in an
   open/save dialog to the fs scope at runtime.
 - **Sidecars** (`service_*`): the webview names the binary, Rust decides
-  whether it may run (`service_host.rs`, `service_trust.rs`). Names in
-  `ALLOWED_SERVICES` run without a prompt whatever binary resolves for them;
-  only `devtool-svc-echo` is bundled. Any other name needs consent in a
-  native dialog showing path and SHA-256, stored in the OS keychain because
-  the webview can write to app data. A changed binary has a new hash and is
-  asked about again. See open findings 8 and 9.
+  whether it may run (`service_host.rs`, `service_trust.rs`). Only a
+  `BUNDLED_SERVICES` binary next to the app executable (a directory the
+  webview cannot write) runs without a prompt. Every other binary, including
+  a URL-installed copy under a bundled name, needs consent in a native
+  dialog showing path and SHA-256, stored in the OS keychain because the
+  webview can write to app data. A changed binary has a new hash and is
+  asked about again. The approved file is re-hashed right before it is
+  spawned from the same path; a mismatch refuses to run.
 - **Secrets** (`secret_vault_*`): values are encrypted at rest; the key is
   in the OS keychain. Any webview code can read any secret through IPC;
   per-plugin scoping exists only in `sdk.ts`. Without a keychain the key
@@ -104,7 +106,7 @@ tripwire against credentials in the shared store). For installed plugins
 the real control is the install step: the user reviews the manifest, and
 the bundle's integrity hash is checked at install and on every load. The
 reviewed manifest is not bound to what gets installed, and updates skip
-the review (open finding 10). See
+the review (open finding 9). See
 [`plugin-sdk/01-architecture.md`](./plugin-sdk/01-architecture.md).
 
 ### 3. Remote artifacts
@@ -149,6 +151,12 @@ not in Rust: any webview code can call `artifact_installer_install`.
   production `seal`/`open` functions are now what the tests call.
 - Installer downloads followed redirects from https to http, which would
   let a network attacker replace both a manifest and its hashes.
+- Sidecar trust was by name: `ALLOWED_SERVICES` let any https manifest (or
+  a webview edit of `extensions/index.json`) run native code under
+  `devtool-svc-redis`/`kafka`/`rabbit`/`container` with no prompt. Now only
+  the bundled copy next to the executable is exempt.
+- Consent hashed one resolution of the path and spawning resolved it again.
+  The approved path is now spawned and its hash re-checked just before.
 - Dead code removed (`plugin_data.rs`, an unused `localNetworkInfo()`
   duplicate and duplicate interface declarations in `src/lib/network.ts`).
 - Misplaced or stale doc comments in `artifact_installer.rs` and
@@ -166,9 +174,8 @@ not in Rust: any webview code can call `artifact_installer_install`.
 | 5 | `secrets_vault.rs` | The no-keychain fallback stores the key next to the data (by design, documented and visible in Settings). |
 | 6 | Rust lints | `cargo clippy` reports pre-existing warnings: child processes not waited on (`bin/devtool-mcp-server.rs`, `tests/service_echo.rs`), a large enum variant in `artifact_installer.rs`. |
 | 7 | Language | Code comments are English; user-facing strings are localized (vi/en). Some Rust error messages and many test titles are still in Vietnamese. |
-| 8 | `service_host.rs` | `ALLOWED_SERVICES` trusts names, and a URL-installed copy wins over a bundled one. An https manifest declaring `bin: "devtool-svc-redis"` (or kafka, rabbit, container) therefore runs native code with no consent prompt. The same holds if webview code rewrites `extensions/index.json` (`bin_path`) or overwrites an installed binary under `services/` through the fs plugin. |
-| 9 | `service_host.rs` | `ensure_trusted` hashes the file the path resolves to at check time; `get_or_spawn` resolves and spawns separately, so a file swapped in between is not re-checked. |
-| 10 | `platform/installer.ts`, `SettingsInstalledExtensions.tsx` | `artifact_installer_install` re-fetches the manifest, so the server can serve a different id or permissions than the user reviewed. Updates install from `sourceUrl` without showing permissions again. |
-| 11 | `platform/service.ts` | `ServiceDescriptor.timeoutMs` is ignored; the host always uses 30s. |
-| 12 | `lib/fileio.ts` | `pickDataFile` reads through the webview file input with no permission check or audit entry. |
-| 13 | `apiclient/scriptSandbox.worker.ts` | User scripts (which can come from shared collections) keep worker globals such as `fetch`, `WebSocket` and `importScripts`, limited only by the CSP. |
+| 8 | `service_host.rs` | A short window remains between the last hash check and the spawn; the file is not locked. |
+| 9 | `platform/installer.ts`, `SettingsInstalledExtensions.tsx` | `artifact_installer_install` re-fetches the manifest, so the server can serve a different id or permissions than the user reviewed. Updates install from `sourceUrl` without showing permissions again. |
+| 10 | `platform/service.ts` | `ServiceDescriptor.timeoutMs` is ignored; the host always uses 30s. |
+| 11 | `lib/fileio.ts` | `pickDataFile` reads through the webview file input with no permission check or audit entry. |
+| 12 | `apiclient/scriptSandbox.worker.ts` | User scripts (which can come from shared collections) keep worker globals such as `fetch`, `WebSocket` and `importScripts`, limited only by the CSP. |
