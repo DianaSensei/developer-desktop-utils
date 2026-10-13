@@ -334,6 +334,8 @@ tất cả vì chúng khác hẳn nhau về THỨ đang bị cô lập khỏi c�
   giờ đọc HAI thư mục khác nhau (`plugin-data/redis-client/` và
   `service-data/devtool-svc-redis/`) — đúng ý, vì đây là hai bản triển khai
   song song cho tới khi Phase 2 cắt hẳn và xoá `redis_tool.rs`.
+  *(Cập nhật 2026-10: cả bốn module đã chuyển ra sidecar Tier B, không còn
+  ai gọi `plugin_data_dir`, nên `plugin_data.rs` đã bị xoá.)*
   `mcp_bridge.rs`'s `mcp-bridge.json` là ngoại lệ ĐÚNG, không đổi: nó không
   phải dữ liệu của MỘT plugin, mà là cấu hình của chính cầu nối MCP (cổng
   loopback), dùng chung cho MỌI bridge của MỌI plugin — không có `pluginId`

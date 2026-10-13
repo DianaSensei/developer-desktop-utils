@@ -24,7 +24,7 @@ export interface ServiceDescriptor {
   bin: string;
   /** Methods this sidecar serves; other calls are blocked client-side. */
   methods: string[];
-  /** Per-call timeout in ms. Defaults to 30s. */
+  /** Not honoured yet: the host applies a fixed 30s timeout (`CALL_TIMEOUT` in service_host.rs). */
   timeoutMs?: number;
 }
 
@@ -113,8 +113,9 @@ export interface PluginService {
 
 /**
  * Client half. Calls are checked in order (service declared, method listed,
- * host error) and every check is audited, since a silently blocked call
- * looks like a dead sidecar. `call` and `stream` share the same checks.
+ * host error). The manifest and method checks are audited, since a silently
+ * blocked call looks like a dead sidecar; host errors are only thrown.
+ * `call` and `stream` share the same checks.
  */
 export function createPluginService(
   manifest: PluginManifest,

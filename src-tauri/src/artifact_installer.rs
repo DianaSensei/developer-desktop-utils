@@ -112,8 +112,9 @@ pub struct RemotePluginManifest {
     #[serde(default)]
     pub hosts: Vec<String>,
     /// Sidecar this plugin calls when `permissions` includes `'service'`. Only
-    /// declares the method allowlist; `bin` must still be in `ALLOWED_SERVICES`
-    /// (service_host.rs) to run.
+    /// declares the method allowlist; `bin` runs only if it is in
+    /// `ALLOWED_SERVICES` or the user consents to its current hash
+    /// (service_host.rs, service_trust.rs).
     #[serde(default)]
     pub service: Option<RemoteServiceDescriptor>,
 }
@@ -141,8 +142,8 @@ pub struct ServiceTarget {
 pub struct RemoteServiceManifest {
     pub bin: String,
     pub version: String,
-    /// Must match `service_host::SERVICE_PROTOCOL`. Informational here; the
-    /// first `service_call` performs the actual check.
+    /// Expected to match `service_host::SERVICE_PROTOCOL`. Informational only:
+    /// it is never compared with anything at install or call time.
     pub protocol: u32,
     /// Keyed by Rust target triple (`x86_64-apple-darwin`,
     /// `aarch64-unknown-linux-gnu`, ...), exactly as `current_target_triple()`
@@ -182,9 +183,8 @@ pub struct InstalledServiceRecord {
     pub source_url: String,
     pub bin_path: String,
     pub installed_at: i64,
-    /// Display only; services are matched by `bin` alone. `bin` must be in the
-    /// global `ALLOWED_SERVICES` allowlist, so two markets installing the same
-    /// `bin` refer to the same sidecar and the newer record replaces the older.
+    /// Display only; services are matched by `bin` alone, so a later install
+    /// of the same `bin` from any source replaces the earlier record.
     #[serde(default)]
     pub market_id: Option<String>,
 }
@@ -278,7 +278,7 @@ fn index_path(dir: &Path) -> PathBuf {
 ///
 /// Migration: if `extensions/index.json` is missing but the legacy
 /// `plugins/index.json` exists, copy it via a temp file and rename. The
-/// legacy file is kept as a fallback.
+/// legacy file is left on disk for manual recovery; nothing reads it again.
 fn prepare_extensions_dir(app_data: &Path) -> Result<PathBuf, String> {
     let dir = app_data.join("extensions");
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;

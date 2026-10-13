@@ -443,8 +443,10 @@ export async function installedPluginManifests(): Promise<
       source: `installed:${group}:${record.manifest.id}@${record.manifest.version}`,
       manifest: {
         // Plugin bundles call `usePluginSdkFor(id)` with the bare id, so
-        // that is the registry id; `assertNoConflictingInstall` keeps it
-        // unique. Storage and secret namespaces are keyed by it too.
+        // that is the registry id. The install UI runs
+        // `assertNoConflictingInstall` on the previewed id, but nothing
+        // enforces uniqueness at install time. Storage and secret namespaces
+        // are keyed by it too.
         id: record.manifest.id,
         group,
         label: record.manifest.label,

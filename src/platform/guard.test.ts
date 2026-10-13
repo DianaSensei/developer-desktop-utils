@@ -8,13 +8,13 @@ import { PLUGINS } from '@/platform';
  * Platform boundary guard, using the same ratchet as
  * `design-system/guard.test.ts`.
  *
- * Built-in tools still call `@tauri-apps/*` and the shared store directly,
- * so manifest permissions are not yet enforced for them. Each count is
- * frozen and lowered as tools move to the SDK; at zero, the permission is
- * effectively enforced.
+ * Counts are frozen in baseline.json and may only go down.
+ * `directTauriInPluginCode` is 0, so built-in plugin code reaches Tauri only
+ * through the SDK; `sharedStoreInPluginCode` allows two migration exceptions.
  *
- * The last two rules are invariants, not debt: manifests stay declarative
- * and secrets never return to the shared store.
+ * `manifestForeignImports` and `secretishKeyInSharedStore` are invariants,
+ * not debt: manifests stay declarative and secrets never return to the
+ * shared store (the latter is a key-name tripwire, not proof).
  */
 
 const SRC = resolve(__dirname, '..');
