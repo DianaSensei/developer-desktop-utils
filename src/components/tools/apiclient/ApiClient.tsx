@@ -407,7 +407,12 @@ export function ApiClient() {
   const run = activeRequest ? (runs[activeRequest.id] ?? EMPTY_RUN) : EMPTY_RUN;
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden">
+    // While request tabs are open, ⌘/Ctrl+1…9 belong to them: the attribute
+    // tells the app's workspace shortcuts (WorkspaceContext) to stand aside.
+    <div
+      className="flex h-full min-h-0 flex-col overflow-hidden"
+      data-claims-shortcuts={store.openRequests.length > 0 ? 'mod-digit' : undefined}
+    >
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <div className="shrink-0 overflow-hidden" style={{ width: sidebarWidth }}>
           <Sidebar store={store} searchInputRef={searchInputRef} onRun={handleRun} revealTick={revealTick} />

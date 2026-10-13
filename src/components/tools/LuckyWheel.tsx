@@ -90,10 +90,15 @@ function drawWheel(
     }
 
     // Label
+    // On the left half the text would read upside down, so turn it a half
+    // turn and anchor it from the other side.
+    const mid = start + seg / 2;
+    const norm = ((mid % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+    const flip = norm > Math.PI / 2 && norm < (Math.PI * 3) / 2;
     ctx.save();
     ctx.translate(cx, cy);
-    ctx.rotate(start + seg / 2);
-    ctx.textAlign = 'right';
+    ctx.rotate(flip ? mid + Math.PI : mid);
+    ctx.textAlign = flip ? 'left' : 'right';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = '#ffffff';
     const fontSize = Math.max(11, Math.min(18, 220 / Math.max(n, 6)));
@@ -101,7 +106,7 @@ function drawWheel(
     const label = choices[i];
     const maxChars = Math.max(6, Math.floor((radius - 28) / (fontSize * 0.55)));
     const text = label.length > maxChars ? `${label.slice(0, maxChars - 1)}…` : label;
-    ctx.fillText(text, radius - 16, 0);
+    ctx.fillText(text, flip ? -(radius - 16) : radius - 16, 0);
     ctx.restore();
   }
 
@@ -320,13 +325,18 @@ export function LuckyWheel() {
   }, [history, sortDir]);
 
   return (
-    <div className="grid h-full grid-cols-1 divide-y overflow-hidden lg:grid-cols-2 lg:divide-x lg:divide-y-0">
+    // Laid out by the tool pane's own width (container query), not the
+    // window's: the sidebar takes 224px, so `lg:` fired with only ~800px of
+    // room. Narrow: one scrolling column, wheel first so Spin stays in reach.
+    // Wide: two columns that each fill the height.
+    <div className="@container h-full">
+    <div className="flex h-full flex-col divide-y overflow-y-auto @3xl:grid @3xl:grid-cols-2 @3xl:divide-x @3xl:divide-y-0 @3xl:overflow-hidden">
       {/* Options + history */}
-      <div className="flex min-h-0 flex-col gap-3 p-4">
+      <div className="flex min-h-[420px] shrink-0 flex-col gap-3 p-4 @3xl:min-h-0 @3xl:shrink">
         <div className="flex min-h-0 flex-[3] flex-col">
           <div className="mb-1.5 flex items-center justify-between">
-            <Label className="text-xs">{m('choices')} <span className="text-fg-mute/60">{m('onePerLine', { hint: quickPasteHint })}</span></Label>
-            <span className="text-[11px] text-fg-mute">{choices.length} {uniqueOnly ? 'unique' : 'slices'}</span>
+            <Label className="text-xs">{m('choices')} <span className="text-fg-mute">{m('onePerLine', { hint: quickPasteHint })}</span></Label>
+            <span className="text-[11px] text-fg-mute">{m(uniqueOnly ? 'uniqueCount' : 'sliceCount', { n: choices.length })}</span>
           </div>
           <Textarea
             value={raw}
@@ -405,7 +415,10 @@ export function LuckyWheel() {
       </div>
 
       {/* Wheel */}
-      <div className="flex min-h-0 flex-col gap-4 p-4">
+      {/* Stacked, this is a flex item that keeps its height (shrink-0): as a
+          grid row it was sized without the canvas (its width is a %), and
+          the wheel spilled over the choices below it. */}
+      <div className="order-first flex shrink-0 flex-col gap-4 p-4 @3xl:order-none @3xl:min-h-0 @3xl:shrink">
         {/* Fixed-height slot so the wheel below never shifts when the banner toggles */}
         <div className="mx-auto h-[60px] w-full max-w-[420px] shrink-0">
           {winner && (
@@ -423,7 +436,7 @@ export function LuckyWheel() {
         </div>
 
         <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4">
-        <div className="relative" style={{ width: 'min(100%, 420px)' }}>
+        <div className="relative" style={{ width: 'min(100%, 420px, 55vh)' }}>
           {/* Pointer */}
           <div className="absolute left-1/2 top-0 z-10 -translate-x-1/2 -translate-y-1">
             <div
@@ -477,10 +490,11 @@ export function LuckyWheel() {
         {choices.length < 2 ? (
           <p className="text-xs text-fg-mute">{m('needTwo')}</p>
         ) : (
-          <p className="text-xs text-fg-mute">Auto-spin draws up to {maxAuto} distinct winner{maxAuto === 1 ? '' : 's'}.</p>
+          <p className="text-xs text-fg-mute">{m('autoLimit', { n: maxAuto })}</p>
         )}
         </div>
       </div>
+    </div>
     </div>
   );
 }

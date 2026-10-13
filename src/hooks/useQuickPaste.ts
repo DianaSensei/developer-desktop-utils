@@ -29,6 +29,10 @@ async function readClipboard(): Promise<string> {
  */
 function isEditableTarget(el: EventTarget | null): boolean {
   if (!(el instanceof HTMLElement)) return false;
+  // A read-only output (focused after selecting text to copy) cannot take a
+  // paste, so ⌘V there should still reach the tool's input.
+  if ((el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) && el.readOnly) return false;
+  if (el.getAttribute('aria-readonly') === 'true') return false;
   const tag = el.tagName;
   return tag === 'INPUT' || tag === 'TEXTAREA' || el.isContentEditable;
 }

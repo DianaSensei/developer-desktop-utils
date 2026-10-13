@@ -1,14 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { usePluginSdkFor, usePluginState } from '@/platform';
 import { Button } from '@/components/ui/button';
-import { Callout } from '@/components/ui/callout';
 import { ColorPicker as ColorField } from '@/components/ui/color-picker';
 import { SectionLabel } from '@/components/ui/section-label';
 import { Tooltip } from '@/components/ui/tooltip';
 import {
   Copy, Check, Pipette, Image as ImageIcon, Download, SlidersHorizontal, HelpCircle, ArrowLeftRight,
 } from 'lucide-react';
-import { isTauri } from '@/lib/platform';
 import { useQuickPaste } from '@/hooks/useQuickPaste';
 import { saveBinaryFile } from '@/lib/fileio';
 import { copyToClipboard } from '@/lib/clipboard';
@@ -169,7 +167,6 @@ export function ColorPicker() {
   const [hoverColor, setHoverColor] = useState<string | null>(null);
   const [loupe, setLoupe] = useState<{ x: number; y: number } | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
-  const [eyeError, setEyeError] = useState('');
 
   const [paletteScrollable, setPaletteScrollable] = useState(false);
 
@@ -325,16 +322,10 @@ export function ColorPicker() {
     e.target.value = '';
   };
 
+  // Only offered where the EyeDropper API exists (WebView2 on Windows,
+  // Chromium); WKWebView and WebKitGTK have none, so the button is hidden
+  // there rather than shown only to fail.
   const pickFromScreen = async () => {
-    setEyeError('');
-    if (!hasEyeDropper) {
-      setEyeError(
-        isTauri
-          ? m('eyeDropperDesktop')
-          : m('eyeDropperBrowser')
-      );
-      return;
-    }
     try {
       const ed = new (window as unknown as { EyeDropper: new () => { open: () => Promise<{ sRGBHex: string }> } }).EyeDropper();
       const res = await ed.open();
@@ -527,10 +518,11 @@ export function ColorPicker() {
             <Button onClick={onUpload} className="w-full gap-2">
               <ImageIcon className="h-4 w-4" /> {m('useImage')}
             </Button>
-            <Button onClick={pickFromScreen} variant="outline" className="w-full gap-2">
-              <Pipette className="h-4 w-4" /> {m('pickFromScreen')}
-            </Button>
-            {eyeError && <Callout tone="error" size="sm">{eyeError}</Callout>}
+            {hasEyeDropper && (
+              <Button onClick={pickFromScreen} variant="outline" className="w-full gap-2">
+                <Pipette className="h-4 w-4" /> {m('pickFromScreen')}
+              </Button>
+            )}
           </div>
         </div>
 

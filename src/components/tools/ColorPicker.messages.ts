@@ -1,11 +1,6 @@
 import { defineMessages } from '@/lib/i18n';
 
 export default defineMessages({
-  eyeDropperDesktop: {
-    vi: 'Chọn màu trên màn hình cần EyeDropper API, mà webview của app macOS (WebKit) không hỗ trợ. Dùng bản web (Chrome/Edge), hoặc tải ảnh chụp màn hình lên ở trên rồi chọn màu từ đó.',
-    en: 'Screen picking needs the EyeDropper API, which the macOS app webview (WebKit) doesn’t support. Use it in the web build (Chrome/Edge), or upload a screenshot above and pick from it.',
-  },
-  eyeDropperBrowser: { vi: 'Trình duyệt của bạn không hỗ trợ EyeDropper API. Hãy thử Chrome hoặc Edge.', en: 'Your browser doesn’t support the EyeDropper API. Try Chrome or Edge.' },
   clickToSelect: { vi: '{{hex}} — bấm để chọn', en: '{{hex}} — click to select' },
   clickToCopy: { vi: 'Bấm để sao chép {{value}}', en: 'Click to copy {{value}}' },
   image: { vi: 'Ảnh', en: 'Image' },

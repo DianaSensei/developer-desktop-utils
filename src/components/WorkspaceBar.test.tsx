@@ -78,6 +78,21 @@ describe('WorkspaceBar', () => {
     expect(screen.getByTestId('path').textContent).toBe('/json');
   });
 
+  it('leaves Ctrl/⌘+number to a tool that claims it (API Client request tabs)', () => {
+    render(<Harness />);
+    fireEvent.click(screen.getByText('To Date'));
+    const claim = document.createElement('div');
+    claim.setAttribute('data-claims-shortcuts', 'mod-digit');
+    document.body.appendChild(claim);
+    try {
+      fireEvent.keyDown(window, { key: '1', code: 'Digit1', ctrlKey: true });
+      fireEvent.keyDown(window, { key: '1', code: 'Digit1', metaKey: true });
+      expect(screen.getByTestId('path').textContent).toBe('/unix-time');
+    } finally {
+      claim.remove();
+    }
+  });
+
   it('switching to an emptied workspace seeds it with the tool on screen', () => {
     render(<Harness />);
     fireEvent.click(screen.getByText('To Date'));

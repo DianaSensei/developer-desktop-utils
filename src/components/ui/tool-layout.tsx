@@ -75,7 +75,7 @@ const PaneHeader = React.forwardRef<HTMLDivElement, PaneHeaderProps>(
         {/* Eyebrow label (small caps, wide tracking) so it reads as a label,
             not data. */}
         <span className="text-[11px] font-semibold uppercase tracking-wider text-fg-mute">{label}</span>
-        {hint && <span className="truncate text-[11px] text-fg-mute/70">{hint}</span>}
+        {hint && <span className="truncate text-[11px] text-fg-mute">{hint}</span>}
       </div>
       {action}
     </div>

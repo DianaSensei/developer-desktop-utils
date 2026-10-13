@@ -134,9 +134,9 @@ export function codeTheme(dark: boolean, opts: CodeThemeOptions = {}): Extension
         padding: `${paddingY}px ${paddingX}px`,
       },
       '.cm-cursor, .cm-dropCursor': { borderLeftColor: 'hsl(var(--fg-c))', borderLeftWidth: '1.5px' },
-      // CodeMirror's own placeholder renders in the document flow. The
-      // muted color at /0.75 matches Input placeholders.
-      '.cm-placeholder': { color: 'hsl(var(--fg-mute-c) / 0.75)', fontStyle: 'normal' },
+      // CodeMirror's own placeholder renders in the document flow. Full
+      // --fg-mute: at /0.75 it fell to ~2.9:1, under WCAG AA.
+      '.cm-placeholder': { color: 'hsl(var(--fg-mute-c))', fontStyle: 'normal' },
 
       '.cm-gutters': gutter === 'panel'
         ? {
@@ -147,7 +147,8 @@ export function codeTheme(dark: boolean, opts: CodeThemeOptions = {}): Extension
           }
         : {
             backgroundColor: 'transparent',
-            color: 'hsl(var(--fg-mute-c) / 0.5)',
+            // Line numbers are read too; /0.5 measured 2.0:1.
+            color: 'hsl(var(--fg-mute-c))',
             border: 'none',
           },
       '.cm-lineNumbers .cm-gutterElement': { padding: '0 10px 0 8px' },

@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   AlertCircle,
+  AlertTriangle,
   CheckCircle2,
   ChevronDown,
   ChevronRight,
@@ -476,12 +477,18 @@ export function JsonFormatter() {
   // every keystroke. Defer the input so the editor stays responsive while
   // parsing a large document; the derived views update at low priority.
   const deferredInput = useDeferredValue(input);
-  const parsed = useMemo<{ value: JsonValue | undefined; error: string }>(() => {
-    if (!deferredInput.trim()) return { value: undefined, error: '' };
+  const parsed = useMemo<{ value: JsonValue | undefined; error: string; strict: boolean }>(() => {
+    if (!deferredInput.trim()) return { value: undefined, error: '', strict: true };
     try {
-      return { value: parseInput(deferredInput), error: '' };
+      const value = parseInput(deferredInput);
+      // The lenient parser also reads trailing commas, unquoted keys,
+      // comments and single quotes. People open a formatter to check JSON,
+      // so "valid" is only claimed when the input itself is strict JSON.
+      let strict = true;
+      try { JSON.parse(deferredInput); } catch { strict = false; }
+      return { value, error: '', strict };
     } catch (err) {
-      return { value: undefined, error: err instanceof Error ? err.message : INVALID };
+      return { value: undefined, error: err instanceof Error ? err.message : INVALID, strict: false };
     }
   }, [deferredInput]);
 
@@ -658,6 +665,7 @@ export function JsonFormatter() {
           value={input}
           onChange={setInput}
           placeholder={'{"key": "value"}  or  "{\\"key\\": \\"value\\"}"'}
+          ariaLabel={c('input')}
         />
       </div>
     </div>
@@ -673,10 +681,15 @@ export function JsonFormatter() {
               <AlertCircle className="h-4 w-4 shrink-0" />
               <span className="font-mono text-xs">{parsed.error === INVALID ? m('invalidJson') : parsed.error}</span>
             </div>
-          ) : (
+          ) : parsed.strict ? (
             <div className="flex items-center gap-2 text-sm text-fg-mute">
               <CheckCircle2 className="h-4 w-4 text-ok" />
               <span className="text-xs">{m('validJson')}</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 text-sm text-fg-mute">
+              <AlertTriangle className="h-4 w-4 shrink-0 text-warn" />
+              <span className="text-xs">{m('lenientJson')}</span>
             </div>
           )}
         </div>

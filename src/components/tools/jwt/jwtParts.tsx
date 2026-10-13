@@ -186,7 +186,7 @@ export function EmptyHint({ ready }: { ready: boolean }) {
     <div className="flex h-full flex-col items-center justify-center gap-3 pt-12 text-center text-fg-mute">
       <KeyRound className="h-12 w-12 text-fg-mute/25" />
       <p className="text-sm font-medium">{ready ? m('pasteToDecode') : m('loading')}</p>
-      <p className="text-[11px] text-fg-mute/70">
+      <p className="text-[11px] text-fg-mute">
         {m('emptySub')} <code className="font-mono">none</code>
       </p>
     </div>

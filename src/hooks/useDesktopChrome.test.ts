@@ -23,6 +23,19 @@ describe('useDesktopChrome', () => {
     expect(evt.defaultPrevented).toBe(true);
   });
 
+  it('menu chuột phải trong ô nhập liệu vẫn mở (Cắt/Chép/Dán, gợi ý chính tả)', () => {
+    renderHook(() => useDesktopChrome());
+    const input = document.createElement('input');
+    const textarea = document.createElement('textarea');
+    document.body.append(input, textarea);
+    for (const el of [input, textarea]) {
+      const evt = new MouseEvent('contextmenu', { cancelable: true, bubbles: true });
+      el.dispatchEvent(evt);
+      expect(evt.defaultPrevented).toBe(false);
+    }
+    input.remove(); textarea.remove();
+  });
+
   it('Backspace/Delete NGOÀI ô nhập liệu bị chặn (không cho lùi trang)', () => {
     renderHook(() => useDesktopChrome());
     expect(keydown(document.body, { key: 'Backspace' }).defaultPrevented).toBe(true);

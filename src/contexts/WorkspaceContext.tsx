@@ -161,8 +161,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   //   ⌘9           last tab
   //   ⌘⇧[ / ⌘⇧]    previous / next  (also Ctrl+PageUp/PageDown)
   //   ⌘⌥1…⌘⌥9      Nth workspace
-  // Ctrl+Tab is left to the API Client's request tabs. Matched on `e.code`
-  // because ⌥ changes `e.key` on macOS (⌥1 → ¡).
+  // Ctrl+Tab is left to the API Client's request tabs, and so is ⌘1…9
+  // while it has request tabs open (`data-claims-shortcuts="mod-digit"`).
+  // Matched on `e.code` because ⌥ changes `e.key` on macOS (⌥1 → ¡).
   const latest = useRef({ tabs, activeToolId, workspaces: state.workspaces, openTool, switchWorkspace });
   latest.current = { tabs, activeToolId, workspaces: state.workspaces, openTool, switchWorkspace };
 
@@ -182,6 +183,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       }
       if (digit && !e.altKey && !e.shiftKey) {
         if (list.length === 0) return;
+        // A tool with its own numbered tabs (API Client) claims ⌘1…9 by
+        // marking an element; it handles the key itself.
+        if (document.querySelector('[data-claims-shortcuts~="mod-digit"]')) return;
         const n = Number(digit[1]);
         const tool = n === 9 ? list[list.length - 1] : list[n - 1];
         if (!tool) return;

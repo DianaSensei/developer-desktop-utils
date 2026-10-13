@@ -26,6 +26,9 @@ export interface CodeSurfaceProps {
   readOnly?: boolean;
   // Fired when the editor loses focus, with the current value (e.g. to reformat).
   onBlur?: (value: string) => void;
+  // Accessible name for screen readers (CodeMirror's content has none).
+  // Defaults to the placeholder. Fixed at mount.
+  ariaLabel?: string;
 }
 
 interface Props extends CodeSurfaceProps {
@@ -39,7 +42,7 @@ interface Props extends CodeSurfaceProps {
 }
 
 export function CodeSurface({
-  value, onChange, placeholder, className, vars, lang, extraExtensions = [], readOnly = false, onBlur,
+  value, onChange, placeholder, className, vars, lang, extraExtensions = [], readOnly = false, onBlur, ariaLabel,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
@@ -67,6 +70,7 @@ export function CodeSurface({
           // No smart quotes or autocorrect (curly quotes break JSON). No-op
           // outside macOS/WebKit.
           EditorView.contentAttributes.of({ autocorrect: 'off', autocapitalize: 'off', spellcheck: 'false' }),
+          ...((ariaLabel ?? placeholder) ? [EditorView.contentAttributes.of({ 'aria-label': (ariaLabel ?? placeholder)! })] : []),
           ...(lang ? [lang] : []),
           ...extraExtensions,
           ...(readOnly ? [EditorState.readOnly.of(true), EditorView.editable.of(false)] : []),

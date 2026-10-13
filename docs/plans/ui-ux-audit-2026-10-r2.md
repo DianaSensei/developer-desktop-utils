@@ -37,31 +37,34 @@ nằm ở **ba chỗ hai đợt audit tĩnh không thấy được**:
    cứng) tự bật ở **mọi** tool lần đầu mở. JSON lenient báo "Valid JSON" cho JSON không hợp
    lệ.
 
-| # | Mức | Vấn đề | Khía cạnh |
-|---|---|---|---|
-| 1 | P1 | Có ≥ 2 tab workspace là mất thanh chuyển tool trong nhóm (Text Counter, Data Converter, JWT, QR…) | Điều hướng |
-| 2 | P1 | ⌘/Ctrl+1–9 trong API Client chuyển sang tool khác thay vì chuyển request tab | Bàn phím |
-| 3 | P1 | Dải tab workspace tràn mà không có dấu hiệu, không cuộn được bằng chuột | Điều hướng |
-| 4 | P1 | Cửa sổ 800–1023px: sidebar thành drawer, trên macOS đè đèn giao thông, nút ✕ "ma" | Responsive |
-| 5 | P1 | Lucky Wheel < 1024px: bánh xe đè danh sách, nút Spin ra khỏi màn hình | Responsive |
-| 6 | P1 | JSON Formatter báo "Valid JSON" cho input không hợp lệ (dấu phẩy thừa, key không ngoặc kép) | Chức năng |
-| 7 | P1 | Lần đầu mở: Enter = Skip onboarding; guide tự bật ở cả 22 tool, tiêu đề tiếng Việt cứng | Onboarding · i18n |
-| 8 | P1 | Khoá HMAC và khoá AES lưu dạng rõ trong `app-settings.json` | Dữ liệu |
-| 9 | P2 | ⌘V "dán nhanh" không có tác dụng khi focus đang ở ô output read-only | Bàn phím |
-| 10 | P2 | Chuột phải bị chặn cả trong ô nhập (mất Cut/Copy/Paste/Spellcheck) | Thói quen dùng |
-| 11 | P2 | Tương phản: 129 chỗ `text-fg-mute/NN` — gợi ý, gutter, placeholder dưới AA ở cả hai theme | A11y |
-| 12 | P2 | Nhãn truy cập: 15 nút/Select không tên, 6 editor CodeMirror không nhãn, nút lồng trong link/tab | A11y |
-| 13 | P2 | Phải nhấn ~40 lần Tab mới tới nội dung tool; không có skip link | Bàn phím |
-| 14 | P2 | Thông báo lỗi thô của engine (`atob`, "Failed to fetch", lỗi thư viện JWT) | Phản hồi lỗi |
-| 15 | P2 | Base64 không nhận base64url / thiếu padding / tiền tố `data:` | Chức năng |
-| 16 | P2 | Text Counter đứng ~1,9s, JSON ~0,75s khi dán 2,5 MB, không có chỉ báo | Hiệu năng |
-| 17 | P2 | Windows: vùng resize đè lên mép trên của nút Close/Maximize | Chrome |
-| 18 | P2 | Onboarding: chọn nhóm = đánh dấu sao mọi tool trong nhóm; bỏ chọn không tắt gì | Onboarding |
-| 19 | P2 | ⌘K đọc clipboard mỗi lần mở mà không có tuỳ chọn tắt | Minh bạch |
-| 20 | P2 | Nút nguy hiểm không cần xác nhận: Settings → Reset / Disable all / Reset config | An toàn thao tác |
-| 21 | P2 | ErrorBoundary: chỉ có tiếng Anh, "Try again" lặp lỗi nếu state lưu bị hỏng | Phục hồi |
-| 22 | P2 | "Pick from Screen" hiện trên macOS/Linux, nơi nó không bao giờ chạy được | Chức năng |
-| 23 | P3 | Lặt vặt: copy, i18n sót, nhãn ngược trên bánh xe, ⌘F bị chặn… (xem cuối) | — |
+| # | Mức | Vấn đề | Khía cạnh | Trạng thái |
+|---|---|---|---|---|
+| 1 | P1 | Có ≥ 2 tab workspace là mất thanh chuyển tool trong nhóm (Text Counter, Data Converter, JWT, QR…) | Điều hướng | ✅ |
+| 2 | P1 | ⌘/Ctrl+1–9 trong API Client chuyển sang tool khác thay vì chuyển request tab | Bàn phím | ✅ |
+| 3 | P1 | Dải tab workspace tràn mà không có dấu hiệu, không cuộn được bằng chuột | Điều hướng | ✅ |
+| 4 | P1 | Cửa sổ 800–1023px: sidebar thành drawer, trên macOS đè đèn giao thông, nút ✕ "ma" | Responsive | ✅ |
+| 5 | P1 | Lucky Wheel < 1024px: bánh xe đè danh sách, nút Spin ra khỏi màn hình | Responsive | ✅ |
+| 6 | P1 | JSON Formatter báo "Valid JSON" cho input không hợp lệ (dấu phẩy thừa, key không ngoặc kép) | Chức năng | ✅ |
+| 7 | P1 | Lần đầu mở: Enter = Skip onboarding; guide tự bật ở cả 22 tool, tiêu đề tiếng Việt cứng | Onboarding · i18n | ◐ |
+| 8 | P1 | Khoá HMAC và khoá AES lưu dạng rõ trong `app-settings.json` | Dữ liệu | ✅ |
+| 9 | P2 | ⌘V "dán nhanh" không có tác dụng khi focus đang ở ô output read-only | Bàn phím | ✅ |
+| 10 | P2 | Chuột phải bị chặn cả trong ô nhập (mất Cut/Copy/Paste/Spellcheck) | Thói quen dùng | ✅ |
+| 11 | P2 | Tương phản: 129 chỗ `text-fg-mute/NN` — gợi ý, gutter, placeholder dưới AA ở cả hai theme | A11y | ◐ |
+| 12 | P2 | Nhãn truy cập: 15 nút/Select không tên, 6 editor CodeMirror không nhãn, nút lồng trong link/tab | A11y | ◐ |
+| 13 | P2 | Phải nhấn ~40 lần Tab mới tới nội dung tool; không có skip link | Bàn phím | ◐ |
+| 14 | P2 | Thông báo lỗi thô của engine (`atob`, "Failed to fetch", lỗi thư viện JWT) | Phản hồi lỗi | ◐ |
+| 15 | P2 | Base64 không nhận base64url / thiếu padding / tiền tố `data:` | Chức năng | ✅ |
+| 16 | P2 | Text Counter đứng ~1,9s, JSON ~0,75s khi dán 2,5 MB, không có chỉ báo | Hiệu năng | — |
+| 17 | P2 | Windows: vùng resize đè lên mép trên của nút Close/Maximize | Chrome | ✅ |
+| 18 | P2 | Onboarding: chọn nhóm = đánh dấu sao mọi tool trong nhóm; bỏ chọn không tắt gì | Onboarding | ✅ |
+| 19 | P2 | ⌘K đọc clipboard mỗi lần mở mà không có tuỳ chọn tắt | Minh bạch | — |
+| 20 | P2 | Nút nguy hiểm không cần xác nhận: Settings → Reset / Disable all / Reset config | An toàn thao tác | ✅ |
+| 21 | P2 | ErrorBoundary: chỉ có tiếng Anh, "Try again" lặp lỗi nếu state lưu bị hỏng | Phục hồi | ✅ |
+| 22 | P2 | "Pick from Screen" hiện trên macOS/Linux, nơi nó không bao giờ chạy được | Chức năng | ✅ |
+| 23 | P3 | Lặt vặt: copy, i18n sót, nhãn ngược trên bánh xe, ⌘F bị chặn… (xem cuối) | — | ◐ |
+
+Trạng thái: ✅ đã sửa trên nhánh `docs/ui-ux-audit-r2` · ◐ sửa một phần · — chưa làm. Chi
+tiết ở mục [Đã sửa](#đã-sửa-trên-nhánh-này) cuối file.
 
 ---
 
@@ -400,3 +403,33 @@ render cả 23 màn hình.
   Enter khi đang ghép chữ không chọn nhầm kết quả.
 - Scrollbar và font trên WebKitGTK (Linux) và WebView2 (Windows) ở dark mode.
 - Mock server và sidecar chạy thật: thông báo khi port bị chiếm, khi bind thất bại.
+
+## Đã sửa trên nhánh này
+
+Kiểm bằng `tsc`, toàn bộ vitest (133 file / 1532 test) và chạy lại harness trên bản build
+(Ctrl+1 trong API Client giữ nguyên route; Enter ở onboarding đi tiếp; không guide nào tự bật;
+Lucky Wheel 800px không đè; menu "Tất cả tab" căn mép phải; axe `aria-input-field-name` 8 → 1).
+
+| # | Sửa thế nào |
+|---|---|
+| 1 | `GroupTabs` tách khỏi `ToolIdentity`; khi dải workspace đang hiện tab, một dải mảnh phía trên tool hiện các tool cùng nhóm (`GroupTabsStrip` trong `App.tsx`). Tab nhóm dùng roving tabindex + ←/→. |
+| 2 | API Client đánh dấu `data-claims-shortcuts="mod-digit"` khi có request tab; `WorkspaceContext` nhường ⌘1–9 khi thấy dấu đó. Test trong `WorkspaceBar.test.tsx`. |
+| 3 | Fade ở mép có tab ẩn, wheel dọc cuộn ngang, nút "Tất cả tab (N)" mở danh sách đầy đủ. Tab đang chọn chỉ cuộn chính dải tab (bỏ `scrollIntoView` — sửa luôn lỗi dịch `<main>` ở bản web). |
+| 4 | Ngưỡng drawer `lg` → `md` (768px, dưới min 800px của cửa sổ): app desktop luôn có sidebar và nút Thu gọn; bỏ nút ✕ "ma" trên titlebar macOS. |
+| 5 | Lucky Wheel bố cục theo container query (`@container` / `@3xl:`); hẹp thì một cột flex cuộn được, bánh xe lên đầu. Nhãn nửa trái lật lại cho dễ đọc; chuỗi cứng → i18n. |
+| 6 | Parse thêm bằng `JSON.parse`; input chỉ đọc được nhờ chế độ lenient hiện cảnh báo `warn` thay vì "Valid JSON". Test `JsonFormatter.status.test.tsx`. |
+| 7 | ◐ Focus mặc định vào nút chính ở mỗi bước onboarding; guide không tự bật ở lần đầu mở (chỉ khi nội dung guide đổi); tiêu đề guide qua i18n; câu chào bỏ Kafka/RabbitMQ. **Chưa đổi:** trang đích `/` vẫn là Cron (route bị `registry.test.ts` khoá — cần quyết định riêng); nội dung guide vẫn chỉ tiếng Anh. |
+| 8 | Khoá HMAC/AES → `useSecretState` (vault); 4 dòng `MIGRATIONS` chuyển giá trị cũ; plugin base64 khai quyền `secrets`. |
+| 9 | `useQuickPaste` coi ô `readOnly` / `aria-readonly` là không sửa được. Test. |
+| 10 | `useDesktopChrome` để menu chuột phải của hệ thống trong input/textarea/contenteditable (kể cả con của CodeMirror). Test. |
+| 11 | ◐ Bỏ độ mờ ở gợi ý đầu pane (`PaneHeader`), placeholder và số dòng CodeMirror, gợi ý JWT/Lucky Wheel, "/ 8h" Time Tracker. **Còn:** keycap trong nút chính, badge method, màu syntax, các chỗ `text-fg-mute/NN` khác (cần token `--fg-faint` + guard). |
+| 12 | ◐ Editor CodeMirror có `aria-label` (prop `ariaLabel`, mặc định là placeholder; Diff/Markdown/SQL/JSON/Data Converter); nút cửa sổ và nút ☰ có `aria-label`. **Còn:** trigger `Select` (axe vẫn báo `button-name`), nút ⭐ lồng trong link sidebar. |
+| 13 | ◐ Tab nhóm còn một điểm dừng Tab. **Còn:** skip link, ⭐ sidebar. |
+| 14 | ◐ Base64 báo lỗi dễ hiểu. **Còn:** JWT, "Failed to fetch", vị trí lỗi Regex. |
+| 15 | Base64 nhận base64url, thiếu padding, xuống dòng, tiền tố `data:`. Test `EncodeHashEncrypt.base64.test.ts`. |
+| 17 | Vùng resize không đè 3 nút cửa sổ (bỏ góc NE, dải North dừng trước nút, East bắt đầu dưới titlebar) và ẩn khi maximize; nút cửa sổ có `aria-label`. |
+| 18 | Onboarding không còn đánh dấu sao; bỏ tích một nhóm (lúc mở lại) thì tắt tool của nhóm; nhãn nhóm qua i18n. |
+| 20 | `ConfirmDialog` cho Disable all / Reset tool / Reset cấu hình. |
+| 21 | ErrorBoundary song ngữ, "Chép chi tiết lỗi", "Xoá dữ liệu của tool…" (xoá `devtool:<id>:*`, có xác nhận, không đụng vault). Test `ErrorBoundary.test.tsx`. |
+| 22 | Nút "Pick from Screen" chỉ hiện khi có `EyeDropper`. |
+| 23 | ◐ Lucky Wheel (nhãn lộn ngược, chuỗi cứng). Các mục P3 còn lại chưa làm. |

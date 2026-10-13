@@ -1,5 +1,5 @@
 import { useDeferredValue, useEffect, useMemo, useState } from 'react';
-import { usePluginSdkFor, usePluginState } from '@/platform';
+import { usePluginSdkFor, usePluginState, useSecretState } from '@/platform';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -53,8 +53,19 @@ function base64Encode(input: string) {
   toBytes(input).forEach((byte) => { binary += String.fromCharCode(byte); });
   return btoa(binary);
 }
-function base64Decode(input: string) {
-  const binary = atob(input.replace(/\s+/g, ''));
+// Accepts the forms people actually paste: base64url (`-` `_`, JWT/OAuth),
+// missing `=` padding, line breaks, and a `data:…;base64,` prefix. Errors
+// say what is wrong instead of passing on atob's DOMException.
+export function base64Decode(input: string) {
+  let s = input.replace(/\s+/g, '').replace(/^data:[^,]*;base64,/i, '');
+  s = s.replace(/-/g, '+').replace(/_/g, '/');
+  const bad = s.match(/[^A-Za-z0-9+/=]/);
+  if (bad) throw new Error(`Not valid Base64: unexpected character "${bad[0]}".`);
+  s = s.replace(/=+$/, '');
+  if (s.includes('=')) throw new Error('Not valid Base64: "=" padding may only appear at the end.');
+  if (s.length % 4 === 1) throw new Error('Not valid Base64: one character too many or too few (truncated input?).');
+  s += '='.repeat((4 - (s.length % 4)) % 4);
+  const binary = atob(s);
   const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
   return fromBytes(bytes);
 }
@@ -537,14 +548,16 @@ export function EncodeHashEncrypt() {
   // Hash tab
   const [hashInput, setHashInput]     = usePluginState(sdk, 'hash:hashInput', '', { legacyKey: 'devtool:hash:hashInput' });
   const [upperHex, setUpperHex]       = usePluginState(sdk, 'hash:upperHex', false, { legacyKey: 'devtool:hash:upperHex' });
-  const [hmacKey, setHmacKey]         = usePluginState(sdk, 'hash:hmacKey', '', { legacyKey: 'devtool:hash:hmacKey' });
+  // Keys are credentials: they live in the encrypted vault, not in the
+  // plain settings file (platform/secrets.ts migrates the old keys).
+  const [hmacKey, setHmacKey]         = useSecretState(sdk, 'hmac-key', '');
   const [showHmacKey, setShowHmacKey] = useState(false);
   const [verifyAlgo, setVerifyAlgo]   = useState<AlgoId | null>(null);
   const [verifyValue, setVerifyValue] = useState('');
 
   // Encrypt tab
   const [encryptInput, setEncryptInput] = usePluginState(sdk, 'hash:encryptInput', '', { legacyKey: 'devtool:hash:encryptInput' });
-  const [encryptKey, setEncryptKey]     = usePluginState(sdk, 'hash:key', '', { legacyKey: 'devtool:hash:key' });
+  const [encryptKey, setEncryptKey]     = useSecretState(sdk, 'aes-key', '');
   const [cryptoMode, setCryptoMode]     = usePluginState<CryptoMode>(sdk, 'hash:aesMode', 'encrypt', { legacyKey: 'devtool:hash:aesMode' });
   const [encryptAlgo, setEncryptAlgo]   = usePluginState<EncryptAlgo>(sdk, 'hash:encryptAlgo', 'aes-gcm', { legacyKey: 'devtool:hash:encryptAlgo' });
   const [showKey, setShowKey]           = useState(false);

@@ -45,6 +45,7 @@ import { CONFIG_FIELDS, SECTION_LABELS, type ConfigSection } from '@/config/appC
 import { useUpdate } from '@/contexts/UpdateContext';
 import { useExtensionUpdates } from '@/contexts/ExtensionUpdateContext';
 import { Badge } from '@/components/ui/badge';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { AppLogo } from '@/components/AppLogo';
 import { ExperimentalBadge } from '@/components/ExperimentalBadge';
 import { useOnboarding } from '@/contexts/OnboardingContext';
@@ -386,6 +387,14 @@ export function Settings() {
     TOOL_DEFS.forEach((t) => { if (features[t.id] !== false) toggleFeature(t.id); });
   };
 
+  // One-click actions that undo the user's own setup ask first.
+  const [pendingConfirm, setPendingConfirm] = useState<'disableAll' | 'resetTools' | 'resetConfig' | null>(null);
+  const CONFIRMS = {
+    disableAll: { title: t('settings.confirm.disableAllTitle'), description: t('settings.confirm.disableAllBody'), confirmLabel: t('settings.tools.disableAll'), run: disableAll },
+    resetTools: { title: t('settings.confirm.resetToolsTitle'), description: t('settings.confirm.resetToolsBody'), confirmLabel: t('common.reset'), run: resetToDefaults },
+    resetConfig: { title: t('settings.confirm.resetConfigTitle'), description: t('settings.confirm.resetConfigBody'), confirmLabel: t('common.reset'), run: resetConfig },
+  } as const;
+
   const openExternal = useCallback(async (e: React.MouseEvent, url: string) => {
     if (!isTauri) return; // on web, let the anchor open a normal tab
     e.preventDefault();
@@ -604,7 +613,7 @@ export function Settings() {
             )}
             {!allDisabled && (
               <button
-                onClick={disableAll}
+                onClick={() => setPendingConfirm('disableAll')}
                 className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-line px-2.5 py-1.5 text-xs text-fg-mute hover:text-fg hover:bg-bg-2 transition-colors"
               >
                 <Ban className="h-3 w-3 shrink-0" />
@@ -612,7 +621,7 @@ export function Settings() {
               </button>
             )}
             <button
-              onClick={resetToDefaults}
+              onClick={() => setPendingConfirm('resetTools')}
               className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-line px-2.5 py-1.5 text-xs text-fg-mute hover:text-fg hover:bg-bg-2 transition-colors"
             >
               <RotateCcw className="h-3 w-3 shrink-0" />
@@ -1107,7 +1116,7 @@ export function Settings() {
             <section className="space-y-3">
               <div className="flex items-center justify-end">
                 <button
-                  onClick={resetConfig}
+                  onClick={() => setPendingConfirm('resetConfig')}
                   className="flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs text-fg-mute hover:text-fg hover:bg-bg-2 transition-colors"
                 >
                   <RotateCcw className="h-3 w-3" />
@@ -1155,6 +1164,16 @@ export function Settings() {
           )}
         </div>
       </div>
+      {pendingConfirm && (
+        <ConfirmDialog
+          open
+          onOpenChange={(o) => { if (!o) setPendingConfirm(null); }}
+          title={CONFIRMS[pendingConfirm].title}
+          description={CONFIRMS[pendingConfirm].description}
+          confirmLabel={CONFIRMS[pendingConfirm].confirmLabel}
+          onConfirm={() => CONFIRMS[pendingConfirm].run()}
+        />
+      )}
     </div>
   );
 }
