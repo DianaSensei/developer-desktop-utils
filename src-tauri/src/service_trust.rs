@@ -1,5 +1,5 @@
-// User consent for running a sidecar that is not in `ALLOWED_SERVICES`
-// (see service_host.rs).
+// User consent for running any sidecar other than a bundled copy next to the
+// app executable (see `BUNDLED_SERVICES` in service_host.rs).
 //
 // A build-time allowlist would require an app release for every new
 // sidecar, and the manifest cannot grant itself permission because the

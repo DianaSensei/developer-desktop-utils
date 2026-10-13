@@ -22,11 +22,12 @@
 //   3. write nothing else to stdout (logs go to stderr).
 //
 // Trust boundary: the webview names the binary, Rust decides whether it runs:
-//   - names in `ALLOWED_SERVICES` run without asking, whatever binary
-//     resolves for them (a URL-installed copy wins over a bundled one, see
-//     `resolve_sidecar_path`);
-//   - any other valid name requires the user's consent through a native
-//     dialog showing the path and SHA-256 (`service_trust.rs`).
+//   - a `BUNDLED_SERVICES` binary found next to the app executable (a
+//     directory the webview cannot write) runs without asking;
+//   - anything else, including a URL-installed copy under a bundled name,
+//     needs the user's consent for its SHA-256 through a native dialog
+//     (`service_trust.rs`). The approved file is hashed again right before
+//     it is spawned.
 
 use std::collections::HashMap;
 use std::process::Stdio;
@@ -49,26 +50,17 @@ pub const SERVICE_PROTOCOL: u32 = 1;
 // out different things and can change independently.
 const CALL_TIMEOUT: Duration = Duration::from_secs(30);
 
-/// Names that run without a consent prompt. Trust is by name: whatever
-/// binary resolves for the name runs, including a URL-installed copy from
-/// any manifest, which takes precedence over a bundled one (see
-/// `resolve_sidecar_path`). Only `devtool-svc-echo` is bundled
-/// (`BUNDLED_SERVICES`). Any other name needs user consent
-/// (`service_trust.rs`); adding a plugin does not require editing this list.
+/// Sidecars shipped with the app. Only these, and only the copy next to the
+/// app executable, run without a consent prompt; trust is never granted by
+/// name alone, because any https manifest can install a binary under any
+/// valid name. Must match `bundle.externalBin` in tauri.conf.json and
+/// `scripts/prepare-service-sidecars.mjs`.
 ///
 /// `devtool-svc-echo` is a minimal example sidecar used by
 /// `tests/service_echo.rs` to exercise one-shot and stream calls end to end.
-///
-/// The redis/container/rabbit/kafka sidecars now ship from the
-/// `developer-desktop-miniapp` repo (see
-/// docs/decisions/architecture/optional-broker-plugins.md). Their names stay
-/// here so existing users are not prompted for consent after upgrading.
-const ALLOWED_SERVICES: &[&str] = &["devtool-svc-echo", "devtool-svc-redis", "devtool-svc-container", "devtool-svc-rabbit", "devtool-svc-kafka"];
-
-/// The subset of `ALLOWED_SERVICES` shipped with the app. Must match
-/// `bundle.externalBin` in tauri.conf.json and
-/// `scripts/prepare-service-sidecars.mjs`. The rest are installed by URL.
-#[cfg(test)]
+/// The redis/container/rabbit/kafka sidecars ship from the
+/// `developer-desktop-miniapp` repo and are installed by URL, so they ask
+/// for consent once per binary version.
 const BUNDLED_SERVICES: &[&str] = &["devtool-svc-echo"];
 
 #[derive(Debug, Deserialize)]
@@ -119,8 +111,8 @@ impl ServiceResponse {
     }
 }
 
-/// Valid name for a sidecar outside `ALLOWED_SERVICES`: `devtool-svc-` plus
-/// kebab-case, with nothing that could escape the services directory.
+/// Valid sidecar name: `devtool-svc-` plus kebab-case, with nothing that
+/// could escape the services directory.
 pub fn is_valid_service_name(bin: &str) -> bool {
     const PREFIX: &str = "devtool-svc-";
     let Some(rest) = bin.strip_prefix(PREFIX) else { return false };
@@ -133,8 +125,8 @@ pub fn is_valid_service_name(bin: &str) -> bool {
 }
 
 /// Why a request is rejected before reaching any process: protocol mismatch,
-/// or a name that cannot be a sidecar. Valid names outside
-/// `ALLOWED_SERVICES` pass here; `ensure_trusted` asks the user before spawn.
+/// or a name that cannot be a sidecar. Valid names pass here;
+/// `ensure_trusted` decides whether the binary may run.
 pub fn reject_reason(request: &ServiceRequest) -> Option<String> {
     if request.protocol != SERVICE_PROTOCOL {
         return Some(format!(
@@ -142,10 +134,9 @@ pub fn reject_reason(request: &ServiceRequest) -> Option<String> {
             request.protocol
         ));
     }
-    if !ALLOWED_SERVICES.contains(&request.bin.as_str()) && !is_valid_service_name(&request.bin) {
+    if !is_valid_service_name(&request.bin) {
         return Some(format!(
-            "dịch vụ \"{}\" không nằm trong allowlist của host và không phải tên sidecar hợp lệ \
-             (cần dạng devtool-svc-<ten-kebab-case>)",
+            "dịch vụ \"{}\" không phải tên sidecar hợp lệ (cần dạng devtool-svc-<ten-kebab-case>)",
             request.bin
         ));
     }
@@ -205,9 +196,10 @@ fn resolve_beside_dir(dir: &std::path::Path, bin: &str) -> Result<std::path::Pat
 }
 
 /// Resolves the binary to spawn for `bin`. A URL-installed copy recorded in
-/// `extensions/index.json` (whose file still exists) always wins over the
-/// copy bundled next to the executable. Do not reverse this order: it lets a
-/// sidecar be dropped from `bundle.externalBin` without changing this code.
+/// `extensions/index.json` (whose file still exists) wins over the copy
+/// bundled next to the executable, so a sidecar can be dropped from
+/// `bundle.externalBin` without changing this code. That is safe only
+/// because `ensure_trusted_with` exempts nothing but the bundled copy.
 fn resolve_sidecar_path(
     index_dir: Option<&std::path::Path>,
     beside_dir: &std::path::Path,
@@ -232,12 +224,6 @@ fn sidecar_dirs(app: &AppHandle) -> Result<(Option<std::path::PathBuf>, std::pat
         .ok_or("Không xác định được thư mục cài đặt của app")?
         .to_path_buf();
     Ok((index_dir, beside_dir))
-}
-
-fn sidecar_path(app: &AppHandle, bin: &str) -> Result<std::path::PathBuf, String> {
-    // Trust boundary: decides which binary is actually spawned for `bin`.
-    let (index_dir, beside_dir) = sidecar_dirs(app)?;
-    resolve_sidecar_path(index_dir.as_deref(), &beside_dir, bin)
 }
 
 /// Routes one parsed response to its waiter.
@@ -352,6 +338,14 @@ fn ui_locale_at(app_data: Option<&std::path::Path>) -> crate::service_trust::Loc
         .unwrap_or(crate::service_trust::Locale::En)
 }
 
+/// A sidecar binary cleared to run: the path to spawn and, unless it is a
+/// bundled copy, the SHA-256 the user approved.
+#[derive(Debug)]
+struct TrustedBinary {
+    path: std::path::PathBuf,
+    sha256: Option<String>,
+}
+
 /// Decision logic of `ensure_trusted` with every app dependency passed in,
 /// so the whole flow is testable.
 async fn ensure_trusted_with<F, Fut>(
@@ -362,29 +356,45 @@ async fn ensure_trusted_with<F, Fut>(
     app_data: Option<&std::path::Path>,
     home: Option<&str>,
     ask: F,
-) -> Result<(), String>
+) -> Result<TrustedBinary, String>
 where
     F: FnOnce(crate::service_trust::ConsentDialog) -> Fut,
     Fut: std::future::Future<Output = bool>,
 {
-    if ALLOWED_SERVICES.contains(&bin) {
-        return Ok(());
-    }
     let path = resolve_sidecar_path(index_dir, beside_dir, bin)?;
+    if BUNDLED_SERVICES.contains(&bin) && path.parent() == Some(beside_dir) {
+        return Ok(TrustedBinary { path, sha256: None });
+    }
     let bytes = tokio::fs::read(&path)
         .await
         .map_err(|e| format!("Không đọc được \"{}\": {e}", path.display()))?;
     let sha256 = crate::artifact_installer::sha256_hex(&bytes);
     let source = index_dir.and_then(|d| crate::artifact_installer::installed_service_source_url_at(d, bin));
     let dialog = crate::service_trust::consent_dialog(ui_locale_at(app_data), bin, &path, &sha256, source.as_deref(), home);
-    trust.ensure(bin, &sha256, || ask(dialog)).await
+    trust.ensure(bin, &sha256, || ask(dialog)).await?;
+    Ok(TrustedBinary { path, sha256: Some(sha256) })
 }
 
-/// Names in `ALLOWED_SERVICES` run without asking; any other sidecar needs
-/// consent for the file its path resolves to now (hashed at check time, not
-/// at install time). `get_or_spawn` resolves the path again before spawning,
-/// so a file swapped in between is not re-checked.
-async fn ensure_trusted(app: &AppHandle, registry: &ServiceRegistry, bin: &str) -> Result<(), String> {
+/// Fails if the approved file changed after consent (it lives in app data,
+/// which the webview can write).
+async fn verify_unchanged(trusted: &TrustedBinary) -> Result<(), String> {
+    let Some(expected) = &trusted.sha256 else { return Ok(()) };
+    let bytes = tokio::fs::read(&trusted.path)
+        .await
+        .map_err(|e| format!("Không đọc được \"{}\": {e}", trusted.path.display()))?;
+    if &crate::artifact_installer::sha256_hex(&bytes) != expected {
+        return Err(format!(
+            "Sidecar \"{}\" đã thay đổi sau khi được cho phép; thử lại để xác nhận bản mới.",
+            trusted.path.display()
+        ));
+    }
+    Ok(())
+}
+
+/// A bundled sidecar next to the executable runs without asking; any other
+/// binary needs consent for the file its path resolves to now (hashed at
+/// check time, not at install time). Returns the path and hash to spawn.
+async fn ensure_trusted(app: &AppHandle, registry: &ServiceRegistry, bin: &str) -> Result<TrustedBinary, String> {
     let (index_dir, beside_dir) = sidecar_dirs(app)?;
     let app_data = app.path().app_data_dir().ok();
     let home = std::env::var("HOME").or_else(|_| std::env::var("USERPROFILE")).ok();
@@ -406,14 +416,16 @@ async fn get_or_spawn(app: &AppHandle, registry: &ServiceRegistry, bin: &str) ->
     if let Some(running) = registry.running.lock().await.get(bin) {
         return Ok(running.clone());
     }
-    ensure_trusted(app, registry, bin).await?;
+    let trusted = ensure_trusted(app, registry, bin).await?;
 
     let mut map = registry.running.lock().await;
     if let Some(running) = map.get(bin) {
         return Ok(running.clone());
     }
 
-    let mut command = Command::new(sidecar_path(app, bin)?);
+    // Spawn exactly the file that was approved, re-hashed just before.
+    verify_unchanged(&trusted).await?;
+    let mut command = Command::new(&trusted.path);
     // Sidecars have no `AppHandle`, so persistent data goes in their own
     // directory passed through the environment.
     if let Ok(app_data) = app.path().app_data_dir() {
@@ -594,15 +606,14 @@ mod tests {
         // consent prompt.
         for bad in ["/bin/sh", "sh", "devtool-svc-", "devtool-svc-../x", "devtool-svc-a/b", "devtool-svc-A", "devtool-svc--x", "devtool-svc-x-"] {
             let reason = reject_reason(&request(bad, SERVICE_PROTOCOL)).unwrap_or_else(|| panic!("{bad} phải bị từ chối"));
-            assert!(reason.contains("allowlist"), "{reason}");
+            assert!(reason.contains("devtool-svc-<ten-kebab-case>"), "{reason}");
         }
     }
 
     #[test]
-    fn valid_name_outside_allowlist_goes_to_consent() {
+    fn valid_name_goes_to_consent() {
         // Not rejected outright: the user decides (service_trust).
         assert!(reject_reason(&request("devtool-svc-service-list-automation", SERVICE_PROTOCOL)).is_none());
-        assert!(!ALLOWED_SERVICES.contains(&"devtool-svc-service-list-automation"));
         assert!(is_valid_service_name("devtool-svc-redis"));
     }
 
@@ -625,13 +636,51 @@ mod tests {
     #[tokio::test]
     async fn bundled_sidecar_never_asks() {
         let trust = memory_trust();
-        // Not even a file is needed: a bundled name never reaches the question.
-        let nowhere = std::path::Path::new("/nonexistent");
-        let r = ensure_trusted_with(&trust, "devtool-svc-echo", None, nowhere, None, None, |_| async {
+        let beside = temp_dir("trust-bundled");
+        std::fs::write(beside.join("devtool-svc-echo"), b"bundled").unwrap();
+        let r = ensure_trusted_with(&trust, "devtool-svc-echo", None, &beside, None, None, |_| async {
             panic!("must not ask for a bundled sidecar")
         })
+        .await
+        .unwrap();
+        assert_eq!(r.path, beside.join("devtool-svc-echo"));
+        assert!(r.sha256.is_none());
+    }
+
+    #[tokio::test]
+    async fn url_installed_copy_of_a_bundled_name_still_asks() {
+        // Any https manifest can install a binary under a bundled name; the
+        // name alone must not skip consent.
+        let bin = "devtool-svc-echo";
+        let (_root, extensions) = fake_installed_sidecar(bin, b"not the bundled echo");
+        let beside = temp_dir("trust-beside-echo");
+        std::fs::write(beside.join(bin), b"bundled").unwrap();
+        let trust = memory_trust();
+        let asked = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let a = asked.clone();
+        let denied = ensure_trusted_with(&trust, bin, Some(&extensions), &beside, None, None, move |_| async move {
+            a.store(true, std::sync::atomic::Ordering::SeqCst);
+            false
+        })
         .await;
-        assert!(r.is_ok());
+        assert!(asked.load(std::sync::atomic::Ordering::SeqCst));
+        assert!(denied.is_err());
+    }
+
+    #[tokio::test]
+    async fn file_swapped_after_consent_is_not_spawned() {
+        let bin = "devtool-svc-swaptest";
+        let (root, extensions) = fake_installed_sidecar(bin, b"approved");
+        let trust = memory_trust();
+        let trusted = ensure_trusted_with(&trust, bin, Some(&extensions), &root, None, None, |_| async { true })
+            .await
+            .unwrap();
+        assert_eq!(trusted.path, root.join(bin));
+        verify_unchanged(&trusted).await.unwrap();
+
+        std::fs::write(root.join(bin), b"swapped").unwrap();
+        let err = verify_unchanged(&trusted).await.unwrap_err();
+        assert!(err.contains("đã thay đổi"), "{err}");
     }
 
     #[tokio::test]
@@ -725,7 +774,7 @@ mod tests {
         for bin in BUNDLED_SERVICES {
             assert!(
                 conf.contains(&format!("binaries/{bin}")),
-                "\"{bin}\" nằm trong ALLOWED_SERVICES nhưng thiếu trong bundle.externalBin"
+                "\"{bin}\" nằm trong BUNDLED_SERVICES nhưng thiếu trong bundle.externalBin"
             );
         }
     }

@@ -76,10 +76,12 @@ mật — nó không phải, và biết chính xác nó LÀ gì quan trọng hơ
   trình KHÔNG do manifest hay webview quyết định — manifest do webview đọc,
   thứ ta đang muốn giới hạn khả năng của nó, nên nó không thể là nơi cấp
   quyền. Có đúng hai nguồn quyền, cả hai nằm ở Rust (`service_host.rs`):
-  1. `ALLOWED_SERVICES` — hằng số CỨNG, quyết định lúc BIÊN DỊCH, cho các
-     sidecar DevTool tự đóng gói. Chạy không hỏi.
-  2. **Sự đồng ý của người dùng** — với mọi tên khác dạng
-     `devtool-svc-<kebab-case>`, lần đầu chạy app hiện hộp thoại native
+  1. `BUNDLED_SERVICES` — hằng số CỨNG, quyết định lúc BIÊN DỊCH, cho các
+     sidecar DevTool tự đóng gói. Chỉ bản nằm CẠNH file chạy của app (thư
+     mục webview không ghi được) mới chạy không hỏi. Quyền KHÔNG cấp theo
+     tên: một bản cài qua URL mang tên `devtool-svc-echo` vẫn phải hỏi.
+  2. **Sự đồng ý của người dùng** — với mọi binary khác (tên dạng
+     `devtool-svc-<kebab-case>`), lần đầu chạy app hiện hộp thoại native
      (đường dẫn + SHA-256 của file sắp chạy) và hỏi. Hộp thoại do Rust bật,
      webview chỉ kích hoạt được câu hỏi chứ không trả lời thay được. Nhờ đó
      một plugin mới kèm sidecar không đòi phát hành lại app.
@@ -93,8 +95,9 @@ mật — nó không phải, và biết chính xác nó LÀ gì quan trọng hơ
   cài đặt thu hồi quyết định.
 
   Giới hạn cần biết: đồng ý là đồng ý chạy với đầy đủ quyền của người dùng,
-  không có sandbox; và mã băm được tính ngay trước khi spawn, không giữ file
-  khoá nên về lý thuyết có cửa sổ thời gian rất ngắn giữa băm và chạy.
+  không có sandbox. File đã được duyệt được băm lại ngay trước khi spawn và
+  app chạy đúng đường dẫn đó; file đổi thì từ chối chạy. Không giữ khoá file
+  nên vẫn còn một cửa sổ rất ngắn giữa lần băm cuối và lúc spawn.
 - **Vì sao không cần sandbox chống mã độc lúc này:** mọi plugin (kể cả
   plugin cài từ URL bên ngoài) hiện do chính người phát hành DevTool viết
   và tự host. Đây không phải kho plugin bên thứ ba. Rủi ro thật đang được
