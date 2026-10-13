@@ -635,6 +635,7 @@ interface ImportDialogProps {
 }
 
 function ImportDialog({ open, onOpenChange, onImport }: ImportDialogProps) {
+  const sdk = usePluginSdk();
   const m = useMessages(MESSAGES);
   const [rawText, setRawText] = useState('');
   const [busy, setBusy] = useState(false);
@@ -678,9 +679,11 @@ function ImportDialog({ open, onOpenChange, onImport }: ImportDialogProps) {
     }
   };
 
+  // Through the SDK (Tauri clipboard plugin): navigator.clipboard in
+  // WKWebView shows a "Paste" permission bubble first.
   const handlePasteClipboard = async () => {
     try {
-      const text = await navigator.clipboard.readText();
+      const text = await sdk.clipboard.readText();
       if (text) setRawText((prev) => (prev.trim() ? prev + '\n' : '') + text);
     } catch {
       setFileError(m('clipboardBlocked'));

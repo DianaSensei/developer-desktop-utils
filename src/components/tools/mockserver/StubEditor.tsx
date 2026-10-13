@@ -97,6 +97,7 @@ export function StubEditor({ stub, onChange, testScript }: Props) {
       <Input
         type="number"
         value={stub.delayMs}
+        aria-label={m('delay')}
         onChange={(e) => onChange({ delayMs: Math.max(0, Number(e.target.value) || 0) })}
         className="h-ctl w-20 text-xs"
       />
@@ -174,6 +175,7 @@ export function StubEditor({ stub, onChange, testScript }: Props) {
                 <Input
                   type="number"
                   value={stub.status}
+                  aria-label={m('status')}
                   onChange={(e) => onChange({ status: Number(e.target.value) || 0 })}
                   className="h-ctl w-20 text-xs"
                 />

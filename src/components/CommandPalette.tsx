@@ -8,6 +8,7 @@ import { toolMatchesQuery } from '@/lib/toolSearch';
 import { DEFAULT_TOOL_ORDER } from '@/lib/toolDefs';
 import { detectClipboardIntent, type ClipboardIntent } from '@/lib/clipboardIntent';
 import { readTextFromClipboard } from '@/lib/clipboard';
+import { paletteClipboardEnabled } from '@/lib/paletteClipboard';
 import { useFeatures } from '@/contexts/FeatureContext';
 import { useLocale } from '@/contexts/LocaleContext';
 import { useWorkspaces, workspaceLabel } from '@/contexts/WorkspaceContext';
@@ -72,6 +73,11 @@ export function CommandPalette() {
     setQuery('');
     setSelected(0);
     let cancelled = false;
+    // Opt-out in Settings: the clipboard often holds passwords or tokens.
+    if (!paletteClipboardEnabled()) {
+      setClipboardIntent(null);
+      return;
+    }
     readTextFromClipboard().then((text) => {
       if (!cancelled) setClipboardIntent(detectClipboardIntent(text));
     });

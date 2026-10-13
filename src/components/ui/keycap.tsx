@@ -34,8 +34,9 @@ export function Keycap({ mod, inline, className, children, ...props }: KeycapPro
         inline
           ? // Inside a button: just a divider in the button's own color
             // (border-current), dimmed on the element because currentColor
-            // takes no alpha modifier.
-            'ml-2 border-l border-current pl-2 opacity-60'
+            // takes no alpha modifier. 90%, not 60%: white at 60% on the
+            // accent measured 3.0:1.
+            'ml-2 border-l border-current pl-2 opacity-90'
           : 'rounded-xs border border-line bg-bg-2/60 px-1.5 py-1 text-fg-mute',
         className,
       )}

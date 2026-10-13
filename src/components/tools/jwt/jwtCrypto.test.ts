@@ -282,3 +282,23 @@ describe('isAlgorithmSupported', () => {
     }
   });
 });
+
+describe('token shape errors', () => {
+  it('says how many parts are missing', () => {
+    expect(() => decodeToken('abc.def')).toThrow(/3 parts .* this has 2/);
+  });
+
+  it('recognises an encrypted JWE', () => {
+    expect(() => decodeToken('a.b.c.d.e')).toThrow(/JWE/);
+  });
+
+  it('names a non-base64url character', () => {
+    expect(() => decodeToken('ey J.e30.sig')).toThrow(/header part .* " "/);
+  });
+
+  it('accepts a token copied with its Bearer prefix', () => {
+    const t = 'eyJhbGciOiJub25lIn0.eyJzdWIiOiIxIn0.';
+    expect(decodeToken(`Bearer ${t}`).payload.sub).toBe('1');
+    expect(decodeToken(`Authorization: Bearer ${t}`).header.alg).toBe('none');
+  });
+});

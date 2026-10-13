@@ -49,7 +49,7 @@ export const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
         'focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus',
         'disabled:pointer-events-none disabled:opacity-50',
         size === 'xs' ? 'h-6 w-6' : 'h-ctl w-ctl',
-        active && 'bg-acc/10 text-acc hover:bg-acc/15',
+        active && 'bg-acc/10 text-acc-ink hover:bg-acc/15',
         // Spin the existing icon.
         busy && '[&>svg]:animate-spin',
         className,

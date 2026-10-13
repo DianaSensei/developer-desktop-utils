@@ -399,7 +399,7 @@ export function SqlFormatter() {
           syntaxErrorLinter(),
           lintGutter(),
           // Keep typed quotes straight (no macOS smart-quote substitution).
-          EditorView.contentAttributes.of({ autocorrect: 'off', autocapitalize: 'off', spellcheck: 'false' }),
+          EditorView.contentAttributes.of({ autocorrect: 'off', autocapitalize: 'off', spellcheck: 'false', 'aria-label': 'SQL' }),
           langConfRef.current.of(modeRef.current === 'sql' ? sqlLang : jsLangWithMongo),
           theme.extension,
           EditorView.lineWrapping,

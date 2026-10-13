@@ -7,6 +7,8 @@ export default defineMessages({
   importStubs: { vi: 'Nhập stub', en: 'Import stubs' },
   importStubsJson: { vi: 'Nhập stub từ JSON', en: 'Import stubs from JSON' },
   addStub: { vi: 'Thêm stub', en: 'Add stub' },
+  addFirstStub: { vi: 'Thêm stub đầu tiên', en: 'Add your first stub' },
+  unnamedStub: { vi: '(chưa đặt tên)', en: '(unnamed)' },
   moveUp: { vi: 'Đưa lên', en: 'Move up' },
   moveDown: { vi: 'Đưa xuống', en: 'Move down' },
   duplicateStub: { vi: 'Nhân bản stub', en: 'Duplicate stub' },

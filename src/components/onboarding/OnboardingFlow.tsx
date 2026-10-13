@@ -26,12 +26,15 @@ function selectedGroupsFromCurrentFeatures(isFeatureEnabled: (id: string) => boo
 
 export function OnboardingFlow() {
   const { show, completed, close } = useOnboarding();
-  const { toggleFeature, toggleFavorite, isFeatureEnabled, isFavorite } = useFeatures();
+  const { toggleFeature, isFeatureEnabled } = useFeatures();
   const { t } = useLocale();
   const [step, setStep] = useState<Step>('welcome');
   // Pre-check groups that are ALREADY fully enabled, so re-opening from
   // Settings after customization doesn't look like a reset.
   const [selected, setSelected] = useState<Set<string>>(() => selectedGroupsFromCurrentFeatures(isFeatureEnabled));
+  // What was ticked when the picker opened, so unticking a group can turn
+  // its tools off (a reopen from Settings shows enabled groups ticked).
+  const [initiallySelected, setInitiallySelected] = useState<Set<string>>(selected);
 
   // Re-sync on every open (not just first mount, since this component stays
   // mounted for the app's lifetime): a reopen from Settings skips straight to
@@ -40,7 +43,9 @@ export function OnboardingFlow() {
   useEffect(() => {
     if (!show) return;
     setStep(completed ? 'tools' : 'welcome');
-    setSelected(selectedGroupsFromCurrentFeatures(isFeatureEnabled));
+    const current = selectedGroupsFromCurrentFeatures(isFeatureEnabled);
+    setSelected(current);
+    setInitiallySelected(current);
     // Only re-sync when the dialog transitions to open, not on every keystroke/toggle.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [show]);
@@ -56,12 +61,19 @@ export function OnboardingFlow() {
     });
   };
 
+  // Enables the picked groups and disables groups the user unticked. It no
+  // longer stars them: picking every group used to make all 22 tools
+  // favorites, which left "Favorites" meaning nothing.
   const applySelection = () => {
     for (const group of ONBOARDING_TOOL_GROUPS) {
-      if (!selected.has(group.id)) continue;
-      for (const toolId of group.toolIds) {
-        if (!isFeatureEnabled(toolId)) toggleFeature(toolId);
-        if (!isFavorite(toolId)) toggleFavorite(toolId);
+      if (selected.has(group.id)) {
+        for (const toolId of group.toolIds) {
+          if (!isFeatureEnabled(toolId)) toggleFeature(toolId);
+        }
+      } else if (initiallySelected.has(group.id)) {
+        for (const toolId of group.toolIds) {
+          if (isFeatureEnabled(toolId)) toggleFeature(toolId);
+        }
       }
     }
     setStep('done');
@@ -97,7 +109,9 @@ export function OnboardingFlow() {
             </DialogHeader>
             <DialogFooter className="sm:justify-between">
               <Button variant="ghost" onClick={close}>{t('onboarding.skip')}</Button>
-              <Button onClick={() => setStep('tools')}>{t('onboarding.start')}</Button>
+              {/* autoFocus: Enter should move forward, not skip (the dialog
+                  would otherwise focus Skip, the first button). */}
+              <Button autoFocus onClick={() => setStep('tools')}>{t('onboarding.start')}</Button>
             </DialogFooter>
           </>
         )}
@@ -128,7 +142,7 @@ export function OnboardingFlow() {
                     )}
                   >
                     <Icon className={cn('h-4 w-4 shrink-0', active ? 'text-acc' : 'text-fg-mute')} />
-                    <span className="min-w-0 flex-1 truncate font-medium">{group.label}</span>
+                    <span className="min-w-0 flex-1 truncate font-medium">{t(group.labelKey)}</span>
                     {active && <Check className="h-3.5 w-3.5 shrink-0 text-acc" />}
                   </button>
                 );
@@ -136,7 +150,7 @@ export function OnboardingFlow() {
             </div>
             <DialogFooter className="sm:justify-between">
               <Button variant="ghost" onClick={close}>{t('onboarding.skip')}</Button>
-              <Button onClick={applySelection}>{t('onboarding.continue')}</Button>
+              <Button autoFocus onClick={applySelection}>{t('onboarding.continue')}</Button>
             </DialogFooter>
           </>
         )}
@@ -153,7 +167,7 @@ export function OnboardingFlow() {
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>
-              <Button onClick={close} className="w-full">{t('onboarding.done.cta')}</Button>
+              <Button autoFocus onClick={close} className="w-full">{t('onboarding.done.cta')}</Button>
             </DialogFooter>
           </>
         )}

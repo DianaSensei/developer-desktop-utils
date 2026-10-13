@@ -60,6 +60,21 @@ describe('useQuickPaste', () => {
     expect(onPaste).not.toHaveBeenCalled();
   });
 
+  it('⌘V khi focus ở ô output chỉ-đọc vẫn dán nhanh vào input của tool', async () => {
+    readText.mockResolvedValue('pasted content');
+    const onPaste = vi.fn();
+    renderHook(() => useQuickPaste(onPaste));
+    const output = document.createElement('textarea');
+    output.readOnly = true;
+    document.body.appendChild(output);
+    output.focus();
+    const evt = keydownV(output);
+    await act(async () => { await Promise.resolve(); });
+    expect(evt.defaultPrevented).toBe(true);
+    expect(onPaste).toHaveBeenCalledWith('pasted content');
+    output.remove();
+  });
+
   it('⌘V bên TRONG input/textarea bị bỏ qua — không chặn dán bình thường vào ô', async () => {
     const onPaste = vi.fn();
     renderHook(() => useQuickPaste(onPaste));

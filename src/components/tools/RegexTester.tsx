@@ -277,6 +277,9 @@ export function RegexTester() {
     return segs;
   }, [result.matches, deferredTest]);
 
+  // Pattern syntax errors are shown under the pattern; "too slow" is about
+  // the test text, so it stays in the results pane.
+  const patternError = result.error && result.error !== TOO_SLOW ? result.error : '';
   const hasResult = result.error || result.matches.length > 0 || (!result.error && pattern && deferredTest);
 
   return (
@@ -289,7 +292,9 @@ export function RegexTester() {
             value={pattern}
             onChange={(e) => setPattern(e.target.value)}
             placeholder="[a-z]+"
-            className={cn('flex-1 h-ctl font-mono text-sm rounded-sm', result.error && 'border-bad')}
+            className={cn('flex-1 h-ctl font-mono text-sm rounded-sm', patternError && 'border-bad')}
+            aria-invalid={!!patternError}
+            aria-describedby={patternError ? 'regex-pattern-error' : undefined}
           />
           <span className="font-mono text-sm text-fg-mute select-none">/</span>
           <div className="inline-flex h-ctl rounded-sm border border-line bg-bg-2/50 p-0.5 gap-px">
@@ -304,7 +309,7 @@ export function RegexTester() {
                 className={cn(
                   'w-6 rounded-md font-mono text-xs font-medium transition-all duration-150',
                   flags.includes(flag)
-                    ? 'bg-acc/10 text-acc'
+                    ? 'bg-acc/10 text-acc-ink'
                     : 'text-fg-mute hover:text-fg'
                 )}
               >
@@ -313,6 +318,12 @@ export function RegexTester() {
             ))}
           </div>
         </div>
+
+        {/* A syntax error belongs next to the pattern, not at the bottom of
+            the results pane. */}
+        {patternError && (
+          <p id="regex-pattern-error" role="alert" className="pl-4 font-mono text-xs text-bad">{patternError}</p>
+        )}
 
         {/* Preset chips — clicking loads both pattern and sample text */}
         <div className="flex flex-wrap gap-1.5">
@@ -326,7 +337,7 @@ export function RegexTester() {
               className={cn(
                 'h-6 text-xs rounded-lg transition-all',
                 activePreset?.label === p.label &&
-                  'border-acc/30 bg-acc/10 text-acc hover:bg-acc/15 hover:text-acc'
+                  'border-acc/30 bg-acc/10 text-acc-ink hover:bg-acc/15 hover:text-acc-ink'
               )}
             >
               {p.label}
@@ -408,9 +419,9 @@ export function RegexTester() {
 
           {/* Tab body */}
           <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-2">
-            {result.error && (
+            {result.error === TOO_SLOW && (
               <div className="px-3 py-2.5 bg-bad/8 border border-bad/20 rounded-lg">
-                <p className="font-mono text-sm text-bad">{result.error === TOO_SLOW ? m('tooSlow') : result.error}</p>
+                <p className="font-mono text-sm text-bad">{m('tooSlow')}</p>
               </div>
             )}
 

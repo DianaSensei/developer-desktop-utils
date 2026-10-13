@@ -120,6 +120,12 @@ const MIGRATIONS: ReadonlyArray<{ from: string; pluginId: string; key: string }>
   { from: 'devtool:jwt:token', pluginId: 'jwt', key: 'token' },
   // The API Client vault exists to hold values kept out of environments.
   { from: 'devtool:apiclient:vault', pluginId: 'api-client', key: 'vault' },
+  // HMAC and AES keys typed into Encode·Hash·Encrypt. The pre-namespace key
+  // comes first so the newer namespaced value wins when both exist.
+  { from: 'devtool:hash:hmacKey', pluginId: 'base64', key: 'hmac-key' },
+  { from: 'devtool:base64:hash:hmacKey', pluginId: 'base64', key: 'hmac-key' },
+  { from: 'devtool:hash:key', pluginId: 'base64', key: 'aes-key' },
+  { from: 'devtool:base64:hash:key', pluginId: 'base64', key: 'aes-key' },
 ];
 
 /**

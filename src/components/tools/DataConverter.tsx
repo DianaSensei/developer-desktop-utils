@@ -237,6 +237,7 @@ export function DataConverter() {
               value={input}
               onChange={setInput}
               placeholder={PLACEHOLDERS[from]}
+              ariaLabel={m('source', { format: FORMATS.find((f) => f.value === from)?.label ?? '' })}
             />
           </div>
         </div>

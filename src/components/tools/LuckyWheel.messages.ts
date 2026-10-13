@@ -20,5 +20,8 @@ export default defineMessages({
   winnersToDraw: { vi: 'Số người thắng cần bốc', en: 'Number of winners to draw' },
   autoLeft: { vi: 'Tự động — còn {{n}}', en: 'Auto {{n}} left' },
   autoSpin: { vi: 'Quay tự động', en: 'Auto-spin' },
+  sliceCount: { vi: '{{n}} ô', en: '{{n}} slices' },
+  uniqueCount: { vi: '{{n}} giá trị khác nhau', en: '{{n}} unique' },
+  autoLimit: { vi: 'Quay tự động bốc tối đa {{n}} người thắng khác nhau.', en: 'Auto-spin draws up to {{n}} distinct winners.' },
   needTwo: { vi: 'Thêm ít nhất hai lựa chọn để quay.', en: 'Add at least two choices to spin.' },
 });

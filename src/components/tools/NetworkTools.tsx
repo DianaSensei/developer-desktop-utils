@@ -14,6 +14,8 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { Callout } from '@/components/ui/callout';
+import { classifyNetworkError } from '@/lib/networkError';
+import COMMON from '@/components/tools/common.messages';
 import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/ui/empty-state';
 import { SearchInput } from '@/components/ui/search-input';
@@ -137,8 +139,12 @@ function MetaBar({ summary, onClear }: { summary: React.ReactNode; onClear: () =
   );
 }
 
+// A recognised transport failure gets a plain-language title; the raw
+// message stays underneath for searching or reporting.
 function ErrorBox({ message }: { message: string }) {
-  return <Callout tone="error" size="sm">{message}</Callout>;
+  const c = useMessages(COMMON);
+  const kind = classifyNetworkError(message);
+  return <Callout tone="error" size="sm" title={kind ? c(`netHint_${kind}`) : undefined}>{message}</Callout>;
 }
 
 // Small result labels (DNS record type, address family, port protocol)
@@ -1089,7 +1095,7 @@ function PortsView() {
     );
   };
 
-  const favBtnActive = favOnly && 'border-acc/40 bg-acc/10 text-acc';
+  const favBtnActive = favOnly && 'border-acc/40 bg-acc/10 text-acc-ink';
 
   return (
     <ViewShell
@@ -1377,7 +1383,7 @@ export function NetworkTools() {
                 className={cn(
                   'flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors',
                   active
-                    ? 'bg-acc/10 text-acc'
+                    ? 'bg-acc/10 text-acc-ink'
                     : 'text-fg-mute hover:text-fg hover:bg-fg/[0.06]',
                 )}
               >

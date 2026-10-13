@@ -18,6 +18,9 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { IconButton } from '@/components/ui/icon-button';
 import { Callout } from '@/components/ui/callout';
+import { classifyNetworkError } from '@/lib/networkError';
+import { useMessages } from '@/contexts/LocaleContext';
+import COMMON from '@/components/tools/common.messages';
 import { Keycap } from '@/components/ui/keycap';
 import { isMac } from '@/hooks/useQuickPaste';
 import { Tabs, type TabDef } from '@/components/ui/tabs';
@@ -226,6 +229,10 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
   // advice the user already acted on.
   const certHint = !!error && request?.settings.verifyTls !== false && looksLikeCertError(error);
   const redirectHint = !!error && request?.settings.followRedirects !== false && looksLikeRedirectLoop(error);
+  // Other transport failures (DNS, refused, timeout, unreachable) get a
+  // plain-language line above the raw message.
+  const netKind = error && !certHint && !redirectHint && !looksLikeCertError(error) ? classifyNetworkError(error) : null;
+  const common = useMessages(COMMON);
 
   const copy = useCallback(async () => {
     const text = tab === 'headers'
@@ -421,6 +428,12 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
             {tr('res.corsA')} <code className="rounded bg-bg-2 px-1">Origin</code> {tr('res.corsB')}{' '}
             <code className="rounded bg-bg-2 px-1">Origin</code> {tr('res.corsC')}
           </Callout>
+        </div>
+      )}
+
+      {netKind && (
+        <div className="shrink-0 border-b border-warn/20 px-3 py-2 motion-safe:animate-fade-in-up">
+          <Callout tone="warning" size="sm">{common(`netHint_${netKind}`)}</Callout>
         </div>
       )}
 

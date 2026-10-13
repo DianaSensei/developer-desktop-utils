@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useDesktopChrome } from '@/hooks/useDesktopChrome';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useThemeSync, triggerThemeTransition } from '@/hooks/useThemeSync';
 import { TOOL_DEF_MAP, DEFAULT_TOOL_ORDER } from '@/lib/toolDefs';
 import { allTools, toolPath } from '@/lib/toolRegistry';
@@ -31,8 +32,8 @@ import { toolMatchesQuery } from '@/lib/toolSearch';
 import { useLiveConnections } from '@/lib/liveConnections';
 import { initDeepLinkHandling } from '@/lib/deepLink';
 import { CommandPalette } from '@/components/CommandPalette';
-import { WorkspaceBar } from '@/components/WorkspaceBar';
-import { ToolIdentity } from '@/components/ToolIdentity';
+import { WorkspaceBar, useWorkspaceBarVisible } from '@/components/WorkspaceBar';
+import { ToolIdentity, GroupTabs, useActiveGroupTabs } from '@/components/ToolIdentity';
 import { WorkspaceProvider } from '@/contexts/WorkspaceContext';
 import { McpBackgroundBridge } from '@/components/McpBackgroundBridge';
 import { McpManageBridge } from '@/components/McpManageBridge';
@@ -82,11 +83,16 @@ const winToggleMaximize = () => { tauriWindow().then((w) => w.toggleMaximize());
 const winClose = () => { tauriWindow().then((w) => w.close()); };
 const winStartResize = (dir: TauriResizeDirection) => { tauriWindow().then((w) => w.startResizeDragging(dir)); };
 
-/** `decorations: false` also removes the OS resize borders, so eight thin
- *  edge and corner zones call `startResizeDragging` in the right direction. */
+/** `decorations: false` also removes the OS resize borders, so thin edge and
+ *  corner zones call `startResizeDragging` in the right direction. They
+ *  sit inside the window, so they stay clear of the caption buttons (the
+ *  top-right corner belongs to Close, as on Windows) and are not rendered
+ *  while the window is maximized. */
 function ResizeHandles() {
   const T = 6; // độ dày vùng cạnh, px
   const C = 12; // độ dài cạnh vùng góc, px
+  const TITLEBAR = 38; // chiều cao titlebar
+  const CAPTION = 128; // 3 nút cửa sổ (3 × 40px) + vạch ngăn
   const edge = (dir: TauriResizeDirection, style: React.CSSProperties) => (
     <div
       key={dir}
@@ -97,16 +103,25 @@ function ResizeHandles() {
   );
   return (
     <>
-      {edge('North', { top: 0, left: C, right: C, height: T, cursor: 'ns-resize' })}
+      {edge('North', { top: 0, left: C, right: CAPTION, height: T, cursor: 'ns-resize' })}
       {edge('South', { bottom: 0, left: C, right: C, height: T, cursor: 'ns-resize' })}
       {edge('West', { top: C, bottom: C, left: 0, width: T, cursor: 'ew-resize' })}
-      {edge('East', { top: C, bottom: C, right: 0, width: T, cursor: 'ew-resize' })}
+      {edge('East', { top: TITLEBAR, bottom: C, right: 0, width: T, cursor: 'ew-resize' })}
       {edge('NorthWest', { top: 0, left: 0, width: C, height: C, cursor: 'nwse-resize' })}
-      {edge('NorthEast', { top: 0, right: 0, width: C, height: C, cursor: 'nesw-resize' })}
       {edge('SouthWest', { bottom: 0, left: 0, width: C, height: C, cursor: 'nesw-resize' })}
       {edge('SouthEast', { bottom: 0, right: 0, width: C, height: C, cursor: 'nwse-resize' })}
     </>
   );
+}
+
+/** Focuses the first editable field of the open tool, else the tool area. */
+function focusToolContent() {
+  const main = document.getElementById('tool-content');
+  if (!main) return;
+  const field = main.querySelector<HTMLElement>(
+    'textarea:not([readonly]), input:not([type="hidden"]):not([readonly]), [contenteditable="true"]',
+  );
+  (field ?? main).focus();
 }
 
 function applySavedOrder<T extends { featureId: string }>(tools: T[], savedOrder: string[]): T[] {
@@ -202,7 +217,7 @@ function NavScrollArea({
 
   return (
     <div className="relative flex-1 min-h-0">
-      <nav ref={navRef} className="h-full overflow-y-auto px-1.5 py-2">
+      <nav ref={navRef} aria-label={t('shell.sidebar.navLabel')} className="h-full overflow-y-auto px-1.5 py-2">
         {navEntries.length === 0 && disabledMatches.length === 0 && query && (
           <p className="px-2 py-4 text-center text-[11px] text-fg-mute">{t('shell.search.noMatch', { query })}</p>
         )}
@@ -289,6 +304,9 @@ function NavScrollArea({
                     {!isCollapsed && (
                       <button
                         type="button"
+                        // Out of the Tab order: it doubled every sidebar stop.
+                        // Keyboard users star tools in Settings → Tools.
+                        tabIndex={-1}
                         aria-label={fav ? t('common.unfavoriteAria', { label: entry.label }) : t('common.favoriteAria', { label: entry.label })}
                         title={fav ? t('common.unfavorite') : t('common.favorite')}
                         onClick={(e) => {
@@ -304,7 +322,7 @@ function NavScrollArea({
                           'ml-auto shrink-0 rounded-xs p-0.5 transition-colors duration-fast ease-out-soft',
                           fav
                             ? 'text-warn opacity-100'
-                            : 'text-fg-mute/50 opacity-0 hover:text-warn group-hover:opacity-100 focus-visible:opacity-100'
+                            : 'text-fg-mute/50 opacity-0 hover:text-warn group-hover:opacity-100 group-focus-visible:opacity-100'
                         )}
                       >
                         <Star className={cn('h-3.5 w-3.5', fav && 'fill-current')} />
@@ -386,6 +404,21 @@ function NavScrollArea({
           </span>
         </div>
       )}
+    </div>
+  );
+}
+
+// With the workspace bar showing tabs, the titlebar no longer has room for
+// the group's sibling tabs (ToolIdentity is only the bar's fallback), so
+// they move to a strip above the tool. Without it, Text Counter or Data
+// Converter would have no visible way in once two tools are open.
+function GroupTabsStrip() {
+  const barVisible = useWorkspaceBarVisible();
+  const { tabs } = useActiveGroupTabs();
+  if (!barVisible || tabs.length === 0) return null;
+  return (
+    <div className="flex shrink-0 items-center border-b border-line bg-chrome px-3 py-1.5">
+      <GroupTabs size="titlebar" />
     </div>
   );
 }
@@ -486,7 +519,7 @@ function Sidebar({
           Always rendered so the fade plays on close too, not just open. */}
       <div
         className={cn(
-          'fixed inset-0 bg-black/30 backdrop-blur-[1px] z-40 lg:hidden transition-opacity duration-slow ease-out-soft',
+          'fixed inset-0 bg-black/30 backdrop-blur-[1px] z-40 md:hidden transition-opacity duration-slow ease-out-soft',
           isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
         )}
         onClick={onClose}
@@ -494,9 +527,9 @@ function Sidebar({
       />
       <aside
         className={cn(
-          'fixed lg:sticky top-0 left-0 z-50 h-full sidebar-chrome transition-[width,transform] duration-slow ease-out-soft flex flex-col',
+          'fixed md:sticky top-0 left-0 z-50 h-full sidebar-chrome transition-[width,transform] duration-slow ease-out-soft flex flex-col',
           isCollapsed ? 'w-14' : 'w-56',
-          isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+          isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
         )}
       >
         {/* Header, only when there is no custom titlebar. Otherwise the
@@ -518,7 +551,7 @@ function Sidebar({
                 DevTool
               </h1>
             </div>
-            <Button variant="ghost" size="icon" className="h-ctl w-ctl shrink-0 lg:hidden" onClick={onClose} title={t('shell.sidebar.closeMenu')}>
+            <Button variant="ghost" size="icon" className="h-ctl w-ctl shrink-0 md:hidden" onClick={onClose} title={t('shell.sidebar.closeMenu')}>
               <X className="h-4 w-4" />
             </Button>
           </div>
@@ -584,7 +617,7 @@ function Sidebar({
               onClick={onToggleCollapse}
               title={isCollapsed ? t('shell.sidebar.expand') : t('shell.sidebar.collapse')}
               className={cn(
-                'group relative hidden lg:flex w-full items-center rounded-sm px-2.5 py-1.5 transition-colors text-fg-mute hover:text-fg hover:bg-bg-2/60',
+                'group relative hidden md:flex w-full items-center rounded-sm px-2.5 py-1.5 transition-colors text-fg-mute hover:text-fg hover:bg-bg-2/60',
                 isCollapsed ? 'justify-center' : 'gap-2.5'
               )}
             >
@@ -634,7 +667,7 @@ function Sidebar({
                 'group relative flex items-center rounded-md px-2.5 py-1.5 transition-[color,background-color,box-shadow] duration-base ease-out-soft',
                 isCollapsed ? 'justify-center' : 'gap-2.5',
                 isSettingsActive
-                  ? 'bg-acc/10 text-acc font-medium'
+                  ? 'bg-acc-tint text-acc-ink font-medium'
                   : 'text-fg-mute hover:text-fg hover:bg-fg/[0.05]'
               )}
             >
@@ -712,8 +745,17 @@ function AppContent() {
     setThemePreferenceState(value);
   };
 
+  // Below 1024px the sidebar starts collapsed (56px) so the tool keeps its
+  // width, without touching the saved preference: widening the window brings
+  // the user's own choice back. Toggling while narrow only lasts until then.
+  const narrow = useMediaQuery('(max-width: 1023.98px)');
+  const [expandedWhileNarrow, setExpandedWhileNarrow] = useState(false);
+  useEffect(() => { if (!narrow) setExpandedWhileNarrow(false); }, [narrow]);
+  const sidebarCollapsed = narrow ? !expandedWhileNarrow : isCollapsed;
+
   const toggleCollapse = () => {
-    setIsCollapsed(!isCollapsed);
+    if (narrow) setExpandedWhileNarrow((v) => !v);
+    else setIsCollapsed(!isCollapsed);
   };
 
   const enabledTools = allTools.filter((tool) => isFeatureEnabled(tool.featureId));
@@ -757,7 +799,7 @@ function AppContent() {
   };
 
   const routes = (
-    <ErrorBoundary resetKey={location.pathname}>
+    <ErrorBoundary resetKey={location.pathname} toolId={activeTool.featureId} toolLabel={activeTool.label}>
       <Suspense fallback={<ToolLoading />}>
         <Routes>
           {enabledTools.map((tool) => (
@@ -790,7 +832,7 @@ function AppContent() {
         <h1 className="whitespace-nowrap text-xs font-semibold leading-none">DevTool</h1>
       </div>
       <span className="h-4 w-px shrink-0 bg-line" />
-      <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 lg:hidden" onClick={() => setSidebarOpen(true)} title={t('shell.titlebar.openMenu')}>
+      <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 md:hidden" onClick={() => setSidebarOpen(true)} title={t('shell.titlebar.openMenu')} aria-label={t('shell.titlebar.openMenu')}>
         <Menu className="h-3.5 w-3.5" />
       </Button>
       {/* The workspace bar replaces the tool identity when there is
@@ -817,7 +859,17 @@ function AppContent() {
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-bg text-fg">
-      {showCustomChrome && <ResizeHandles />}
+      {/* Skip link: without it, keyboard users tab through the titlebar and
+          every sidebar row (~40 stops) before reaching the tool. Hidden until
+          focused; moves focus to the first field of the tool. */}
+      <button
+        type="button"
+        onClick={focusToolContent}
+        className="sr-only focus-visible:not-sr-only focus-visible:fixed focus-visible:left-3 focus-visible:top-3 focus-visible:z-[300] focus-visible:rounded-md focus-visible:bg-card focus-visible:px-3 focus-visible:py-2 focus-visible:text-sm focus-visible:font-medium focus-visible:shadow-lg focus-visible:ring-[3px] focus-visible:ring-focus"
+      >
+        {t('shell.skipToContent')}
+      </button>
+      {showCustomChrome && !isMaximized && <ResizeHandles />}
       {/* macOS overlay titlebar, spanning the whole window and independent
           of the sidebar's width. `data-tauri-drag-region="deep"` makes it
           draggable while buttons stay clickable. The traffic lights are
@@ -835,9 +887,6 @@ function AppContent() {
             {/* Slot for tool-specific header actions (filled via ToolHeaderActions portal) */}
             <div id="tool-header-actions" className="flex items-center gap-0.5" />
             {titlebarHelpAction}
-            <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 lg:hidden" onClick={() => setSidebarOpen(false)} title={t('shell.sidebar.closeMenu')}>
-              <X className="h-3.5 w-3.5" />
-            </Button>
           </div>
         </div>
       )}
@@ -863,7 +912,7 @@ function AppContent() {
               size="icon"
               className="h-full w-10 shrink-0 cursor-default rounded-none text-fg/90 hover:bg-fg/10 hover:text-fg active:scale-100 active:bg-fg/15 focus-visible:ring-0 focus-visible:ring-offset-0"
               onClick={winMinimize}
-              title={t('shell.titlebar.minimize')}
+              title={t('shell.titlebar.minimize')} aria-label={t('shell.titlebar.minimize')}
             >
               <Minus className="h-3 w-3" strokeWidth={1.5} />
             </Button>
@@ -872,7 +921,7 @@ function AppContent() {
               size="icon"
               className="h-full w-10 shrink-0 cursor-default rounded-none text-fg/90 hover:bg-fg/10 hover:text-fg active:scale-100 active:bg-fg/15 focus-visible:ring-0 focus-visible:ring-offset-0"
               onClick={winToggleMaximize}
-              title={isMaximized ? t('shell.titlebar.restore') : t('shell.titlebar.maximize')}
+              title={isMaximized ? t('shell.titlebar.restore') : t('shell.titlebar.maximize')} aria-label={isMaximized ? t('shell.titlebar.restore') : t('shell.titlebar.maximize')}
             >
               {isMaximized ? (
                 <Copy className="h-3 w-3 -scale-x-100" strokeWidth={1.5} />
@@ -885,7 +934,7 @@ function AppContent() {
               size="icon"
               className="h-full w-10 shrink-0 cursor-default rounded-none text-fg/90 hover:bg-[#e81123] hover:text-white active:scale-100 active:bg-[#c42b1c] active:text-white dark:hover:bg-[#c42b1c] dark:active:bg-[#8c2318] focus-visible:ring-0 focus-visible:ring-offset-0"
               onClick={winClose}
-              title={t('shell.titlebar.close')}
+              title={t('shell.titlebar.close')} aria-label={t('shell.titlebar.close')}
             >
               <X className="h-3.5 w-3.5" strokeWidth={1.5} />
             </Button>
@@ -898,10 +947,10 @@ function AppContent() {
         onClose={() => setSidebarOpen(false)}
         themePreference={themePreference}
         onThemeChange={changeTheme}
-        isCollapsed={isCollapsed}
+        isCollapsed={sidebarCollapsed}
         onToggleCollapse={toggleCollapse}
       />
-      <main className="flex-1 flex flex-col min-h-0 overflow-hidden">
+      <main id="tool-content" tabIndex={-1} className="flex-1 flex flex-col min-h-0 overflow-hidden outline-hidden">
         {/* With a custom titlebar the tool header lives there; not
             rendering it here keeps #tool-header-actions unique. */}
         {!showMergedTitlebar && (
@@ -909,7 +958,7 @@ function AppContent() {
           {/* py-2 gives a 50px row that lines up with the sidebar header. */}
           <div className="flex items-center justify-between px-4 py-2 sm:px-5">
             <div className="flex items-center gap-2.5">
-              <Button variant="ghost" size="icon" className="lg:hidden h-ctl w-ctl" onClick={() => setSidebarOpen(true)} title={t('shell.titlebar.openMenu')} aria-label={t('shell.titlebar.openMenu')}>
+              <Button variant="ghost" size="icon" className="md:hidden h-ctl w-ctl" onClick={() => setSidebarOpen(true)} title={t('shell.titlebar.openMenu')} aria-label={t('shell.titlebar.openMenu')}>
                 <Menu className="h-4 w-4" />
               </Button>
               {/* No live dot here: the active tab already shows one. The
@@ -936,22 +985,25 @@ function AppContent() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="lg:hidden h-ctl w-ctl"
+                className="md:hidden h-ctl w-ctl"
                 onClick={() => changeTheme(NEXT_THEME[themePreference])}
                 title={t('shell.titlebar.themeCycleTap', { theme: t(THEME_OPTIONS.find((o) => o.value === themePreference)!.labelKey) })}
               >
+                {/* The current preference, as in the sidebar row (it used to
+                    show the opposite theme here). */}
                 {themePreference === 'system' ? (
                   <Monitor className="h-4 w-4" />
                 ) : isDark ? (
-                  <Sun className="h-4 w-4" />
-                ) : (
                   <Moon className="h-4 w-4" />
+                ) : (
+                  <Sun className="h-4 w-4" />
                 )}
               </Button>
             </div>
           </div>
         </div>
         )}
+        <GroupTabsStrip />
         {isFullHeight ? (
           <div className="flex-1 min-h-0 overflow-hidden">
             {/* key on pathname re-triggers the entrance animation on each tool switch */}

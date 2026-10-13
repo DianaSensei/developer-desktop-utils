@@ -2,6 +2,10 @@ import { defineMessages } from '@/lib/i18n';
 
 export default defineMessages({
   validJson: { vi: 'JSON hợp lệ', en: 'Valid JSON' },
+  lenientJson: {
+    vi: 'Không phải JSON chuẩn — đã đọc nới lỏng (dấu phẩy thừa, key không ngoặc kép, comment hoặc nháy đơn). Output dùng nháy kép là JSON chuẩn.',
+    en: 'Not strict JSON — read leniently (trailing commas, unquoted keys, comments or single quotes). The output with double quotes is valid JSON.',
+  },
   invalidJson: { vi: 'JSON không hợp lệ', en: 'Invalid JSON' },
   searchPlaceholder: { vi: 'Tìm theo key, giá trị hoặc path…', en: 'Find by key, value, or path…' },
   prevMatch: { vi: 'Kết quả trước (⇧↵)', en: 'Previous match (⇧↵)' },

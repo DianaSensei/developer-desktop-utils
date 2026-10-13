@@ -17,9 +17,8 @@
 // each algorithm, not a second copy for MCP.
 //
 // A caller supplies its own key/passphrase per call — nothing here ever
-// reads the tool's own persisted `devtool:hash:key`/`devtool:hash:hmacKey`
-// fields, so (unlike the Vault-style exclusions elsewhere in this repo)
-// there is no separate "secret store" this bridge could leak.
+// reads the keys the tool keeps in its vault (`aes-key`/`hmac-key`), so
+// there is no stored secret this bridge could leak.
 
 import {
   ALGORITHMS, CODECS, ENCRYPT_ALGOS, HMAC_ALGORITHMS,

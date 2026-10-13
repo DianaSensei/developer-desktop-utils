@@ -6,8 +6,8 @@
 // color (`--card`); the accent is reserved for mode selection (group tabs,
 // Segmented).
 
-import { useEffect, useRef, useState, type ReactNode, type KeyboardEvent as ReactKeyboardEvent } from 'react';
-import { Check, ChevronDown, Layers, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { Check, ChevronDown, ChevronsUpDown, Layers, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { MOD_KEY, IS_MAC } from '@/lib/platform';
 import { useLocale } from '@/contexts/LocaleContext';
@@ -30,6 +30,21 @@ export interface WorkspaceBarProps {
   fallback?: ReactNode;
 }
 
+/** True when the bar shows tabs (rather than its `fallback`). */
+export function useWorkspaceBarVisible() {
+  const { workspaces, tabs } = useWorkspaces();
+  return tabs.length >= 2 || workspaces.length >= 2;
+}
+
+/**
+ * The ⌘/Ctrl digit that opens tab `index` (WorkspaceContext): 1–8 for the
+ * first eight tabs, 9 for the last tab past those, none for the rest.
+ */
+export function tabShortcutDigit(index: number, count: number): number | null {
+  if (index < 8) return index + 1;
+  return index === count - 1 ? 9 : null;
+}
+
 const shortcut = (keys: string) => (IS_MAC ? `${MOD_KEY}${keys}` : `${MOD_KEY}+${keys}`);
 
 export function WorkspaceBar({ size = 'header', fallback = null }: WorkspaceBarProps) {
@@ -39,17 +54,44 @@ export function WorkspaceBar({ size = 'header', fallback = null }: WorkspaceBarP
   const { t } = useLocale();
   const liveIds = useLiveConnections();
   const menu = useContextMenu();
+  const visible = useWorkspaceBarVisible();
   const listRef = useRef<HTMLDivElement>(null);
   const [dragId, setDragId] = useState<string | null>(null);
 
-  // Keep the active tab in view when the tabs overflow.
+  // Keep the active tab in view when the tabs overflow. Scrolls only the
+  // tab list: `scrollIntoView` would also scroll every overflow:hidden
+  // ancestor (the web header pushed <main> sideways by ~800px).
   useEffect(() => {
-    listRef.current
-      ?.querySelector<HTMLElement>('[aria-selected="true"]')
-      ?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+    const list = listRef.current;
+    const tab = list?.querySelector<HTMLElement>('[aria-selected="true"]');
+    if (!list || !tab) return;
+    const left = tab.offsetLeft - list.offsetLeft;
+    if (left < list.scrollLeft) list.scrollLeft = left;
+    else if (left + tab.offsetWidth > list.scrollLeft + list.clientWidth) {
+      list.scrollLeft = left + tab.offsetWidth - list.clientWidth;
+    }
   }, [activeToolId, tabs.length]);
 
-  if (tabs.length < 2 && workspaces.length < 2) return <>{fallback}</>;
+  // Which edges have hidden tabs, for the fades and the "all tabs" menu.
+  const [overflow, setOverflow] = useState({ left: false, right: false });
+  const measure = useCallback(() => {
+    const el = listRef.current;
+    if (!el) return;
+    const left = el.scrollLeft > 1;
+    const right = el.scrollLeft + el.clientWidth < el.scrollWidth - 1;
+    setOverflow((o) => (o.left === left && o.right === right ? o : { left, right }));
+  }, []);
+  useLayoutEffect(() => {
+    const el = listRef.current;
+    if (!el) return;
+    measure();
+    el.addEventListener('scroll', measure, { passive: true });
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null;
+    ro?.observe(el);
+    return () => { el.removeEventListener('scroll', measure); ro?.disconnect(); };
+  }, [measure, tabs.length, visible]);
+
+  if (!visible) return <>{fallback}</>;
 
   const compact = size === 'titlebar';
   const h = compact ? 'h-6' : 'h-ctl';
@@ -75,11 +117,17 @@ export function WorkspaceBar({ size = 'header', fallback = null }: WorkspaceBarP
     <div className="flex min-w-0 items-center gap-1" data-tauri-drag-region="false">
       <WorkspaceSwitcher compact={compact} />
       <span className="mx-0.5 h-4 w-px shrink-0 bg-line" aria-hidden />
+      <div className="relative flex min-w-0 items-center">
       <div
         ref={listRef}
         role="tablist"
         aria-label={t('shell.workspace.tabsLabel', { name: workspaceLabel(active, workspaces.indexOf(active), (n) => t('shell.workspace.defaultName', { n })) })}
         className="no-scrollbar flex min-w-0 items-center gap-1 overflow-x-auto"
+        // A plain mouse wheel only scrolls vertically; turn it sideways so
+        // hidden tabs are reachable without a trackpad.
+        onWheel={(e) => {
+          if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) e.currentTarget.scrollLeft += e.deltaY;
+        }}
       >
         {tabs.map((tool, i) => {
           const Icon = tool.icon;
@@ -161,6 +209,52 @@ export function WorkspaceBar({ size = 'header', fallback = null }: WorkspaceBarP
           );
         })}
       </div>
+      {/* Fades mark the edge where tabs are hidden. */}
+      {overflow.left && (
+        <span aria-hidden className="pointer-events-none absolute inset-y-0 left-0 w-6 bg-gradient-to-r from-chrome to-transparent" />
+      )}
+      {overflow.right && (
+        <span aria-hidden className="pointer-events-none absolute inset-y-0 right-0 w-6 bg-gradient-to-l from-chrome to-transparent" />
+      )}
+      </div>
+      {(overflow.left || overflow.right) && (
+        <DropdownMenu className="shrink-0">
+          <DropdownMenuTrigger
+            title={t('shell.workspace.allTabs', { n: tabs.length })}
+            aria-label={t('shell.workspace.allTabs', { n: tabs.length })}
+            className={cn(
+              'grid place-items-center rounded-sm text-fg-mute transition-colors hover:bg-card/60 hover:text-fg',
+              'focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus',
+              compact ? 'h-6 w-6' : 'h-ctl w-ctl',
+            )}
+          >
+            <ChevronsUpDown className="h-3.5 w-3.5" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-64">
+            <DropdownMenuLabel>{t('shell.workspace.allTabs', { n: tabs.length })}</DropdownMenuLabel>
+            {tabs.map((tool, i) => {
+              const Icon = tool.icon;
+              return (
+                <DropdownMenuItem
+                  key={tool.featureId}
+                  active={tool.featureId === activeToolId}
+                  onClick={() => openTool(tool.featureId)}
+                  icon={<Icon className="h-3.5 w-3.5 shrink-0" />}
+                >
+                  <span className="flex items-center gap-2">
+                    <span className="min-w-0 flex-1 truncate">{tool.label}</span>
+                    {tabShortcutDigit(i, tabs.length) && (
+                      <span className="shrink-0 font-mono text-[11px] text-fg-mute">
+                        {shortcut(String(tabShortcutDigit(i, tabs.length)))}
+                      </span>
+                    )}
+                  </span>
+                </DropdownMenuItem>
+              );
+            })}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
       <button
         type="button"
         onClick={requestCommandPalette}

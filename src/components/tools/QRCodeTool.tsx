@@ -391,7 +391,7 @@ function QrGenerator() {
   const chip = (active: boolean) =>
     cn('rounded-lg border text-xs font-medium transition-colors cursor-pointer select-none',
       active
-        ? 'border-acc/30 bg-acc/10 text-acc'
+        ? 'border-acc/30 bg-acc/10 text-acc-ink'
         : 'border-line bg-bg hover:border-acc/60 hover:bg-bg-2/50');
 
   return (

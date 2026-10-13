@@ -16,20 +16,22 @@
 @layer base {
   /* ── Editor syntax colors ───────────────────────────────────────────────
      A separate system that ignores the accent: token colors carry syntax
-     meaning, so changing the tone must not recolor keywords. */
+     meaning, so changing the tone must not recolor keywords. Light values
+     are ≥4.5:1 on the editor background (#f0f2f5, the darkest surface they
+     sit on); several used to be 2.9–4.1:1. */
   :root {
     --sql-keyword: hsl(216 90% 46%);
-    --sql-string: hsl(130 50% 35%);
-    --sql-comment: hsl(0 0% 50%);
-    --sql-number: hsl(25 90% 42%);
-    --sql-operator: hsl(0 0% 45%);
-    --sql-function: hsl(185 75% 33%);
+    --sql-string: hsl(130 50% 31%);
+    --sql-comment: hsl(0 0% 42%);
+    --sql-number: hsl(25 90% 35%);
+    --sql-operator: hsl(0 0% 42%);
+    --sql-function: hsl(185 75% 28%);
     --sql-type: hsl(270 55% 45%);
-    --js-property: hsl(32 90% 44%);
+    --js-property: hsl(32 90% 33%);
     --js-method: hsl(270 60% 52%);
     /* JSON tree view (JsonFormatter): strings, numbers and booleans reuse the
        SQL hues; only keys and null get their own. */
-    --json-key: hsl(202 88% 38%);
+    --json-key: hsl(202 88% 35%);
     --json-null: hsl(350 68% 46%);
 
     /* ── HTTP method colors ─────────────────────────────────────────────
@@ -37,9 +39,9 @@
        POST, red DELETE. The only allowed overlap with --ok/--bad hues,
        because methods and status codes never sit side by side. Channel
        form so badges can use alpha. */
-    --method-get-c:    152 55% 34%;
-    --method-post-c:    32 85% 40%;
-    --method-put-c:    214 80% 46%;
+    --method-get-c:    152 55% 26%;
+    --method-post-c:    32 85% 32%;
+    --method-put-c:    214 80% 42%;
     --method-patch-c:  272 60% 50%;
     --method-delete-c:   2 65% 46%;
 

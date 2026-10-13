@@ -64,7 +64,7 @@ function MarkdownSourceEditor({ value, onChange, placeholder }: { value: string;
           markdownLang,
           // CodeMirror defaults every editor to spellcheck off (code isn't
           // prose) — this is prose, so put it back on.
-          EditorView.contentAttributes.of({ spellcheck: 'true' }),
+          EditorView.contentAttributes.of({ spellcheck: 'true', 'aria-label': 'Markdown' }),
           theme.extension,
           EditorView.lineWrapping,
           ...(placeholder ? [placeholderExt(placeholder)] : []),

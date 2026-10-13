@@ -103,6 +103,11 @@ export function wasFreshInstall(): boolean {
   return freshInstall;
 }
 
+/** Every key currently in the store (e.g. to clear one plugin's namespace). */
+export function storageKeys(): string[] {
+  return [...cache.keys()];
+}
+
 export function storageGet(key: string): string | null {
   return cache.has(key) ? cache.get(key)! : null;
 }

@@ -721,7 +721,7 @@ export function TimeTracker() {
               </div>
               <span className="whitespace-nowrap text-[11px] text-fg-mute">
                 {tr('today')} <span className="font-mono tabular-nums text-fg">{fmtTotal(todayTotal)}</span>
-                <span className="text-fg-mute/70"> / {settings.dailyTargetHours}h</span>
+                <span className="text-fg-mute"> / {settings.dailyTargetHours}h</span>
               </span>
             </div>
           )}
