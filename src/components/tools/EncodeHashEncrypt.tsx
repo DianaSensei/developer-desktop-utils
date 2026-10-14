@@ -564,7 +564,9 @@ export function EncodeHashEncrypt() {
   const [verifyValue, setVerifyValue] = useState('');
 
   // Encrypt tab
-  const [encryptInput, setEncryptInput] = usePluginState(sdk, 'hash:encryptInput', '', { legacyKey: 'devtool:hash:encryptInput' });
+  // The text being encrypted is the secret itself; it belongs in the vault
+  // with the key, not in the plain settings file.
+  const [encryptInput, setEncryptInput] = useSecretState(sdk, 'encrypt-input', '');
   const [encryptKey, setEncryptKey]     = useSecretState(sdk, 'aes-key', '');
   const [cryptoMode, setCryptoMode]     = usePluginState<CryptoMode>(sdk, 'hash:aesMode', 'encrypt', { legacyKey: 'devtool:hash:aesMode' });
   const [encryptAlgo, setEncryptAlgo]   = usePluginState<EncryptAlgo>(sdk, 'hash:encryptAlgo', 'aes-gcm', { legacyKey: 'devtool:hash:encryptAlgo' });
