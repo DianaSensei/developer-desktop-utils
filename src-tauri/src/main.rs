@@ -28,13 +28,7 @@ fn main() {
         // feature already forwards the URL to `onOpenUrl` (src/lib/deepLink.ts);
         // the closure only has to bring the window to the front, which the OS
         // does not do on its own.
-        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
-            if let Some(window) = app.get_webview_window("main") {
-                let _ = window.unminimize();
-                let _ = window.show();
-                let _ = window.set_focus();
-            }
-        }))
+        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| show_main_window(app)))
         .plugin(tauri_plugin_deep_link::init())
         .setup(|_app| {
             // AppImage has no installer to register the URI scheme, so register
@@ -47,8 +41,10 @@ fn main() {
             // mcp_bridge.rs.
             mcp_bridge::start(_app.handle());
 
-            // macOS only routes Cmd+Z/X/C/V/A to the webview when a native Edit
-            // menu exists, so add one there.
+            // macOS takes the first submenu as the app menu, so it comes first
+            // (About, Hide, Quit with Cmd+Q). Cmd+Z/X/C/V/A only reach the
+            // webview when a native Edit menu exists. The Window menu has no
+            // Close item: Cmd+W belongs to the API Client (close tab).
             //
             // Windows and Linux draw their own titlebar (`decorations: false`)
             // and shortcuts already reach the webview. Calling `set_menu` there
@@ -65,7 +61,23 @@ fn main() {
                     &PredefinedMenuItem::separator(_app)?,
                     &PredefinedMenuItem::select_all(_app, None)?,
                 ])?;
-                let menu = Menu::with_items(_app, &[&edit])?;
+                let app_menu = Submenu::with_items(_app, &_app.package_info().name, true, &[
+                    &PredefinedMenuItem::about(_app, None, None)?,
+                    &PredefinedMenuItem::separator(_app)?,
+                    &PredefinedMenuItem::services(_app, None)?,
+                    &PredefinedMenuItem::separator(_app)?,
+                    &PredefinedMenuItem::hide(_app, None)?,
+                    &PredefinedMenuItem::hide_others(_app, None)?,
+                    &PredefinedMenuItem::show_all(_app, None)?,
+                    &PredefinedMenuItem::separator(_app)?,
+                    &PredefinedMenuItem::quit(_app, None)?,
+                ])?;
+                let window_menu = Submenu::with_items(_app, "Window", true, &[
+                    &PredefinedMenuItem::minimize(_app, None)?,
+                    &PredefinedMenuItem::maximize(_app, None)?,
+                    &PredefinedMenuItem::fullscreen(_app, None)?,
+                ])?;
+                let menu = Menu::with_items(_app, &[&app_menu, &edit, &window_menu])?;
                 _app.set_menu(menu)?;
             }
             Ok(())
@@ -74,13 +86,25 @@ fn main() {
         // Record dragged paths so `read_file_data_url` and `hash_file` only read
         // files the user dropped. `Enter` is recorded as well as `Drop` because
         // Tauri notifies the webview before these listeners run. See dropped.rs.
-        .on_window_event(|window, event| {
-            if let tauri::WindowEvent::DragDrop(
+        .on_window_event(|window, event| match event {
+            tauri::WindowEvent::DragDrop(
                 tauri::DragDropEvent::Enter { paths, .. } | tauri::DragDropEvent::Drop { paths, .. },
-            ) = event
-            {
+            ) => {
                 window.state::<dropped::DroppedPaths>().remember(paths);
             }
+            // On macOS closing the window hides it and DevTool stays in the
+            // Dock, as Mac apps do: clicking the Dock icon brings the same
+            // window back, and MCP bridges in the webview keep answering.
+            // Cmd+Q quits. A full-screen window is closed instead, since a
+            // hidden one would leave an empty Space; see `RunEvent::Reopen`.
+            #[cfg(target_os = "macos")]
+            tauri::WindowEvent::CloseRequested { api, .. }
+                if window.label() == MAIN_WINDOW && !window.is_fullscreen().unwrap_or(false) =>
+            {
+                api.prevent_close();
+                let _ = window.hide();
+            }
+            _ => {}
         })
         .manage(mockserver::MockState::default())
         .manage(service_host::ServiceRegistry::default())
@@ -96,12 +120,15 @@ fn main() {
         .plugin(tauri_plugin_store::Builder::new().build())
         // Do not restore `DECORATIONS`: older installs saved `decorated: true`
         // in `.window-state.json`, which would override `decorations: false`
-        // from tauri.windows.conf.json / tauri.linux.conf.json.
+        // from tauri.windows.conf.json / tauri.linux.conf.json. Nor `VISIBLE`:
+        // on macOS the window is hidden, not closed, so quitting from the Dock
+        // would save it as hidden.
         .plugin(
             tauri_plugin_window_state::Builder::new()
                 .with_state_flags(
                     tauri_plugin_window_state::StateFlags::all()
-                        - tauri_plugin_window_state::StateFlags::DECORATIONS,
+                        - tauri_plugin_window_state::StateFlags::DECORATIONS
+                        - tauri_plugin_window_state::StateFlags::VISIBLE,
                 )
                 .build(),
         )
@@ -137,6 +164,43 @@ fn main() {
             mockserver::mock_update_rules,
             mockserver::mock_test_script,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|_app, _event| {
+            #[cfg(target_os = "macos")]
+            match _event {
+                // The last window closing (`code: None`) does not quit on
+                // macOS; Cmd+Q, the Dock's Quit and `exit()` still do.
+                tauri::RunEvent::ExitRequested { code: None, api, .. } => api.prevent_exit(),
+                // Dock icon or Finder while DevTool is running.
+                tauri::RunEvent::Reopen { .. } => show_main_window(_app),
+                _ => {}
+            }
+        });
+}
+
+const MAIN_WINDOW: &str = "main";
+
+/// Brings the main window to the front, recreating it from tauri.conf.json
+/// when it was closed, so a second launch, a deep link or a Dock click always
+/// ends with a visible window.
+fn show_main_window(app: &tauri::AppHandle) {
+    let window = match app.get_webview_window(MAIN_WINDOW) {
+        Some(window) => window,
+        None => {
+            let Some(config) = app.config().app.windows.iter().find(|w| w.label == MAIN_WINDOW) else {
+                return;
+            };
+            match tauri::WebviewWindowBuilder::from_config(app, config).and_then(|b| b.build()) {
+                Ok(window) => window,
+                Err(e) => {
+                    eprintln!("could not reopen the main window: {e}");
+                    return;
+                }
+            }
+        }
+    };
+    let _ = window.unminimize();
+    let _ = window.show();
+    let _ = window.set_focus();
 }
