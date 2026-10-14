@@ -14,6 +14,7 @@ import { Segmented } from '@/components/ui/segmented';
 import { Callout } from '@/components/ui/callout';
 import { ToolPanes, ToolPane, PaneHeader, ToolToolbar } from '@/components/ui/tool-layout';
 import CryptoJS from 'crypto-js';
+import { sha3Hex } from '@/lib/sha3';
 import { EnvelopeFormatError, decryptAesGcm, encryptAesGcm, isAesGcmEnvelope } from '@/lib/aesGcm';
 import { cn } from '@/lib/utils';
 import { SectionLabel } from '@/components/ui/section-label';
@@ -404,16 +405,18 @@ export const ALGORITHMS = [
   { id: 'sha256',   label: 'SHA-256',    bits: 256, chars: 64,  desc: 'Recommended · file integrity, tokens, APIs' },
   { id: 'sha384',   label: 'SHA-384',    bits: 384, chars: 96,  desc: 'SHA-2 · truncated SHA-512, 48-byte digest' },
   { id: 'sha512',   label: 'SHA-512',    bits: 512, chars: 128, desc: 'Maximum strength · best security, slower' },
-  { id: 'sha3-256', label: 'SHA-3/256',  bits: 256, chars: 64,  desc: 'Modern Keccak · used in Ethereum/web3' },
-  { id: 'sha3-512', label: 'SHA-3/512',  bits: 512, chars: 128, desc: 'Modern Keccak · maximum SHA-3 strength' },
+  { id: 'sha3-256', label: 'SHA-3/256',  bits: 256, chars: 64,  desc: 'FIPS 202 · NIST standard SHA-3' },
+  { id: 'sha3-512', label: 'SHA-3/512',  bits: 512, chars: 128, desc: 'FIPS 202 · maximum SHA-3 strength' },
+  { id: 'keccak-256', label: 'Keccak-256', bits: 256, chars: 64, desc: 'Original Keccak · Ethereum addresses and signatures' },
 ] as const;
 
 export type AlgoId = (typeof ALGORITHMS)[number]['id'];
 
-// SHA-3 uses a single-length HmacSHA3 (512-bit), which would be misleading for sha3-256.
-// Show HMAC only for algorithms with a dedicated per-length HmacXXX function.
+// crypto-js has only one HmacSHA3, and it is Keccak-512, which would be
+// misleading for any of these. Show HMAC only for algorithms with a dedicated
+// per-length HmacXXX function.
 export const HMAC_ALGORITHMS = ALGORITHMS.filter(
-  (a) => !['sha3-256', 'sha3-512'].includes(a.id)
+  (a) => !['sha3-256', 'sha3-512', 'keccak-256'].includes(a.id)
 );
 
 export function computeHash(id: AlgoId, input: string): string {
@@ -425,8 +428,10 @@ export function computeHash(id: AlgoId, input: string): string {
     case 'sha256':    return CryptoJS.SHA256(input).toString();
     case 'sha384':    return CryptoJS.SHA384(input).toString();
     case 'sha512':    return CryptoJS.SHA512(input).toString();
-    case 'sha3-256':  return CryptoJS.SHA3(input, { outputLength: 256 }).toString();
-    case 'sha3-512':  return CryptoJS.SHA3(input, { outputLength: 512 }).toString();
+    // CryptoJS.SHA3 is pre-standard Keccak; see lib/sha3.ts.
+    case 'sha3-256':  return sha3Hex(input, 256);
+    case 'sha3-512':  return sha3Hex(input, 512);
+    case 'keccak-256': return CryptoJS.SHA3(input, { outputLength: 256 }).toString();
   }
 }
 

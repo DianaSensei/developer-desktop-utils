@@ -99,3 +99,19 @@ describe('randomString', () => {
     expect(seen.size).toBe(alphabet.length);
   });
 });
+
+describe('randomInt — ranges the 32-bit path cannot cover', () => {
+  it('draws from ranges wider than 2^32 without hanging', () => {
+    for (let i = 0; i < 200; i++) {
+      const v = randomInt(0, 5_000_000_000);
+      expect(Number.isInteger(v) && v >= 0 && v <= 5_000_000_000).toBe(true);
+    }
+    const big = randomInt(1, 1e10);
+    expect(big >= 1 && big <= 1e10).toBe(true);
+  });
+
+  it('refuses a range with no whole number in it', () => {
+    expect(() => randomInt(0.5, 0.7)).toThrow(RangeError);
+    expect(randomInt(2.2, 3.8)).toBe(3);
+  });
+});

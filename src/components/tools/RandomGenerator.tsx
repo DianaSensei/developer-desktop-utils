@@ -88,12 +88,21 @@ export function RandomGenerator() {
   const [numMax, setNumMax] = usePluginState(sdk, 'gen:numMax', 100, { legacyKey: 'devtool:gen:numMax' });
   const [decimals, setDecimals] = usePluginState(sdk, 'gen:decimals', 0, { legacyKey: 'devtool:gen:decimals' });
 
+  const [numError, setNumError] = useState('');
   const generateNumbers = useCallback(() => {
     const min = Math.min(numMin, numMax);
     const max = Math.max(numMin, numMax);
     const dec = clamp(decimals, 0, 10);
+    // Whole numbers between 0.5 and 0.7 do not exist; say so rather than
+    // returning one outside the range.
+    if (dec === 0 && Math.ceil(min) > Math.floor(max)) {
+      setResults([]);
+      setNumError(m('noWholeNumber'));
+      return;
+    }
+    setNumError('');
     setResults(Array.from({ length: clamp(count, 1, maxNumberCount) }, () => randomNumber(min, max, dec)));
-  }, [count, numMin, numMax, decimals, maxNumberCount]);
+  }, [count, numMin, numMax, decimals, maxNumberCount, m]);
 
   // Text
   const [textLen, setTextLen] = usePluginState(sdk, 'gen:textLen', 16, { legacyKey: 'devtool:gen:textLen' });
@@ -199,7 +208,8 @@ export function RandomGenerator() {
       {/* Results */}
       <div className="flex-1 min-h-0 overflow-y-auto p-4">
         <ResultList items={results} />
-        {!results.length && (
+        {mode === 'number' && numError && <p role="alert" className="text-xs text-bad">{numError}</p>}
+        {!results.length && !(mode === 'number' && numError) && (
           <div className="flex items-center justify-center h-full text-fg-mute text-sm">
             {m('configureHint')}
           </div>

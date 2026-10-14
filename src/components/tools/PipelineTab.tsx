@@ -117,6 +117,11 @@ const SEP_OPTIONS = [
   { id: ',',  label: ', — comma'         },
 ];
 
+export function compareCodeUnits(a: string, b: string): number {
+  if (a === b) return 0;
+  return a < b ? -1 : 1;
+}
+
 // ─── Crypto helpers ────────────────────────────────────────────────────────────
 
 function computeHash(algo: HashAlgo, input: string): string {
@@ -241,8 +246,11 @@ function executeStep(step: PipelineStep, input: string): StepResult {
         try { flatMap = flattenJson(JSON.parse(step.jsonText ?? '')); } catch { /* empty */ }
         let active = (step.jsonFields ?? []).filter((f) => f.enabled);
         const sort = step.jsonSort ?? 'none';
-        if (sort === 'asc')  active = [...active].sort((a, b) => a.key.localeCompare(b.key));
-        if (sort === 'desc') active = [...active].sort((a, b) => b.key.localeCompare(a.key));
+        // Byte (ASCII) order, as payment gateways sign it (OnePay vpc_*,
+        // Alipay, WeChat Pay): `Version` < `amount`, `vpc_MerchTxnRef` <
+        // `vpc_Merchant`. localeCompare would put lowercase first.
+        if (sort === 'asc')  active = [...active].sort((a, b) => compareCodeUnits(a.key, b.key));
+        if (sort === 'desc') active = [...active].sort((a, b) => compareCodeUnits(b.key, a.key));
         const sep = step.jsonSeparator ?? '&';
         const fmt = step.jsonFormat ?? 'key=value';
         const parts = active.map((f) => {
