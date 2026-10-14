@@ -153,9 +153,14 @@ describe('useMcpBridge — Tauri desktop', () => {
     (store.updateRequest as ReturnType<typeof vi.fn>).mockImplementation((_reqId: string, patch: Partial<ApiRequest>) => {
       Object.assign(store.collections[0].items[0], patch);
     });
-    const res = await call(store, 'update_request', { requestId: id, patch: { url: '/new-url' } });
-    expect(store.updateRequest).toHaveBeenCalledWith(id, { url: '/new-url' });
-    expect((res.result as ApiRequest).url).toBe('/new-url');
+    const res = await call(store, 'update_request', { requestId: id, patch: { url: '/new-url?page=2' } });
+    // The params table follows the URL, as the address bar keeps it.
+    expect(store.updateRequest).toHaveBeenCalledWith(id, {
+      url: '/new-url?page=2',
+      params: [expect.objectContaining({ key: 'page', value: '2', enabled: true })],
+    });
+    // The reply is the request after the patch, not the render's snapshot.
+    expect((res.result as ApiRequest).url).toBe('/new-url?page=2');
   });
 
   it('update_request patch.script only touches the given side (req/res), leaving the other untouched', async () => {
@@ -302,8 +307,12 @@ describe('useMcpBridge — Tauri desktop', () => {
       oauth2: expect.objectContaining({ grantType: 'client_credentials' }),
     }));
 
+    store.collections[0].items.push({ id: 'f1', type: 'folder', name: 'F', items: [] } as unknown as Collection['items'][number]);
     await call(store, 'set_node_headers', { collectionId: 'c1', nodeId: 'f1', headers: [{ id: 'h1', key: 'X', value: 'Y', enabled: true }] });
     expect(store.setNodeHeaders).toHaveBeenCalledWith('c1', 'f1', [{ id: 'h1', key: 'X', value: 'Y', enabled: true }]);
+
+    const missing = await call(store, 'set_node_headers', { collectionId: 'c1', nodeId: 'no-such-folder', headers: [] });
+    expect(missing.error).toMatch(/No folder with id "no-such-folder"/);
   });
 
   it('set_node_script merges a partial patch onto the node\'s existing script instead of replacing it', async () => {
@@ -338,11 +347,18 @@ describe('useMcpBridge — Tauri desktop', () => {
 
   it('add_environment creates then optionally names/seeds variables', async () => {
     const store = makeStore();
+    // Named/seeded in one write: an add plus updates in the same tick could
+    // undo the add.
     const res = await call(store, 'add_environment', { collectionId: 'c1', name: 'Staging', variables: [{ id: 'v1', key: 'k', value: 'v', enabled: true }] });
+    expect(store.importEnvironment).toHaveBeenCalledWith(expect.objectContaining({
+      name: 'Staging', collectionId: 'c1', variables: [expect.objectContaining({ key: 'k', value: 'v' })],
+    }));
+    expect(store.updateEnvironment).not.toHaveBeenCalled();
+    expect(res.result).toEqual({ id: 'imported-env-id' });
+
+    const bare = await call(store, 'add_environment', { collectionId: 'c1' });
     expect(store.addEnvironment).toHaveBeenCalledWith('c1');
-    expect(store.updateEnvironment).toHaveBeenCalledWith('new-env-id', { name: 'Staging' });
-    expect(store.updateEnvironment).toHaveBeenCalledWith('new-env-id', { variables: [{ id: 'v1', key: 'k', value: 'v', enabled: true }] });
-    expect(res.result).toEqual({ id: 'new-env-id' });
+    expect(bare.result).toEqual({ id: 'new-env-id' });
   });
 
   it('duplicate_environment / delete_environment / import_environment', async () => {
@@ -436,8 +452,29 @@ describe('useMcpBridge — Tauri desktop', () => {
       tests: [], logs: [], error: null,
     });
     const res = await call(store, 'run_request', { requestId: id, environmentId: 'e1' }, runRequest);
-    expect(runRequest).toHaveBeenCalledWith(expect.objectContaining({ id }), {}, undefined, 'e1');
+    expect(runRequest).toHaveBeenCalledWith(expect.objectContaining({ id }), {}, undefined, 'e1', { recordHistory: true });
     expect((res.result as { response: { status: number } }).response.status).toBe(200);
+  });
+
+  it('run_request never returns vault or secret values, even when the server echoes them', async () => {
+    const store = makeStore();
+    const id = store.collections[0].items[0].id;
+    const runRequest = vi.fn().mockResolvedValue({
+      response: {
+        status: 200, statusText: 'OK', ok: true, headers: [['x-echo', 'VAULT-ONLY-SECRET']],
+        body: '{"key":"SUPER-SECRET-123"}', contentType: 'application/json', timeMs: 1, sizeBytes: 2,
+        url: 'https://api.test/v?token=VAULT-ONLY-SECRET',
+      },
+      tests: [{ name: 'has SUPER-SECRET-123', passed: true }],
+      logs: [{ level: 'log', text: 'token VAULT-ONLY-SECRET' }],
+      error: null,
+      sensitiveValues: ['VAULT-ONLY-SECRET', 'SUPER-SECRET-123'],
+    });
+    const res = await call(store, 'run_request', { requestId: id }, runRequest);
+    const text = JSON.stringify(res.result);
+    expect(text).not.toContain('VAULT-ONLY-SECRET');
+    expect(text).not.toContain('SUPER-SECRET-123');
+    expect(text).not.toContain('sensitiveValues');
   });
 
   it('run_request caps an oversized log array and trims oversized individual entries', async () => {

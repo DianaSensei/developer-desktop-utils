@@ -46,7 +46,7 @@ const MIN_REDACTABLE_LENGTH = 4;
 // across restarts. This can only catch exact, unencoded matches — a
 // transformed/encoded echo won't be caught — so it's a mitigation, not a
 // guarantee.
-function redactText(text: string, sensitiveValues: string[]): string {
+export function redactText(text: string, sensitiveValues: string[]): string {
   let out = text;
   for (const v of sensitiveValues) {
     if (v.length >= MIN_REDACTABLE_LENGTH) out = out.split(v).join(REDACTED_PLACEHOLDER);

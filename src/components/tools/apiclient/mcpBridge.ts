@@ -26,10 +26,11 @@
 import { useEffect, useRef } from 'react';
 import { usePluginSdkFor } from '@/platform';
 import { isTauri } from '@/lib/platform';
-import type { ApiStore } from './store';
+import { redactText, type ApiStore } from './store';
 import type { ApiRequest, Auth, Environment, KeyValue, LogEntry, RequestBody, RequestScript, RequestSettings, TreeItem } from './types';
 import { API_CLIENT_MCP_TOOLS } from './mcpTools';
 import { newAuth, newEnvironment, newRequest, uid } from './types';
+import { paramsFromUrl } from './request';
 import type { ExecResult } from './engine';
 
 export type RunRequestFn = (
@@ -37,7 +38,20 @@ export type RunRequestFn = (
   dataVars?: Record<string, string>,
   signal?: AbortSignal,
   envId?: string | null,
-) => Promise<ExecResult>;
+  options?: { recordHistory?: boolean },
+) => Promise<ExecResult & { sensitiveValues?: string[] }>;
+
+/** Every string in a JSON-shaped value, with sensitive literals replaced. */
+function redactStrings<T>(value: T, sensitiveValues: string[] = []): T {
+  if (sensitiveValues.length === 0) return value;
+  const walk = (v: unknown): unknown => {
+    if (typeof v === 'string') return redactText(v, sensitiveValues);
+    if (Array.isArray(v)) return v.map(walk);
+    if (v && typeof v === 'object') return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, walk(x)]));
+    return v;
+  };
+  return walk(value) as T;
+}
 
 interface McpCallEvent {
   id: string;
@@ -102,6 +116,25 @@ function requireNode(store: ApiStore, collectionId: string, nodeId: string | nul
   const item = findItemIn(c.items, nodeId);
   if (!item || item.type !== 'folder') throw new Error(`No folder with id "${nodeId}" in collection "${collectionId}"`);
   return item;
+}
+
+function requireFolder(store: ApiStore, collectionId: string, folderId: string) {
+  const item = findItemIn(requireCollection(store, collectionId).items, folderId);
+  if (!item || item.type !== 'folder') throw new Error(`No folder with id "${folderId}" in collection "${collectionId}"`);
+  return item;
+}
+
+const WHERE = ['before', 'after', 'inside'] as const;
+function requireWhere(v: unknown): (typeof WHERE)[number] {
+  if (v === undefined) return 'inside';
+  if (!WHERE.includes(v as (typeof WHERE)[number])) throw new Error(`"where" must be one of ${WHERE.join(', ')}`);
+  return v as (typeof WHERE)[number];
+}
+
+/** A move/copy target: a collection or any item in one. */
+function requireTarget(store: ApiStore, id: string) {
+  if (store.collections.some((c) => c.id === id)) return;
+  findItemWithCollection(store, id);
 }
 
 function requireEnvironment(store: ApiStore, id: string) {
@@ -267,6 +300,7 @@ function buildHandlers(store: ApiStore, runRequest: RunRequestFn): Record<string
 
     set_active_environment: async (args) => {
       const envId = (args.environmentId ?? null) as string | null;
+      if (envId !== null) requireEnvironment(store, envId);
       if (args.scope === 'global') {
         store.setActiveGlobalEnv(envId);
       } else {
@@ -289,18 +323,23 @@ function buildHandlers(store: ApiStore, runRequest: RunRequestFn): Record<string
       const { request } = findRequestWithCollection(store, id);
       const patch = (args.patch ?? {}) as Partial<ApiRequest>;
       const merged: Partial<ApiRequest> = { ...patch };
+      // The params table is what gets sent; the address bar keeps it in step
+      // with the URL, so a URL patch has to as well.
+      if (typeof patch.url === 'string' && !('params' in patch)) merged.params = paramsFromUrl(patch.url, request.params);
       if ('script' in patch) merged.script = mergeScript(request.script, patch.script);
       if ('auth' in patch) merged.auth = mergeAuth(request.auth, patch.auth);
       if ('body' in patch) merged.body = mergeBody(request.body, patch.body);
       if ('settings' in patch) merged.settings = mergeSettings(request.settings, patch.settings);
       store.updateRequest(id, merged);
-      return findRequestWithCollection(store, id).request;
+      // `store` is this render's snapshot and does not have the update yet.
+      return { ...request, ...merged };
     },
 
     create_request: async (args) => {
       const collectionId = requireString(args.collectionId, 'collectionId');
       requireCollection(store, collectionId);
       const folderId = typeof args.folderId === 'string' ? args.folderId : undefined;
+      if (folderId) requireFolder(store, collectionId, folderId);
       const req = newRequest((args.request ?? {}) as Partial<ApiRequest>);
       store.addRequest(collectionId, req, folderId);
       return req;
@@ -310,13 +349,20 @@ function buildHandlers(store: ApiStore, runRequest: RunRequestFn): Record<string
       const id = requireString(args.requestId, 'requestId');
       const { request } = findRequestWithCollection(store, id);
       const envId = args.environmentId === undefined ? undefined : (args.environmentId as string | null);
-      const result = await runRequest(request, {}, undefined, envId);
-      return {
-        response: summarizeResponseForMcp(result.response),
-        tests: result.tests,
-        ...summarizeLogsForMcp(result.logs),
-        error: result.error,
-      };
+      // Recorded in History like a Send, as the tool description says.
+      const { sensitiveValues, ...result } = await runRequest(request, {}, undefined, envId, { recordHistory: true });
+      // Vault and secret-variable values never leave the app: the server can
+      // echo them back (the final URL with an API key, a debug body), so the
+      // result gets the same scrub as History.
+      return redactStrings(
+        {
+          response: summarizeResponseForMcp(result.response),
+          tests: result.tests,
+          ...summarizeLogsForMcp(result.logs),
+          error: result.error,
+        },
+        sensitiveValues,
+      );
     },
 
     // ── folders & tree structure ────────────────────────────────────────
@@ -325,6 +371,7 @@ function buildHandlers(store: ApiStore, runRequest: RunRequestFn): Record<string
       const collectionId = requireString(args.collectionId, 'collectionId');
       requireCollection(store, collectionId);
       const parentId = typeof args.parentId === 'string' ? args.parentId : undefined;
+      if (parentId) requireFolder(store, collectionId, parentId);
       const id = store.addItem(collectionId, 'folder', parentId);
       if (typeof args.name === 'string' && args.name) store.renameItem(id, args.name);
       return { id };
@@ -357,7 +404,9 @@ function buildHandlers(store: ApiStore, runRequest: RunRequestFn): Record<string
     move_item: async (args) => {
       const sourceId = requireString(args.sourceId, 'sourceId');
       const targetId = requireString(args.targetId, 'targetId');
-      const where = (args.where as 'before' | 'after' | 'inside' | undefined) ?? 'inside';
+      const where = requireWhere(args.where);
+      findItemWithCollection(store, sourceId);
+      requireTarget(store, targetId);
       store.moveItem(sourceId, targetId, where);
       return { ok: true };
     },
@@ -366,7 +415,9 @@ function buildHandlers(store: ApiStore, runRequest: RunRequestFn): Record<string
     copy_item: async (args) => {
       const sourceId = requireString(args.sourceId, 'sourceId');
       const targetId = requireString(args.targetId, 'targetId');
-      const where = (args.where as 'before' | 'after' | 'inside' | undefined) ?? 'inside';
+      const where = requireWhere(args.where);
+      findItemWithCollection(store, sourceId);
+      requireTarget(store, targetId);
       store.copyItem(sourceId, targetId, where);
       return { ok: true };
     },
@@ -435,8 +486,8 @@ function buildHandlers(store: ApiStore, runRequest: RunRequestFn): Record<string
 
     set_node_headers: async (args) => {
       const collectionId = requireString(args.collectionId, 'collectionId');
-      requireCollection(store, collectionId);
       const nodeId = typeof args.nodeId === 'string' ? args.nodeId : null;
+      requireNode(store, collectionId, nodeId);
       store.setNodeHeaders(collectionId, nodeId, (args.headers ?? []) as KeyValue[]);
       return { ok: true };
     },
@@ -446,9 +497,12 @@ function buildHandlers(store: ApiStore, runRequest: RunRequestFn): Record<string
     add_environment: async (args) => {
       const collectionId = (typeof args.collectionId === 'string' ? args.collectionId : null);
       if (collectionId) requireCollection(store, collectionId);
-      const id = store.addEnvironment(collectionId);
-      if (typeof args.name === 'string' && args.name) store.updateEnvironment(id, { name: args.name });
-      if (Array.isArray(args.variables)) store.updateEnvironment(id, { variables: args.variables as KeyValue[] });
+      // One write: an add followed by updates in the same tick could undo
+      // the add (it read the environments from this render).
+      const name = typeof args.name === 'string' && args.name ? args.name : undefined;
+      const variables = Array.isArray(args.variables) ? (args.variables as KeyValue[]) : [];
+      if (name === undefined && variables.length === 0) return { id: store.addEnvironment(collectionId) };
+      const id = store.importEnvironment(newEnvironment(name ?? 'New Environment', collectionId, variables));
       return { id };
     },
 
@@ -499,20 +553,28 @@ export function useMcpBridge(store: ApiStore, runRequest: RunRequestFn, enabled 
       await sdk.native.invoke('mcp_register_tools', { pluginId: sdk.id, tools: API_CLIENT_MCP_TOOLS });
       // Through the SDK: the `mcp:call` event and `mcp_respond` are covered
       // by the plugin's 'native' permission and allowlist, so they are audited.
-      const fn = await sdk.native.listen<McpCallEvent>('mcp:call', async (payload) => {
+      // One call at a time. Handlers read `store` as of the latest render
+      // and merge onto it, so two calls in flight together (MCP clients do
+      // call tools in parallel) would each write over the other. Waiting a
+      // macrotask after each call lets React render its update first.
+      let queue: Promise<void> = Promise.resolve();
+      const fn = await sdk.native.listen<McpCallEvent>('mcp:call', (payload) => {
         const { id, tool, args } = payload;
-        const handler = handlersRef.current[tool];
         // Not one of this bridge's tools (e.g. a Mock Server tool while both
         // bridges are listening in the background) — leave it alone rather
         // than answering "unknown tool", since the two bridges share one
         // event and only one of them owns any given tool name.
-        if (!handler) return;
-        try {
-          const result = await handler(args ?? {});
-          await sdk.native.invoke('mcp_respond', { id, result: result ?? null, error: null });
-        } catch (e) {
-          await sdk.native.invoke('mcp_respond', { id, result: null, error: (e as Error).message ?? String(e) });
-        }
+        if (!handlersRef.current[tool]) return;
+        queue = queue.then(async () => {
+          const handler = handlersRef.current[tool];
+          try {
+            const result = await handler(args ?? {});
+            await sdk.native.invoke('mcp_respond', { id, result: result ?? null, error: null });
+          } catch (e) {
+            await sdk.native.invoke('mcp_respond', { id, result: null, error: (e as Error).message ?? String(e) });
+          }
+          await new Promise((resolve) => setTimeout(resolve, 0));
+        });
       });
       if (cancelled) fn();
       else unlisten = fn;

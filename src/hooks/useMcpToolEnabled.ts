@@ -1,4 +1,4 @@
-import { usePersistentState } from './usePersistentState';
+import { useSharedSetting } from './useSharedSetting';
 
 /**
  * Per-tool MCP kill switch (Settings → MCP, and the MCP setup dialog) —
@@ -43,11 +43,14 @@ export const MCP_TOOL_CAPABILITIES: Record<McpToolId, string> = {
 };
 
 const KEY = 'devtool-mcp-tool-enabled';
+const NONE_DISABLED: EnabledMap = {};
 
 type EnabledMap = Partial<Record<McpToolId, boolean>>;
 
 export function useMcpToolEnabledMap() {
-  const [map, setMap] = usePersistentState<EnabledMap>(KEY, {});
+  // Shared, so switching a tool off (Settings, the dialog, or an MCP client)
+  // takes effect in the bridges that are already mounted.
+  const [map, setMap] = useSharedSetting<EnabledMap>(KEY, NONE_DISABLED);
 
   const isEnabled = (id: McpToolId) => map[id] !== false;
   const setToolEnabled = (id: McpToolId, enabled: boolean) =>
