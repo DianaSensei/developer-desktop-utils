@@ -139,7 +139,18 @@ export function RequestPanel({ request, onChange, vars, tab, onTabChange }: Prop
             </div>
           </div>
         )}
-        {tab === 'body' && <div className="flex min-h-0 flex-1 flex-col p-3"><BodyEditor request={request} onChange={onChange} vars={vars} /></div>}
+        {tab === 'body' && (
+          <div className="flex min-h-0 flex-1 flex-col gap-2 p-3">
+            {(request.method === 'GET' || request.method === 'HEAD') && request.body.mode !== 'none' && (
+              // Not sent: fetch rejects a GET/HEAD body. Say so rather than
+              // let the editor suggest it goes out.
+              <p role="note" className="rounded-sm border border-warn/40 bg-warn/10 px-2 py-1 text-xs text-warn">
+                {t('req.body.notSentForMethod', { method: request.method })}
+              </p>
+            )}
+            <BodyEditor request={request} onChange={onChange} vars={vars} />
+          </div>
+        )}
         {tab === 'auth' && <div className="min-h-0 flex-1 overflow-y-auto p-3"><AuthEditor auth={request.auth} onChange={(auth) => onChange({ auth })} vars={vars} /></div>}
         {tab === 'script' && <ScriptEditor request={request} onChange={onChange} />}
         {tab === 'settings' && <div className="min-h-0 flex-1 overflow-y-auto p-3"><SettingsEditor request={request} onChange={onChange} /></div>}

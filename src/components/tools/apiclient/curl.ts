@@ -98,9 +98,40 @@ function looksUrlEncoded(body: string): boolean {
   return body.trim() !== '' && body.split('&').every((seg) => /^[^&=\s]+=/.test(seg));
 }
 
+/** Form-decodes one key or value the way a server reads it (`+` is a
+ *  space), keeping text that is not valid percent-encoding (`50%`) as it is
+ *  instead of throwing. */
+function formDecode(s: string): string {
+  const spaced = s.replace(/\+/g, ' ');
+  try {
+    return decodeURIComponent(spaced);
+  } catch {
+    return spaced.replace(/%([0-9A-Fa-f]{2})/g, (m, hex: string) => {
+      try { return decodeURIComponent(`%${hex}`); } catch { return m; }
+    });
+  }
+}
+
+function splitFormPairs(body: string): [string, string][] {
+  return body.split('&').filter(Boolean).map((p) => {
+    const eq = p.indexOf('=');
+    return [formDecode(eq >= 0 ? p.slice(0, eq) : p), formDecode(eq >= 0 ? p.slice(eq + 1) : '')];
+  });
+}
+
+// Short options that take a value may have it attached (`-XPUT`,
+// `-H'Accept: x'`, `-uuser:pass`); split them so the loop sees two tokens.
+const ATTACHABLE = new Set(['X', 'H', 'd', 'F', 'u', 'b', 'A', 'e']);
+function splitAttached(tokens: string[]): string[] {
+  return tokens.flatMap((t) =>
+    /^-[A-Za-z]./.test(t) && !t.startsWith('--') && ATTACHABLE.has(t[1]) ? [t.slice(0, 2), t.slice(2)] : [t],
+  );
+}
+
 export function parseCurl(input: string): ApiRequest {
   let tokens = tokenize(input.trim());
   if (tokens[0] === 'curl') tokens = tokens.slice(1);
+  tokens = splitAttached(tokens);
 
   let method = '';
   let url = '';
@@ -109,6 +140,9 @@ export function parseCurl(input: string): ApiRequest {
   const headers: [string, string][] = [];
   const formData: [string, string, boolean][] = []; // key, value, isFile
   const urlencoded: [string, string][] = [];
+  // -d data in order, so it can join --data-urlencode pairs instead of
+  // being dropped when both are used (OAuth token requests do).
+  const dataParts: string[] = [];
   let mode: 'none' | 'raw' | 'urlencoded' | 'multipart' = 'none';
   // -G/--get: curl appends the data to the query string and sends a GET
   // instead of putting it in a body.
@@ -123,10 +157,28 @@ export function parseCurl(input: string): ApiRequest {
       const idx = h.indexOf(':');
       if (idx > 0) headers.push([h.slice(0, idx).trim(), h.slice(idx + 1).trim()]);
     } else if (t === '-d' || t === '--data' || t === '--data-raw' || t === '--data-binary' || t === '--data-ascii') {
-      body += (body ? '&' : '') + arg();
-      if (mode === 'none') mode = 'raw';
+      const data = arg();
+      dataParts.push(data);
+      if (mode === 'urlencoded') urlencoded.push(...splitFormPairs(data));
+      else {
+        body += (body ? '&' : '') + data;
+        if (mode === 'none') mode = 'raw';
+      }
+    } else if (t === '--json') {
+      // curl 7.82+: the data, plus JSON Content-Type and Accept, POST by default.
+      body += arg();
+      mode = 'raw';
+      if (!headers.some(([k]) => k.toLowerCase() === 'content-type')) headers.push(['Content-Type', 'application/json']);
+      if (!headers.some(([k]) => k.toLowerCase() === 'accept')) headers.push(['Accept', 'application/json']);
+    } else if (t === '-I' || t === '--head') {
+      if (!method) method = 'HEAD';
     } else if (t === '--data-urlencode') {
       const kv = arg(); const eq = kv.indexOf('=');
+      if (mode !== 'urlencoded') {
+        // Earlier -d data becomes form fields alongside this one.
+        urlencoded.push(...dataParts.flatMap(splitFormPairs));
+        body = '';
+      }
       urlencoded.push(eq >= 0 ? [kv.slice(0, eq), kv.slice(eq + 1)] : [kv, '']);
       mode = 'urlencoded';
     } else if (t === '-F' || t === '--form') {
@@ -193,7 +245,7 @@ export function parseCurl(input: string): ApiRequest {
     // plain text would silently disagree with what curl actually sends.
     const isUrlEnc = /x-www-form-urlencoded/.test(ctHeader) || (!ctHeader && !isJson && looksUrlEncoded(body));
     if (isUrlEnc) {
-      req.body = { mode: 'urlencoded', raw: '', form: body.split('&').filter(Boolean).map((p) => { const eq = p.indexOf('='); return newKeyValue(decodeURIComponent(eq >= 0 ? p.slice(0, eq) : p), decodeURIComponent(eq >= 0 ? p.slice(eq + 1) : '')); }) };
+      req.body = { mode: 'urlencoded', raw: '', form: splitFormPairs(body).map(([k, v]) => newKeyValue(k, v)) };
     } else {
       req.body = { mode: isJson ? 'json' : 'text', raw: body, form: [] };
     }
