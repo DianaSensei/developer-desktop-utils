@@ -465,7 +465,7 @@ fn stage_install_plugin(
     // Remove the previous version's directory once the index is written.
     // Best effort: a failed delete (e.g. a locked file on Windows) does not
     // fail the install.
-    // An index written before versions were validated may hold an unsafe
+    // An index written before versions were validated may hold an invalid
     // one; never let it steer a delete.
     if let Some(old_version) = old_version.filter(|v| is_safe_path_segment(v)) {
         if old_version != new_version {
@@ -1522,13 +1522,13 @@ mod tests {
         assert!(read_index(&index_dir).unwrap().is_empty());
     }
 
-    /// An index written by an older build may already hold an unsafe version;
+    /// An index written by an older build may already hold an invalid version;
     /// updating must not `remove_dir_all` through it.
     #[test]
     fn update_never_deletes_through_an_unsafe_recorded_version() {
-        let index_dir = temp_dir("plugin-legacy-unsafe-index");
-        let plugins_dir = temp_dir("plugin-legacy-unsafe-bundles");
-        let victim = temp_dir("plugin-legacy-unsafe-victim");
+        let index_dir = temp_dir("plugin-legacy-invalid-index");
+        let plugins_dir = temp_dir("plugin-legacy-invalid-bundles");
+        let victim = temp_dir("plugin-legacy-invalid-victim");
         std::fs::write(victim.join("thesis.docx"), b"keep").unwrap();
 
         let mut legacy = plugin_manifest("https://x/a.mjs", &sha256_hex(b"a"));
@@ -1545,7 +1545,7 @@ mod tests {
         let mut v2 = plugin_manifest("https://x/v2.mjs", &sha256_hex(b"v2"));
         v2.version = "2.0.0".into();
         stage_install_plugin(&index_dir, &plugins_dir, v2, "https://x/p.json".into(), None, b"v2").unwrap();
-        assert!(victim.join("thesis.docx").exists(), "the unsafe recorded path must not be deleted");
+        assert!(victim.join("thesis.docx").exists(), "the invalid recorded path must not be deleted");
     }
 
     #[test]
@@ -1562,9 +1562,9 @@ mod tests {
 
     #[test]
     fn uninstall_rejects_ids_and_market_ids_that_are_not_path_safe() {
-        let index_dir = temp_dir("uninstall-unsafe-index");
-        let plugins_dir = temp_dir("uninstall-unsafe-plugins");
-        let services_dir = temp_dir("uninstall-unsafe-services");
+        let index_dir = temp_dir("uninstall-invalid-index");
+        let plugins_dir = temp_dir("uninstall-invalid-plugins");
+        let services_dir = temp_dir("uninstall-invalid-services");
         assert!(stage_uninstall(&index_dir, &plugins_dir, &services_dir, "../x", None).is_err());
         assert!(stage_uninstall(&index_dir, &plugins_dir, &services_dir, "demo", Some("../x")).is_err());
     }
