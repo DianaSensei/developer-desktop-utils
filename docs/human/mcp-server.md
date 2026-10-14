@@ -107,7 +107,12 @@ The two processes find each other automatically: on launch, DevTool writes
 its bridge's port and a random auth token to `<app data dir>/mcp-bridge.json`
 (same directory Tauri already uses for this app's other persisted files);
 `devtool-mcp-server` re-reads that file on every call, so restarting DevTool
-(new port/token) doesn't require restarting the MCP server too.
+(new port/token) doesn't require restarting the MCP server too. It also polls
+the bridge's tool list every few seconds and sends the client
+`notifications/tools/list_changed` when it changes (the app opening or
+closing, a tool screen mounting, a plugin being installed or switched off),
+so a Claude Code session started before DevTool picks the tools up without a
+restart.
 
 **Excluded on purpose:** the Vault (API Client's local secret store) isn't
 exposed here — the UI itself keeps Vault values out of generated code, cURL
@@ -163,8 +168,18 @@ The repo root ships a checked-in `.mcp.json` that runs the same binary via
 with zero manual setup: open Claude Code anywhere inside this repo, approve
 the project's MCP server prompt once, and it's available in every future
 session opened here (requires the same Rust toolchain building the app
-already needs — nothing extra to install). The first call compiles the
-binary (a few seconds); every call after that is instant.
+already needs — nothing extra to install).
+
+The binary lives in the app's crate, so the **first** start compiles all of
+Tauri in release mode — several minutes on a fresh checkout, and on Linux it
+needs the same WebKitGTK/GTK dev packages as the app. That is longer than an
+MCP client waits for a server to start, so the first session reports the
+server as failed ("Connection closed"). Build it once beforehand and every
+start after that is instant:
+
+```bash
+cargo build --release --bin devtool-mcp-server --manifest-path src-tauri/Cargo.toml
+```
 
 To register it manually instead (e.g. globally, with `--scope user`):
 

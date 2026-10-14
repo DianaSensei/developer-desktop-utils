@@ -414,6 +414,37 @@ async fn fetch_registered_tools() -> Result<Vec<Tool>, String> {
         .collect())
 }
 
+/// What the bridge currently offers, as one comparable string; empty while
+/// the app is closed or the bridge does not answer.
+async fn registered_tools_signature() -> String {
+    match read_bridge_info() {
+        Ok(info) => http_get_json(info.port, &info.token, "/tools")
+            .await
+            .map(|v| v.to_string())
+            .unwrap_or_default(),
+        Err(_) => String::new(),
+    }
+}
+
+const TOOL_LIST_POLL: Duration = Duration::from_secs(3);
+
+/// Polls the bridge and tells the client to re-list tools whenever the set
+/// changes: the app opening or closing, a tool screen mounting, a plugin
+/// being installed or switched off. Ends when the client disconnects.
+async fn watch_tool_list(peer: rmcp::service::Peer<RoleServer>) {
+    let mut last = registered_tools_signature().await;
+    loop {
+        tokio::time::sleep(TOOL_LIST_POLL).await;
+        let current = registered_tools_signature().await;
+        if current != last {
+            last = current;
+            if peer.notify_tool_list_changed().await.is_err() {
+                return;
+            }
+        }
+    }
+}
+
 // Listed even when the bridge is unreachable, since it is answered locally.
 fn scripting_reference_tool() -> Tool {
     Tool::new(
@@ -431,7 +462,11 @@ struct DevToolServer;
 
 impl ServerHandler for DevToolServer {
     fn get_info(&self) -> ServerConfig {
-        ServerConfig::new(ServerCapabilities::builder().enable_tools().build())
+        // `listChanged`: MCP clients list tools once at connect, so without
+        // it a client started before the app (or before a plugin registers)
+        // would only ever see get_scripting_reference. `watch_tool_list`
+        // sends the notification.
+        ServerConfig::new(ServerCapabilities::builder().enable_tools().enable_tool_list_changed().build())
             .with_instructions(
                 "Drives every DevTool tool that has registered itself with the running app's \
                  MCP bridge — call list_tools for the current set, since it can grow (a plugin \
@@ -487,7 +522,10 @@ async fn main() {
     let server = DevToolServer;
     match server.serve(stdio()).await {
         Ok(service) => {
-            if let Err(e) = service.waiting().await {
+            let watcher = tokio::spawn(watch_tool_list(service.peer().clone()));
+            let result = service.waiting().await;
+            watcher.abort();
+            if let Err(e) = result {
                 eprintln!("devtool-mcp-server: {e}");
             }
         }
