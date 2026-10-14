@@ -400,18 +400,78 @@ async fn fetch_registered_tools() -> Result<Vec<Tool>, String> {
     let info = read_bridge_info()?;
     let json = http_get_json(info.port, &info.token, "/tools").await?;
     let entries = json.as_array().cloned().unwrap_or_default();
-    Ok(entries
-        .into_iter()
-        .filter_map(|def| {
-            let name = def.get("name")?.as_str()?.to_string();
-            let description = def.get("description").and_then(Value::as_str).unwrap_or("").to_string();
-            let schema = match def.get("inputSchema").cloned().unwrap_or_else(|| json!({})) {
-                Value::Object(m) => m,
-                _ => Default::default(),
-            };
-            Some(Tool::new(name, description, schema))
-        })
-        .collect())
+    Ok(normalize_tools(entries))
+}
+
+/// Turns the bridge's entries into tools every MCP client accepts. Clients
+/// validate `tools/list` as a whole: one tool whose `inputSchema` lacks
+/// `"type": "object"` makes the client reject the entire list ("Invalid
+/// result for tools/list") and show no tools at all. Entries come from any
+/// registered plugin, so they are repaired here, or dropped with a note on
+/// stderr (which MCP clients log) when they cannot be: no name, or a name
+/// already taken.
+fn normalize_tools(entries: Vec<Value>) -> Vec<Tool> {
+    let mut seen = std::collections::HashSet::new();
+    let mut tools = Vec::with_capacity(entries.len());
+    for def in entries {
+        let Some(name) = def.get("name").and_then(Value::as_str).filter(|n| !n.is_empty()) else {
+            eprintln!("devtool-mcp-server: skipped a registered tool without a name");
+            continue;
+        };
+        if name == "get_scripting_reference" || !seen.insert(name.to_string()) {
+            eprintln!("devtool-mcp-server: skipped duplicate tool `{name}`");
+            continue;
+        }
+        let description = def.get("description").and_then(Value::as_str).unwrap_or("").to_string();
+        let schema = normalize_input_schema(name, def.get("inputSchema"));
+        tools.push(Tool::new(name.to_string(), description, schema));
+    }
+    tools
+}
+
+/// An object schema with `type: "object"`, as MCP requires of `inputSchema`.
+/// A schema that only forgot `type` keeps its properties; one that describes
+/// something other than an object (or is not a schema at all) becomes an
+/// open object, so the tool stays callable and the app validates arguments.
+fn normalize_input_schema(name: &str, schema: Option<&Value>) -> serde_json::Map<String, Value> {
+    let open_object = || {
+        json!({ "type": "object", "properties": {}, "additionalProperties": true })
+            .as_object()
+            .cloned()
+            .unwrap_or_default()
+    };
+    let Some(Value::Object(schema)) = schema else {
+        if schema.is_some() {
+            eprintln!("devtool-mcp-server: tool `{name}` has an inputSchema that is not an object; accepting any arguments");
+        }
+        return open_object();
+    };
+    let mut schema = schema.clone();
+    match schema.get("type") {
+        Some(Value::String(t)) if t == "object" => {}
+        None => {
+            schema.insert("type".into(), json!("object"));
+        }
+        Some(_) => {
+            eprintln!("devtool-mcp-server: tool `{name}` takes a non-object inputSchema; accepting any arguments");
+            return open_object();
+        }
+    }
+    if schema.get("properties").is_some_and(|p| !p.is_object()) {
+        schema.remove("properties");
+    }
+    if let Some(required) = schema.get("required") {
+        let names: Vec<Value> = required
+            .as_array()
+            .map(|r| r.iter().filter(|v| v.is_string()).cloned().collect())
+            .unwrap_or_default();
+        if names.is_empty() {
+            schema.remove("required");
+        } else {
+            schema.insert("required".into(), Value::Array(names));
+        }
+    }
+    schema
 }
 
 /// What the bridge currently offers, as one comparable string; empty while
@@ -530,5 +590,59 @@ async fn main() {
             }
         }
         Err(e) => eprintln!("devtool-mcp-server: failed to start: {e}"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn listed(entries: Value) -> Vec<Value> {
+        normalize_tools(entries.as_array().cloned().unwrap_or_default())
+            .into_iter()
+            .map(|t| serde_json::to_value(t).unwrap())
+            .collect()
+    }
+
+    #[test]
+    fn every_listed_schema_is_an_object_schema() {
+        let tools = listed(json!([
+            { "name": "ok", "inputSchema": { "type": "object", "properties": { "a": { "type": "string" } }, "required": ["a"] } },
+            { "name": "untyped", "inputSchema": { "properties": { "a": { "type": "string" } } } },
+            { "name": "empty", "inputSchema": {} },
+            { "name": "null", "inputSchema": null },
+            { "name": "missing" },
+            { "name": "array", "inputSchema": [] },
+            { "name": "string_type", "inputSchema": { "type": "string" } },
+            { "name": "union_type", "inputSchema": { "type": ["object", "null"] } },
+            { "name": "bad_parts", "inputSchema": { "type": "object", "properties": [], "required": "a" } },
+        ]));
+        assert_eq!(tools.len(), 9);
+        for tool in &tools {
+            assert_eq!(tool["inputSchema"]["type"], "object", "{tool}");
+            let props = &tool["inputSchema"]["properties"];
+            assert!(props.is_null() || props.is_object(), "{tool}");
+            let required = &tool["inputSchema"]["required"];
+            assert!(required.is_null() || required.as_array().unwrap().iter().all(Value::is_string), "{tool}");
+        }
+        // A schema that only forgot `type` keeps what it describes.
+        assert_eq!(tools[0]["inputSchema"]["required"], json!(["a"]));
+        assert_eq!(tools[1]["inputSchema"]["properties"]["a"]["type"], "string");
+    }
+
+    #[test]
+    fn nameless_and_duplicate_tools_are_dropped() {
+        let tools = listed(json!([
+            { "name": "a", "description": "first" },
+            { "name": "a", "description": "second" },
+            { "name": "" },
+            { "name": 5 },
+            { "description": "no name" },
+            { "name": "get_scripting_reference" },
+            { "name": "b" },
+        ]));
+        let names: Vec<&str> = tools.iter().map(|t| t["name"].as_str().unwrap()).collect();
+        assert_eq!(names, ["a", "b"]);
+        assert_eq!(tools[0]["description"], "first");
     }
 }

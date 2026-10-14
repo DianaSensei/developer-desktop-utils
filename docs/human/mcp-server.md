@@ -112,7 +112,11 @@ the bridge's tool list every few seconds and sends the client
 `notifications/tools/list_changed` when it changes (the app opening or
 closing, a tool screen mounting, a plugin being installed or switched off),
 so a Claude Code session started before DevTool picks the tools up without a
-restart.
+restart. Every listed tool is checked first: MCP clients reject the whole
+`tools/list` result when a single tool's `inputSchema` is not an object
+schema, so a schema missing `"type": "object"` is repaired, one that is not
+an object schema becomes "any arguments", and a tool with no name or a
+duplicate name is left out. Each repair or omission is logged on stderr.
 
 **Excluded on purpose:** the Vault (API Client's local secret store) isn't
 exposed here — the UI itself keeps Vault values out of generated code, cURL
@@ -344,6 +348,12 @@ Reference:
   isn't running, or hasn't finished starting. Open it and retry.
 - **"Could not reach DevTool on 127.0.0.1:\<port\>"** — the app was closed
   after writing the discovery file (stale port). Restart the app.
+- **"Invalid result for tools/list"** / **tools fetch failed** — a server
+  built before this check passed on a tool whose `inputSchema` was not an
+  object schema, and the client then dropped every tool. Rebuild the server
+  (`cargo build --release --bin devtool-mcp-server`, or update the app) and
+  reconnect from `/mcp`. The client's MCP log names any tool the server
+  repaired or left out.
 - **"No response from DevTool — open the app with the tool that owns this
   call on screen, or turn on Settings → MCP → Background MCP bridge…"** —
   the app is running but nothing answered within 30s. Two possible causes,
