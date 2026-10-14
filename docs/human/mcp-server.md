@@ -118,6 +118,13 @@ schema, so a schema missing `"type": "object"` is repaired, one that is not
 an object schema becomes "any arguments", and a tool with no name or a
 duplicate name is left out. Each repair or omission is logged on stderr.
 
+On macOS the server does not stay inside `DevTool.app`: it copies itself to
+`~/Library/Application Support/com.desktop-devtool-app/mcp/` (refreshed
+whenever the app updates) and re-executes from there, keeping its pid and
+stdio. macOS treats any process running from `DevTool.app/Contents/MacOS/`
+as DevTool itself, so a server left there by an open MCP session made
+clicking DevTool do nothing.
+
 **Excluded on purpose:** the Vault (API Client's local secret store) isn't
 exposed here — the UI itself keeps Vault values out of generated code, cURL
 export, and history, and an MCP client reading/writing it would defeat that
@@ -348,6 +355,10 @@ Reference:
   isn't running, or hasn't finished starting. Open it and retry.
 - **"Could not reach DevTool on 127.0.0.1:\<port\>"** — the app was closed
   after writing the discovery file (stale port). Restart the app.
+- **macOS: clicking DevTool does nothing (no bounce, no window)** — an MCP
+  session started by a server built before the fix above is still running
+  from inside the app bundle. Run `pkill -f devtool-mcp-server`, open
+  DevTool, then reconnect the MCP clients (`/mcp` in Claude Code).
 - **"Invalid result for tools/list"** / **tools fetch failed** — a server
   built before this check passed on a tool whose `inputSchema` was not an
   object schema, and the client then dropped every tool. Rebuild the server

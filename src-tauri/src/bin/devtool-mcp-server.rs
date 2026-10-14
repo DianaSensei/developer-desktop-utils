@@ -577,8 +577,94 @@ impl ServerHandler for DevToolServer {
     }
 }
 
-#[tokio::main]
-async fn main() {
+// ── leaving the app bundle (macOS) ──────────────────────────────────────
+// MCP clients launch this binary from `DevTool.app/Contents/MacOS/` (it is
+// the bundle's sidecar), and macOS counts any process running from there as
+// DevTool itself: while an MCP client keeps one open, clicking DevTool only
+// "activates" that window-less process, so the app never opens again until
+// every MCP session ends. Before serving, the server therefore re-executes a
+// copy of itself kept in the app data directory. `exec` keeps the pid and
+// the stdio pipes, so the client never notices, and existing MCP configs
+// that point into the bundle keep working.
+
+/// Set on the re-executed copy so it never tries to move again.
+#[cfg(unix)]
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+const RELOCATED_ENV: &str = "DEVTOOL_MCP_RELOCATED";
+
+/// Whether `exe` sits in an app bundle's `Contents/MacOS` directory.
+#[cfg(unix)]
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+fn is_in_app_bundle(exe: &std::path::Path) -> bool {
+    let mut dirs = exe.ancestors().skip(1).filter_map(|p| p.file_name()?.to_str());
+    matches!(
+        (dirs.next(), dirs.next(), dirs.next()),
+        (Some("MacOS"), Some("Contents"), Some(app)) if app.ends_with(".app")
+    )
+}
+
+/// Copies `exe` into `dir` unless an identical copy is already there, and
+/// returns the copy's path. Writes to a temporary file and renames it, so a
+/// server starting at the same moment never runs a half-written copy, and a
+/// copy already running keeps its own file. Bytes are copied by hand rather
+/// than with `fs::copy`, which would carry the bundle's quarantine attribute.
+#[cfg(unix)]
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+fn bundle_free_copy(exe: &std::path::Path, dir: &std::path::Path) -> std::io::Result<PathBuf> {
+    use std::os::unix::fs::PermissionsExt;
+    let target = dir.join("devtool-mcp-server");
+    let bytes = std::fs::read(exe)?;
+    if std::fs::read(&target).is_ok_and(|existing| existing == bytes) {
+        return Ok(target);
+    }
+    std::fs::create_dir_all(dir)?;
+    let tmp = dir.join(format!(".devtool-mcp-server.{}", std::process::id()));
+    std::fs::write(&tmp, &bytes)?;
+    std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(0o755))?;
+    std::fs::rename(&tmp, &target).inspect_err(|_| {
+        let _ = std::fs::remove_file(&tmp);
+    })?;
+    Ok(target)
+}
+
+/// Replaces this process with the copy outside the bundle. Returns only if
+/// that is not needed or not possible, in which case the server simply runs
+/// from where it is.
+#[cfg(target_os = "macos")]
+fn leave_app_bundle() {
+    use std::os::unix::process::CommandExt;
+    if std::env::var_os(RELOCATED_ENV).is_some() {
+        return;
+    }
+    let Ok(exe) = std::env::current_exe() else { return };
+    if !is_in_app_bundle(&exe) {
+        return;
+    }
+    let copy = match bundle_free_copy(&exe, &app_data_dir().join("mcp")) {
+        Ok(copy) => copy,
+        Err(e) => {
+            eprintln!("devtool-mcp-server: could not copy itself out of the app bundle ({e}); running from it");
+            return;
+        }
+    };
+    let err = std::process::Command::new(&copy)
+        .args(std::env::args_os().skip(1))
+        .env(RELOCATED_ENV, "1")
+        .exec();
+    eprintln!("devtool-mcp-server: could not start {} ({err}); running from the app bundle", copy.display());
+}
+
+fn main() {
+    #[cfg(target_os = "macos")]
+    leave_app_bundle();
+    tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .expect("tokio runtime")
+        .block_on(serve());
+}
+
+async fn serve() {
     let server = DevToolServer;
     match server.serve(stdio()).await {
         Ok(service) => {
@@ -596,6 +682,46 @@ async fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(unix)]
+    #[test]
+    fn only_a_bundle_sidecar_counts_as_in_the_app_bundle() {
+        use std::path::Path;
+        assert!(is_in_app_bundle(Path::new("/Applications/DevTool.app/Contents/MacOS/devtool-mcp-server")));
+        assert!(!is_in_app_bundle(Path::new("/Users/me/Library/Application Support/x/mcp/devtool-mcp-server")));
+        assert!(!is_in_app_bundle(Path::new("/repo/src-tauri/target/release/devtool-mcp-server")));
+        assert!(!is_in_app_bundle(Path::new("/Applications/DevTool.app/Contents/Resources/devtool-mcp-server")));
+        assert!(!is_in_app_bundle(Path::new("/opt/Contents/MacOS/devtool-mcp-server")));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn the_bundle_free_copy_is_refreshed_only_when_it_differs() {
+        let root = std::env::temp_dir().join(format!("devtool-mcp-copy-test-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let exe = root.join("DevTool.app/Contents/MacOS/devtool-mcp-server");
+        std::fs::create_dir_all(exe.parent().unwrap()).unwrap();
+        std::fs::write(&exe, b"v1").unwrap();
+        let dir = root.join("data/mcp");
+
+        let copy = bundle_free_copy(&exe, &dir).unwrap();
+        assert_eq!(std::fs::read(&copy).unwrap(), b"v1");
+        use std::os::unix::fs::PermissionsExt;
+        assert_eq!(std::fs::metadata(&copy).unwrap().permissions().mode() & 0o777, 0o755);
+        let first_written = std::fs::metadata(&copy).unwrap().modified().unwrap();
+
+        // Same binary: the copy is reused, not rewritten.
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        bundle_free_copy(&exe, &dir).unwrap();
+        assert_eq!(std::fs::metadata(&copy).unwrap().modified().unwrap(), first_written);
+
+        // The app was updated: the copy follows.
+        std::fs::write(&exe, b"v2").unwrap();
+        bundle_free_copy(&exe, &dir).unwrap();
+        assert_eq!(std::fs::read(&copy).unwrap(), b"v2");
+        assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 1, "no temporary file left behind");
+        let _ = std::fs::remove_dir_all(&root);
+    }
 
     fn listed(entries: Value) -> Vec<Value> {
         normalize_tools(entries.as_array().cloned().unwrap_or_default())
