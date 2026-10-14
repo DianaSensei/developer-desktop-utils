@@ -14,7 +14,8 @@ import { INDENT_OPTIONS, parseInput, quoteText, serialize } from './JsonFormatte
 type ToolHandler = (args: Record<string, unknown>) => Promise<unknown>;
 
 function requireString(v: unknown, name: string): string {
-  if (typeof v !== 'string' || !v) throw new Error(`"${name}" is required and must be a string`);
+  // '' is input like any other: it reports as invalid JSON, not as missing.
+  if (typeof v !== 'string') throw new Error(`"${name}" is required and must be a string`);
   return v;
 }
 

@@ -90,3 +90,12 @@ describe('codecMcpBridge — encrypt_text/decrypt_text', () => {
     await expect(call('encrypt_text', { text: 'x', key: 'k', algorithm: 'nope' })).rejects.toThrow(/Unknown encryption algorithm/);
   });
 });
+
+describe('codecMcpBridge — an empty string is input, not a missing argument', () => {
+  it('hashes, HMACs and encodes ""', async () => {
+    const hash = (await call('hash_compute', { text: '', algorithm: 'sha256' })) as { hash: string };
+    expect(hash.hash).toBe('e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855');
+    await expect(call('hash_hmac', { text: '', key: '', algorithm: 'sha256' })).resolves.toMatchObject({ algorithm: 'sha256' });
+    await expect(call('codec_encode', { text: '', algorithm: 'base64' })).resolves.toEqual({ output: '' });
+  });
+});

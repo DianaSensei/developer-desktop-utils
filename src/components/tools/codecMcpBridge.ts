@@ -34,6 +34,13 @@ function requireString(v: unknown, name: string): string {
   return v;
 }
 
+/** Like requireString, but '' is valid input: hashing or encoding an empty
+ *  string has a well-defined result (SHA-256 of '' is e3b0c442…). */
+function requireText(v: unknown, name: string): string {
+  if (typeof v !== 'string') throw new Error(`"${name}" is required and must be a string`);
+  return v;
+}
+
 function requireCodec(id: string) {
   const codec = CODECS.find((c) => c.id === id);
   if (!codec) throw new Error(`Unknown codec "${id}" — one of ${CODECS.map((c) => c.id).join(', ')}`);
@@ -62,18 +69,18 @@ export function buildCodecHandlers(): Record<string, ToolHandler> {
   return {
     codec_encode: async (args) => {
       const codec = requireCodec(requireString(args.algorithm, 'algorithm'));
-      return { output: codec.encode(requireString(args.text, 'text')) };
+      return { output: codec.encode(requireText(args.text, 'text')) };
     },
 
     codec_decode: async (args) => {
       const codec = requireCodec(requireString(args.algorithm, 'algorithm'));
-      return { output: codec.decode(requireString(args.text, 'text')) };
+      return { output: codec.decode(requireText(args.text, 'text')) };
     },
 
     // Omit `algorithm` to get every hash at once (same as the UI, which
     // always computes all 9 in parallel) — pass it to get just one.
     hash_compute: async (args) => {
-      const text = requireString(args.text, 'text');
+      const text = requireText(args.text, 'text');
       const upperHex = args.upperHex === true;
       const format = (v: string) => (upperHex ? v.toUpperCase() : v);
       if (typeof args.algorithm === 'string' && args.algorithm) {
@@ -85,8 +92,9 @@ export function buildCodecHandlers(): Record<string, ToolHandler> {
 
     hash_hmac: async (args) => {
       const id = requireHmacAlgo(requireString(args.algorithm, 'algorithm'));
-      const text = requireString(args.text, 'text');
-      const key = requireString(args.key, 'key');
+      const text = requireText(args.text, 'text');
+      // An empty HMAC key is valid (RFC 2104 pads it), unlike a passphrase.
+      const key = requireText(args.key, 'key');
       const upperHex = args.upperHex === true;
       const hmac = computeHmac(id, text, key);
       return { algorithm: id, hmac: upperHex ? hmac.toUpperCase() : hmac };
@@ -94,7 +102,7 @@ export function buildCodecHandlers(): Record<string, ToolHandler> {
 
     encrypt_text: async (args) => {
       const algo = requireEncryptAlgo(requireString(args.algorithm, 'algorithm'));
-      const text = requireString(args.text, 'text');
+      const text = requireText(args.text, 'text');
       const key = requireString(args.key, 'key');
       const output = algo === 'aes-gcm'
         ? await encryptAesGcm(text, key)
