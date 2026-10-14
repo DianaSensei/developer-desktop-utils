@@ -107,7 +107,23 @@ The two processes find each other automatically: on launch, DevTool writes
 its bridge's port and a random auth token to `<app data dir>/mcp-bridge.json`
 (same directory Tauri already uses for this app's other persisted files);
 `devtool-mcp-server` re-reads that file on every call, so restarting DevTool
-(new port/token) doesn't require restarting the MCP server too.
+(new port/token) doesn't require restarting the MCP server too. It also polls
+the bridge's tool list every few seconds and sends the client
+`notifications/tools/list_changed` when it changes (the app opening or
+closing, a tool screen mounting, a plugin being installed or switched off),
+so a Claude Code session started before DevTool picks the tools up without a
+restart. Every listed tool is checked first: MCP clients reject the whole
+`tools/list` result when a single tool's `inputSchema` is not an object
+schema, so a schema missing `"type": "object"` is repaired, one that is not
+an object schema becomes "any arguments", and a tool with no name or a
+duplicate name is left out. Each repair or omission is logged on stderr.
+
+On macOS the server does not stay inside `DevTool.app`: it copies itself to
+`~/Library/Application Support/com.desktop-devtool-app/mcp/` (refreshed
+whenever the app updates) and re-executes from there, keeping its pid and
+stdio. macOS treats any process running from `DevTool.app/Contents/MacOS/`
+as DevTool itself, so a server left there by an open MCP session made
+clicking DevTool do nothing.
 
 **Excluded on purpose:** the Vault (API Client's local secret store) isn't
 exposed here — the UI itself keeps Vault values out of generated code, cURL
@@ -163,8 +179,18 @@ The repo root ships a checked-in `.mcp.json` that runs the same binary via
 with zero manual setup: open Claude Code anywhere inside this repo, approve
 the project's MCP server prompt once, and it's available in every future
 session opened here (requires the same Rust toolchain building the app
-already needs — nothing extra to install). The first call compiles the
-binary (a few seconds); every call after that is instant.
+already needs — nothing extra to install).
+
+The binary lives in the app's crate, so the **first** start compiles all of
+Tauri in release mode — several minutes on a fresh checkout, and on Linux it
+needs the same WebKitGTK/GTK dev packages as the app. That is longer than an
+MCP client waits for a server to start, so the first session reports the
+server as failed ("Connection closed"). Build it once beforehand and every
+start after that is instant:
+
+```bash
+cargo build --release --bin devtool-mcp-server --manifest-path src-tauri/Cargo.toml
+```
 
 To register it manually instead (e.g. globally, with `--scope user`):
 
@@ -329,6 +355,16 @@ Reference:
   isn't running, or hasn't finished starting. Open it and retry.
 - **"Could not reach DevTool on 127.0.0.1:\<port\>"** — the app was closed
   after writing the discovery file (stale port). Restart the app.
+- **macOS: clicking DevTool does nothing (no bounce, no window)** — an MCP
+  session started by a server built before the fix above is still running
+  from inside the app bundle. Run `pkill -f devtool-mcp-server`, open
+  DevTool, then reconnect the MCP clients (`/mcp` in Claude Code).
+- **"Invalid result for tools/list"** / **tools fetch failed** — a server
+  built before this check passed on a tool whose `inputSchema` was not an
+  object schema, and the client then dropped every tool. Rebuild the server
+  (`cargo build --release --bin devtool-mcp-server`, or update the app) and
+  reconnect from `/mcp`. The client's MCP log names any tool the server
+  repaired or left out.
 - **"No response from DevTool — open the app with the tool that owns this
   call on screen, or turn on Settings → MCP → Background MCP bridge…"** —
   the app is running but nothing answered within 30s. Two possible causes,

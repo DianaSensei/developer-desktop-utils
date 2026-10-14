@@ -21,6 +21,7 @@ export function randomBelow(bound: number): number {
     throw new RangeError('bound must be a positive integer');
   }
   if (bound === 1) return 0;
+  if (bound > 2 ** 32) return randomBelow53(bound);
   const RANGE = 2 ** 32;
   // Largest multiple of `bound` that fits in 32 bits; draws at or above it are
   // the biased tail and get thrown away.
@@ -32,13 +33,28 @@ export function randomBelow(bound: number): number {
   }
 }
 
+/** Bounds above 2^32 draw 53 bits instead, the most a double holds exactly.
+ *  With 32 bits `limit` would be 0 and the loop would never end. */
+function randomBelow53(bound: number): number {
+  const RANGE = 2 ** 53;
+  if (bound > RANGE) throw new RangeError('bound must be at most 2^53');
+  const limit = RANGE - (RANGE % bound);
+  const buf = new Uint32Array(2);
+  for (;;) {
+    crypto.getRandomValues(buf);
+    const x = (buf[0] >>> 11) * 2 ** 32 + buf[1];
+    if (x < limit) return x % bound;
+  }
+}
+
 /**
  * Uniform integer in `[min, max]`, both ends inclusive.
  */
 export function randomInt(min: number, max: number): number {
   const lo = Math.ceil(Math.min(min, max));
   const hi = Math.floor(Math.max(min, max));
-  if (hi < lo) return lo;
+  // e.g. [0.5, 0.7]: returning `lo` would give 1, outside the range.
+  if (hi < lo) throw new RangeError('no integer in range');
   return lo + randomBelow(hi - lo + 1);
 }
 

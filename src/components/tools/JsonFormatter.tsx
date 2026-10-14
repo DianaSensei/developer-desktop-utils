@@ -28,7 +28,29 @@ import MESSAGES from '@/components/tools/JsonFormatter.messages';
 import { useInputHistory } from '@/hooks/useInputHistory';
 import { SplitPane } from '@/components/ui/split-pane';
 
-export type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
+/** A number literal a double cannot hold exactly (an id above 2^53, more
+ *  significant digits than a double keeps, `1e999`). It is kept as its
+ *  source text so formatting never changes the value. */
+export class JsonNumberText {
+  constructor(readonly text: string) {}
+  toString(): string {
+    return this.text;
+  }
+}
+
+export type JsonValue =
+  | string
+  | number
+  | boolean
+  | null
+  | JsonNumberText
+  | JsonValue[]
+  | { [key: string]: JsonValue };
+
+/** Objects and arrays; `JsonNumberText` is a leaf even though it is an object. */
+function isContainer(value: JsonValue): value is JsonValue[] | { [key: string]: JsonValue } {
+  return value !== null && typeof value === 'object' && !(value instanceof JsonNumberText);
+}
 type Mode = 'beautify' | 'string' | 'minify';
 
 export const INDENT_OPTIONS: Record<string, { unit: string; size: number }> = {
@@ -37,17 +59,26 @@ export const INDENT_OPTIONS: Record<string, { unit: string; size: number }> = {
   tab: { unit: '\t', size: 4 },
 };
 
-// --- Quote normalization & lenient parsing ---------------------------------
-function normalizeSmartQuotes(text: string) {
-  return text
-    .replace(/[“”„‟«»]/g, '"')
-    .replace(/[‘’‚‛‹›]/g, "'");
+// --- Lenient parsing ---------------------------------------------------------
+// Typographic quotes (pasted from chat or a word processor) may stand in for
+// the delimiters, but only there: inside a string opened with a straight
+// quote, “ ” ‘ ’ « » are ordinary characters and are kept.
+const CURLY_DOUBLE = '“”„‟«»';
+const CURLY_SINGLE = '‘’‚‛‹›';
+
+function closersFor(open: string): string {
+  if (open === '"' || open === "'") return open;
+  return CURLY_DOUBLE.includes(open) ? CURLY_DOUBLE + '"' : CURLY_SINGLE + "'";
+}
+
+function isQuoteStart(c: string | undefined): boolean {
+  return c !== undefined && (c === '"' || c === "'" || CURLY_DOUBLE.includes(c) || CURLY_SINGLE.includes(c));
 }
 
 // Tolerant JSON parser: accepts standard JSON plus single quotes, unquoted
 // object keys, trailing commas, and // and /* */ comments.
 function parseLenient(text: string): JsonValue {
-  const src = normalizeSmartQuotes(text);
+  const src = text;
   const n = src.length;
   let i = 0;
 
@@ -84,11 +115,11 @@ function parseLenient(text: string): JsonValue {
   };
 
   const parseString = (): string => {
-    const quote = src[i++];
+    const closers = closersFor(src[i++]);
     let result = '';
     while (i < n) {
       const c = src[i++];
-      if (c === quote) {
+      if (closers.includes(c)) {
         if (isStringEnd()) return result;
         result += c;
         continue;
@@ -126,7 +157,7 @@ function parseLenient(text: string): JsonValue {
     return src.slice(start, i);
   };
 
-  const parseNumber = (): number => {
+  const parseNumber = (): number | JsonNumberText => {
     const start = i;
     if (src[i] === '-' || src[i] === '+') i++;
     while (i < n && /[0-9]/.test(src[i])) i++;
@@ -139,8 +170,15 @@ function parseLenient(text: string): JsonValue {
       if (src[i] === '+' || src[i] === '-') i++;
       while (i < n && /[0-9]/.test(src[i])) i++;
     }
-    const value = Number(src.slice(start, i));
+    // A leading `+` is lenient input only; JSON output never carries it.
+    const lexeme = src.slice(start, i).replace(/^\+/, '');
+    const value = Number(lexeme);
     if (Number.isNaN(value)) fail('Invalid number');
+    const isInteger = /^-?\d+$/.test(lexeme);
+    const significantDigits = lexeme.replace(/[eE].*$/, '').replace(/[^0-9]/g, '').replace(/^0+/, '').length;
+    if (!Number.isFinite(value) || (isInteger && !Number.isSafeInteger(value)) || significantDigits > 17) {
+      return new JsonNumberText(lexeme);
+    }
     return value;
   };
 
@@ -150,7 +188,7 @@ function parseLenient(text: string): JsonValue {
     if (c === undefined) return fail('Unexpected end of input');
     if (c === '{') return parseObject();
     if (c === '[') return parseArray();
-    if (c === '"' || c === "'") return parseString();
+    if (isQuoteStart(c)) return parseString();
     if (c === '-' || c === '+' || (c >= '0' && c <= '9')) return parseNumber();
     if (src.startsWith('true', i)) { i += 4; return true; }
     if (src.startsWith('false', i)) { i += 5; return false; }
@@ -166,11 +204,13 @@ function parseLenient(text: string): JsonValue {
     for (;;) {
       skipWs();
       const c = src[i];
-      const key = c === '"' || c === "'" ? parseString() : parseUnquotedKey();
+      const key = isQuoteStart(c) ? parseString() : parseUnquotedKey();
       skipWs();
       if (src[i] !== ':') fail('Expected ":"');
       i++;
-      obj[key] = parseValue();
+      // defineProperty: a `__proto__` key must stay a key, not set the
+      // object's prototype (and so vanish from the output).
+      Object.defineProperty(obj, key, { value: parseValue(), writable: true, enumerable: true, configurable: true });
       skipWs();
       if (src[i] === ',') {
         i++;
@@ -212,7 +252,7 @@ function parseLenient(text: string): JsonValue {
 function tryParseStructured(text: string): JsonValue | undefined {
   try {
     const value = parseLenient(text);
-    if (value !== null && typeof value === 'object') return value;
+    if (isContainer(value)) return value;
   } catch {
     // not structured JSON
   }
@@ -317,7 +357,7 @@ export function serialize(value: JsonValue, indentUnit: string, quote: string): 
 
     if (val === null) return 'null';
     if (typeof val === 'string') return quoteText(val, quote);
-    if (typeof val === 'number' || typeof val === 'boolean') return String(val);
+    if (typeof val === 'number' || typeof val === 'boolean' || val instanceof JsonNumberText) return String(val);
 
     if (Array.isArray(val)) {
       if (val.length === 0) return '[]';
@@ -339,6 +379,7 @@ type ValueType = 'string' | 'number' | 'boolean' | 'null' | 'array' | 'object';
 
 function valueType(value: JsonValue): ValueType {
   if (value === null) return 'null';
+  if (value instanceof JsonNumberText) return 'number';
   if (Array.isArray(value)) return 'array';
   return typeof value as ValueType;
 }
@@ -348,7 +389,7 @@ function buildChildPath(parentPath: string, key: string) {
 }
 
 function collectContainerPaths(value: JsonValue, path = '$', acc: string[] = []): string[] {
-  if (value !== null && typeof value === 'object') {
+  if (isContainer(value)) {
     acc.push(path);
     if (Array.isArray(value)) {
       value.forEach((item, index) => collectContainerPaths(item, `${path}[${index}]`, acc));
@@ -466,7 +507,7 @@ export function JsonFormatter() {
   const [selectedPath, setSelectedPath] = useState('');
   const [hoveredContainer, setHoveredContainer] = useState('');
 
-  useQuickPaste((text) => setInput(normalizeSmartQuotes(text)));
+  useQuickPaste(setInput);
   useInputHistory(input, setInput);
 
   const indent = INDENT_OPTIONS[indentKey] ?? INDENT_OPTIONS['2'];

@@ -83,17 +83,24 @@ function applyClauseBreaks(text: string, ind: string): string {
     const ch = text[i];
     if (ch === '(') { depth++; result += ch; i++; continue; }
     if (ch === ')') { depth = Math.max(0, depth - 1); result += ch; i++; continue; }
-    if (depth === 0 && /[a-zA-Z]/i.test(ch)) {
+    // Keywords only start a clause at the start of a word: `color`,
+    // `region`, `date_from` must not break at OR, ON, FROM.
+    if (/[A-Za-z_$]/.test(ch) && (i === 0 || !/[A-Za-z0-9_$.]/.test(text[i - 1]))) {
       const rest = text.slice(i);
       let matched = false;
-      for (const { re, indent } of SQL_BREAK_PATTERNS) {
-        const m = rest.match(re);
-        if (m) {
-          if (result.trimEnd()) result = result.trimEnd() + '\n' + (indent ? ind : '');
-          result += m[0]; i += m[0].length; matched = true; break;
+      if (depth === 0) {
+        for (const { re, indent } of SQL_BREAK_PATTERNS) {
+          const m = rest.match(re);
+          if (m) {
+            if (result.trimEnd()) result = result.trimEnd() + '\n' + (indent ? ind : '');
+            result += m[0]; i += m[0].length; matched = true; break;
+          }
         }
       }
-      if (!matched) { result += ch; i++; }
+      if (!matched) {
+        const word = /^[A-Za-z0-9_$]+/.exec(rest)![0];
+        result += word; i += word.length;
+      }
       continue;
     }
     result += ch; i++;
@@ -113,11 +120,14 @@ function restore(text: string, store: string[]): string {
   return text.replace(/\x00(\d+)\x00/g, (_, i) => store[Number(i)]);
 }
 
-function formatSQL(input: string, opts: SqlFormatOptions): string {
+export function formatSQL(input: string, opts: SqlFormatOptions): string {
   const ind = ' '.repeat(opts.indentSize);
   const [text1, store] = protect(
     input,
-    /('(?:[^'\\]|\\.|'')*'|"(?:[^"\\]|\\.|"")*"|`[^`]*`|--[^\r\n]*|\/\*[\s\S]*?\*\/)/g
+    // A line comment keeps the newline that ends it, otherwise collapsing
+    // whitespace pulls the next line into the comment. `$tag$…$tag$` is a
+    // Postgres function body, not SQL to reformat.
+    /('(?:[^'\\]|\\.|'')*'|"(?:[^"\\]|\\.|"")*"|`[^`]*`|\$([A-Za-z_]*)\$[\s\S]*?\$\2\$|--[^\r\n]*(?:\r?\n|$)|\/\*[\s\S]*?\*\/)/g
   );
   let text = text1;
   if (opts.collapseSpaces) text = text.replace(/[ \t]+/g, ' ');
@@ -128,11 +138,11 @@ function formatSQL(input: string, opts: SqlFormatOptions): string {
 
 // ─── MongoDB / JS formatter ───────────────────────────────────────────────────
 
-function formatMongo(input: string, indentSize: number): string {
+export function formatMongo(input: string, indentSize: number): string {
   const ind = ' '.repeat(indentSize);
   const [text1, store] = protect(
     input,
-    /("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`|\/\/[^\r\n]*|\/\*[\s\S]*?\*\/)/g
+    /("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`|\/\/[^\r\n]*(?:\r?\n|$)|\/\*[\s\S]*?\*\/)/g
   );
   let text = text1.replace(/\s+/g, ' ').trim();
 

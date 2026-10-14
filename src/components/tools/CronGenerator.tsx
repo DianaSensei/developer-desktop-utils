@@ -348,15 +348,18 @@ function fieldsFromExpression(mode: CronMode, expression: string) {
   );
 }
 
-function inferMode(expression: string, fallback: CronMode): CronMode {
-  const count = normalizeExpression(expression).split(' ').filter(Boolean).length;
-  if (count === 5) return 'linux';
-  if (count === 6) {
-    // Spring uses 0-7 for day of week, Quartz uses 1-7
-    // If it looks like it uses 0-6 range or SUN-SAT aliases, it's likely Spring
-    return 'spring';
+export function inferMode(expression: string, fallback: CronMode): CronMode {
+  const fields = normalizeExpression(expression).split(' ').filter(Boolean);
+  if (fields.length === 5) return 'linux';
+  if (fields.length === 7) return 'quartz';
+  if (fields.length === 6) {
+    // Quartz (year optional) and Spring both have 6 fields, and they number
+    // days of the week differently (Quartz 1 = Sunday), so keep the flavour
+    // the user picked. Only coming from 5-field Linux, guess: `?`, `L`, `W`
+    // and `#` exist only in Quartz.
+    if (fallback === 'quartz' || fallback === 'spring') return fallback;
+    return /[?LW#]/.test(fields.slice(3, 6).join(' ')) ? 'quartz' : 'spring';
   }
-  if (count === 7) return 'quartz';
   return fallback;
 }
 
@@ -528,7 +531,13 @@ function explainExpression(mode: CronMode, fields: CronFields | null, errors: st
     if (secondStep && fields.minute === '*' && fields.hour === '*' && fields.dayOfMonth === '?' && fields.month === '*' && fields.dayOfWeek === '*') {
       return t('everyNSeconds', { n: secondStep[1] });
     }
-    if (minuteStep && fields.seconds === '0' && fields.hour === '*' && fields.month === '*') {
+    // Only when no day is restricted: `0 */5 * ? * MON` is not "every 5
+    // minutes".
+    const anyDay = (v: string) => v === '*' || v === '?';
+    if (
+      minuteStep && fields.seconds === '0' && fields.hour === '*' && fields.month === '*' &&
+      anyDay(fields.dayOfMonth) && anyDay(fields.dayOfWeek)
+    ) {
       return t('everyNMinutes', { n: minuteStep[1] });
     }
   }

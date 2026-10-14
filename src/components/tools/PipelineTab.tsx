@@ -1,6 +1,6 @@
-import { useDeferredValue, useMemo, useState } from 'react';
+import { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { ToggleChip } from '@/components/ui/toggle-chip';
-import { usePluginSdkFor, usePluginState } from '@/platform';
+import { usePluginSdkFor, usePluginState, useSecretState } from '@/platform';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Segmented } from '@/components/ui/segmented';
@@ -116,6 +116,11 @@ const SEP_OPTIONS = [
   { id: '\n', label: '↵ — newline'       },
   { id: ',',  label: ', — comma'         },
 ];
+
+export function compareCodeUnits(a: string, b: string): number {
+  if (a === b) return 0;
+  return a < b ? -1 : 1;
+}
 
 // ─── Crypto helpers ────────────────────────────────────────────────────────────
 
@@ -241,8 +246,11 @@ function executeStep(step: PipelineStep, input: string): StepResult {
         try { flatMap = flattenJson(JSON.parse(step.jsonText ?? '')); } catch { /* empty */ }
         let active = (step.jsonFields ?? []).filter((f) => f.enabled);
         const sort = step.jsonSort ?? 'none';
-        if (sort === 'asc')  active = [...active].sort((a, b) => a.key.localeCompare(b.key));
-        if (sort === 'desc') active = [...active].sort((a, b) => b.key.localeCompare(a.key));
+        // Byte (ASCII) order, as payment gateways sign it (OnePay vpc_*,
+        // Alipay, WeChat Pay): `Version` < `amount`, `vpc_MerchTxnRef` <
+        // `vpc_Merchant`. localeCompare would put lowercase first.
+        if (sort === 'asc')  active = [...active].sort((a, b) => compareCodeUnits(a.key, b.key));
+        if (sort === 'desc') active = [...active].sort((a, b) => compareCodeUnits(b.key, a.key));
         const sep = step.jsonSeparator ?? '&';
         const fmt = step.jsonFormat ?? 'key=value';
         const parts = active.map((f) => {
@@ -934,7 +942,29 @@ export function PipelineTab({ active }: { active: boolean }) {
   const t = useMessages(MESSAGES);
   const sdk = usePluginSdkFor('base64');
   const [steps, setSteps] = usePluginState<PipelineStep[]>(sdk, 'pipeline:steps-v2', DEFAULT_STEPS, { legacyKey: 'devtool:pipeline:steps-v2' });
+  // HMAC keys are credentials: kept in the vault by step id, never in the
+  // plain settings file that holds the steps.
+  const [stepKeys, setStepKeys, stepKeysReady] = useSecretState<Record<string, string>>(sdk, 'pipeline:step-keys', {});
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
+
+  // Earlier versions stored `key` inside the steps: move it to the vault
+  // once the vault has loaded, then drop it from the steps.
+  useEffect(() => {
+    if (!stepKeysReady) return;
+    const legacy = steps.filter((s) => s.key);
+    if (legacy.length === 0) return;
+    setStepKeys((prev) => {
+      const next = { ...prev };
+      for (const s of legacy) if (!next[s.id]) next[s.id] = s.key!;
+      return next;
+    });
+    setSteps((prev) => prev.map(({ key: _key, ...rest }) => rest));
+  }, [stepKeysReady, steps, setSteps, setStepKeys]);
+
+  const stepsWithKeys = useMemo(
+    () => steps.map((s) => (s.op === 'hmac' ? { ...s, key: stepKeys[s.id] ?? s.key ?? '' } : s)),
+    [steps, stepKeys],
+  );
 
   // Quick-paste JSON directly into the input step
   useQuickPaste((text) => {
@@ -957,14 +987,22 @@ export function PipelineTab({ active }: { active: boolean }) {
     });
   }, active);
 
-  const deferredSteps = useDeferredValue(steps);
+  const deferredSteps = useDeferredValue(stepsWithKeys);
   const results = useMemo(() => executePipeline(deferredSteps), [deferredSteps]);
 
-  const updateStep = (id: string, patch: Partial<PipelineStep>) =>
-    setSteps((prev) => prev.map((s) => s.id === id ? { ...s, ...patch } : s));
+  const updateStep = (id: string, { key, ...patch }: Partial<PipelineStep>) => {
+    if (key !== undefined) setStepKeys((prev) => ({ ...prev, [id]: key }));
+    if (Object.keys(patch).length > 0) setSteps((prev) => prev.map((s) => s.id === id ? { ...s, ...patch } : s));
+  };
 
-  const removeStep = (id: string) =>
+  const removeStep = (id: string) => {
     setSteps((prev) => prev.filter((s) => s.id !== id));
+    setStepKeys((prev) => {
+      if (!(id in prev)) return prev;
+      const { [id]: _removed, ...rest } = prev;
+      return rest;
+    });
+  };
 
   const moveStep = (id: string, dir: -1 | 1) => {
     setSteps((prev) => {
@@ -979,7 +1017,8 @@ export function PipelineTab({ active }: { active: boolean }) {
   };
 
   const addStep = (op: StepOp) => {
-    setSteps((prev) => [...prev, { id: makeId(), op, ...(STEP_DEFAULTS[op] ?? {}) }]);
+    const { key: _key, ...defaults } = STEP_DEFAULTS[op] ?? {};
+    setSteps((prev) => [...prev, { id: makeId(), op, ...defaults }]);
   };
 
   return (
@@ -995,7 +1034,7 @@ export function PipelineTab({ active }: { active: boolean }) {
 
       {/* Steps */}
       <div className="space-y-0">
-        {steps.map((step, index) => (
+        {stepsWithKeys.map((step, index) => (
           <div key={step.id}>
             <StepCard
               step={step} index={index} total={steps.length}

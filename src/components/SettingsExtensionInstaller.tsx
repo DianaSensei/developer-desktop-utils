@@ -1,10 +1,16 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useId, useState } from 'react';
 import { useLocale } from '@/contexts/LocaleContext';
 import { isTauri } from '@/lib/platform';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Callout } from '@/components/ui/callout';
 import { Spinner } from '@/components/ui/spinner';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+  ExtensionManifestPreview,
+  findReplacedRecord,
+  replacementNeedsAcknowledgement,
+} from '@/components/ExtensionManifestPreview';
 import {
   assertNoConflictingInstall,
   currentTargetTriple,
@@ -12,6 +18,7 @@ import {
   getPlugin,
   installArtifact,
   listInstalledArtifacts,
+  type InstalledArtifactRecord,
   type RemoteArtifactManifest,
 } from '@/platform';
 
@@ -42,6 +49,11 @@ export function SettingsExtensionInstaller() {
   // so it cannot be installed from here (the marketplace and deep links
   // install both together).
   const [missingServiceBin, setMissingServiceBin] = useState<string | null>(null);
+  // Installed copy the preview would replace, and the user's acknowledgement
+  // when that replacement is a downgrade or comes from another source.
+  const [replaced, setReplaced] = useState<InstalledArtifactRecord | undefined>(undefined);
+  const [acknowledged, setAcknowledged] = useState(false);
+  const ackId = useId();
 
   const runPreview = useCallback(async (targetUrl: string, marketId?: string) => {
     setPreview(null);
@@ -50,18 +62,21 @@ export function SettingsExtensionInstaller() {
     setInstallError(null);
     setPreviewMarketId(marketId);
     setMissingServiceBin(null);
+    setReplaced(undefined);
+    setAcknowledged(false);
     if (!targetUrl.trim()) return;
     setPreviewing(true);
     try {
       const manifest = await fetchArtifactManifestPreview(targetUrl.trim());
       setPreview(manifest);
+      const installed = await listInstalledArtifacts();
+      setReplaced(findReplacedRecord(manifest, installed));
       if (manifest.kind === 'service') {
         // Computed by the host, not guessed in the webview.
         setPreviewTriple(await currentTargetTriple());
       } else if (manifest.service) {
         // The plugin needs a sidecar: warn now if it is missing rather than
         // after install with an obscure service error.
-        const installed = await listInstalledArtifacts();
         const hasService = installed.some((r) => r.kind === 'service' && r.manifest.bin === manifest.service!.bin);
         if (!hasService) setMissingServiceBin(manifest.service.bin);
       }
@@ -87,7 +102,8 @@ export function SettingsExtensionInstaller() {
       if (preview?.kind === 'plugin') {
         await assertNoConflictingInstall(preview.id, previewMarketId, getPlugin(preview.id)?.group);
       }
-      await installArtifact(url.trim(), previewMarketId);
+      // Rust refuses the install if the source now serves something else.
+      await installArtifact(url.trim(), previewMarketId, preview ?? undefined);
       setUrl('');
       setPreview(null);
       setPreviewTriple(null);
@@ -104,8 +120,7 @@ export function SettingsExtensionInstaller() {
     await relaunch();
   };
 
-  const previewTargetSupported =
-    preview?.kind === 'service' && previewTriple ? Object.hasOwn(preview.targets, previewTriple) : null;
+  const needsAcknowledgement = !!preview && replacementNeedsAcknowledgement(preview, url.trim(), replaced);
 
   return (
     <div className="space-y-3">
@@ -122,6 +137,8 @@ export function SettingsExtensionInstaller() {
             setPreview(null);
             setPreviewTriple(null);
             setPreviewError(null);
+            setReplaced(undefined);
+            setAcknowledged(false);
             // A typed URL no longer belongs to the previously previewed market.
             setPreviewMarketId(undefined);
           }}
@@ -139,63 +156,27 @@ export function SettingsExtensionInstaller() {
 
       {preview && (
         <div className="rounded-lg border p-3 space-y-2">
-          <div className="flex items-center gap-2">
-            <span className="rounded border px-1.5 py-0.5 font-mono text-[11px] uppercase text-fg-mute">
-              {preview.kind === 'plugin' ? t('settings.extensions.install.kind.plugin') : t('settings.extensions.install.kind.service')}
-            </span>
-            {preview.kind === 'plugin' ? (
-              <p className="text-xs font-medium">
-                {preview.label} <span className="font-mono text-fg-mute/60">{preview.id}@{preview.version}</span>
-              </p>
-            ) : (
-              <p className="text-xs font-medium font-mono">{preview.bin}@{preview.version}</p>
+          <ExtensionManifestPreview manifest={preview} sourceUrl={url.trim()} targetTriple={previewTriple} replaced={replaced}>
+            {missingServiceBin && (
+              <Callout tone="warning" size="sm">
+                {t('settings.extensions.install.serviceDependencyMissing', { bin: missingServiceBin })}
+              </Callout>
             )}
-          </div>
+          </ExtensionManifestPreview>
 
-          {preview.kind === 'plugin' ? (
-            <>
-              <p className="text-[11px] text-fg-mute">{preview.description}</p>
-              {preview.permissions.length > 0 && (
-                <div className="flex flex-wrap gap-1">
-                  {preview.permissions.map((perm) => (
-                    <span key={perm} className="rounded border px-1.5 py-0.5 font-mono text-[11px] text-fg-mute">
-                      {perm}
-                    </span>
-                  ))}
-                </div>
-              )}
-              {missingServiceBin && (
-                <Callout tone="warning" size="sm">
-                  {t('settings.extensions.install.serviceDependencyMissing', { bin: missingServiceBin })}
-                </Callout>
-              )}
-            </>
-          ) : (
-            <div className="space-y-1">
-              {previewTriple && (
-                <p className="text-[11px] text-fg-mute">
-                  {t('settings.extensions.install.targetTriple', { triple: previewTriple })}
-                </p>
-              )}
-              {previewTargetSupported !== null && (
-                <p className={previewTargetSupported ? 'text-[11px] text-fg-mute' : 'text-[11px] text-bad'}>
-                  {previewTargetSupported
-                    ? t('settings.extensions.install.targetSupported')
-                    : t('settings.extensions.install.targetUnsupported')}
-                </p>
-              )}
-              <div className="flex flex-wrap gap-1">
-                {Object.keys(preview.targets).map((triple) => (
-                  <span key={triple} className="rounded border px-1.5 py-0.5 font-mono text-[11px] text-fg-mute">
-                    {triple}
-                  </span>
-                ))}
-              </div>
+          {needsAcknowledgement && (
+            <div className="flex items-start gap-2">
+              <Checkbox id={ackId} size="sm" checked={acknowledged} onCheckedChange={setAcknowledged} className="mt-0.5" />
+              <label htmlFor={ackId} className="text-[11px]">{t('settings.extensions.install.acknowledge')}</label>
             </div>
           )}
 
           {installError && <Callout tone="error" size="sm">{installError}</Callout>}
-          <Button size="sm" onClick={() => void handleInstall()} disabled={installing}>
+          <Button
+            size="sm"
+            onClick={() => void handleInstall()}
+            disabled={installing || (needsAcknowledgement && !acknowledged)}
+          >
             {installing ? <Spinner size="sm" /> : t('settings.extensions.install.confirm')}
           </Button>
         </div>

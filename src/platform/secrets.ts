@@ -126,6 +126,9 @@ const MIGRATIONS: ReadonlyArray<{ from: string; pluginId: string; key: string }>
   { from: 'devtool:base64:hash:hmacKey', pluginId: 'base64', key: 'hmac-key' },
   { from: 'devtool:hash:key', pluginId: 'base64', key: 'aes-key' },
   { from: 'devtool:base64:hash:key', pluginId: 'base64', key: 'aes-key' },
+  // The plaintext typed into the Encrypt tab.
+  { from: 'devtool:hash:encryptInput', pluginId: 'base64', key: 'encrypt-input' },
+  { from: 'devtool:base64:hash:encryptInput', pluginId: 'base64', key: 'encrypt-input' },
 ];
 
 /**

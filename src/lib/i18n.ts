@@ -344,6 +344,29 @@ export const DICTIONARY = {
     vi: 'Manifest KHÔNG có bản cho nền tảng này — cài sẽ bị từ chối.',
     en: 'The manifest has NO build for this platform — install will be rejected.',
   },
+  'settings.extensions.install.source': { vi: 'Nguồn: {{host}}', en: 'Source: {{host}}' },
+  'settings.extensions.install.hosts': { vi: 'Được gọi tới:', en: 'Network access:' },
+  'settings.extensions.install.newBadge': { vi: 'mới', en: 'new' },
+  'settings.extensions.install.replaces': {
+    vi: 'Sẽ thay bản {{version}} đang cài (nguồn: {{host}}).',
+    en: 'Replaces the installed {{version}} (from {{host}}).',
+  },
+  'settings.extensions.install.downgrade': {
+    vi: 'Bản này CŨ HƠN bản đang cài.',
+    en: 'This is an OLDER version than the one installed.',
+  },
+  'settings.extensions.install.sourceChanged': {
+    vi: 'Bản này đến từ nguồn KHÁC với bản đang cài.',
+    en: 'This comes from a DIFFERENT source than the installed copy.',
+  },
+  'settings.extensions.install.addedAccess': {
+    vi: 'Bản này xin thêm quyền hoặc quyền truy cập mạng (đánh dấu "mới").',
+    en: 'This version asks for more permissions or network access (marked "new").',
+  },
+  'settings.extensions.install.acknowledge': {
+    vi: 'Tôi đã đọc cảnh báo ở trên và vẫn muốn cài',
+    en: 'I have read the warning above and still want to install',
+  },
   'settings.extensions.install.serviceDependencyMissing': {
     vi: 'Plugin này cần sidecar "{{bin}}" để hoạt động đầy đủ, và sidecar đó CHƯA được cài. Dán URL manifest service của nó (thường đi kèm cùng chỗ với plugin này) và cài riêng — hai URL tách biệt nhau, không tự tải hộ được.',
     en: 'This plugin needs the "{{bin}}" sidecar to work fully, and it isn’t installed yet. Paste its service manifest URL (usually listed alongside this plugin) and install it separately — the two are separate URLs, this can’t fetch it for you.',

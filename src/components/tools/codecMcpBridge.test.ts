@@ -37,7 +37,10 @@ describe('codecMcpBridge — hash_compute', () => {
     const res = await call('hash_compute', { text: 'hello' }) as Record<string, string>;
     expect(res.md5).toBe('5d41402abc4b2a76b9719d911017c592');
     expect(res.sha256).toMatch(/^[0-9a-f]{64}$/);
-    expect(Object.keys(res)).toHaveLength(9);
+    expect(Object.keys(res)).toHaveLength(10);
+    // FIPS 202 SHA-3, distinct from the original Keccak.
+    expect(res['sha3-256']).toBe('3338be694f50c5f338814986cdf0686453a888b84f424d792af4b9202398f392');
+    expect(res['keccak-256']).toBe('1c8aff950685c2ed4bc3174f3472287b56d9517b9c948127319a09a7a36deac8');
   });
 
   it('returns one algorithm when given', async () => {
@@ -85,5 +88,14 @@ describe('codecMcpBridge — encrypt_text/decrypt_text', () => {
 
   it('rejects an unknown algorithm', async () => {
     await expect(call('encrypt_text', { text: 'x', key: 'k', algorithm: 'nope' })).rejects.toThrow(/Unknown encryption algorithm/);
+  });
+});
+
+describe('codecMcpBridge — an empty string is input, not a missing argument', () => {
+  it('hashes, HMACs and encodes ""', async () => {
+    const hash = (await call('hash_compute', { text: '', algorithm: 'sha256' })) as { hash: string };
+    expect(hash.hash).toBe('e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855');
+    await expect(call('hash_hmac', { text: '', key: '', algorithm: 'sha256' })).resolves.toMatchObject({ algorithm: 'sha256' });
+    await expect(call('codec_encode', { text: '', algorithm: 'base64' })).resolves.toEqual({ output: '' });
   });
 });

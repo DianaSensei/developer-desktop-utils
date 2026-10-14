@@ -54,7 +54,15 @@ export function buildUrl(req: ApiRequest, sub: Sub): string {
   const pathMap: Record<string, string> = {};
   for (const p of req.pathParams ?? []) if (p.enabled && p.key) pathMap[p.key] = sub(p.value);
   const enc = (v: string) => (req.settings?.encodeUrl === false ? v : encodeURIComponent(v));
-  base = base.replace(/(\/):([A-Za-z_]\w*)/g, (m, slash, name) => (name in pathMap ? slash + enc(pathMap[name]) : m));
+  // Names may contain '-' (OpenAPI `{file-id}` imports as `:file-id`); a
+  // name that isn't defined still falls back to the part before the first
+  // '-', so `/:id-v2` keeps working.
+  base = base.replace(/(\/):([A-Za-z_][\w-]*)/g, (m, slash, name: string) => {
+    if (name in pathMap) return slash + enc(pathMap[name]);
+    const dash = name.indexOf('-');
+    const head = dash > 0 ? name.slice(0, dash) : '';
+    return head && head in pathMap ? slash + enc(pathMap[head]) + name.slice(dash) : m;
+  });
 
   const params = enabledPairs(req.params).map(
     ([k, v]) => [sub(k), sub(v)] as [string, string],
@@ -78,9 +86,21 @@ export function buildUrl(req: ApiRequest, sub: Sub): string {
   if (req.settings?.encodeUrl === false) {
     return `${head}?${params.map(([k, v]) => `${k}=${v}`).join('&')}`;
   }
-  const search = new URLSearchParams();
-  for (const [k, v] of params) search.append(k, v);
-  return `${head}?${search.toString()}`;
+  return `${head}?${params.map(([k, v]) => `${encodeQueryPart(k)}=${encodeQueryPart(v)}`).join('&')}`;
+}
+
+/**
+ * Percent-encodes a query key or value, leaving what is already encoded as
+ * it is: valid `%XX` escapes and `+`. Pasted or imported URLs carry encoded
+ * values (`redirect=https%3A%2F%2F…`, `q=a+b`); encoding them again sent
+ * `%253A` and `%2B`, a different value. A literal `%` or space is still
+ * encoded (`50%` → `50%25`, `a b` → `a%20b`).
+ */
+export function encodeQueryPart(s: string): string {
+  return s
+    .split(/(%[0-9A-Fa-f]{2})/)
+    .map((part, i) => (i % 2 === 1 ? part : encodeURIComponent(part).replace(/%2B/g, '+')))
+    .join('');
 }
 
 // Assemble headers from the collection/folder chain (outer→inner), the
@@ -446,6 +466,9 @@ const DISPLAY_CONTENT_TYPE: Record<string, string | null> = {
 };
 
 function resolveBody(req: ApiRequest, sub: Sub): ResolvedBody {
+  // buildBody sends none for these (fetch refuses a GET/HEAD body), so the
+  // generated code must not show one either.
+  if (req.method === 'GET' || req.method === 'HEAD') return { type: 'none' };
   const b = req.body;
   switch (b.mode) {
     case 'json': case 'xml': case 'text': case 'sparql':

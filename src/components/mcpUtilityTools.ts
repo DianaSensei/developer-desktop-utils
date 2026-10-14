@@ -36,12 +36,12 @@ export const CODEC_MCP_TOOLS: McpToolDef[] = [
         },
         {
             "name": "hash_compute",
-            "description": "Hash text. Omit `algorithm` to get every algorithm at once (md5, ripemd160, sha1, sha224, sha256, sha384, sha512, sha3-256, sha3-512), as { algorithm: hash }; pass one to get just that hash as { algorithm, hash }.",
+            "description": "Hash text. Omit `algorithm` to get every algorithm at once (md5, ripemd160, sha1, sha224, sha256, sha384, sha512, sha3-256, sha3-512, keccak-256), as { algorithm: hash }; pass one to get just that hash as { algorithm, hash }.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
                     "text": { "type": "string" },
-                    "algorithm": { "type": "string", "enum": ["md5", "ripemd160", "sha1", "sha224", "sha256", "sha384", "sha512", "sha3-256", "sha3-512"] },
+                    "algorithm": { "type": "string", "enum": ["md5", "ripemd160", "sha1", "sha224", "sha256", "sha384", "sha512", "sha3-256", "sha3-512", "keccak-256"] },
                     "upperHex": { "type": "boolean" }
                 },
                 "required": ["text"]

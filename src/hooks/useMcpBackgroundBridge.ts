@@ -1,4 +1,4 @@
-import { usePersistentState } from './usePersistentState';
+import { useSharedSetting } from './useSharedSetting';
 
 const KEY = 'devtool-mcp-background-bridge';
 
@@ -10,6 +10,8 @@ const KEY = 'devtool-mcp-background-bridge';
  * on before an MCP client can drive either tool while it isn't visible.
  */
 export function useMcpBackgroundBridge() {
-  const [enabled, setEnabled] = usePersistentState<boolean>(KEY, false);
+  // Shared: the app-root bridge, each tool's bridge, Settings and the MCP
+  // management tools must all see a change at once.
+  const [enabled, setEnabled] = useSharedSetting<boolean>(KEY, false);
   return { enabled, setEnabled };
 }

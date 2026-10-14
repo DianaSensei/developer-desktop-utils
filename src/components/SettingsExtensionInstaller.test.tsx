@@ -152,6 +152,7 @@ describe('SettingsExtensionInstaller — xem trước (preview)', () => {
     await settle();
 
     invokeMock.mockResolvedValueOnce(serviceManifestRaw());
+    invokeMock.mockResolvedValueOnce([]); // listInstalledArtifacts — nothing to replace
     invokeMock.mockResolvedValueOnce('aarch64-apple-darwin'); // current_target_triple
 
     const input = screen.getByPlaceholderText('https://example.com/extension.json');
@@ -176,8 +177,10 @@ describe('SettingsExtensionInstaller — xem trước (preview)', () => {
     await waitFor(() => {
       expect(screen.getByText(/External extensions changed|Đã thay đổi tiện ích/)).toBeTruthy();
     });
+    // The previewed manifest goes along so Rust can refuse a changed one.
     expect(invokeMock).toHaveBeenCalledWith('artifact_installer_install', {
       sourceUrl: 'https://example.com/svc.json',
+      expectedManifest: serviceManifestRaw(),
     });
   });
 
@@ -186,6 +189,7 @@ describe('SettingsExtensionInstaller — xem trước (preview)', () => {
     await settle();
 
     invokeMock.mockResolvedValueOnce(serviceManifestRaw());
+    invokeMock.mockResolvedValueOnce([]); // listInstalledArtifacts
     invokeMock.mockResolvedValueOnce('x86_64-pc-windows-msvc'); // triple KHÔNG có trong manifest.targets
 
     const input = screen.getByPlaceholderText('https://example.com/extension.json');
@@ -249,6 +253,7 @@ describe('SettingsExtensionInstaller — cài đặt (success)', () => {
     await settle();
 
     invokeMock.mockResolvedValueOnce(pluginManifestRaw());
+    invokeMock.mockResolvedValueOnce([]); // listInstalledArtifacts — nothing to replace
     const input = screen.getByPlaceholderText('https://example.com/extension.json');
     fireEvent.change(input, { target: { value: 'https://example.com/plugin.json' } });
     fireEvent.click(screen.getByRole('button', { name: /Preview|Xem trước/ }));
@@ -264,6 +269,7 @@ describe('SettingsExtensionInstaller — cài đặt (success)', () => {
     });
     expect(invokeMock).toHaveBeenCalledWith('artifact_installer_install', {
       sourceUrl: 'https://example.com/plugin.json',
+      expectedManifest: pluginManifestRaw(),
     });
   });
 });

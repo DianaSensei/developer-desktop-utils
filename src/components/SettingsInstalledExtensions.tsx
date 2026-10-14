@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Download, RefreshCw, Trash2 } from 'lucide-react';
 import { useLocale } from '@/contexts/LocaleContext';
 import { useExtensionUpdates } from '@/contexts/ExtensionUpdateContext';
@@ -6,12 +6,11 @@ import { isTauri } from '@/lib/platform';
 import { Button } from '@/components/ui/button';
 import { Callout } from '@/components/ui/callout';
 import { Spinner } from '@/components/ui/spinner';
+import { ExtensionInstallDialog } from '@/components/ExtensionInstallDialog';
 import {
   checkForServiceUpdate,
   checkForUpdate,
   findCoupledRecord,
-  installPlugin,
-  installService,
   listInstalledArtifacts,
   recordKey,
   uninstallArtifact,
@@ -21,7 +20,9 @@ import {
 /**
  * Installed extensions (plugins and services, from a market or a URL), with
  * update and uninstall in one place. Changes apply after a restart, so every
- * action ends by setting the "restart needed" flag.
+ * action ends by setting the "restart needed" flag. An update goes through
+ * `ExtensionInstallDialog`, like a first install, so new permissions, hosts or
+ * a changed source are shown before anything is replaced.
  */
 
 /** The bare id or bin sent to `artifact_installer_uninstall`, unlike
@@ -36,8 +37,9 @@ function coupledLabel(record: InstalledArtifactRecord): string {
   return record.kind === 'plugin' ? record.manifest.label : record.manifest.bin;
 }
 
-/** Action awaiting confirmation on a service row. */
-type PendingServiceAction = 'update' | 'uninstall';
+/** Action awaiting confirmation on a row. Updates confirm in the install
+ *  dialog instead. */
+type PendingServiceAction = 'uninstall';
 
 export function SettingsInstalledExtensions() {
   const { t } = useLocale();
@@ -51,6 +53,9 @@ export function SettingsInstalledExtensions() {
     {},
   );
   const [needsRestart, setNeedsRestart] = useState(false);
+  const [updateTarget, setUpdateTarget] = useState<InstalledArtifactRecord | null>(null);
+  // Stable per target so the dialog does not refetch on unrelated renders.
+  const updateUrls = useMemo(() => (updateTarget ? [updateTarget.sourceUrl] : []), [updateTarget]);
 
   const refresh = useCallback(async () => {
     if (!isTauri) return;
@@ -103,27 +108,6 @@ export function SettingsInstalledExtensions() {
     }
   };
 
-  const performUpdate = async (record: InstalledArtifactRecord) => {
-    const key = recordKey(record);
-    setRowBusy((prev) => ({ ...prev, [key]: true }));
-    setRowError((prev) => ({ ...prev, [key]: '' }));
-    try {
-      if (record.kind === 'plugin') {
-        await installPlugin(record.sourceUrl, record.marketId);
-      } else {
-        await installService(record.sourceUrl, record.marketId);
-      }
-      setRowUpdateVersion((prev) => ({ ...prev, [key]: undefined }));
-      setNeedsRestart(true);
-      await refresh();
-    } catch (e) {
-      setRowError((prev) => ({ ...prev, [key]: String(e instanceof Error ? e.message : e) }));
-    } finally {
-      setRowBusy((prev) => ({ ...prev, [key]: false }));
-      setPendingServiceAction((prev) => ({ ...prev, [key]: undefined }));
-    }
-  };
-
   /** A plugin without a coupled sidecar is removed immediately. A service, or
    *  a plugin whose removal stops a sidecar, first shows a warning and runs
    *  after `handleConfirmServiceAction`. */
@@ -137,19 +121,20 @@ export function SettingsInstalledExtensions() {
   };
 
   const handleUpdateClick = (record: InstalledArtifactRecord) => {
-    if (record.kind === 'plugin') {
-      void performUpdate(record);
-      return;
-    }
-    setPendingServiceAction((prev) => ({ ...prev, [recordKey(record)]: 'update' }));
+    setUpdateTarget(record);
   };
 
-  const handleConfirmServiceAction = (record: InstalledArtifactRecord, action: PendingServiceAction) => {
-    if (action === 'update') {
-      void performUpdate(record);
-    } else {
-      void performUninstall(record);
+  const handleUpdated = () => {
+    if (updateTarget) {
+      const key = recordKey(updateTarget);
+      setRowUpdateVersion((prev) => ({ ...prev, [key]: undefined }));
     }
+    setNeedsRestart(true);
+    void refresh();
+  };
+
+  const handleConfirmServiceAction = (record: InstalledArtifactRecord) => {
+    void performUninstall(record);
   };
 
   const handleCancelServiceAction = (key: string) => {
@@ -239,15 +224,36 @@ export function SettingsInstalledExtensions() {
                   </div>
                   <div className="flex shrink-0 gap-1.5">
                     {updateVersion && updateVersion !== 'up-to-date' ? (
-                      <Button size="sm" variant="outline" onClick={() => handleUpdateClick(record)} disabled={busy}>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleUpdateClick(record)}
+                        disabled={busy}
+                        aria-label={t('settings.extensions.installed.update')}
+                        title={t('settings.extensions.installed.update')}
+                      >
                         <Download className="h-3.5 w-3.5" />
                       </Button>
                     ) : (
-                      <Button size="sm" variant="outline" onClick={() => void handleCheckUpdate(record)} disabled={busy}>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => void handleCheckUpdate(record)}
+                        disabled={busy}
+                        aria-label={t('settings.extensions.installed.checkUpdate')}
+                        title={t('settings.extensions.installed.checkUpdate')}
+                      >
                         <RefreshCw className="h-3.5 w-3.5" />
                       </Button>
                     )}
-                    <Button size="sm" variant="outline" onClick={() => handleUninstallClick(record)} disabled={busy}>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleUninstallClick(record)}
+                      disabled={busy}
+                      aria-label={t('settings.extensions.installed.uninstall')}
+                      title={t('settings.extensions.installed.uninstall')}
+                    >
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>
                   </div>
@@ -262,7 +268,7 @@ export function SettingsInstalledExtensions() {
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => handleConfirmServiceAction(record, pending)}
+                          onClick={() => handleConfirmServiceAction(record)}
                           disabled={busy}
                         >
                           {busy ? <Spinner size="sm" /> : t('settings.extensions.installed.confirm')}
@@ -273,7 +279,7 @@ export function SettingsInstalledExtensions() {
                       </div>
                     }
                   >
-                    {pending === 'uninstall' && coupled && (
+                    {coupled && (
                       <p className="mb-1 font-medium">
                         {t('settings.extensions.installed.coupledUninstallNote', { label: coupledLabel(coupled) })}
                       </p>
@@ -286,6 +292,16 @@ export function SettingsInstalledExtensions() {
           })
         )}
       </div>
+
+      <ExtensionInstallDialog
+        urls={updateUrls}
+        marketId={updateTarget?.marketId}
+        open={updateTarget !== null}
+        onOpenChange={(next) => {
+          if (!next) setUpdateTarget(null);
+        }}
+        onInstalled={handleUpdated}
+      />
     </div>
   );
 }

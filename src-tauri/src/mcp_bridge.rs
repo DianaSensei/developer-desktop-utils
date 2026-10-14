@@ -22,7 +22,8 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use axum::extract::State;
+use axum::extract::rejection::JsonRejection;
+use axum::extract::{DefaultBodyLimit, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Json};
 use axum::routing::{get, post};
@@ -36,6 +37,16 @@ use uuid::Uuid;
 // client sees this error instead of its own timeout. Equal to
 // `service_host.rs`'s `CALL_TIMEOUT` only by coincidence.
 const CALL_TIMEOUT: Duration = Duration::from_secs(30);
+
+// Tool arguments can carry whole documents (json_format, hash_compute on a
+// file's text); axum's 2 MB default rejected those with a bare 413.
+const MAX_CALL_BODY_BYTES: usize = 64 * 1024 * 1024;
+
+/// Whether some bridge has registered `tool`. A name nobody registered has
+/// nobody listening for it, so waiting for an answer is pointless.
+fn is_registered(inner: &Inner, tool: &str) -> bool {
+    inner.tools.values().flatten().any(|t| t.name == tool)
+}
 
 #[derive(Clone, Default)]
 pub struct McpBridgeState {
@@ -118,16 +129,37 @@ async fn health() -> impl IntoResponse {
 async fn call(
     State((app, state)): State<(AppHandle, McpBridgeState)>,
     headers: HeaderMap,
-    Json(body): Json<CallRequest>,
+    body: Result<Json<CallRequest>, JsonRejection>,
 ) -> impl IntoResponse {
     if !check_auth(&state, &headers) {
         return (StatusCode::UNAUTHORIZED, Json(serde_json::json!({ "error": "unauthorized" }))).into_response();
     }
+    // Answer in JSON whatever went wrong reading the body (too large, not
+    // JSON): the MCP server shows the `error` field to the client.
+    let Json(body) = match body {
+        Ok(body) => body,
+        Err(rejection) => {
+            return (rejection.status(), Json(serde_json::json!({ "error": format!("Invalid call: {}", rejection.body_text()) })))
+                .into_response();
+        }
+    };
 
     let id = Uuid::new_v4().to_string();
     let (tx, rx) = oneshot::channel();
     {
         let mut inner = state.inner.lock().unwrap();
+        if !is_registered(&inner, &body.tool) {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({
+                    "error": format!(
+                        "No DevTool tool named \"{}\" is answering right now: the tool that owns it isn't open, or its MCP access is off. Open it in DevTool, or turn on Settings → MCP → Background MCP bridge.",
+                        body.tool
+                    )
+                })),
+            )
+                .into_response();
+        }
         inner.pending.insert(id.clone(), tx);
     }
 
@@ -263,7 +295,7 @@ pub fn start(app: &AppHandle) {
 
         let router = Router::new()
             .route("/health", get(health))
-            .route("/call", post(call))
+            .route("/call", post(call).layer(DefaultBodyLimit::max(MAX_CALL_BODY_BYTES)))
             .route("/tools", get(list_tools_http))
             .with_state((app_handle.clone(), state));
 
@@ -274,6 +306,18 @@ pub fn start(app: &AppHandle) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn only_registered_tool_names_are_dispatched() {
+        let mut inner = Inner::default();
+        assert!(!is_registered(&inner, "json_format"));
+        inner.tools.insert(
+            "json".into(),
+            vec![ToolDef { name: "json_format".into(), description: String::new(), input_schema: empty_schema() }],
+        );
+        assert!(is_registered(&inner, "json_format"));
+        assert!(!is_registered(&inner, "no_such_tool"));
+    }
 
     #[test]
     fn constant_time_eq_matches_plain_equality() {

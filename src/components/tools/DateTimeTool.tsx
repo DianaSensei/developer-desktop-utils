@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { CopyButton } from '@/components/ui/copy-button';
 import {
-  format, parseISO, fromUnixTime, getUnixTime,
+  format, parseISO, getUnixTime,
   startOfDay, endOfDay, startOfWeek, endOfWeek,
   startOfMonth, endOfMonth, startOfYear, endOfYear,
   getWeekOfMonth,
@@ -84,14 +84,39 @@ function formatInTz(date: Date, tz: string, fmt: string): string {
   } catch { return format(date, fmt); }
 }
 
+/** Wall-clock components in `tz` → the UTC instant. The offset is taken
+ *  twice: the first guess can sit on the other side of a DST change than the
+ *  wall time itself, which put such times an hour off. */
+export function zonedWallToUtc(yr: number, mo: number, dy: number, hr: number, mn: number, sc: number, tz: string): Date {
+  const utcGuess = Date.UTC(yr, mo, dy, hr, mn, sc);
+  const first = tzOffsetMinutes(new Date(utcGuess), tz);
+  const second = tzOffsetMinutes(new Date(utcGuess - first * 60000), tz);
+  return new Date(utcGuess - second * 60000);
+}
+
+/** Unix time with the unit chosen by magnitude: s, ms, µs or ns. */
+export function fromUnixAny(digits: string): Date | null {
+  const n = Number(digits);
+  if (!Number.isFinite(n)) return null;
+  const abs = Math.abs(n);
+  const ms = abs < 1e11 ? n * 1000 : abs < 1e14 ? n : abs < 1e17 ? n / 1000 : n / 1e6;
+  const d = new Date(ms);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+/** Whole-number input that is read as a Unix timestamp. Four digits stay a
+ *  year (`2026`), as before. */
+export function looksLikeUnixTime(s: string): boolean {
+  return /^-?\d+$/.test(s) && !/^\d{4}$/.test(s);
+}
+
 // Parse a date string whose components are expressed in `tz` local time
-function parseInTz(str: string, tz: string): Date | null {
+export function parseInTz(str: string, tz: string): Date | null {
   const s = str.trim();
   if (!s) return null;
 
   // Unix timestamps are absolute — no tz adjustment
-  if (/^\d{10}$/.test(s)) return fromUnixTime(parseInt(s));
-  if (/^\d{13}$/.test(s)) return new Date(parseInt(s));
+  if (looksLikeUnixTime(s)) return fromUnixAny(s);
 
   // Time-only: attach today's date (in tz context)
   const timeOnly = s.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(am|pm)?$/i);
@@ -104,23 +129,24 @@ function parseInTz(str: string, tz: string): Date | null {
   let naive: Date | null = null;
   try {
     // Use parseISO for ISO date / date-time strings so a bare `YYYY-MM-DD`
-    // is read as local wall-clock midnight. `new Date('YYYY-MM-DD')` would
+    // (or `YYYY-MM`, `YYYY`) is read as local wall-clock midnight. `new Date('YYYY-MM-DD')` would
     // parse it as UTC midnight, then the getLocal* reads below would shift it
     // a day backwards in any timezone west of UTC.
-    const isIso = s.includes('T') || /^\d{4}-\d{2}-\d{2}$/.test(s);
+    const isIso = s.includes('T') || /^\d{4}(?:-\d{2}(?:-\d{2})?)?$/.test(s);
     naive = isIso ? parseISO(s) : new Date(s);
     if (isNaN(naive.getTime())) naive = null;
   } catch { /* */ }
   if (!naive) return null;
 
-  // Extract components as typed (ignoring local system offset)
-  const yr = naive.getFullYear(), mo = naive.getMonth(), dy = naive.getDate();
-  const hr = naive.getHours(), mn = naive.getMinutes(), sc = naive.getSeconds();
+  // A string that names its own offset (`Z`, `+07:00`, `GMT`) is already an
+  // instant; reading it as wall time in `tz` would move it.
+  if (/(?:Z|[+-]\d{2}(?::?\d{2})?|\b(?:GMT|UTC)(?:[+-]\d{1,4})?)$/i.test(s)) return naive;
 
-  // Treat those components as being in `tz`; find UTC equivalent
-  const utcGuess = new Date(Date.UTC(yr, mo, dy, hr, mn, sc));
-  const offset = tzOffsetMinutes(utcGuess, tz);
-  return new Date(utcGuess.getTime() - offset * 60000);
+  // Treat the typed components as being in `tz`
+  return zonedWallToUtc(
+    naive.getFullYear(), naive.getMonth(), naive.getDate(),
+    naive.getHours(), naive.getMinutes(), naive.getSeconds(), tz,
+  );
 }
 
 export function formatRFC3339InTz(date: Date, tz: string): string {
@@ -261,13 +287,15 @@ const FORMAT_ROWS: FormatRow[] = [
   {
     label: 'Week of year', tzSensitive: true,
     description: 'ISO week number (1–53). Week 1 is the week containing the first Thursday of the year (Mon-first weeks).',
-    value: (d, tz, t) => t('weekOf', { w: formatInTz(d, tz, 'w'), period: formatInTz(d, tz, 'yyyy') }),
+    // I / RRRR: ISO week and ISO week-numbering year (2026-12-28 is week 53
+    // of 2026; `w` / `yyyy` would say week 1).
+    value: (d, tz, t) => t('weekOf', { w: formatInTz(d, tz, 'I'), period: formatInTz(d, tz, 'RRRR') }),
   },
   {
     label: 'Week of month', tzSensitive: true,
     description: 'Which week within the month the date falls in (1–5), counting Mon-first weeks.',
     value: (d, tz, t) => {
-      const wall = new Date(formatInTz(d, tz, 'yyyy-MM-dd HH:mm:ss'));
+      const wall = new Date(formatInTz(d, tz, "yyyy-MM-dd'T'HH:mm:ss"));
       const w = getWeekOfMonth(wall, { weekStartsOn: 1 });
       return t('weekOf', { w, period: formatInTz(d, tz, 'MMMM yyyy') });
     },
@@ -399,7 +427,9 @@ function DiffDateInput({ value, onChange, tz }: {
 export function DateTimeTool() {
   const sdk = usePluginSdkFor('unix-time');
   const m = useMessages(MESSAGES);
-  const [rawInput, setRawInput] = usePluginState(sdk, 'datetime:raw', '', { legacyKey: 'devtool:datetime:raw' });
+  // `datetime:raw` held the live clock, rewritten every second, so it cannot
+  // tell a typed value from a tick; start from a fresh key (empty = live).
+  const [rawInput, setRawInput] = usePluginState(sdk, 'datetime:input', '');
   const [inputTz, setInputTz] = usePluginState(sdk, 'datetime:inputTz', LOCAL_TZ || 'UTC', { legacyKey: 'devtool:datetime:inputTz' });
   const [outputTz, setOutputTz] = usePluginState(sdk, 'datetime:outputTz', LOCAL_TZ || 'UTC', { legacyKey: 'devtool:datetime:outputTz' });
   const [showPicker, setShowPicker] = useState(false);
@@ -413,31 +443,36 @@ export function DateTimeTool() {
   const [showDiff, setShowDiff] = usePluginState(sdk, 'datetime:showDiff', true, { legacyKey: 'devtool:datetime:showDiff' });
   const [customFmt, setCustomFmt] = usePluginState(sdk, 'datetime:customFmt', '', { legacyKey: 'devtool:datetime:customFmt' });
 
-  const [isLive, setIsLive] = useState(true);
+  // Live mode is "no input of my own": an empty saved input. Deriving it
+  // from the saved input keeps a timestamp the user entered when the tool
+  // remounts or the app restarts, instead of the clock replacing it.
+  const [isLive, setIsLive] = useState(() => !rawInput.trim());
   const [liveDate, setLiveDate] = useState(new Date());
 
-  // Live tick
+  // Live tick. Only the clock state changes; the persisted input is not
+  // rewritten every second.
   useEffect(() => {
-    const id = setInterval(() => {
-      const now = new Date();
-      setLiveDate(now);
-      if (isLive) setRawInput(formatInTz(now, inputTz, "yyyy-MM-dd'T'HH:mm:ss"));
-    }, 1000);
+    if (!isLive) return;
+    const id = setInterval(() => setLiveDate(new Date()), 1000);
     return () => clearInterval(id);
-  }, [isLive, inputTz, setRawInput]);
+  }, [isLive]);
 
-  // Init: if empty, go live
-  useEffect(() => {
-    if (!rawInput.trim()) {
-      setIsLive(true);
-      setRawInput(formatInTz(new Date(), inputTz, "yyyy-MM-dd'T'HH:mm:ss"));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const liveText = formatInTz(liveDate, inputTz, "yyyy-MM-dd'T'HH:mm:ss");
+  const inputValue = isLive ? liveText : rawInput;
 
   const handleRawChange = (val: string) => {
     setRawInput(val);
     setIsLive(!val.trim());
+  };
+
+  // Editing the ticking clock: freeze it at the shown time and select it,
+  // so typing replaces it rather than appending to a value that keeps moving.
+  const handleInputFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+    if (!isLive) return;
+    setRawInput(liveText);
+    setIsLive(false);
+    const el = e.currentTarget;
+    requestAnimationFrame(() => el.select());
   };
 
   // ⌘V / Ctrl+V fills the date/time input (and exits live mode) when no field
@@ -446,16 +481,19 @@ export function DateTimeTool() {
 
   const resetToNow = useCallback(() => {
     setIsLive(true);
-    setRawInput(formatInTz(new Date(), inputTz, "yyyy-MM-dd'T'HH:mm:ss"));
-  }, [setRawInput, inputTz]);
+    setLiveDate(new Date());
+    setRawInput('');
+  }, [setRawInput]);
 
   // When inputTz changes, update raw display to show same UTC moment in new tz
   const prevInputTz = useRef(inputTz);
   useEffect(() => {
     if (prevInputTz.current === inputTz) return;
+    // Parse with the zone the text was written in, then move the ref on.
+    const previousTz = prevInputTz.current;
     prevInputTz.current = inputTz;
     if (isLive) return; // live mode handles it via the interval
-    const d = parseInTz(rawInput, prevInputTz.current);
+    const d = parseInTz(rawInput, previousTz);
     if (d) setRawInput(formatInTz(d, inputTz, "yyyy-MM-dd'T'HH:mm:ss"));
   }, [inputTz]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -482,7 +520,7 @@ export function DateTimeTool() {
     setPickerSnapshot(null);
   }, []);
 
-  const isTimestamp = /^\d{10,13}$/.test(rawInput.trim());
+  const isTimestamp = looksLikeUnixTime(rawInput.trim());
   const parseError = !isLive && !!rawInput.trim() && !parsedDate;
   const showHint = !isLive && isTimestamp && !!parsedDate;
   const tzsDiffer = inputTz !== outputTz;
@@ -526,16 +564,12 @@ export function DateTimeTool() {
   const applyBoundaryInTz = (fn: (d: Date) => Date, d: Date, tz: string): Date => {
     // Convert UTC date to naive local in tz
     const wallStr = formatInTz(d, tz, 'yyyy-MM-dd HH:mm:ss');
-    const naive = new Date(wallStr);
-    const bounded = fn(naive);
-    // Re-interpret bounded components as tz time
-    const utcGuess = new Date(Date.UTC(
-      bounded.getFullYear(), bounded.getMonth(), bounded.getDate(),
-      bounded.getHours(), bounded.getMinutes(), bounded.getSeconds()
-    ));
-    const offset = tzOffsetMinutes(utcGuess, tz);
-    return new Date(utcGuess.getTime() - offset * 60000);
+    const naive = new Date(wallStr.replace(' ', 'T'));
+    const b = fn(naive);
+    // Re-interpret the bounded components as tz time
+    return zonedWallToUtc(b.getFullYear(), b.getMonth(), b.getDate(), b.getHours(), b.getMinutes(), b.getSeconds(), tz);
   };
+
 
   return (
     <div className="h-full overflow-y-auto">
@@ -564,7 +598,8 @@ export function DateTimeTool() {
 
           <div className="relative" ref={pickerRef}>
             <Input
-              value={rawInput}
+              value={inputValue}
+              onFocus={handleInputFocus}
               onChange={(e) => handleRawChange(e.target.value)}
               placeholder={m('mainPlaceholder')}
               className={cn('font-mono text-sm pr-9', parseError && 'border-bad')}

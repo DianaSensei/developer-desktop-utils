@@ -42,7 +42,9 @@ function collectPairs(): Pair[] {
     const pluginId = owner?.[1] ?? owner?.[2];
     if (!pluginId) continue;
 
-    for (const m of src.matchAll(/usePluginState(?:<[^>]*>)?\(\s*sdk,\s*'([^']+)'[\s\S]*?legacyKey:\s*'([^']+)'/g)) {
+    // `[^;]` keeps a match inside one call: a call without legacyKey must
+    // not borrow the next call's.
+    for (const m of src.matchAll(/usePluginState(?:<[^>]*>)?\(\s*sdk,\s*'([^']+)'[^;]*?legacyKey:\s*'([^']+)'/g)) {
       pairs.push({ file: relative(SRC, file), pluginId, key: m[1], legacyKey: m[2] });
     }
     for (const m of src.matchAll(/migrateLegacyKey\(sdk,\s*([A-Z_]+|'[^']+'),\s*'([^']+)'\)/g)) {

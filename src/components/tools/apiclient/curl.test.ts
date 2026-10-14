@@ -154,3 +154,38 @@ describe("parseCurl — ANSI-C quoting ($'…')", () => {
     expect(r.body.raw).toBe("a\tb 'q' z");
   });
 });
+
+describe('parseCurl — flags as people actually write them', () => {
+  const form = (r: ReturnType<typeof parseCurl>) => r.body.form.map((f) => [f.key, f.value]);
+
+  it('reads attached short options (-XPUT, -H\'…\', -uuser:pass)', () => {
+    const r = parseCurl(`curl -XPUT https://x/a -H'Accept: text/plain' -uada:pw -d '{"a":1}'`);
+    expect(r.method).toBe('PUT');
+    expect(r.headers.map((h) => [h.key, h.value])).toEqual([['Accept', 'text/plain']]);
+    expect(r.auth).toMatchObject({ type: 'basic', username: 'ada', password: 'pw' });
+    expect(r.body).toMatchObject({ mode: 'json', raw: '{"a":1}' });
+  });
+
+  it('--json sends the data as JSON with POST', () => {
+    const r = parseCurl(`curl --json '{"a":1}' https://x/a`);
+    expect(r.method).toBe('POST');
+    expect(r.url).toBe('https://x/a');
+    expect(r.body).toMatchObject({ mode: 'json', raw: '{"a":1}' });
+    expect(r.headers.map((h) => h.key)).toEqual(['Content-Type', 'Accept']);
+  });
+
+  it('-I is HEAD', () => {
+    expect(parseCurl('curl -I https://x/a').method).toBe('HEAD');
+  });
+
+  it('-d and --data-urlencode together keep every field, in order', () => {
+    const r = parseCurl(`curl https://x/token -d grant_type=password --data-urlencode 'password=p@ss w' -d scope=read`);
+    expect(r.body.mode).toBe('urlencoded');
+    expect(form(r)).toEqual([['grant_type', 'password'], ['password', 'p@ss w'], ['scope', 'read']]);
+  });
+
+  it('form data with a bare % or + is read the way a server reads it', () => {
+    expect(form(parseCurl(`curl https://x/a -d 'discount=50%'`))).toEqual([['discount', '50%']]);
+    expect(form(parseCurl(`curl https://x/a -d 'q=hello+world&x=%2B1'`))).toEqual([['q', 'hello world'], ['x', '+1']]);
+  });
+});

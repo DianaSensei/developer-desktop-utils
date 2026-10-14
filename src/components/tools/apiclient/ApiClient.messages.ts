@@ -128,6 +128,10 @@ export default defineMessages({
   // ── Request panel ──────────────────────────────────────────────────────
   'req.tab.params': { vi: 'Params', en: 'Params' },
   'req.tab.body': { vi: 'Body', en: 'Body' },
+  'req.body.notSentForMethod': {
+    vi: 'Request {{method}} được gửi không kèm body. Dùng POST/PUT, hoặc chuyển dữ liệu sang Params.',
+    en: '{{method}} requests are sent without a body. Use POST/PUT, or move the data to Params.',
+  },
   'req.tab.auth': { vi: 'Auth', en: 'Auth' },
   'req.tab.script': { vi: 'Script', en: 'Script' },
   'req.tab.tests': { vi: 'Test', en: 'Tests' },

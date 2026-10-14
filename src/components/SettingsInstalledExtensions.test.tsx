@@ -318,3 +318,43 @@ describe('SettingsInstalledExtensions — plugin + sidecar riêng LIÊN QUAN đ�
     });
   });
 });
+
+describe('SettingsInstalledExtensions — update goes through the preview', () => {
+  it('shows added permissions and hosts, and installs only after Install, with the previewed manifest', async () => {
+    const remote = pluginManifestRaw({ version: '1.1.0', permissions: ['secrets', 'http'], hosts: ['*'] });
+    invokeMock.mockImplementation((command: string) => {
+      switch (command) {
+        case 'artifact_installer_list':
+          return Promise.resolve([installedPluginRaw()]);
+        case 'artifact_installer_fetch_manifest':
+          return Promise.resolve(remote);
+        case 'artifact_installer_install':
+          return Promise.resolve(installedPluginRaw({ manifest: remote }));
+        default:
+          return Promise.resolve(undefined);
+      }
+    });
+    await renderInTauri();
+    await settle();
+    await waitFor(() => expect(screen.getByText('Demo')).toBeTruthy());
+
+    fireEvent.click(screen.getByRole('button', { name: /Check for update|Kiểm bản mới/ }));
+    const update = await screen.findByRole('button', { name: /^Update$|^Cập nhật$/ });
+    fireEvent.click(update);
+
+    const dialog = await screen.findByRole('dialog');
+    await waitFor(() => expect(within(dialog).getByText(/Replaces the installed 1\.0\.0|Sẽ thay bản 1\.0\.0/)).toBeTruthy());
+    expect(within(dialog).getByText(/^secrets/).textContent).toMatch(/new|mới/);
+    expect(within(dialog).getByText(/^\*/).textContent).toMatch(/new|mới/);
+    expect(invokeMock).not.toHaveBeenCalledWith('artifact_installer_install', expect.anything());
+
+    fireEvent.click(within(dialog).getByRole('button', { name: /^Install$|^Cài đặt$/ }));
+    await waitFor(() =>
+      expect(invokeMock).toHaveBeenCalledWith('artifact_installer_install', {
+        sourceUrl: 'https://example.com/plugin.json',
+        marketId: undefined,
+        expectedManifest: remote,
+      }),
+    );
+  });
+});

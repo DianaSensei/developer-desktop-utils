@@ -13,6 +13,7 @@ export default defineMessages({
   modeLabel: { vi: 'Chế độ generator', en: 'Generator mode' },
   count: { vi: 'Số lượng', en: 'Count' },
   min: { vi: 'Nhỏ nhất', en: 'Min' },
+  noWholeNumber: { vi: 'Không có số nguyên nào giữa Nhỏ nhất và Lớn nhất — tăng khoảng hoặc thêm chữ số thập phân.', en: 'There is no whole number between Min and Max — widen the range or add decimals.' },
   max: { vi: 'Lớn nhất', en: 'Max' },
   decimals: { vi: 'Số lẻ', en: 'Decimals' },
   length: { vi: 'Độ dài', en: 'Length' },

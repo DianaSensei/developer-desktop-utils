@@ -133,3 +133,37 @@ describe('round-trip parse ∘ stringify', () => {
     expect(typeof reparsed.year).toBe('number');
   });
 });
+
+describe('parseProperties — values and keys are kept as written', () => {
+  it('a __proto__ / constructor key is plain data and never touches Object.prototype', () => {
+    const parsed = parseProperties('__proto__.polluted=yes\nconstructor.prototype.p2=yes\na=1') as Record<string, unknown>;
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+    expect(({} as Record<string, unknown>).p2).toBeUndefined();
+    expect(Object.hasOwn(parsed, '__proto__')).toBe(true);
+    expect(JSON.parse(JSON.stringify(parsed))).toEqual(
+      JSON.parse('{"__proto__":{"polluted":"yes"},"constructor":{"prototype":{"p2":"yes"}},"a":1}'),
+    );
+  });
+
+  it('numbers that would not print back the same stay strings', () => {
+    expect(parseProperties('version=1.10\nrate=1.0\nhalf=.5\nzip=07000\nn=3.25')).toEqual({
+      version: '1.10',
+      rate: '1.0',
+      half: '.5',
+      zip: '07000',
+      n: 3.25,
+    });
+  });
+
+  it('Spring logging levels: a key that is both a value and a prefix keeps every line', () => {
+    const text = 'logging.level.com.example=DEBUG\nlogging.level.com.example.service=TRACE';
+    expect(parseProperties(text)).toEqual({
+      logging: { level: { com: { example: 'DEBUG', 'example.service': 'TRACE' } } },
+    });
+    const reversed = 'logging.level.com.example.service=TRACE\nlogging.level.com.example=DEBUG';
+    expect(parseProperties(reversed)).toEqual({
+      logging: { level: { com: { example: 'DEBUG', 'example.service': 'TRACE' } } },
+    });
+    expect(stringifyProperties(parseProperties(text)).split('\n').sort()).toEqual(text.split('\n').sort());
+  });
+});

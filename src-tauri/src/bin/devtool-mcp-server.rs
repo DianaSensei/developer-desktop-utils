@@ -400,18 +400,109 @@ async fn fetch_registered_tools() -> Result<Vec<Tool>, String> {
     let info = read_bridge_info()?;
     let json = http_get_json(info.port, &info.token, "/tools").await?;
     let entries = json.as_array().cloned().unwrap_or_default();
-    Ok(entries
-        .into_iter()
-        .filter_map(|def| {
-            let name = def.get("name")?.as_str()?.to_string();
-            let description = def.get("description").and_then(Value::as_str).unwrap_or("").to_string();
-            let schema = match def.get("inputSchema").cloned().unwrap_or_else(|| json!({})) {
-                Value::Object(m) => m,
-                _ => Default::default(),
-            };
-            Some(Tool::new(name, description, schema))
-        })
-        .collect())
+    Ok(normalize_tools(entries))
+}
+
+/// Turns the bridge's entries into tools every MCP client accepts. Clients
+/// validate `tools/list` as a whole: one tool whose `inputSchema` lacks
+/// `"type": "object"` makes the client reject the entire list ("Invalid
+/// result for tools/list") and show no tools at all. Entries come from any
+/// registered plugin, so they are repaired here, or dropped with a note on
+/// stderr (which MCP clients log) when they cannot be: no name, or a name
+/// already taken.
+fn normalize_tools(entries: Vec<Value>) -> Vec<Tool> {
+    let mut seen = std::collections::HashSet::new();
+    let mut tools = Vec::with_capacity(entries.len());
+    for def in entries {
+        let Some(name) = def.get("name").and_then(Value::as_str).filter(|n| !n.is_empty()) else {
+            eprintln!("devtool-mcp-server: skipped a registered tool without a name");
+            continue;
+        };
+        if name == "get_scripting_reference" || !seen.insert(name.to_string()) {
+            eprintln!("devtool-mcp-server: skipped duplicate tool `{name}`");
+            continue;
+        }
+        let description = def.get("description").and_then(Value::as_str).unwrap_or("").to_string();
+        let schema = normalize_input_schema(name, def.get("inputSchema"));
+        tools.push(Tool::new(name.to_string(), description, schema));
+    }
+    tools
+}
+
+/// An object schema with `type: "object"`, as MCP requires of `inputSchema`.
+/// A schema that only forgot `type` keeps its properties; one that describes
+/// something other than an object (or is not a schema at all) becomes an
+/// open object, so the tool stays callable and the app validates arguments.
+fn normalize_input_schema(name: &str, schema: Option<&Value>) -> serde_json::Map<String, Value> {
+    let open_object = || {
+        json!({ "type": "object", "properties": {}, "additionalProperties": true })
+            .as_object()
+            .cloned()
+            .unwrap_or_default()
+    };
+    let Some(Value::Object(schema)) = schema else {
+        if schema.is_some() {
+            eprintln!("devtool-mcp-server: tool `{name}` has an inputSchema that is not an object; accepting any arguments");
+        }
+        return open_object();
+    };
+    let mut schema = schema.clone();
+    match schema.get("type") {
+        Some(Value::String(t)) if t == "object" => {}
+        None => {
+            schema.insert("type".into(), json!("object"));
+        }
+        Some(_) => {
+            eprintln!("devtool-mcp-server: tool `{name}` takes a non-object inputSchema; accepting any arguments");
+            return open_object();
+        }
+    }
+    if schema.get("properties").is_some_and(|p| !p.is_object()) {
+        schema.remove("properties");
+    }
+    if let Some(required) = schema.get("required") {
+        let names: Vec<Value> = required
+            .as_array()
+            .map(|r| r.iter().filter(|v| v.is_string()).cloned().collect())
+            .unwrap_or_default();
+        if names.is_empty() {
+            schema.remove("required");
+        } else {
+            schema.insert("required".into(), Value::Array(names));
+        }
+    }
+    schema
+}
+
+/// What the bridge currently offers, as one comparable string; empty while
+/// the app is closed or the bridge does not answer.
+async fn registered_tools_signature() -> String {
+    match read_bridge_info() {
+        Ok(info) => http_get_json(info.port, &info.token, "/tools")
+            .await
+            .map(|v| v.to_string())
+            .unwrap_or_default(),
+        Err(_) => String::new(),
+    }
+}
+
+const TOOL_LIST_POLL: Duration = Duration::from_secs(3);
+
+/// Polls the bridge and tells the client to re-list tools whenever the set
+/// changes: the app opening or closing, a tool screen mounting, a plugin
+/// being installed or switched off. Ends when the client disconnects.
+async fn watch_tool_list(peer: rmcp::service::Peer<RoleServer>) {
+    let mut last = registered_tools_signature().await;
+    loop {
+        tokio::time::sleep(TOOL_LIST_POLL).await;
+        let current = registered_tools_signature().await;
+        if current != last {
+            last = current;
+            if peer.notify_tool_list_changed().await.is_err() {
+                return;
+            }
+        }
+    }
 }
 
 // Listed even when the bridge is unreachable, since it is answered locally.
@@ -431,7 +522,11 @@ struct DevToolServer;
 
 impl ServerHandler for DevToolServer {
     fn get_info(&self) -> ServerConfig {
-        ServerConfig::new(ServerCapabilities::builder().enable_tools().build())
+        // `listChanged`: MCP clients list tools once at connect, so without
+        // it a client started before the app (or before a plugin registers)
+        // would only ever see get_scripting_reference. `watch_tool_list`
+        // sends the notification.
+        ServerConfig::new(ServerCapabilities::builder().enable_tools().enable_tool_list_changed().build())
             .with_instructions(
                 "Drives every DevTool tool that has registered itself with the running app's \
                  MCP bridge — call list_tools for the current set, since it can grow (a plugin \
@@ -482,15 +577,198 @@ impl ServerHandler for DevToolServer {
     }
 }
 
-#[tokio::main]
-async fn main() {
+// ── leaving the app bundle (macOS) ──────────────────────────────────────
+// MCP clients launch this binary from `DevTool.app/Contents/MacOS/` (it is
+// the bundle's sidecar), and macOS counts any process running from there as
+// DevTool itself: while an MCP client keeps one open, clicking DevTool only
+// "activates" that window-less process, so the app never opens again until
+// every MCP session ends. Before serving, the server therefore re-executes a
+// copy of itself kept in the app data directory. `exec` keeps the pid and
+// the stdio pipes, so the client never notices, and existing MCP configs
+// that point into the bundle keep working.
+
+/// Set on the re-executed copy so it never tries to move again.
+#[cfg(unix)]
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+const RELOCATED_ENV: &str = "DEVTOOL_MCP_RELOCATED";
+
+/// Whether `exe` sits in an app bundle's `Contents/MacOS` directory.
+#[cfg(unix)]
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+fn is_in_app_bundle(exe: &std::path::Path) -> bool {
+    let mut dirs = exe.ancestors().skip(1).filter_map(|p| p.file_name()?.to_str());
+    matches!(
+        (dirs.next(), dirs.next(), dirs.next()),
+        (Some("MacOS"), Some("Contents"), Some(app)) if app.ends_with(".app")
+    )
+}
+
+/// Copies `exe` into `dir` unless an identical copy is already there, and
+/// returns the copy's path. Writes to a temporary file and renames it, so a
+/// server starting at the same moment never runs a half-written copy, and a
+/// copy already running keeps its own file. Bytes are copied by hand rather
+/// than with `fs::copy`, which would carry the bundle's quarantine attribute.
+#[cfg(unix)]
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+fn bundle_free_copy(exe: &std::path::Path, dir: &std::path::Path) -> std::io::Result<PathBuf> {
+    use std::os::unix::fs::PermissionsExt;
+    let target = dir.join("devtool-mcp-server");
+    let bytes = std::fs::read(exe)?;
+    if std::fs::read(&target).is_ok_and(|existing| existing == bytes) {
+        return Ok(target);
+    }
+    std::fs::create_dir_all(dir)?;
+    let tmp = dir.join(format!(".devtool-mcp-server.{}", std::process::id()));
+    std::fs::write(&tmp, &bytes)?;
+    std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(0o755))?;
+    std::fs::rename(&tmp, &target).inspect_err(|_| {
+        let _ = std::fs::remove_file(&tmp);
+    })?;
+    Ok(target)
+}
+
+/// Replaces this process with the copy outside the bundle. Returns only if
+/// that is not needed or not possible, in which case the server simply runs
+/// from where it is.
+#[cfg(target_os = "macos")]
+fn leave_app_bundle() {
+    use std::os::unix::process::CommandExt;
+    if std::env::var_os(RELOCATED_ENV).is_some() {
+        return;
+    }
+    let Ok(exe) = std::env::current_exe() else { return };
+    if !is_in_app_bundle(&exe) {
+        return;
+    }
+    let copy = match bundle_free_copy(&exe, &app_data_dir().join("mcp")) {
+        Ok(copy) => copy,
+        Err(e) => {
+            eprintln!("devtool-mcp-server: could not copy itself out of the app bundle ({e}); running from it");
+            return;
+        }
+    };
+    let err = std::process::Command::new(&copy)
+        .args(std::env::args_os().skip(1))
+        .env(RELOCATED_ENV, "1")
+        .exec();
+    eprintln!("devtool-mcp-server: could not start {} ({err}); running from the app bundle", copy.display());
+}
+
+fn main() {
+    #[cfg(target_os = "macos")]
+    leave_app_bundle();
+    tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .expect("tokio runtime")
+        .block_on(serve());
+}
+
+async fn serve() {
     let server = DevToolServer;
     match server.serve(stdio()).await {
         Ok(service) => {
-            if let Err(e) = service.waiting().await {
+            let watcher = tokio::spawn(watch_tool_list(service.peer().clone()));
+            let result = service.waiting().await;
+            watcher.abort();
+            if let Err(e) = result {
                 eprintln!("devtool-mcp-server: {e}");
             }
         }
         Err(e) => eprintln!("devtool-mcp-server: failed to start: {e}"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[cfg(unix)]
+    #[test]
+    fn only_a_bundle_sidecar_counts_as_in_the_app_bundle() {
+        use std::path::Path;
+        assert!(is_in_app_bundle(Path::new("/Applications/DevTool.app/Contents/MacOS/devtool-mcp-server")));
+        assert!(!is_in_app_bundle(Path::new("/Users/me/Library/Application Support/x/mcp/devtool-mcp-server")));
+        assert!(!is_in_app_bundle(Path::new("/repo/src-tauri/target/release/devtool-mcp-server")));
+        assert!(!is_in_app_bundle(Path::new("/Applications/DevTool.app/Contents/Resources/devtool-mcp-server")));
+        assert!(!is_in_app_bundle(Path::new("/opt/Contents/MacOS/devtool-mcp-server")));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn the_bundle_free_copy_is_refreshed_only_when_it_differs() {
+        let root = std::env::temp_dir().join(format!("devtool-mcp-copy-test-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let exe = root.join("DevTool.app/Contents/MacOS/devtool-mcp-server");
+        std::fs::create_dir_all(exe.parent().unwrap()).unwrap();
+        std::fs::write(&exe, b"v1").unwrap();
+        let dir = root.join("data/mcp");
+
+        let copy = bundle_free_copy(&exe, &dir).unwrap();
+        assert_eq!(std::fs::read(&copy).unwrap(), b"v1");
+        use std::os::unix::fs::PermissionsExt;
+        assert_eq!(std::fs::metadata(&copy).unwrap().permissions().mode() & 0o777, 0o755);
+        let first_written = std::fs::metadata(&copy).unwrap().modified().unwrap();
+
+        // Same binary: the copy is reused, not rewritten.
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        bundle_free_copy(&exe, &dir).unwrap();
+        assert_eq!(std::fs::metadata(&copy).unwrap().modified().unwrap(), first_written);
+
+        // The app was updated: the copy follows.
+        std::fs::write(&exe, b"v2").unwrap();
+        bundle_free_copy(&exe, &dir).unwrap();
+        assert_eq!(std::fs::read(&copy).unwrap(), b"v2");
+        assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 1, "no temporary file left behind");
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    fn listed(entries: Value) -> Vec<Value> {
+        normalize_tools(entries.as_array().cloned().unwrap_or_default())
+            .into_iter()
+            .map(|t| serde_json::to_value(t).unwrap())
+            .collect()
+    }
+
+    #[test]
+    fn every_listed_schema_is_an_object_schema() {
+        let tools = listed(json!([
+            { "name": "ok", "inputSchema": { "type": "object", "properties": { "a": { "type": "string" } }, "required": ["a"] } },
+            { "name": "untyped", "inputSchema": { "properties": { "a": { "type": "string" } } } },
+            { "name": "empty", "inputSchema": {} },
+            { "name": "null", "inputSchema": null },
+            { "name": "missing" },
+            { "name": "array", "inputSchema": [] },
+            { "name": "string_type", "inputSchema": { "type": "string" } },
+            { "name": "union_type", "inputSchema": { "type": ["object", "null"] } },
+            { "name": "bad_parts", "inputSchema": { "type": "object", "properties": [], "required": "a" } },
+        ]));
+        assert_eq!(tools.len(), 9);
+        for tool in &tools {
+            assert_eq!(tool["inputSchema"]["type"], "object", "{tool}");
+            let props = &tool["inputSchema"]["properties"];
+            assert!(props.is_null() || props.is_object(), "{tool}");
+            let required = &tool["inputSchema"]["required"];
+            assert!(required.is_null() || required.as_array().unwrap().iter().all(Value::is_string), "{tool}");
+        }
+        // A schema that only forgot `type` keeps what it describes.
+        assert_eq!(tools[0]["inputSchema"]["required"], json!(["a"]));
+        assert_eq!(tools[1]["inputSchema"]["properties"]["a"]["type"], "string");
+    }
+
+    #[test]
+    fn nameless_and_duplicate_tools_are_dropped() {
+        let tools = listed(json!([
+            { "name": "a", "description": "first" },
+            { "name": "a", "description": "second" },
+            { "name": "" },
+            { "name": 5 },
+            { "description": "no name" },
+            { "name": "get_scripting_reference" },
+            { "name": "b" },
+        ]));
+        let names: Vec<&str> = tools.iter().map(|t| t["name"].as_str().unwrap()).collect();
+        assert_eq!(names, ["a", "b"]);
+        assert_eq!(tools[0]["description"], "first");
     }
 }

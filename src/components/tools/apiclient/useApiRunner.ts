@@ -9,7 +9,45 @@ import type { ApiStore } from './store';
 import { executeRequest } from './engine';
 import type { ApiRequest, Environment, KeyValue, VarMap } from './types';
 
+/** Literal values that must never leave the app in plaintext: vault values
+ *  and secret-flagged variables of the environments a run used. */
+export function sensitiveValuesFor(
+  vaultVars: Record<string, string>,
+  collectionEnv: Environment | null,
+  globalEnv: Environment | null,
+): string[] {
+  const secretEnvValues = [...(collectionEnv?.variables ?? []), ...(globalEnv?.variables ?? [])]
+    .filter((v) => v.secret && v.value).map((v) => v.value);
+  return [...Object.values(vaultVars), ...secretEnvValues];
+}
+
+export interface RunOptions {
+  /** Record the run in History (MCP runs do; the Runner keeps its own log). */
+  recordHistory?: boolean;
+}
+
 export function useApiRunner(store: ApiStore, scriptTimeoutMs: number) {
+  // A Runner pass or an MCP call outlives the render it started in: reading
+  // the store through a ref lets each request see what the previous one
+  // wrote (a login script's token), instead of the snapshot from the click.
+  const storeRef = useRef(store);
+  storeRef.current = store;
+
+  // What the last runs wrote, until the store re-renders with it. A Runner
+  // pass can start the next request before React has rendered the previous
+  // one's update, so env and collection-variable writes are also kept here.
+  const pendingEnvs = useRef(new Map<string, Environment>());
+  const pendingCollectionVars = useRef(new Map<string, KeyValue[]>());
+  const seenEnvironments = useRef(store.environments);
+  const seenCollections = useRef(store.collections);
+  if (seenEnvironments.current !== store.environments) {
+    seenEnvironments.current = store.environments;
+    pendingEnvs.current.clear();
+  }
+  if (seenCollections.current !== store.collections) {
+    seenCollections.current = store.collections;
+    pendingCollectionVars.current.clear();
+  }
   // Read through a ref so `runRequest`/`send` don't churn when unrelated
   // config values change.
   const scriptTimeoutRef = useRef(scriptTimeoutMs);
@@ -43,30 +81,38 @@ export function useApiRunner(store: ApiStore, scriptTimeoutMs: number) {
     result: Awaited<ReturnType<typeof executeRequest>>,
     recordHistory = true,
   ) => {
+    const store = storeRef.current;
     // Capture any Set-Cookie into the jar (scoped to the URL that returned them).
     if (store.cookiesEnabled && result.response?.setCookies?.length) {
       store.captureCookies(result.response.url ?? req.url, result.response.setCookies);
     }
     if (result.collectionEnvChanged && collectionEnv) {
-      store.updateEnvironment(collectionEnv.id, { variables: mergeVarsIntoRows(collectionEnv.variables, result.collectionEnvVars) });
+      const variables = mergeVarsIntoRows(collectionEnv.variables, result.collectionEnvVars);
+      pendingEnvs.current.set(collectionEnv.id, { ...collectionEnv, variables });
+      store.updateEnvironment(collectionEnv.id, { variables });
     }
     if (result.globalEnvChanged && globalEnv) {
-      store.updateEnvironment(globalEnv.id, { variables: mergeVarsIntoRows(globalEnv.variables, result.globalEnvVars) });
+      const variables = mergeVarsIntoRows(globalEnv.variables, result.globalEnvVars);
+      pendingEnvs.current.set(globalEnv.id, { ...globalEnv, variables });
+      store.updateEnvironment(globalEnv.id, { variables });
     }
     if (result.collectionVarsChanged) {
       const owningCollectionId = store.getOwningCollectionId(req.id);
       const collection = owningCollectionId ? store.collections.find((c) => c.id === owningCollectionId) : null;
       if (owningCollectionId && collection) {
-        store.setCollectionVariables(owningCollectionId, mergeVarsIntoRows(collection.variables ?? [], result.collectionVars));
+        const rows = mergeVarsIntoRows(
+          pendingCollectionVars.current.get(owningCollectionId) ?? collection.variables ?? [],
+          result.collectionVars,
+        );
+        pendingCollectionVars.current.set(owningCollectionId, rows);
+        store.setCollectionVariables(owningCollectionId, rows);
       }
     }
     if (!recordHistory) return;
     // Values that must never be persisted in plaintext if the server happened
     // to echo them back in the response (see redactText in store.ts). Secret-
     // flagged environment variables get the same treatment as vault values.
-    const secretEnvValues = [...(collectionEnv?.variables ?? []), ...(globalEnv?.variables ?? [])]
-      .filter((v) => v.secret && v.value).map((v) => v.value);
-    const sensitiveValues = [...Object.values(store.vaultVars), ...secretEnvValues];
+    const sensitiveValues = sensitiveValuesFor(store.vaultVars, collectionEnv, globalEnv);
     store.addHistory({
       method: req.method, url: req.url,
       status: result.response?.status ?? 0,
@@ -78,7 +124,7 @@ export function useApiRunner(store: ApiStore, scriptTimeoutMs: number) {
       tests: result.tests,
       logs: result.logs,
     }, sensitiveValues);
-  }, [store]);
+  }, []);
 
   // Run one request (used by the Runner and the MCP bridge); resolves
   // inherited scripts/auth/envs per id — never
@@ -97,24 +143,40 @@ export function useApiRunner(store: ApiStore, scriptTimeoutMs: number) {
   // and global env); the Runner/MCP bridge always pass a concrete id or
   // `null` ("No Environment"), routed into whichever of the two slots that
   // environment's own scope belongs to (only ever forcing one at a time).
-  const runRequest = useCallback(async (req: ApiRequest, dataVars?: VarMap, signal?: AbortSignal, envId?: string | null) => {
+  const runRequest = useCallback(async (
+    req: ApiRequest,
+    dataVars?: VarMap,
+    signal?: AbortSignal,
+    envId?: string | null,
+    options: RunOptions = {},
+  ) => {
+    const store = storeRef.current;
     const jar = store.cookiesEnabled ? store.cookies : [];
-    let collectionEnv: Environment | null;
-    let globalEnv: Environment | null;
-    if (envId === undefined) {
-      ({ collectionEnv, globalEnv } = store.getEnvsForRequest(req.id));
-    } else if (envId === null) {
+    let { collectionEnv, globalEnv } = store.getEnvsForRequest(req.id);
+    if (envId === null) {
       collectionEnv = null;
       globalEnv = null;
-    } else {
-      const forced = store.environments.find((e) => e.id === envId) ?? null;
-      collectionEnv = forced?.collectionId ? forced : null;
-      globalEnv = forced && !forced.collectionId ? forced : null;
+    } else if (envId !== undefined) {
+      const forced = store.environments.find((e) => e.id === envId);
+      if (!forced) throw new Error(`No environment with id "${envId}"`);
+      // Pin the chosen environment in its own scope; the other scope keeps
+      // its normal resolution, as a plain Send would.
+      if (forced.collectionId) collectionEnv = forced;
+      else globalEnv = forced;
     }
-    const result = await executeRequest(req, collectionEnv, globalEnv, signal, store.getInherited(req.id), jar, dataVars, scriptTimeoutRef.current, store.vaultVars, store.getCollectionVars(req.id));
-    persistResult(req, collectionEnv, globalEnv, result, false);
-    return result;
-  }, [store, persistResult]);
+    const latest = (env: Environment | null) => (env ? pendingEnvs.current.get(env.id) ?? env : null);
+    collectionEnv = latest(collectionEnv);
+    globalEnv = latest(globalEnv);
+    let collectionVars = store.getCollectionVars(req.id);
+    const owningId = store.getOwningCollectionId(req.id);
+    const pendingRows = owningId ? pendingCollectionVars.current.get(owningId) : undefined;
+    if (pendingRows) {
+      collectionVars = Object.fromEntries(pendingRows.filter((v) => v.enabled && v.key).map((v) => [v.key, v.value]));
+    }
+    const result = await executeRequest(req, collectionEnv, globalEnv, signal, store.getInherited(req.id), jar, dataVars, scriptTimeoutRef.current, store.vaultVars, collectionVars);
+    persistResult(req, collectionEnv, globalEnv, result, options.recordHistory ?? false);
+    return { ...result, sensitiveValues: sensitiveValuesFor(store.vaultVars, collectionEnv, globalEnv) };
+  }, [persistResult]);
 
   return { runRequest, persistResult, scriptTimeoutRef };
 }

@@ -27,6 +27,11 @@ export function useEnvSecrets(
         typeof action === 'function'
           ? (action as (prev: Environment[]) => Environment[])(environmentsRef.current)
           : action;
+      // Advance the ref now: a second call in the same tick (a script writing
+      // the collection env and then the global env, MCP add_environment then
+      // update) must build on this result, not on the last render, or it
+      // silently undoes it.
+      environmentsRef.current = next;
       const split = splitEnvSecrets(next);
       setStripped(split.stripped);
       setSecrets(split.secrets);

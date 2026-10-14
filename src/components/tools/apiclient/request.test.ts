@@ -258,3 +258,36 @@ describe('buildUrl — disabled query params', () => {
     expect(buildUrl(req, id)).toBe('https://api.test/search?q=raw');
   });
 });
+
+describe('buildUrl — already-encoded query values are sent as they are', () => {
+  const make = (url: string) => {
+    const req = newRequest({ url });
+    return { ...req, params: paramsFromUrl(url, []) };
+  };
+
+  it('does not encode a pasted percent-escape or + a second time', () => {
+    const req = make('https://api.test/cb?redirect=https%3A%2F%2Fy.com%2Fz&q=a+b');
+    expect(buildUrl(req, (v: string) => v)).toBe('https://api.test/cb?redirect=https%3A%2F%2Fy.com%2Fz&q=a+b');
+  });
+
+  it('still encodes what is not encoded yet', () => {
+    const req = make('https://api.test/s');
+    req.params = [
+      { id: '1', key: 'q', value: 'a b&c', enabled: true },
+      { id: '2', key: 'pct', value: '50%', enabled: true },
+      { id: '3', key: 'url', value: 'https://y.com/z?x=1', enabled: true },
+    ];
+    expect(buildUrl(req, (v: string) => v)).toBe('https://api.test/s?q=a%20b%26c&pct=50%25&url=https%3A%2F%2Fy.com%2Fz%3Fx%3D1');
+  });
+});
+
+describe('buildUrl — path params with a hyphen', () => {
+  it('substitutes :file-id and keeps :id-v2 working', () => {
+    const req = newRequest({ url: 'https://api.test/files/:file-id/v/:id-v2' });
+    req.pathParams = [
+      { id: 'a', key: 'file-id', value: 'abc', enabled: true },
+      { id: 'b', key: 'id', value: '7', enabled: true },
+    ];
+    expect(buildUrl(req, (v: string) => v)).toBe('https://api.test/files/abc/v/7-v2');
+  });
+});

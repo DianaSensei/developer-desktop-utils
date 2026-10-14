@@ -33,3 +33,13 @@ describe('generateCode — Shell/curl', () => {
     expect(out).toBe("curl --request GET \\\n  --url 'https://api.example.com/users'");
   });
 });
+
+describe('generateCode — matches what is sent', () => {
+  it('a GET keeps no body in the generated command, since none is sent', () => {
+    const req = newRequest({ method: 'GET', url: 'https://es.test/_search' });
+    req.body = { mode: 'json', raw: '{"query":{"match_all":{}}}', form: [] };
+    const out = generateCode(req, {}, 'Shell', 'curl', true, []);
+    expect(out).not.toContain('match_all');
+    expect(out).not.toMatch(/--data/);
+  });
+});

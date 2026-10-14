@@ -342,6 +342,24 @@ fn is_kebab_ish(s: &str) -> bool {
     !s.is_empty() && s.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
 }
 
+/// A value that is joined into an install path (`version`, `market_id`)
+/// must stay a single directory name: semver characters only, so no `/`,
+/// `\`, drive prefix (`C:`), absolute path or `..` can redirect the write
+/// or the later `remove_dir_all` outside the extensions directory.
+fn is_safe_path_segment(s: &str) -> bool {
+    !s.is_empty()
+        && s.len() <= 64
+        && !s.starts_with('.')
+        && s.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '+' | '_'))
+}
+
+fn validate_market_id(market_id: Option<&str>) -> Result<(), String> {
+    match market_id {
+        Some(m) if !is_safe_path_segment(m) => Err(format!("market_id \"{m}\" không hợp lệ")),
+        _ => Ok(()),
+    }
+}
+
 fn is_sha256_hex(s: &str) -> bool {
     s.len() == 64 && s.chars().all(|c| c.is_ascii_hexdigit())
 }
@@ -354,6 +372,9 @@ fn is_sha256_hex(s: &str) -> bool {
 fn validate_remote_plugin_manifest(m: &RemotePluginManifest) -> Result<(), String> {
     if !is_kebab_ish(&m.id) {
         return Err(format!("id \"{}\" phải là kebab-case", m.id));
+    }
+    if !is_safe_path_segment(&m.version) {
+        return Err(format!("version \"{}\" không hợp lệ (chỉ chữ, số và . - + _)", m.version));
     }
     if !m.entry.starts_with("https://") {
         return Err("entry phải là URL https".to_string());
@@ -369,8 +390,8 @@ fn validate_remote_service_manifest(m: &RemoteServiceManifest) -> Result<(), Str
     if !is_kebab_ish(&m.bin) {
         return Err(format!("bin \"{}\" phải là kebab-case, không đuôi mở rộng", m.bin));
     }
-    if m.version.trim().is_empty() {
-        return Err("version không được rỗng".to_string());
+    if !is_safe_path_segment(&m.version) {
+        return Err(format!("version \"{}\" không hợp lệ (chỉ chữ, số và . - + _)", m.version));
     }
     if m.targets.is_empty() {
         return Err("targets không được rỗng".to_string());
@@ -396,6 +417,8 @@ fn stage_install_plugin(
     market_id: Option<String>,
     bytes: &[u8],
 ) -> Result<InstalledArtifactRecord, String> {
+    validate_remote_plugin_manifest(&manifest)?;
+    validate_market_id(market_id.as_deref())?;
     let actual = sha256_hex(bytes);
     if actual != manifest.integrity.to_lowercase() {
         return Err(format!(
@@ -442,7 +465,9 @@ fn stage_install_plugin(
     // Remove the previous version's directory once the index is written.
     // Best effort: a failed delete (e.g. a locked file on Windows) does not
     // fail the install.
-    if let Some(old_version) = old_version {
+    // An index written before versions were validated may hold an invalid
+    // one; never let it steer a delete.
+    if let Some(old_version) = old_version.filter(|v| is_safe_path_segment(v)) {
         if old_version != new_version {
             let _ = std::fs::remove_dir_all(plugin_disk_dir(plugins_dir, market_id.as_deref(), &id).join(&old_version));
         }
@@ -489,6 +514,8 @@ fn stage_install_service(
     target_triple: &str,
     bytes: &[u8],
 ) -> Result<InstalledArtifactRecord, String> {
+    validate_remote_service_manifest(&manifest)?;
+    validate_market_id(market_id.as_deref())?;
     let target = target_for(&manifest, target_triple)?;
 
     let actual = sha256_hex(bytes);
@@ -544,7 +571,7 @@ fn stage_install_service(
 
     // Remove the previous version's directory. The caller has already stopped
     // the running sidecar, so no process holds the old binary.
-    if let Some(old_version) = old_version {
+    if let Some(old_version) = old_version.filter(|v| is_safe_path_segment(v)) {
         if old_version != new_version {
             let _ = std::fs::remove_dir_all(services_dir.join(&bin).join(&old_version));
         }
@@ -562,6 +589,10 @@ fn stage_uninstall(
     key: &str,
     market_id: Option<&str>,
 ) -> Result<Option<String>, String> {
+    if !is_kebab_ish(key) {
+        return Err(format!("\"{key}\" không phải id hợp lệ"));
+    }
+    validate_market_id(market_id)?;
     let mut records = read_index(index_dir)?;
     let before = records.len();
     let mut removed: Option<InstalledArtifactRecord> = None;
@@ -708,6 +739,22 @@ pub async fn artifact_installer_fetch_manifest(url: String) -> Result<RemoteArti
     fetch_manifest_from(&url).await
 }
 
+/// The manifest is fetched again at install time, so the source can serve
+/// something other than what the user approved in the preview (different
+/// permissions, hosts, bundle). The webview passes the previewed manifest;
+/// any difference refuses the install.
+fn check_matches_preview(
+    expected: Option<&RemoteArtifactManifest>,
+    fetched: &RemoteArtifactManifest,
+) -> Result<(), String> {
+    match expected {
+        Some(e) if e != fetched => {
+            Err("Manifest đã thay đổi kể từ lúc xem trước — mở lại để xem bản mới rồi mới cài.".to_string())
+        }
+        _ => Ok(()),
+    }
+}
+
 #[tauri::command]
 pub async fn artifact_installer_install(
     app: AppHandle,
@@ -715,10 +762,12 @@ pub async fn artifact_installer_install(
     services: tauri::State<'_, crate::service_host::ServiceRegistry>,
     source_url: String,
     market_id: Option<String>,
+    expected_manifest: Option<RemoteArtifactManifest>,
 ) -> Result<InstalledArtifactRecord, String> {
     let _guard = index_state.0.lock().await;
 
     let manifest = artifact_installer_fetch_manifest(source_url.clone()).await?;
+    check_matches_preview(expected_manifest.as_ref(), &manifest)?;
     let index_dir = extensions_dir(&app)?;
 
     let record = match manifest {
@@ -1430,5 +1479,110 @@ mod tests {
         let url = serve_once("hello".into(), "text/plain").await;
         let bytes = download_capped(&url, 100).await.unwrap();
         assert_eq!(bytes, b"hello");
+    }
+    #[test]
+    fn version_and_market_id_must_be_a_single_path_segment() {
+        for ok in ["1.0.0", "1.1.0-beta.1", "2.0.0+build.5", "1_0"] {
+            assert!(is_safe_path_segment(ok), "{ok}");
+        }
+        for bad in ["", ".", "..", "../..", "../../victim", "/home/u/Documents", "a/b", "a\\b", "C:", "C:\\x", ".hidden", "1.0.0 "] {
+            assert!(!is_safe_path_segment(bad), "{bad:?}");
+            let mut m = plugin_manifest("https://x/a.mjs", &"a".repeat(64));
+            m.version = bad.into();
+            assert!(validate_remote_plugin_manifest(&m).is_err(), "plugin version {bad:?}");
+            let mut s = service_manifest("devtool-svc-demo", "t", "https://x/bin", &"a".repeat(64));
+            s.version = bad.into();
+            assert!(validate_remote_service_manifest(&s).is_err(), "service version {bad:?}");
+        }
+        assert!(validate_market_id(Some("custom-1700000000-ab12")).is_ok());
+        assert!(validate_market_id(Some("../escape")).is_err());
+    }
+
+    /// A manifest whose version points outside the plugins directory must
+    /// not write there, and a later update must not delete it.
+    #[test]
+    fn plugin_version_cannot_escape_the_plugins_dir() {
+        let index_dir = temp_dir("plugin-traversal-index");
+        let plugins_dir = temp_dir("plugin-traversal-bundles");
+        let victim = temp_dir("plugin-traversal-victim");
+        std::fs::write(victim.join("thesis.docx"), b"keep").unwrap();
+
+        let mut evil = plugin_manifest("https://x/a.mjs", &sha256_hex(b"a"));
+        evil.version = victim.to_string_lossy().into_owned();
+        let err = stage_install_plugin(&index_dir, &plugins_dir, evil, "https://x/p.json".into(), None, b"a").unwrap_err();
+        assert!(err.contains("version"), "{err}");
+        assert!(!victim.join("bundle.mjs").exists());
+
+        let mut relative = plugin_manifest("https://x/a.mjs", &sha256_hex(b"a"));
+        relative.version = "../../escape".into();
+        assert!(stage_install_plugin(&index_dir, &plugins_dir, relative, "https://x/p.json".into(), None, b"a").is_err());
+
+        let m = plugin_manifest("https://x/a.mjs", &sha256_hex(b"a"));
+        assert!(stage_install_plugin(&index_dir, &plugins_dir, m, "https://x/p.json".into(), Some("../x".into()), b"a").is_err());
+        assert!(read_index(&index_dir).unwrap().is_empty());
+    }
+
+    /// An index written by an older build may already hold an invalid version;
+    /// updating must not `remove_dir_all` through it.
+    #[test]
+    fn update_never_deletes_through_an_unsafe_recorded_version() {
+        let index_dir = temp_dir("plugin-legacy-invalid-index");
+        let plugins_dir = temp_dir("plugin-legacy-invalid-bundles");
+        let victim = temp_dir("plugin-legacy-invalid-victim");
+        std::fs::write(victim.join("thesis.docx"), b"keep").unwrap();
+
+        let mut legacy = plugin_manifest("https://x/a.mjs", &sha256_hex(b"a"));
+        legacy.version = victim.to_string_lossy().into_owned();
+        let record = InstalledArtifactRecord::Plugin(InstalledPluginRecord {
+            manifest: legacy,
+            source_url: "https://x/p.json".into(),
+            bundle_path: victim.join("bundle.mjs").to_string_lossy().into_owned(),
+            installed_at: 0,
+            market_id: None,
+        });
+        write_index(&index_dir, &[record]).unwrap();
+
+        let mut v2 = plugin_manifest("https://x/v2.mjs", &sha256_hex(b"v2"));
+        v2.version = "2.0.0".into();
+        stage_install_plugin(&index_dir, &plugins_dir, v2, "https://x/p.json".into(), None, b"v2").unwrap();
+        assert!(victim.join("thesis.docx").exists(), "the invalid recorded path must not be deleted");
+    }
+
+    #[test]
+    fn service_version_cannot_escape_the_services_dir() {
+        let index_dir = temp_dir("svc-traversal-index");
+        let services_dir = temp_dir("svc-traversal-bins");
+        let triple = current_target_triple();
+        let mut m = service_manifest("devtool-svc-demo", &triple, "https://x/bin", &sha256_hex(b"b"));
+        m.version = "../../../home/u/.local/bin".into();
+        let err = stage_install_service(&index_dir, &services_dir, m, "https://x/s.json".into(), None, &triple, b"b").unwrap_err();
+        assert!(err.contains("version"), "{err}");
+        assert!(read_index(&index_dir).unwrap().is_empty());
+    }
+
+    #[test]
+    fn uninstall_rejects_ids_and_market_ids_that_are_not_path_safe() {
+        let index_dir = temp_dir("uninstall-invalid-index");
+        let plugins_dir = temp_dir("uninstall-invalid-plugins");
+        let services_dir = temp_dir("uninstall-invalid-services");
+        assert!(stage_uninstall(&index_dir, &plugins_dir, &services_dir, "../x", None).is_err());
+        assert!(stage_uninstall(&index_dir, &plugins_dir, &services_dir, "demo", Some("../x")).is_err());
+    }
+    #[test]
+    fn install_refuses_a_manifest_that_changed_since_the_preview() {
+        let previewed = RemoteArtifactManifest::Plugin(plugin_manifest("https://x/a.mjs", &"a".repeat(64)));
+        assert!(check_matches_preview(None, &previewed).is_ok());
+        assert!(check_matches_preview(Some(&previewed), &previewed).is_ok());
+
+        let mut widened = plugin_manifest("https://x/a.mjs", &"a".repeat(64));
+        widened.permissions = vec!["secrets".into(), "http".into()];
+        widened.hosts = vec!["*".into()];
+        let widened = RemoteArtifactManifest::Plugin(widened);
+        assert!(check_matches_preview(Some(&previewed), &widened).is_err());
+
+        // The webview sends back what the fetch command serialized.
+        let round_trip: RemoteArtifactManifest =
+            serde_json::from_str(&serde_json::to_string(&previewed).unwrap()).unwrap();
+        assert!(check_matches_preview(Some(&round_trip), &previewed).is_ok());
     }
 }

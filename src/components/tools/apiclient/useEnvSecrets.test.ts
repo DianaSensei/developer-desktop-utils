@@ -102,3 +102,33 @@ describe('useEnvSecrets', () => {
     expect(JSON.parse((await secretGet('api-client', 'envSecrets')) ?? '{}')).toEqual({});
   });
 });
+
+describe('useEnvSecrets — updates in the same tick build on each other', () => {
+  it('adding then updating an environment keeps both changes', async () => {
+    const { result } = renderHook(() => useSubject());
+    await waitFor(() => expect(result.current[2]).toBe(true));
+
+    act(() => {
+      result.current[1]((prev) => [...prev, { id: 'e2', name: 'New', variables: [] }]);
+      result.current[1]((prev) => prev.map((e) => (e.id === 'e2' ? { ...e, name: 'Prod' } : e)));
+    });
+
+    expect(result.current[0].map((e) => [e.id, e.name])).toEqual([['e2', 'Prod']]);
+  });
+
+  it('two renames in one tick both apply', async () => {
+    const { result } = renderHook(() => useSubject());
+    await waitFor(() => expect(result.current[2]).toBe(true));
+    act(() => {
+      result.current[1]([
+        { id: 'a', name: 'A', variables: [] },
+        { id: 'b', name: 'B', variables: [] },
+      ]);
+    });
+    act(() => {
+      result.current[1]((prev) => prev.map((e) => (e.id === 'a' ? { ...e, name: 'A2' } : e)));
+      result.current[1]((prev) => prev.map((e) => (e.id === 'b' ? { ...e, name: 'B2' } : e)));
+    });
+    expect(result.current[0].map((e) => e.name)).toEqual(['A2', 'B2']);
+  });
+});

@@ -24,7 +24,7 @@ export function parseProperties(text: string): unknown {
     const { key, value } = splitKeyValue(line);
     const path = keyPath(unescape(key));
     if (path.length === 0) continue;
-    assign(holder, path, coerce(unescape(value)));
+    assign(holder, path, inferScalar(unescape(value)));
   }
 
   return holder.root === undefined ? {} : holder.root;
@@ -83,17 +83,70 @@ function keyPath(key: string): (string | number)[] {
   return path;
 }
 
+type Container = Record<string, unknown> | unknown[];
+
+function isContainer(v: unknown): v is Container {
+  return typeof v === 'object' && v !== null;
+}
+
+function getOwn(node: Container, key: string | number): unknown {
+  return Object.hasOwn(node, key) ? (node as Record<string | number, unknown>)[key] : undefined;
+}
+
+// defineProperty rather than `node[key] = value`: a `__proto__` key must stay
+// ordinary data, never replace the object's prototype (or reach
+// Object.prototype, which would leak into every object in the app).
+function setOwn(node: Container, key: string | number, value: unknown): void {
+  Object.defineProperty(node, key, { value, writable: true, enumerable: true, configurable: true });
+}
+
+// Inverse of keyPath, for keys that have to stay flat.
+function joinPath(path: (string | number)[]): string {
+  return path.reduce<string>((acc, seg) => (typeof seg === 'number' ? `${acc}[${seg}]` : acc ? `${acc}.${seg}` : seg), '');
+}
+
+function flatLeaves(value: unknown, prefix: string, out: [string, unknown][]): [string, unknown][] {
+  if (!isContainer(value)) {
+    out.push([prefix, value]);
+    return out;
+  }
+  for (const [k, v] of Object.entries(value)) {
+    flatLeaves(v, Array.isArray(value) ? `${prefix}[${k}]` : `${prefix}.${k}`, out);
+  }
+  return out;
+}
+
 function assign(holder: { root: unknown }, path: (string | number)[], value: unknown): void {
   if (path.length === 0) return;
   if (holder.root === undefined) holder.root = typeof path[0] === 'number' ? [] : {};
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let node: any = holder.root;
+  let node = holder.root as Container;
   for (let i = 0; i < path.length - 1; i++) {
     const key = path[i];
-    if (node[key] === undefined) node[key] = typeof path[i + 1] === 'number' ? [] : {};
-    node = node[key];
+    const next = getOwn(node, key);
+    if (next === undefined) {
+      const created: Container = typeof path[i + 1] === 'number' ? [] : {};
+      setOwn(node, key, created);
+      node = created;
+      continue;
+    }
+    if (!isContainer(next)) {
+      // `a=1` then `a.b=2` (Spring: `logging.level.com.example=DEBUG` and
+      // `logging.level.com.example.service=TRACE`): `a` already holds a value,
+      // so the rest stays one dotted key beside it rather than being lost.
+      if (Array.isArray(node)) throw new Error(`"${joinPath(path)}" conflicts with an earlier value`);
+      setOwn(node, joinPath(path.slice(i)), value);
+      return;
+    }
+    node = next;
   }
-  node[path[path.length - 1]] = value;
+  const leaf = path[path.length - 1];
+  const existing = getOwn(node, leaf);
+  if (isContainer(existing) && !Array.isArray(node)) {
+    // The same conflict the other way round (`a.b=2` then `a=1`): keep the
+    // earlier section as dotted keys so both lines survive.
+    for (const [k, v] of flatLeaves(existing, String(leaf), [])) setOwn(node, k, v);
+  }
+  setOwn(node, leaf, value);
 }
 
 function unescape(s: string): string {
@@ -116,16 +169,18 @@ function unescape(s: string): string {
 }
 
 // Strings stay strings, but bare numbers/booleans become typed values so the
-// JSON/YAML output is natural (matches the tool's CSV behavior). Leading-zero
-// numbers (zip codes, ids) are left as strings.
-function coerce(s: string): unknown {
+// JSON/YAML output is natural (matches the tool's CSV behavior). Numbers that
+// would not print back the same (zip codes, ids, versions like 1.10) are left
+// as strings.
+export function inferScalar(s: string): unknown {
   if (s === 'true') return true;
   if (s === 'false') return false;
-  if (/^-?\d+$/.test(s) && !/^-?0\d/.test(s)) {
+  // Only when the number prints back exactly as written: `1.10` (a version)
+  // or `07000` (a zip code) would otherwise change.
+  if (/^-?\d+$/.test(s) || /^-?\d*\.\d+$/.test(s)) {
     const n = Number(s);
-    if (Number.isSafeInteger(n)) return n;
+    if (String(n) === s && (Number.isSafeInteger(n) || !Number.isInteger(n))) return n;
   }
-  if (/^-?\d*\.\d+$/.test(s)) return Number(s);
   return s;
 }
 
