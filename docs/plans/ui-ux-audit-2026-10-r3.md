@@ -190,3 +190,64 @@ Phần vỏ app đã ổn sau vòng 2. Vấn đề nằm ở **ruột của từ
 4. **Một dòng là xong:** SHA-3 (#1), treo khi random (#2), sort ASCII (#3), prototype pollution
    (S4), `Array.isArray` cho favorites, tìm kiếm bỏ dấu tiếng Việt.
 5. P2/P3 còn lại theo tool, kèm test cho từng lỗi (phần lớn đã có sẵn repro).
+
+---
+
+## MCP (devtool-mcp-server + bridge + API Client tools)
+
+Kiểm thêm theo yêu cầu: chạy `devtool-mcp-server` thật qua stdio (JSON-RPC), không có app và
+với một bridge giả đúng định dạng `/tools`·`/call` của `mcp_bridge.rs`; phía webview chạy các
+handler với `useApiStore` + `useApiRunner` thật (chỉ mock IPC Tauri).
+
+| # | Mức | Vấn đề | Chỗ |
+|---|---|---|---|
+| M1 | P1 | Server không khai `tools.listChanged`, không bao giờ gửi `notifications/tools/list_changed`: Claude Code mở trước app (hoặc trước khi tool/plugin đăng ký) chỉ thấy `get_scripting_reference` cả phiên. | `bin/devtool-mcp-server.rs` |
+| M2 | P1 | Công tắc MCP (Background bridge, Per-tool access) là `usePersistentState` riêng từng component: `devtool_mcp_set_background`/`set_tool_enabled` báo ok mà không có tác dụng tới khi khởi động lại; Settings ghi đè thay đổi của client; bật nền lúc đang chạy làm API Client/Mock Server không trả lời ở đâu cả. | `useMcpBackgroundBridge.ts`, `useMcpToolEnabled.ts` |
+| M3 | P1 | `add_environment` có `name`/`variables` trả id của environment không tồn tại (cùng gốc với #17). | `useEnvSecrets.ts` |
+| M4 | P1 | `run_request` trả nguyên giá trị vault/biến secret mà server echo lại (URL cuối có API key, body, header, log, test). | `apiclient/mcpBridge.ts` |
+| M5 | P2 | `update_request` trả bản trước khi patch; đổi URL không cập nhật bảng params nên không có tác dụng. | `apiclient/mcpBridge.ts` |
+| M6 | P2 | `run_request`: `environmentId` sai id chạy im lặng không env; ép env collection làm mất env global; kết quả không vào History dù mô tả nói có. | `useApiRunner.ts` |
+| M7 | P2 | `create_request`/`add_folder`/`set_node_headers`/`move_item`/`copy_item`/`set_active_environment` báo thành công với id không tồn tại; gọi song song ghi đè nhau. | `apiclient/mcpBridge.ts` |
+| M8 | P2 | Tool chưa ai đăng ký chờ đủ 30 s rồi báo sai lý do; tham số > 2 MB lỗi "non-JSON response (HTTP 413)". | `mcp_bridge.rs` |
+| M9 | P2 | `hash_compute`/`hash_hmac`/`codec_*` từ chối chuỗi rỗng. | `codecMcpBridge.ts` |
+| M10 | P2 | `.mcp.json` chạy `cargo run --release` cho cả crate Tauri: lần đầu biên dịch nhiều phút (Linux cần WebKitGTK), lâu hơn thời gian client chờ → "Connection closed". Tài liệu ghi "vài giây". | `.mcp.json`, `docs/human/mcp-server.md` |
+| M11 | P2 (bảo mật) | `sdk.native.listen` không có allowlist sự kiện: plugin có quyền `native` đọc được mọi `mcp:call` (kể cả `key` của `encrypt_text`), trả lời giả trước, và đăng ký/xoá tool dưới `pluginId` khác; trùng tên tool không bị phát hiện. | `platform/sdk.ts`, `mcp_bridge.rs` |
+| M12 | P3 | `get_scripting_reference` lệch sandbox vài chỗ (`req.*` có ở mọi phase; `pm.environment.get` rơi xuống env global). | `bin/devtool-mcp-server.rs` |
+
+Đã kiểm, đúng: mỗi tool quảng bá đều có handler và ngược lại; enum khớp; token so sánh hằng
+thời gian; envelope `{result}`/`{error}` → `isError`; timeout bridge 30 s < server 35 s; khi
+không có app, server trả lỗi rõ ràng và `get_scripting_reference` vẫn trả lời.
+
+---
+
+## Đã sửa trên nhánh này
+
+Mỗi mục có test (vitest; Rust cho installer/bridge — crate biên dịch được trong container sau
+khi cài WebKitGTK). Cuối cùng: `tsc` sạch, vitest 146 file / 1 621 test, `cargo test`
+`artifact_installer` 39/39, `mcp_bridge` 2/2. Kiểm lại trên bản build: Unix Time (0 lần ghi
+store khi đứng yên, giữ vùng chọn, giữ timestamp qua chuyển tool/tải lại), SQL formatter.
+
+| Commit | Sửa |
+|---|---|
+| `76532e4` | S1 `version`/`market_id` chỉ là một đoạn đường dẫn; không xoá qua version không an toàn trong index cũ. S2 Rust từ chối manifest khác bản đã xem trước; Update đi qua dialog. S3 dialog/ô dán URL hiện nguồn, `hosts`, bản bị thay, quyền/host mới, bắt tick xác nhận khi hạ cấp hoặc đổi nguồn. |
+| `5072e96` | S4, #9–#16: properties (`__proto__`, `1.10`, key vừa là giá trị vừa là tiền tố), XML không đổi giá trị, YAML merge key, JSON (nháy cong, `__proto__`, số > 2^53), SQL (từ khoá đầu từ, comment giữ xuống dòng, `$$`), Diff JSON không ghi đè văn bản. |
+| `937b22a` | #1 SHA-3 FIPS 202 (+ Keccak-256 đúng tên), #2 random > 2^32 không treo, khoảng không có số nguyên báo lỗi, #3 sort ASCII. |
+| `538bddd` | #4–#7 + P2 Date/Time: giữ giá trị đã nhập, không ghi store mỗi giây, offset tường minh, DST hai lượt, timestamp mọi độ dài, tuần ISO, đổi múi giờ input. |
+| `eb4d0f5` | #8 Cron giữ Quartz/Spring; diễn giải không bỏ điều kiện ngày. |
+| `18057c6` | S5 khoá bước Pipeline vào vault (có migration), #22 nội dung Encrypt vào vault. |
+| `294f9e5` | M1 `listChanged` + poll bridge 3 s; M10 sửa tài liệu (đề xuất tách crate ở dưới). |
+| `8700991` | #17/M3 ghi env cùng tick, #18 Runner truyền biến giữa request, M2 công tắc MCP dùng chung (`useSharedSetting`), M4 che kết quả `run_request` + ghi History, M5–M7. |
+| `4de4673` | #19 không mã hoá hai lần, path param có gạch nối, #20 GET/HEAD: cảnh báo + code sinh ra khớp, #21 + P2 import curl. |
+| `6e43ef3` | M8 tool chưa đăng ký trả lỗi ngay, giới hạn body 64 MB + lỗi JSON; M9 chuỗi rỗng. |
+
+**Còn lại / cần quyết định**
+
+- **M10 — tách `devtool-mcp-server` ra crate riêng** (chỉ `rmcp`/`tokio`/`serde`): build vài
+  chục giây, không cần WebKitGTK, `.mcp.json` dùng được ngay lần đầu. Đụng `scripts/sidecar.mjs`,
+  release và CI nên chưa làm.
+- **M11** — routing `mcp:call` theo plugin sở hữu và ràng `pluginId` vào plugin gọi: thay đổi
+  ở tầng SDK/bridge, cần thiết kế.
+- GET có body (#20) chỉ gửi được nếu có lệnh Rust riêng (fetch của plugin-http từ chối).
+- P2/P3 của các tool còn lại (Regex `u` + emoji, Text Counter grapheme, QR > 125 KB, Calendar
+  DST, Postman import/export, Mock Server header lỗi trả 200 rỗng, tìm kiếm tiếng Việt, …)
+  chưa sửa.
