@@ -223,7 +223,7 @@ không có app, server trả lỗi rõ ràng và `get_scripting_reference` vẫn
 ## Đã sửa trên nhánh này
 
 Mỗi mục có test (vitest; Rust cho installer/bridge — crate biên dịch được trong container sau
-khi cài WebKitGTK). Cuối cùng: `tsc` sạch, vitest 146 file / 1 621 test, `cargo test`
+khi cài WebKitGTK). Cuối cùng: `tsc` sạch, vitest 146 file / 1 619 test, `cargo test`
 `artifact_installer` 39/39, `mcp_bridge` 2/2. Kiểm lại trên bản build: Unix Time (0 lần ghi
 store khi đứng yên, giữ vùng chọn, giữ timestamp qua chuyển tool/tải lại), SQL formatter.
 
