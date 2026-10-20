@@ -84,6 +84,8 @@ export interface PipelineStep {
   jwsDetached?: boolean;
   /** jws-verify: payload of a detached JWS. */
   detachedPayload?: string;
+  /** jwt-verify / jws-verify: the pasted key, or the leaf certificate in the token's own `x5c` header. */
+  keySource?: 'key' | 'x5c';
   // Extract
   path?: string;
   pattern?: string;
@@ -276,6 +278,27 @@ function keyInput(step: PipelineStep) {
   return { material: step.key ?? '', encoding: step.keyEncoding ?? 'utf8' };
 }
 
+/**
+ * The leaf certificate of a token's `x5c` header, as PEM — how Apple signs
+ * App Store / Advanced Commerce JWS (ES256 with a three-certificate chain).
+ *
+ * This proves the payload was signed by the key in that certificate, NOT that
+ * the certificate chains to Apple's root: anyone can put their own
+ * certificate in `x5c`. The step's UI says so; a server must validate the chain.
+ */
+export function x5cLeafPem(token: string): string {
+  const [h] = normalizeToken(token).split('.');
+  const header = parseJson(decodeSegment(h ?? '', 'header'), 'Header') as { x5c?: unknown };
+  const leaf = Array.isArray(header.x5c) ? header.x5c[0] : undefined;
+  if (typeof leaf !== 'string' || !leaf) throw new Error('The token header has no x5c certificate chain to verify with.');
+  const body = leaf.replace(/\s+/g, '').match(/.{1,64}/g)!.join('\n');
+  return `-----BEGIN CERTIFICATE-----\n${body}\n-----END CERTIFICATE-----`;
+}
+
+function verifyKeyInput(step: PipelineStep, token: string) {
+  return step.keySource === 'x5c' ? { material: x5cLeafPem(token) } : keyInput(step);
+}
+
 async function jwsSign(step: PipelineStep, input: string): Promise<string> {
   const alg = step.jwtAlg ?? 'HS256';
   if (alg === 'none') throw new Error('JWS needs a signing algorithm; "none" exists only for unsigned JWTs.');
@@ -305,7 +328,7 @@ async function jwsVerify(step: PipelineStep, input: string): Promise<string> {
   if (typeof header.alg === 'string' && header.alg !== alg) {
     throw new Error(`Token header says alg "${header.alg}" but this step verifies as ${alg}.`);
   }
-  const key = await resolveKey(keyInput(step), alg, 'verify');
+  const key = await resolveKey(verifyKeyInput(step, token), alg, 'verify');
   try {
     const { payload } = await compactVerify(token, key as never, { algorithms: [alg] });
     return dec.decode(payload);
@@ -396,7 +419,7 @@ async function run(step: PipelineStep, input: string): Promise<string> {
         expiresIn: step.jwtExpiresIn || undefined,
       });
     case 'jwt-verify': {
-      const outcome = await verifyToken({ token: input, algorithm: step.jwtAlg ?? 'HS256', key: keyInput(step) });
+      const outcome = await verifyToken({ token: input, algorithm: step.jwtAlg ?? 'HS256', key: verifyKeyInput(step, input) });
       if (!outcome.valid) throw new Error(outcome.message);
       return JSON.stringify(outcome.payload, null, 2);
     }

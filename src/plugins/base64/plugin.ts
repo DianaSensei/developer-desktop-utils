@@ -7,7 +7,7 @@ export default definePlugin({
   icon: Binary,
   description:
     "Encode/decode (Base64, URL, Hex, Morse…), image↔Base64, hash text or files (MD5, SHA, HMAC, checksums), password hashing (bcrypt/Argon2), and AES-256 encrypt/decrypt.",
-  keywords: ["base64", "encode", "decode", "url encode", "hex", "morse", "hash", "md5", "sha1", "sha256", "sha512", "hmac", "checksum", "crc", "bcrypt", "argon2", "aes", "encrypt", "decrypt", "cipher", "password"],
+  keywords: ["base64", "encode", "decode", "url encode", "hex", "morse", "hash", "md5", "sha1", "sha256", "sha512", "hmac", "checksum", "crc", "bcrypt", "argon2", "aes", "encrypt", "decrypt", "cipher", "password", "pipeline", "jwt", "jws"],
   route: '/base64',
   order: 110,
   defaultEnabled: true,

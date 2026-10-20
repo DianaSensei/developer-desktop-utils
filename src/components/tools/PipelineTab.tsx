@@ -28,6 +28,7 @@ import {
 } from './pipelineEngine';
 import { SECRET_ENCODINGS, isAsymmetric, isHmac, type AlgorithmSpec, type JwtAlgorithm, type SecretEncoding } from './jwt/jwtCrypto';
 import type { EncryptAlgo } from './encodeCore';
+import { PipelineTemplates } from './PipelineTemplates';
 
 export { compareCodeUnits } from './pipelineEngine';
 
@@ -610,11 +611,32 @@ function JwtKeyControls({ step, purpose, showKey, onToggleKey, onUpdate }: {
   const alg = step.jwtAlg ?? 'HS256';
   const algorithms = isJws ? JWS_ALGORITHMS : JWT_ALGORITHMS;
   const spec = algorithms.find((a) => a.alg === alg);
+  // x5c only makes sense for a certificate, i.e. an asymmetric algorithm.
+  const canX5c = purpose === 'verify' && isAsymmetric(alg);
+  const fromX5c = canX5c && step.keySource === 'x5c';
   return (
     <div className="space-y-2">
-      <JwtAlgSelect value={alg} algorithms={algorithms} onChange={(v) => onUpdate({ jwtAlg: v })} />
-      {spec && <p className="text-[11px] text-fg-mute">{spec.keyHint}</p>}
-      {alg === 'none' ? (
+      <div className="flex flex-wrap items-center gap-2">
+        <JwtAlgSelect value={alg} algorithms={algorithms} onChange={(v) => onUpdate({ jwtAlg: v })} />
+        {canX5c && (
+          <div className="flex items-center gap-1.5">
+            <ParamLabel>{t('keySource')}</ParamLabel>
+            <Segmented
+              value={step.keySource ?? 'key'}
+              onValueChange={(v) => onUpdate({ keySource: v })}
+              size="sm"
+              options={[{ value: 'key', label: t('keySource.key') }, { value: 'x5c', label: t('keySource.x5c') }]}
+              aria-label={t('keySource')}
+            />
+          </div>
+        )}
+      </div>
+      {fromX5c ? (
+        <p className="flex items-start gap-1.5 text-[11px] text-warn">
+          <AlertTriangle className="h-3 w-3 shrink-0 mt-px" />{t('x5cWarning')}
+        </p>
+      ) : spec && <p className="text-[11px] text-fg-mute">{spec.keyHint}</p>}
+      {fromX5c ? null : alg === 'none' ? (
         <p className="flex items-center gap-1.5 text-[11px] text-warn">
           <AlertTriangle className="h-3 w-3 shrink-0" />{t('algNone')}
         </p>
@@ -1181,6 +1203,13 @@ export function PipelineTab({ active }: { active: boolean }) {
     });
   };
 
+  const loadTemplate = (next: PipelineStep[], keys: Record<string, string>) => {
+    setSteps(next);
+    // The replaced steps' keys go with them; the template's own come in.
+    setStepKeys(keys);
+    setShowKeys({});
+  };
+
   const addStep = (op: StepOp) => {
     const { key: _key, ...defaults } = STEP_DEFAULTS[op] ?? {};
     setSteps((prev) => [...prev, { id: makeId(), op, ...defaults }]);
@@ -1188,6 +1217,8 @@ export function PipelineTab({ active }: { active: boolean }) {
 
   return (
     <div className="tool-scrollable tool-padding tool-spacer">
+
+      <PipelineTemplates steps={stepsWithKeys} onLoad={loadTemplate} makeId={makeId} />
 
       {/* Empty state */}
       {steps.length === 0 && (

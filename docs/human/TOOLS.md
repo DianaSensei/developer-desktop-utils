@@ -98,6 +98,10 @@ Chains steps, each one feeding its output to the next: text or JSON-field input;
 
 Keys, passphrases and PEM/JWK keys of a step are stored in the encrypted vault by step id, never in the saved steps.
 
+JWT/JWS verify can use the leaf certificate of the token's own `x5c` header as the key (Apple App Store / Advanced Commerce signed payloads). That proves the signature matches that certificate — it does not validate the chain to Apple's root.
+
+**Templates** save the steps and settings for reuse (`pipeline:templates`), with built-in examples (Apple Advanced Commerce JWS → `request`, App Store Server Notification → transaction, payment HMAC). Input data is dropped unless "keep input" is ticked; keys are never in a template or its exported JSON — "remember keys" stores them in the vault under the template id (`pipeline:template-keys`).
+
 **OS / system impact:** clipboard read (quick paste) and write. No data leaves the app.
 
 ---
