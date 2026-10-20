@@ -10,7 +10,7 @@ import { CopyButton } from '@/components/ui/copy-button';
 import { PaneHeader, ToolToolbar } from '@/components/ui/tool-layout';
 import { CodeViewer } from '@/design-system';
 import { JsonEditor } from '@/components/ui/code-editor';
-import { usePluginSdk, usePluginState, useSecretState } from '@/platform';
+import { usePluginSdkFor, usePluginState, useSecretState } from '@/platform';
 import { useQuickPaste, useQuickPasteHint } from '@/hooks/useQuickPaste';
 import { useInputHistory } from '@/hooks/useInputHistory';
 import {
@@ -39,21 +39,27 @@ export function JwtDebugger() {
   // vault, not the shared key plane every module in the webview can read.
   // Everything else here (mode, algorithm, the claims being drafted) is
   // ordinary preference state.
-  const sdk = usePluginSdk();
-  const [token, setToken, tokenReady] = useSecretState(sdk, 'token', '');
-  const [secret, setSecret] = useSecretState(sdk, 'hmac-secret', '');
-  const [privateKey, setPrivateKey] = useSecretState(sdk, 'private-key', '');
-  const [publicKey, setPublicKey] = useSecretState(sdk, 'public-key', '');
+  //
+  // The debugger is the JWT tab of Encode·Hash·Encrypt (it used to be its
+  // own `jwt` plugin), so its state lives in that plugin under `jwt:`. The
+  // vault entries were moved at startup (platform/secrets.ts VAULT_MOVES);
+  // `legacyKey` brings the plain preferences along on first read.
+  const sdk = usePluginSdkFor('base64');
+  const [token, setToken, tokenReady] = useSecretState(sdk, 'jwt:token', '');
+  const [secret, setSecret] = useSecretState(sdk, 'jwt:hmac-secret', '');
+  const [privateKey, setPrivateKey] = useSecretState(sdk, 'jwt:private-key', '');
+  const [publicKey, setPublicKey] = useSecretState(sdk, 'jwt:public-key', '');
 
-  const [mode, setMode] = usePluginState<Mode>(sdk, 'mode', 'decode');
-  const [algorithm, setAlgorithm] = usePluginState<JwtAlgorithm>(sdk, 'algorithm', 'HS256');
-  const [encoding, setEncoding] = usePluginState<SecretEncoding>(sdk, 'secret-encoding', 'utf8');
-  const [payload, setPayload] = usePluginState(sdk, 'sign-payload', SAMPLE_PAYLOAD);
-  const [kid, setKid] = usePluginState(sdk, 'sign-kid', '');
-  const [expiresIn, setExpiresIn] = usePluginState(sdk, 'sign-expires-in', '1h');
-  const [issuer, setIssuer] = usePluginState(sdk, 'verify-issuer', '');
-  const [audience, setAudience] = usePluginState(sdk, 'verify-audience', '');
-  const [clockTolerance, setClockTolerance] = usePluginState(sdk, 'verify-clock-tolerance', '0');
+  const legacy = (key: string) => ({ legacyKey: `devtool:jwt:${key}` });
+  const [mode, setMode] = usePluginState<Mode>(sdk, 'jwt:mode', 'decode', legacy('mode'));
+  const [algorithm, setAlgorithm] = usePluginState<JwtAlgorithm>(sdk, 'jwt:algorithm', 'HS256', legacy('algorithm'));
+  const [encoding, setEncoding] = usePluginState<SecretEncoding>(sdk, 'jwt:secret-encoding', 'utf8', legacy('secret-encoding'));
+  const [payload, setPayload] = usePluginState(sdk, 'jwt:sign-payload', SAMPLE_PAYLOAD, legacy('sign-payload'));
+  const [kid, setKid] = usePluginState(sdk, 'jwt:sign-kid', '', legacy('sign-kid'));
+  const [expiresIn, setExpiresIn] = usePluginState(sdk, 'jwt:sign-expires-in', '1h', legacy('sign-expires-in'));
+  const [issuer, setIssuer] = usePluginState(sdk, 'jwt:verify-issuer', '', legacy('verify-issuer'));
+  const [audience, setAudience] = usePluginState(sdk, 'jwt:verify-audience', '', legacy('verify-audience'));
+  const [clockTolerance, setClockTolerance] = usePluginState(sdk, 'jwt:verify-clock-tolerance', '0', legacy('verify-clock-tolerance'));
 
   const [outcome, setOutcome] = useState<VerifyOutcome | null>(null);
   const [signed, setSigned] = useState('');

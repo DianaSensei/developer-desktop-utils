@@ -239,6 +239,10 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
       'Password tab: hash a password with bcrypt or Argon2 (id/i/d) and a fresh random salt, or Verify a password against an existing hash (algorithm auto-detected).',
       'Encrypt tab: AES-256 GCM by default — enter a passphrase and encrypt/decrypt. The AES-CBC/CTR/CFB/OFB, 3DES and Rabbit modes below it exist to exchange ciphertext with a crypto-js caller.',
       'Pipeline tab: chain steps — Input (text / JSON fields), Encode/Decode (every codec), Hash / HMAC / Encrypt / Decrypt, JWT & JWS (decode, sign, verify), Extract (JSON path, regex, split) and Transform (case, trim, prepend/append, find & replace with regex, JSON pretty/minify). Each step shows its own output; the last is the final result. Save a pipeline as a template to reuse it, or start from an example (Apple Advanced Commerce / App Store notification JWS, payment HMAC).',
+      'JWT tab (formerly the JWT Debugger tool) — Decode: paste a JWT (header.payload.signature) — header and payload show as formatted JSON instantly, with exp / nbf / iat rendered as real times and flagged when expired.',
+      <>Verify: pick the algorithm you <strong className="text-fg">expect</strong>, paste the key (shared secret for <Tok>HS*</Tok>; PEM public key, X.509 certificate, JWK or a whole JWK Set for the rest), and optionally require an issuer / audience.</>,
+      <>Sign: edit the claims, set an expiry like <Tok>1h</Tok> or <Tok>7d</Tok>, paste a private key — or press <strong className="text-fg">Generate pair</strong> to get a fresh one, which also fills the public key for the Verify side.</>,
+      <>Algorithms: <Tok>HS256/384/512</Tok>, <Tok>RS256/384/512</Tok>, <Tok>PS256/384/512</Tok>, <Tok>ES256/384/512</Tok>, <Tok>EdDSA</Tok>, and unsigned <Tok>none</Tok>.</>,
     ],
     know: [
       'Hashes are one-way; most codecs are reversible. Everything runs locally — files and text are never uploaded.',
@@ -248,11 +252,17 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
       'Templates never contain keys, and exported template JSON never does either; “Remember keys” keeps them in the encrypted vault next to the template.',
       'Pipeline keys, passphrases and PEM keys live in the encrypted vault, not in the saved steps. A step whose output is random (AES-GCM) or time-based (JWT iat) holds still until its input or settings change.',
       'AES-256 GCM ciphertext is a self-describing envelope (magic, iteration count, salt, IV, tag), so raising the iteration count later still leaves older messages readable. It is this tool’s own format — crypto-js cannot read it.',
+      'Everything runs on your machine through the OS webview’s own Web Crypto — no key, token or claim is ever sent anywhere.',
+      <>For <Tok>HS*</Tok>, pick how the secret is written down (plain text / base64 / base64url / hex). A secret from <Tok>openssl rand -base64 32</Tok> is <em>bytes</em>, and HMAC-ing its printed characters instead produces a token the real service rejects.</>,
+      'Tokens and keys are held in the OS secret store, not in ordinary app storage.',
     ],
     caveat: [
       'Only AES-256 GCM stretches the passphrase properly (PBKDF2-SHA256, 600k rounds) and detects tampering. Every other mode is crypto-js, which derives its key with a single MD5 and authenticates nothing — interop, not protection. ECB additionally leaks plaintext patterns.',
       'Base64 is ~33% larger than the binary; very large images/files strain memory, and clipboard image copy isn’t supported on every platform.',
       'Higher bcrypt cost / Argon2 memory is slower by design; bcrypt only uses the first 72 bytes of a password.',
+      <>Verify never reads the algorithm off the token’s own <Tok>alg</Tok> header — trusting it is exactly how algorithm-confusion attacks work — so a token whose header disagrees with your choice is rejected as a mismatch.</>,
+      <>Web Crypto only imports PKCS#8 private keys (<Tok>-----BEGIN PRIVATE KEY-----</Tok>). Convert a PKCS#1 or SEC1 key with <Tok>openssl pkcs8 -topk8 -nocrypt</Tok>.</>,
+      <>Ed25519 is missing from some webviews; unavailable algorithms are greyed out in the picker. A token signed with <Tok>none</Tok> carries no signature and proves nothing.</>,
     ],
   }),
 
@@ -280,25 +290,6 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
     caveat: [
       'The tree is read-only (no editing) and search is plain text, not regex.',
       'Comments aren’t preserved in output; JS number precision limits very large integers.',
-    ],
-  }),
-
-  jwt: makeGuide({
-    use: [
-      'Decode: paste a JWT (header.payload.signature) — header and payload show as formatted JSON instantly, with exp / nbf / iat rendered as real times and flagged when expired.',
-      <>Verify: pick the algorithm you <strong className="text-fg">expect</strong>, paste the key (shared secret for <Tok>HS*</Tok>; PEM public key, X.509 certificate, JWK or a whole JWK Set for the rest), and optionally require an issuer / audience.</>,
-      <>Sign: edit the claims, set an expiry like <Tok>1h</Tok> or <Tok>7d</Tok>, paste a private key — or press <strong className="text-fg">Generate pair</strong> to get a fresh one, which also fills the public key for the Verify side.</>,
-      <>Algorithms: <Tok>HS256/384/512</Tok>, <Tok>RS256/384/512</Tok>, <Tok>PS256/384/512</Tok>, <Tok>ES256/384/512</Tok>, <Tok>EdDSA</Tok>, and unsigned <Tok>none</Tok>.</>,
-    ],
-    know: [
-      'Everything runs on your machine through the OS webview’s own Web Crypto — no key, token or claim is ever sent anywhere.',
-      <>For <Tok>HS*</Tok>, pick how the secret is written down (plain text / base64 / base64url / hex). A secret from <Tok>openssl rand -base64 32</Tok> is <em>bytes</em>, and HMAC-ing its printed characters instead produces a token the real service rejects.</>,
-      'Tokens and keys are held in the OS secret store, not in ordinary app storage.',
-    ],
-    caveat: [
-      <>Verify never reads the algorithm off the token’s own <Tok>alg</Tok> header — trusting it is exactly how algorithm-confusion attacks work — so a token whose header disagrees with your choice is rejected as a mismatch.</>,
-      <>Web Crypto only imports PKCS#8 private keys (<Tok>-----BEGIN PRIVATE KEY-----</Tok>). Convert a PKCS#1 or SEC1 key with <Tok>openssl pkcs8 -topk8 -nocrypt</Tok>.</>,
-      <>Ed25519 is missing from some webviews; unavailable algorithms are greyed out in the picker. A token signed with <Tok>none</Tok> carries no signature and proves nothing.</>,
     ],
   }),
 

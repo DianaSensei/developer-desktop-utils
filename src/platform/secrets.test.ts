@@ -128,11 +128,32 @@ describe('di trú từ store dùng chung — đường desktop', () => {
     await mod.migrateSecretsFromSharedStore();
 
     expect(vault.get('2fa/accounts')).toBe('a');
-    expect(vault.get('jwt/token')).toBe('b');
+    expect(vault.get('base64/jwt:token')).toBe('b');
     expect(vault.get('api-client/vault')).toBe('c');
     for (const k of ['devtool:2fa:accounts', 'devtool:jwt:token', 'devtool:apiclient:vault']) {
       expect(store.storageGet(k), k).toBeNull();
     }
+  });
+
+  it('chuyển khoá jwt/* sang base64/jwt:*, xoá bản cũ, chạy lại không làm gì', async () => {
+    const { mod, vault } = await loadDesktopSecrets();
+    vault.set('jwt/token', 'tok');
+    vault.set('jwt/private-key', 'pem');
+
+    expect(await mod.migrateVaultMoves()).toEqual(['jwt/token', 'jwt/private-key']);
+    expect(vault.get('base64/jwt:token')).toBe('tok');
+    expect(vault.get('base64/jwt:private-key')).toBe('pem');
+    expect(vault.has('jwt/token')).toBe(false);
+    expect(await mod.migrateVaultMoves()).toEqual([]);
+  });
+
+  it('giữ giá trị đã có ở chỗ mới', async () => {
+    const { mod, vault } = await loadDesktopSecrets();
+    vault.set('jwt/hmac-secret', 'old');
+    vault.set('base64/jwt:hmac-secret', 'new');
+    await mod.migrateVaultMoves();
+    expect(vault.get('base64/jwt:hmac-secret')).toBe('new');
+    expect(vault.has('jwt/hmac-secret')).toBe(false);
   });
 });
 

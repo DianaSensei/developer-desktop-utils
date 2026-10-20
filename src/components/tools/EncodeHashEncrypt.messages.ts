@@ -6,6 +6,7 @@ export default defineMessages({
   'tab.encode': { vi: 'Mã hoá', en: 'Encode' },
   'tab.image': { vi: 'Ảnh', en: 'Image' },
   'tab.hash': { vi: 'Hash', en: 'Hash' },
+  'tab.jwt': { vi: 'JWT', en: 'JWT' },
   'tab.checksum': { vi: 'Checksum', en: 'Checksum' },
   'tab.password': { vi: 'Mật khẩu', en: 'Password' },
   'tab.encrypt': { vi: 'Mã hoá đối xứng', en: 'Encrypt' },

@@ -1,4 +1,5 @@
 import { useDeferredValue, useEffect, useMemo, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { usePluginSdkFor, usePluginState, useSecretState } from '@/platform';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
@@ -6,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Eye, EyeOff, Lock, ArrowLeftRight, Check, X, KeyRound, Code, AlertTriangle, ShieldCheck, Workflow, FileCheck, ImageIcon, Fingerprint } from 'lucide-react';
 import { PipelineTab } from './PipelineTab';
+import { JwtDebugger } from './jwt/JwtDebugger';
 import { ChecksumTool } from './ChecksumTool';
 import { ImageBase64Tool } from './ImageBase64Tool';
 import { PasswordHash } from './PasswordHash';
@@ -32,7 +34,8 @@ import {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type Tab = 'encode' | 'image' | 'hash' | 'checksum' | 'password' | 'encrypt' | 'pipeline';
+type Tab = 'encode' | 'image' | 'hash' | 'jwt' | 'checksum' | 'password' | 'encrypt' | 'pipeline';
+const TABS: readonly Tab[] = ['encode', 'image', 'hash', 'jwt', 'checksum', 'password', 'encrypt', 'pipeline'];
 type EncodeMode = 'encode' | 'decode';
 type CryptoMode = 'encrypt' | 'decrypt';
 
@@ -51,6 +54,18 @@ export function EncodeHashEncrypt() {
   const sdk = usePluginSdkFor('base64');
   // Top-level tab
   const [tab, setTab] = usePluginState<Tab>(sdk, 'codec:tab', 'encode', { legacyKey: 'devtool:codec:tab' });
+
+  // `?tab=jwt` opens a tab directly: the old /jwt route and the ⌘K clipboard
+  // suggestion for a copied token land here. Consumed once, then dropped
+  // from the URL so a reload doesn't keep forcing it.
+  const location = useLocation();
+  const navigate = useNavigate();
+  useEffect(() => {
+    const wanted = new URLSearchParams(location.search).get('tab');
+    if (!wanted) return;
+    if ((TABS as readonly string[]).includes(wanted)) setTab(wanted as Tab);
+    navigate({ pathname: location.pathname, search: '' }, { replace: true });
+  }, [location.search, location.pathname, navigate, setTab]);
 
   // Encode tab
   const [input, setInput]           = usePluginState(sdk, 'codec:input', '', { legacyKey: 'devtool:codec:input' });
@@ -222,6 +237,7 @@ export function EncodeHashEncrypt() {
             { value: 'encode', label: m('tab.encode'), icon: Code },
             { value: 'image', label: m('tab.image'), icon: ImageIcon },
             { value: 'hash', label: m('tab.hash'), icon: Lock },
+            { value: 'jwt', label: m('tab.jwt'), icon: KeyRound },
             { value: 'checksum', label: m('tab.checksum'), icon: FileCheck },
             { value: 'password', label: m('tab.password'), icon: Fingerprint },
             { value: 'encrypt', label: m('tab.encrypt'), icon: ArrowLeftRight },
@@ -433,6 +449,13 @@ export function EncodeHashEncrypt() {
       {tab === 'image' && (
         <div className="flex-1 min-h-0">
           <ImageBase64Tool />
+        </div>
+      )}
+
+      {/* ── JWT tab (the former JWT Debugger tool) ───────────────────────────── */}
+      {tab === 'jwt' && (
+        <div className="flex-1 min-h-0">
+          <JwtDebugger />
         </div>
       )}
 

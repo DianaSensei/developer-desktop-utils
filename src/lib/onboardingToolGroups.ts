@@ -47,7 +47,7 @@ export const ONBOARDING_TOOL_GROUPS: OnboardingToolGroup[] = [
     id: 'network-security',
     labelKey: 'onboarding.group.network-security',
     icon: ShieldCheck,
-    toolIds: ['network', 'jwt', '2fa'],
+    toolIds: ['network', '2fa'],
   },
   {
     id: 'fun',

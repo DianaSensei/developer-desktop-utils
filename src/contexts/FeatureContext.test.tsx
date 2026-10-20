@@ -39,6 +39,16 @@ describe('FeatureProvider', () => {
     expect(JSON.parse(store.get('devtool-features')!)['color-picker']).toBe(true);
   });
 
+  it('carries the merged JWT Debugger over to Encode·Hash·Encrypt', () => {
+    store.set('devtool-features', JSON.stringify({ jwt: true, base64: false }));
+    store.set('devtool-favorites', JSON.stringify(['jwt', 'json', 'base64']));
+    store.set(TOOL_ORDER_KEY, JSON.stringify(['json', 'jwt', 'base64']));
+    const { result } = renderHook(() => useFeatures(), { wrapper: FeatureProvider });
+    expect(result.current.isFeatureEnabled('base64')).toBe(true);
+    expect(result.current.favorites).toEqual(['base64', 'json']);
+    expect(result.current.toolOrder).toEqual(['json', 'base64']);
+  });
+
   it('merges saved overrides onto defaults, keeping new tools at their default value', () => {
     store.set('devtool-features', JSON.stringify({ 'color-picker': true }));
     const { result } = renderHook(() => useFeatures(), { wrapper: FeatureProvider });
@@ -70,9 +80,9 @@ describe('FeatureProvider', () => {
     const empty = renderHook(() => useFeatures(), { wrapper: FeatureProvider });
     expect(empty.result.current.toolOrder).toEqual([]);
 
-    store.set('devtool-tool-order', JSON.stringify(['jwt', 'regex']));
+    store.set('devtool-tool-order', JSON.stringify(['diff', 'regex']));
     const { result } = renderHook(() => useFeatures(), { wrapper: FeatureProvider });
-    expect(result.current.toolOrder).toEqual(['jwt', 'regex']);
+    expect(result.current.toolOrder).toEqual(['diff', 'regex']);
   });
 
   it('falls back to empty tool order when the saved value is corrupt JSON', () => {

@@ -884,7 +884,7 @@ git push origin main --tags
 | `cron-generator` | Cron Generator | ✅ | Visual editor, Quartz/Spring support |
 | `text-transform` | Text Transformer | ✅ | Case, join/split, arrays, Vietnamese phone numbers |
 | `text-counter` | Text Counter | ✅ | Chars, words, lines, reading time |
-| `base64` | Encode·Hash·Encrypt | ✅ | Base64, URL, Hex, Morse, MD5, SHA, HMAC, bcrypt, Argon2, AES-256 |
+| `base64` | Encode·Hash·Encrypt | ✅ | Base64, URL, Hex, Morse, MD5, SHA, HMAC, bcrypt, Argon2, AES-256, JWT tab (decode/verify/sign, ex-`jwt` plugin), Pipeline + templates |
 | `unix-time` | Date / Time | ✅ | Timestamp conversion, timezone, ISO 8601 |
 | `json` | JSON Formatter | ✅ | Format, validate, minify, tree view |
 | `data-converter` | Data Converter | ✅ | JSON ↔ YAML ↔ TOML ↔ XML ↔ .properties |
@@ -892,7 +892,6 @@ git push origin main --tags
 | `qrcode` | QR Code | ✅ | Generate + decode |
 | `2fa` | 2FA Authenticator | ✅ | TOTP/HOTP, SHA-1/256/512, 6/8 digits |
 | `color-picker` | Color Picker | ❌ | HEX/RGB/HSL/CMYK, image eyedropper |
-| `jwt` | JWT Debugger | ❌ | Decode headers + payloads |
 | `regex` | Regex Tester | ❌ | Live match highlighting, Web Worker |
 | `diff` | Diff | ❌ | CodeMirror merge view (live diff, revert chunks), structural JSON diff |
 | `markdown` | Markdown | ❌ | Live preview, GFM |

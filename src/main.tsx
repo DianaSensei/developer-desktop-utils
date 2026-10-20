@@ -87,6 +87,7 @@ import {
   clearSecrets,
   migrateSecretsFromPlainStore,
   migrateSecretsFromSharedStore,
+  migrateVaultMoves,
 } from './platform/secrets';
 import { applyAccentToDocument, getAccentPreference } from './lib/accentPreference';
 import { applyCornerToDocument, getCornerPreference } from './lib/cornerPreference';
@@ -111,6 +112,8 @@ async function bootstrap() {
   // legacy vault is migrated first, then leftovers in the shared store.
   await migrateSecretsFromPlainStore();
   await migrateSecretsFromSharedStore();
+  // Then entries whose owning plugin changed (JWT Debugger → Encode tab).
+  await migrateVaultMoves();
 
   // Apply the accent before first paint to avoid a flash of the default.
   applyAccentToDocument(getAccentPreference());
