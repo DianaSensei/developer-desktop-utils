@@ -92,6 +92,16 @@ Computes **MD5, SHA-1, SHA-256, SHA-512** hashes of typed/pasted text using the 
 
 ---
 
+### Pipeline (Encode · Hash · Encrypt tab)
+
+Chains steps, each one feeding its output to the next: text or JSON-field input; encode/decode with every codec of the Encode tab plus Base64 URL and compact hex; hash, HMAC (hex / Base64 / Base64 URL output, key as text, base64 or hex), encrypt/decrypt (the Encrypt tab's algorithms); JWT decode/sign/verify and compact JWS sign/verify (attached or detached payload), on the same `jose` code as the JWT Debugger; extract by JSON path, regex group or split; and text transforms. Logic lives in `pipelineEngine.ts`, which reuses `encodeCore.ts`, `lib/aesGcm.ts` and `jwt/jwtCrypto.ts`.
+
+Keys, passphrases and PEM/JWK keys of a step are stored in the encrypted vault by step id, never in the saved steps.
+
+**OS / system impact:** clipboard read (quick paste) and write. No data leaves the app.
+
+---
+
 ### Date / Time
 
 Converts Unix timestamps to human-readable dates and vice versa. Formats dates in any IANA timezone using `date-fns`. Computes time differences and boundary values (start/end of day, week, month).

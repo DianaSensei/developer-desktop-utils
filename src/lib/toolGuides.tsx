@@ -238,12 +238,13 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
       'Checksum tab: drag a file in to compute MD5/SHA-1/256/512 with a progress bar, then verify against a known hash.',
       'Password tab: hash a password with bcrypt or Argon2 (id/i/d) and a fresh random salt, or Verify a password against an existing hash (algorithm auto-detected).',
       'Encrypt tab: AES-256 GCM by default — enter a passphrase and encrypt/decrypt. The AES-CBC/CTR/CFB/OFB, 3DES and Rabbit modes below it exist to exchange ciphertext with a crypto-js caller.',
-      'Pipeline tab: chain multiple encode/hash/encrypt stages together.',
+      'Pipeline tab: chain steps — Input (text / JSON fields), Encode/Decode (every codec), Hash / HMAC / Encrypt / Decrypt, JWT & JWS (decode, sign, verify), Extract (JSON path, regex, split) and Transform (case, trim, prepend/append, find & replace with regex, JSON pretty/minify). Each step shows its own output; the last is the final result.',
     ],
     know: [
       'Hashes are one-way; most codecs are reversible. Everything runs locally — files and text are never uploaded.',
       'Files are checksummed in chunks (in Rust on desktop, a Web Worker on the web), so the UI stays responsive.',
       'Password hashing uses hash-wasm (WASM bundled inline → offline) and runs on a button since it’s intentionally slow.',
+      'Pipeline keys, passphrases and PEM keys live in the encrypted vault, not in the saved steps. A step whose output is random (AES-GCM) or time-based (JWT iat) holds still until its input or settings change.',
       'AES-256 GCM ciphertext is a self-describing envelope (magic, iteration count, salt, IV, tag), so raising the iteration count later still leaves older messages readable. It is this tool’s own format — crypto-js cannot read it.',
     ],
     caveat: [
