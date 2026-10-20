@@ -623,7 +623,7 @@ function JwtKeyControls({ step, purpose, showKey, onToggleKey, onUpdate }: {
             <ParamLabel>{t('keySource')}</ParamLabel>
             <Segmented
               value={step.keySource ?? 'key'}
-              onValueChange={(v) => onUpdate({ keySource: v })}
+              onValueChange={(v) => onUpdate(v === 'x5c' ? { keySource: v, x5cTrust: step.x5cTrust ?? 'apple' } : { keySource: v })}
               size="sm"
               options={[{ value: 'key', label: t('keySource.key') }, { value: 'x5c', label: t('keySource.x5c') }]}
               aria-label={t('keySource')}
@@ -632,9 +632,7 @@ function JwtKeyControls({ step, purpose, showKey, onToggleKey, onUpdate }: {
         )}
       </div>
       {fromX5c ? (
-        <p className="flex items-start gap-1.5 text-[11px] text-warn">
-          <AlertTriangle className="h-3 w-3 shrink-0 mt-px" />{t('x5cWarning')}
-        </p>
+        <X5cTrustControls step={step} onUpdate={onUpdate} />
       ) : spec && <p className="text-[11px] text-fg-mute">{spec.keyHint}</p>}
       {fromX5c ? null : alg === 'none' ? (
         <p className="flex items-center gap-1.5 text-[11px] text-warn">
@@ -658,6 +656,42 @@ function JwtKeyControls({ step, purpose, showKey, onToggleKey, onUpdate }: {
           placeholder={purpose === 'sign' ? t('privateKeyPlaceholder') : t('publicKeyPlaceholder')}
           multiline
         />
+      )}
+    </div>
+  );
+}
+
+/** Which root an x5c chain must end at. Apple's root is pinned in jwt/x5cChain.ts. */
+function X5cTrustControls({ step, onUpdate }: { step: PipelineStep; onUpdate: (patch: Partial<PipelineStep>) => void }) {
+  const t = useMessages(MESSAGES);
+  const trust = step.x5cTrust ?? 'apple';
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <ParamLabel>{t('x5cTrust')}</ParamLabel>
+        <Segmented
+          value={trust}
+          onValueChange={(v) => onUpdate({ x5cTrust: v })}
+          size="sm"
+          options={(['apple', 'custom', 'none'] as const).map((v) => ({ value: v, label: t(`x5cTrust.${v}`) }))}
+          aria-label={t('x5cTrust')}
+        />
+      </div>
+      {trust === 'custom' && (
+        <Textarea
+          value={step.trustRoot ?? ''}
+          onChange={(e) => onUpdate({ trustRoot: e.target.value })}
+          placeholder={t('trustRootPlaceholder')}
+          className="min-h-[72px] font-mono text-[11px] resize-y"
+          spellCheck={false}
+        />
+      )}
+      {trust === 'none' ? (
+        <p className="flex items-start gap-1.5 text-[11px] text-warn">
+          <AlertTriangle className="h-3 w-3 shrink-0 mt-px" />{t('x5cWarning')}
+        </p>
+      ) : (
+        <p className="text-[11px] text-fg-mute">{t(trust === 'apple' ? 'x5cAppleInfo' : 'x5cCustomInfo')}</p>
       )}
     </div>
   );

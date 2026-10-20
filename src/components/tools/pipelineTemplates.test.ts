@@ -10,39 +10,44 @@ import {
   BUILTIN_TEMPLATES, exportTemplates, instantiateTemplate, parseTemplates, toTemplateSteps,
 } from '@/components/tools/pipelineTemplates';
 
-// Throwaway self-signed P-256 certificate (CN=pipeline-test), standing in for
-// the leaf of Apple's x5c chain. Test fixture only.
-const TEST_KEY = `-----BEGIN PRIVATE KEY-----
-MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgFZCJj2Zkf1N43iSo
-ya0YgDEGdZ5yJAtcsbAlfJzLqSWhRANCAARD+YznLYWFc7mUx3rDn3NOlLc3wG1w
-70eUDmG90pFYJcjOXYUOwq14EurieTtq+tJDhaabvP0BXaHhqkhkQ6lK
------END PRIVATE KEY-----`;
-const TEST_CERT = 'MIIBiDCCAS2gAwIBAgIUVyFOPBVGJOwJps9jXgu+C1JcLHEwCgYIKoZIzj0EAwIwGDEWMBQGA1UEAwwNcGlwZWxpbmUtdGVzdDAgFw0yNjEwMjAwMzU3MDdaGA8yMTI2MDkyNjAzNTcwN1owGDEWMBQGA1UEAwwNcGlwZWxpbmUtdGVzdDBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABEP5jOcthYVzuZTHesOfc06UtzfAbXDvR5QOYb3SkVglyM5dhQ7CrXgS6uJ5O2r60kOFppu8/QFdoeGqSGRDqUqjUzBRMB0GA1UdDgQWBBRAvEbDCiROeAzIxoxI2Xr9UCXcOTAfBgNVHSMEGDAWgBRAvEbDCiROeAzIxoxI2Xr9UCXcOTAPBgNVHRMBAf8EBTADAQH/MAoGCCqGSM49BAMCA0kAMEYCIQDUWabBe3vBOppL8XpzW1PuMEVd2O9MQ0z9B0OKqZXmvAIhAIumQF2JqhOPXx/NQBe50gyMOLLIrFqLbAO7SmMZLOvH';
+import { TEST_INTERMEDIATE, TEST_LEAF, TEST_LEAF_KEY, TEST_ROOT } from '@/components/tools/jwt/x5cChain.fixtures';
 
+/** Signed like Apple does it (ES256, x5c = leaf, intermediate, root), by the test chain. */
 async function appleStyleJws(payload: unknown): Promise<string> {
-  const key = await importPKCS8(TEST_KEY, 'ES256');
+  const key = await importPKCS8(TEST_LEAF_KEY, 'ES256');
   return new CompactSign(new TextEncoder().encode(JSON.stringify(payload)))
-    .setProtectedHeader({ alg: 'ES256', x5c: [TEST_CERT] })
+    .setProtectedHeader({ alg: 'ES256', x5c: [TEST_LEAF, TEST_INTERMEDIATE, TEST_ROOT] })
     .sign(key);
 }
 
 let n = 0;
 const ids = () => `id${n++}`;
 
-/** Load a built-in template, put `input` into its first step, run it. */
-async function runBuiltin(id: string, input: string) {
+/**
+ * Load a built-in template, put `input` into its first step, run it. The
+ * test chain is not Apple's, so `trustTestRoot` swaps the Apple root for it.
+ */
+async function runBuiltin(id: string, input: string, trustTestRoot = true) {
   const tpl = BUILTIN_TEMPLATES.find((t) => t.id === id)!;
   const { steps } = instantiateTemplate(tpl, ids);
   steps[0] = { ...steps[0], textValue: input };
-  return (await executePipeline(steps)).at(-1)!;
+  const run = trustTestRoot
+    ? steps.map((s) => (s.x5cTrust === 'apple' ? { ...s, x5cTrust: 'custom' as const, trustRoot: TEST_ROOT } : s))
+    : steps;
+  return (await executePipeline(run)).at(-1)!;
 }
 
 describe('Pipeline templates — built-in Apple examples', () => {
   const request = { operation: 'CREATE_SUBSCRIPTION', currency: 'USD', items: [{ sku: 'pro' }] };
 
-  it('Advanced Commerce: verifies the JWS with its x5c, then decodes the base64 request', async () => {
+  it('Advanced Commerce: verifies the JWS chain, then decodes the base64 request', async () => {
     const jws = await appleStyleJws({ request: Buffer.from(JSON.stringify(request)).toString('base64'), version: '1' });
     expect(await runBuiltin('builtin:apple-advanced-commerce', jws)).toEqual({ output: JSON.stringify(request, null, 2) });
+  });
+
+  it('Advanced Commerce: as shipped, trusts only Apple Root CA - G3', async () => {
+    const jws = await appleStyleJws({ request: 'e30=' });
+    expect((await runBuiltin('builtin:apple-advanced-commerce', jws, false)).error).toMatch(/Apple Root CA - G3/);
   });
 
   it('Advanced Commerce: fails on a tampered payload', async () => {
@@ -56,6 +61,20 @@ describe('Pipeline templates — built-in Apple examples', () => {
     const signedPayload = await appleStyleJws({ notificationType: 'SUBSCRIBED', data: { signedTransactionInfo: await appleStyleJws(tx) } });
     expect(await runBuiltin('builtin:apple-notification', JSON.stringify({ signedPayload })))
       .toEqual({ output: JSON.stringify(tx, null, 2) });
+  });
+
+  it('checks certificates at the payload signedDate', async () => {
+    const jws = await appleStyleJws({ request: 'e30=', signedDate: Date.parse('2020-01-01') });
+    expect((await runBuiltin('builtin:apple-advanced-commerce', jws)).error).toMatch(/not valid at 2020-01-01/);
+  });
+
+  it('can still check the leaf signature alone, when asked', async () => {
+    const jws = await appleStyleJws({ a: 1 });
+    const r = await executePipeline([
+      { id: 'a', op: 'text-sunk', textValue: jws },
+      { id: 'b', op: 'jws-verify', jwtAlg: 'ES256', keySource: 'x5c', x5cTrust: 'none' },
+    ]);
+    expect(r[1]).toEqual({ output: '{"a":1}' });
   });
 
   it('says so when a token has no x5c', async () => {

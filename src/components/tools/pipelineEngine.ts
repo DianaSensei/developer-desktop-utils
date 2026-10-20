@@ -47,6 +47,7 @@ export type StepOp =
   // Transform
   | 'uppercase' | 'lowercase' | 'trim' | 'prepend' | 'append' | 'replace' | 'json-format';
 
+export type X5cTrust = 'apple' | 'custom' | 'none';
 export type DigestFormat = 'hex' | 'base64' | 'base64url';
 export type JwtPart = 'payload' | 'header' | 'signature' | 'all';
 
@@ -86,6 +87,10 @@ export interface PipelineStep {
   detachedPayload?: string;
   /** jwt-verify / jws-verify: the pasted key, or the leaf certificate in the token's own `x5c` header. */
   keySource?: 'key' | 'x5c';
+  /** With `x5c`: which root the chain must end at. Default 'apple'; 'none' checks the leaf signature only. */
+  x5cTrust?: X5cTrust;
+  /** With x5cTrust 'custom': the trusted root certificate (PEM). Public, so it is kept in the step. */
+  trustRoot?: string;
   // Extract
   path?: string;
   pattern?: string;
@@ -278,25 +283,55 @@ function keyInput(step: PipelineStep) {
   return { material: step.key ?? '', encoding: step.keyEncoding ?? 'utf8' };
 }
 
-/**
- * The leaf certificate of a token's `x5c` header, as PEM — how Apple signs
- * App Store / Advanced Commerce JWS (ES256 with a three-certificate chain).
- *
- * This proves the payload was signed by the key in that certificate, NOT that
- * the certificate chains to Apple's root: anyone can put their own
- * certificate in `x5c`. The step's UI says so; a server must validate the chain.
- */
-export function x5cLeafPem(token: string): string {
+function tokenHeader(token: string): Record<string, unknown> {
   const [h] = normalizeToken(token).split('.');
-  const header = parseJson(decodeSegment(h ?? '', 'header'), 'Header') as { x5c?: unknown };
-  const leaf = Array.isArray(header.x5c) ? header.x5c[0] : undefined;
+  return parseJson(decodeSegment(h ?? '', 'header'), 'Header') as Record<string, unknown>;
+}
+
+/** The leaf certificate of a token's `x5c` header, as PEM. */
+export function x5cLeafPem(token: string): string {
+  const x5c = tokenHeader(token).x5c;
+  const leaf = Array.isArray(x5c) ? x5c[0] : undefined;
   if (typeof leaf !== 'string' || !leaf) throw new Error('The token header has no x5c certificate chain to verify with.');
   const body = leaf.replace(/\s+/g, '').match(/.{1,64}/g)!.join('\n');
   return `-----BEGIN CERTIFICATE-----\n${body}\n-----END CERTIFICATE-----`;
 }
 
-function verifyKeyInput(step: PipelineStep, token: string) {
-  return step.keySource === 'x5c' ? { material: x5cLeafPem(token) } : keyInput(step);
+/**
+ * When the chain is checked: Apple payloads carry `signedDate` (ms), and
+ * Apple's own library validates certificates at that time, so a transaction
+ * signed last year still verifies after its leaf certificate expired. The
+ * claim is read before the signature is checked, but the signature check
+ * that follows still has to pass with the chained key.
+ */
+function effectiveDate(token: string): Date {
+  try {
+    const payload = JSON.parse(decodeSegment(normalizeToken(token).split('.')[1] ?? '', 'payload')) as { signedDate?: unknown };
+    if (typeof payload.signedDate === 'number' && Number.isFinite(payload.signedDate)) return new Date(payload.signedDate);
+  } catch { /* not JSON: use now */ }
+  return new Date();
+}
+
+/**
+ * Key for a verify step. With `x5c`, the leaf certificate of the token —
+ * after checking that the chain ends at the trusted root, unless the step
+ * says not to (then it proves only that SOME key signed the token: anyone can
+ * put a certificate in x5c).
+ */
+async function verifyKeyInput(step: PipelineStep, token: string) {
+  if (step.keySource !== 'x5c') return keyInput(step);
+  const leaf = x5cLeafPem(token);
+  const trust = step.x5cTrust ?? 'apple';
+  if (trust !== 'none') {
+    const { verifyX5cChain, APPLE_ROOT_CA_G3 } = await import('./jwt/x5cChain');
+    if (trust === 'custom' && !step.trustRoot?.trim()) throw new Error('Paste the trusted root certificate (PEM) to check the chain against.');
+    await verifyX5cChain(tokenHeader(token).x5c, {
+      roots: trust === 'apple' ? [APPLE_ROOT_CA_G3] : [step.trustRoot!],
+      apple: trust === 'apple',
+      at: effectiveDate(token),
+    });
+  }
+  return { material: leaf };
 }
 
 async function jwsSign(step: PipelineStep, input: string): Promise<string> {
@@ -328,7 +363,7 @@ async function jwsVerify(step: PipelineStep, input: string): Promise<string> {
   if (typeof header.alg === 'string' && header.alg !== alg) {
     throw new Error(`Token header says alg "${header.alg}" but this step verifies as ${alg}.`);
   }
-  const key = await resolveKey(verifyKeyInput(step, token), alg, 'verify');
+  const key = await resolveKey(await verifyKeyInput(step, token), alg, 'verify');
   try {
     const { payload } = await compactVerify(token, key as never, { algorithms: [alg] });
     return dec.decode(payload);
@@ -419,7 +454,7 @@ async function run(step: PipelineStep, input: string): Promise<string> {
         expiresIn: step.jwtExpiresIn || undefined,
       });
     case 'jwt-verify': {
-      const outcome = await verifyToken({ token: input, algorithm: step.jwtAlg ?? 'HS256', key: verifyKeyInput(step, input) });
+      const outcome = await verifyToken({ token: input, algorithm: step.jwtAlg ?? 'HS256', key: await verifyKeyInput(step, input) });
       if (!outcome.valid) throw new Error(outcome.message);
       return JSON.stringify(outcome.payload, null, 2);
     }

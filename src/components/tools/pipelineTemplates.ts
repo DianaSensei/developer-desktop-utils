@@ -30,7 +30,7 @@ export const BUILTIN_TEMPLATES: BuiltinTemplate[] = [
     updatedAt: 0,
     steps: [
       { id: 'a1', op: 'text-sunk', textValue: '' },
-      { id: 'a2', op: 'jws-verify', jwtAlg: 'ES256', keySource: 'x5c' },
+      { id: 'a2', op: 'jws-verify', jwtAlg: 'ES256', keySource: 'x5c', x5cTrust: 'apple' },
       { id: 'a3', op: 'json-path', path: 'request' },
       { id: 'a4', op: 'decode', codec: 'base64' },
       { id: 'a5', op: 'json-format', jsonIndent: 'pretty' },
@@ -45,9 +45,9 @@ export const BUILTIN_TEMPLATES: BuiltinTemplate[] = [
     steps: [
       { id: 'n1', op: 'text-sunk', textValue: '' },
       { id: 'n2', op: 'json-path', path: 'signedPayload' },
-      { id: 'n3', op: 'jws-verify', jwtAlg: 'ES256', keySource: 'x5c' },
+      { id: 'n3', op: 'jws-verify', jwtAlg: 'ES256', keySource: 'x5c', x5cTrust: 'apple' },
       { id: 'n4', op: 'json-path', path: 'data.signedTransactionInfo' },
-      { id: 'n5', op: 'jws-verify', jwtAlg: 'ES256', keySource: 'x5c' },
+      { id: 'n5', op: 'jws-verify', jwtAlg: 'ES256', keySource: 'x5c', x5cTrust: 'apple' },
       { id: 'n6', op: 'json-format', jsonIndent: 'pretty' },
     ],
   },
