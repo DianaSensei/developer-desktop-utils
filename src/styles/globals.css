@@ -73,12 +73,18 @@
   .diff-merge-view .cm-merge-b .cm-changedLine {
     background-color: hsl(var(--diff-added) / 0.08) !important;
   }
+  /* The exact characters that differ get a solid fill over the faint line
+     tint, so "where" reads at a glance instead of only "which line". */
   .diff-merge-view .cm-merge-a .cm-changedText,
   .diff-merge-view .cm-deletedChunk .cm-deletedText {
-    background: linear-gradient(hsl(var(--bad-c) / 0.5), hsl(var(--bad-c) / 0.5)) bottom / 100% 2px no-repeat !important;
+    background: hsl(var(--bad-c) / 0.3) !important;
+    border-radius: var(--r-xs);
+    box-shadow: inset 0 -1px 0 hsl(var(--bad-c) / 0.7);
   }
   .diff-merge-view .cm-merge-b .cm-changedText {
-    background: linear-gradient(hsl(var(--diff-added) / 0.6), hsl(var(--diff-added) / 0.6)) bottom / 100% 2px no-repeat !important;
+    background: hsl(var(--diff-added) / 0.3) !important;
+    border-radius: var(--r-xs);
+    box-shadow: inset 0 -1px 0 hsl(var(--diff-added) / 0.7);
   }
   .diff-merge-view .cm-changedLineGutter,
   .diff-merge-view .cm-deletedLineGutter {

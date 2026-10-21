@@ -5,7 +5,8 @@ import {
   Segmented, PaneHeader, Badge, CopyButton, IconButton, CollapsibleSection,
   type BadgeTone,
 } from '@/design-system';
-import { DiffMergeView, type DiffStats, type DiffSide } from './DiffMergeView';
+import { DiffMergeView, type DiffMergeViewHandle, type DiffStats, type DiffSide } from './DiffMergeView';
+import { previewText, type DiffChange } from './diffChanges';
 import { useQuickPaste, useQuickPasteHint } from '@/hooks/useQuickPaste';
 import { useMessages } from '@/contexts/LocaleContext';
 import MESSAGES from '@/components/tools/diff/TextDiff.messages';
@@ -152,6 +153,9 @@ export function TextDiff() {
   const [text2, setText2] = usePluginState(sdk, 'diff:text2', '', { legacyKey: 'devtool:diff:text2' });
   const [collapseUnchanged, setCollapseUnchanged] = useState(false);
   const [stats, setStats] = useState<DiffStats | null>(null);
+  const [changes, setChanges] = useState<{ list: DiffChange[]; precise: boolean }>({ list: [], precise: true });
+  const mergeRef = useRef<DiffMergeViewHandle>(null);
+  const onChangesChange = useCallback((list: DiffChange[], precise: boolean) => setChanges({ list, precise }), []);
 
   const fmtJson = reindentJson;
   const modeRef = useRef(mode);
@@ -246,6 +250,7 @@ export function TextDiff() {
       </div>
 
       <DiffMergeView
+        ref={mergeRef}
         key={mode}
         className="min-h-0"
         original={text1}
@@ -257,10 +262,33 @@ export function TextDiff() {
         language={mode}
         collapseUnchanged={collapseUnchanged}
         onStatsChange={setStats}
+        onChangesChange={onChangesChange}
         onFocusSide={handleFocusSide}
         originalPlaceholder={mode === 'json' ? m('pasteOriginalJson') : m('enterOriginal', { hint: quickPasteHint })}
         modifiedPlaceholder={mode === 'json' ? m('pasteModifiedJson') : m('enterModified', { hint: quickPasteHint })}
       />
+
+      {/* Exact differences — every changed run of characters with its
+          line:column on both sides; click to select it in both panes. */}
+      {mode === 'text' && hasContent && changes.list.length > 0 && (
+        <div className="shrink-0 border-t border-line" style={{ maxHeight: '32%' }}>
+          <div className="h-full overflow-y-auto">
+            <CollapsibleSection
+              title={m('exactChanges')}
+              hint={m(changes.list.length >= 500 ? 'changesCountMax' : 'changesCount', { n: changes.list.length })}
+              defaultOpen
+              className="px-4 py-2.5"
+            >
+              {!changes.precise && <p className="pb-1.5 text-xs text-warn">{m('imprecise')}</p>}
+              <div className="space-y-0.5 pb-1">
+                {changes.list.map((c, i) => (
+                  <ExactChangeRow key={`${c.fromA}-${c.fromB}-${i}`} change={c} onReveal={() => mergeRef.current?.reveal(c)} />
+                ))}
+              </div>
+            </CollapsibleSection>
+          </div>
+        </div>
+      )}
 
       {/* Structural JSON diff — logical changes by path, unaffected by
           formatting/key order. Only relevant in JSON mode. */}
@@ -293,6 +321,30 @@ export function TextDiff() {
         </div>
       )}
     </div>
+  );
+}
+
+function ExactChangeRow({ change, onReveal }: { change: DiffChange; onReveal: () => void }) {
+  const m = useMessages(MESSAGES);
+  const tone: BadgeTone = change.kind === 'insert' ? 'success' : change.kind === 'delete' ? 'danger' : 'warning';
+  const where = change.lineA === change.lineB && change.colA === change.colB
+    ? `${change.lineA}:${change.colA}`
+    : `${change.lineA}:${change.colA} → ${change.lineB}:${change.colB}`;
+  return (
+    <button
+      type="button"
+      onClick={onReveal}
+      title={m('revealChange')}
+      className="flex w-full items-start gap-2 rounded px-1.5 py-1 text-left font-mono text-xs transition-colors hover:bg-bg-2/60 focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus"
+    >
+      <Badge tone={tone} uppercase>{m(`kind.${change.kind}`)}</Badge>
+      <span className="w-28 shrink-0 tabular-nums text-fg-mute" title={m('lineCol')}>{where}</span>
+      <span className="min-w-0 flex-1 break-all">
+        {change.removed && <span className="rounded-xs bg-bad/15 px-0.5 text-bad line-through">{previewText(change.removed)}</span>}
+        {change.removed && change.added && <span className="mx-1 text-fg-mute">→</span>}
+        {change.added && <span className="rounded-xs bg-ok/15 px-0.5 text-ok">{previewText(change.added)}</span>}
+      </span>
+    </button>
   );
 }
 

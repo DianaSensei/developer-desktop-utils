@@ -163,7 +163,7 @@ Runs the regex you provide against the test input using the browser's built-in `
 
 ### Diff
 
-Two modes. **Text** compares two blocks word-level and highlights additions/removals using the `diff` npm package. **JSON** parses both sides and computes a structural diff — every difference is listed by key/index path as added, removed, or changed (old → new), ignoring formatting and key order. The JSON diff is a small hand-rolled recursive walk; both modes run entirely in JS.
+Two modes. **Text** compares two blocks with `@codemirror/merge`, character-precise (`DIFF_CONFIG` in `diff/diffChanges.ts` raises the package's 500-step scan limit, which otherwise merges every edit in a long document into one chunk), fills the exact changed characters, and lists every change with its line:column on both sides; clicking a row selects it in both panes. **JSON** parses both sides and computes a structural diff — every difference is listed by key/index path as added, removed, or changed (old → new), ignoring formatting and key order. The JSON diff is a small hand-rolled recursive walk; both modes run entirely in JS.
 
 **OS / system impact:** none.
 

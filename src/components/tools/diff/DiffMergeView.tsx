@@ -11,8 +11,9 @@
 // editor. `code-editor-base.tsx`'s `CodeSurface` is the single-editor
 // equivalent every other tool should keep using.
 
-import { useEffect, useRef } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
 import { EditorView, keymap, placeholder as placeholderExt } from '@codemirror/view';
+import { EditorSelection } from '@codemirror/state';
 import { indentWithTab } from '@codemirror/commands';
 import { json as jsonLang, jsonParseLinter } from '@codemirror/lang-json';
 import { linter, lintGutter } from '@codemirror/lint';
@@ -22,6 +23,7 @@ import { MergeView, goToNextChunk, goToPreviousChunk } from '@codemirror/merge';
 import { smartBracketSkip, codeThemeWithHighlight } from '@/components/ui/code-theme';
 import { useIsDark } from '@/hooks/useIsDark';
 import { cn } from '@/lib/utils';
+import { DIFF_CONFIG, allPrecise, listChanges, type DiffChange } from './diffChanges';
 
 export interface DiffStats {
   added: number;
@@ -47,7 +49,17 @@ export interface DiffMergeViewProps {
   onFocusSide?: (side: DiffSide) => void;
   originalPlaceholder?: string;
   modifiedPlaceholder?: string;
+  /** Every character-level change with its line:column, after each edit. */
+  onChangesChange?: (changes: DiffChange[], precise: boolean) => void;
 }
+
+export interface DiffMergeViewHandle {
+  /** Select a change on both sides and scroll it into view. */
+  reveal: (change: DiffChange) => void;
+}
+
+/** Rows the Changes panel can usefully show; more is noise, and costs a render. */
+const CHANGE_LIST_LIMIT = 500;
 
 function lineSpan(doc: Text, from: number, to: number): number {
   if (to <= from) return 0;
@@ -95,7 +107,7 @@ function baseExtensions(language: 'text' | 'json', themeCompartment: Compartment
   ];
 }
 
-export function DiffMergeView({
+export const DiffMergeView = forwardRef<DiffMergeViewHandle, DiffMergeViewProps>(function DiffMergeView({
   className,
   original,
   modified,
@@ -109,7 +121,8 @@ export function DiffMergeView({
   onFocusSide,
   originalPlaceholder,
   modifiedPlaceholder,
-}: DiffMergeViewProps) {
+  onChangesChange,
+}, ref) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mergeViewRef = useRef<MergeView | null>(null);
   const dark = useIsDark();
@@ -126,6 +139,8 @@ export function DiffMergeView({
   onStatsChangeRef.current = onStatsChange;
   const onFocusSideRef = useRef(onFocusSide);
   onFocusSideRef.current = onFocusSide;
+  const onChangesChangeRef = useRef(onChangesChange);
+  onChangesChangeRef.current = onChangesChange;
 
   const lastARef = useRef(original);
   const lastBRef = useRef(modified);
@@ -137,15 +152,24 @@ export function DiffMergeView({
   useEffect(() => {
     if (!containerRef.current) return;
 
+    // Both sides' update listeners fire for one edit; report once per chunk set.
+    let lastChunks: unknown = null;
     const reportStats = () => {
       const view = mergeViewRef.current;
-      if (view) onStatsChangeRef.current?.(summarize(view));
+      if (!view || view.chunks === lastChunks) return;
+      lastChunks = view.chunks;
+      onStatsChangeRef.current?.(summarize(view));
+      onChangesChangeRef.current?.(
+        listChanges(view.chunks, view.a.state.doc, view.b.state.doc, CHANGE_LIST_LIMIT),
+        allPrecise(view.chunks),
+      );
     };
 
     const view = new MergeView({
       parent: containerRef.current,
       gutter: true,
       highlightChanges: true,
+      diffConfig: DIFF_CONFIG,
       revertControls: 'a-to-b',
       collapseUnchanged: collapseUnchanged ? { margin: 3, minSize: 4 } : undefined,
       a: {
@@ -221,6 +245,20 @@ export function DiffMergeView({
     view.b.dispatch({ effects: compB.current.reconfigure(codeThemeWithHighlight(dark, opts)) });
   }, [dark]);
 
+  useImperativeHandle(ref, () => ({
+    reveal(change) {
+      const view = mergeViewRef.current;
+      if (!view) return;
+      const select = (side: EditorView, from: number, to: number) => side.dispatch({
+        selection: EditorSelection.single(from, to),
+        effects: EditorView.scrollIntoView(from, { y: 'center' }),
+      });
+      select(view.a, change.fromA, change.toA);
+      select(view.b, change.fromB, change.toB);
+      (change.fromB !== change.toB ? view.b : view.a).focus();
+    },
+  }), []);
+
   useEffect(() => {
     mergeViewRef.current?.reconfigure({
       collapseUnchanged: collapseUnchanged ? { margin: 3, minSize: 4 } : undefined,
@@ -228,4 +266,4 @@ export function DiffMergeView({
   }, [collapseUnchanged]);
 
   return <div ref={containerRef} className={cn('diff-merge-view flex flex-1 min-h-0 flex-col overflow-hidden', className)} />;
-}
+});

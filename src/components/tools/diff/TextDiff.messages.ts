@@ -4,8 +4,8 @@ export default defineMessages({
   text: { vi: 'Văn bản', en: 'Text' },
   modeLabel: { vi: 'Chế độ so sánh', en: 'Diff mode' },
   textHint: {
-    vi: 'So sánh trực tiếp — cuộn đồng bộ, tô sáng trong dòng, và mũi tên để chép thay đổi sang bên kia.',
-    en: 'Live diff — synced scrolling, inline highlights, and chunk arrows to copy changes across.',
+    vi: 'So sánh trực tiếp — tô đúng ký tự khác, danh sách chỗ khác theo dòng:cột, và mũi tên để chép thay đổi sang bên kia.',
+    en: 'Live diff — exact changed characters highlighted, a line:column list of every change, and arrows to copy changes across.',
   },
   jsonHint: {
     vi: 'So sánh cấu trúc theo path ở dưới, kèm diff từng dòng của JSON đã định dạng.',
@@ -30,6 +30,18 @@ export default defineMessages({
     vi: 'Dữ liệu quá lớn để so sánh cấu trúc — diff từng dòng ở trên vẫn dùng được.',
     en: 'Input is too large for the structural diff — the line diff above still works.',
   },
+  exactChanges: { vi: 'Chỗ khác', en: 'Exact changes' },
+  changesCount: { vi: '— {{n}} chỗ', en: '— {{n}}' },
+  changesCountMax: { vi: '— {{n}} chỗ đầu tiên', en: '— first {{n}}' },
+  imprecise: {
+    vi: 'Văn bản quá lớn để so từng ký tự trong thời gian cho phép — một số chỗ đang hiện theo khối dòng.',
+    en: 'The text is too large to compare character by character in time — some changes are shown as whole blocks.',
+  },
+  revealChange: { vi: 'Chọn chỗ này ở cả hai bên', en: 'Select this change in both panes' },
+  lineCol: { vi: 'Dòng:cột (bản gốc → bản sửa)', en: 'Line:column (original → modified)' },
+  'kind.insert': { vi: 'thêm', en: 'added' },
+  'kind.delete': { vi: 'xoá', en: 'removed' },
+  'kind.replace': { vi: 'sửa', en: 'changed' },
   identical: {
     vi: 'Không có khác biệt — hai giá trị JSON giống hệt nhau về cấu trúc.',
     en: 'No differences — the two JSON values are structurally identical.',
