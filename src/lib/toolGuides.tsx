@@ -307,7 +307,8 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
   diff: makeGuide({
     use: [
       'Paste (or type into) the original on the left and the modified version on the right — both panes stay editable.',
-      'Changes highlight inline as you type, with unchanged lines vertically aligned between the two sides so they stay in sync while scrolling.',
+      'The exact characters that differ are filled in red / green as you type — not just the line — with unchanged lines aligned between the two sides so they stay in sync while scrolling.',
+      'Text mode lists every change below the diff with its line:column on both sides (removed → added, whitespace shown as · ⇥ ↵); click a row to select that change in both panes.',
       <>Click the <Tok>⇝</Tok> arrow next to a changed chunk to revert it — copies that chunk from Original into Modified.</>,
       'JSON mode also auto-formats each side (on paste and on blur) and lists logical changes by key/index path below the diff, ignoring formatting and key order.',
     ],
