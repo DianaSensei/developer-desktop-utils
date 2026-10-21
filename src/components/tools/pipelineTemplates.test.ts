@@ -4,20 +4,20 @@
 // Uint8Array`, which jsdom's second realm breaks (see jwt/jwtCrypto.test.ts).
 
 import { describe, expect, it } from 'vitest';
-import { CompactSign, importPKCS8 } from 'jose';
+import { CompactSign } from 'jose';
 import { executePipeline, type PipelineStep } from '@/components/tools/pipelineEngine';
 import {
   BUILTIN_TEMPLATES, exportTemplates, instantiateTemplate, parseTemplates, toTemplateSteps,
 } from '@/components/tools/pipelineTemplates';
 
-import { TEST_INTERMEDIATE, TEST_LEAF, TEST_LEAF_KEY, TEST_ROOT } from '@/components/tools/jwt/x5cChain.fixtures';
+import { testChain } from '@/components/tools/jwt/x5cChain.fixtures';
 
 /** Signed like Apple does it (ES256, x5c = leaf, intermediate, root), by the test chain. */
 async function appleStyleJws(payload: unknown): Promise<string> {
-  const key = await importPKCS8(TEST_LEAF_KEY, 'ES256');
+  const c = await testChain();
   return new CompactSign(new TextEncoder().encode(JSON.stringify(payload)))
-    .setProtectedHeader({ alg: 'ES256', x5c: [TEST_LEAF, TEST_INTERMEDIATE, TEST_ROOT] })
-    .sign(key);
+    .setProtectedHeader({ alg: 'ES256', x5c: [c.leaf, c.intermediate, c.root] })
+    .sign(c.leafKey);
 }
 
 let n = 0;
@@ -28,11 +28,12 @@ const ids = () => `id${n++}`;
  * test chain is not Apple's, so `trustTestRoot` swaps the Apple root for it.
  */
 async function runBuiltin(id: string, input: string, trustTestRoot = true) {
+  const { root } = await testChain();
   const tpl = BUILTIN_TEMPLATES.find((t) => t.id === id)!;
   const { steps } = instantiateTemplate(tpl, ids);
   steps[0] = { ...steps[0], textValue: input };
   const run = trustTestRoot
-    ? steps.map((s) => (s.x5cTrust === 'apple' ? { ...s, x5cTrust: 'custom' as const, trustRoot: TEST_ROOT } : s))
+    ? steps.map((s) => (s.x5cTrust === 'apple' ? { ...s, x5cTrust: 'custom' as const, trustRoot: root } : s))
     : steps;
   return (await executePipeline(run)).at(-1)!;
 }
