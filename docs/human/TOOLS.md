@@ -91,6 +91,14 @@ Computes **MD5, SHA-1, SHA-256, SHA-512** hashes of typed/pasted text using the 
 
 ---
 
+### Keys (Encode · Hash · Encrypt tab)
+
+Generates key pairs (Ed25519, RSA 2048/3072/4096, EC P-256/384/521, X25519) and symmetric secrets (HMAC 256/384/512, AES-128/256, random 1–1024 bytes) with the webview's Web Crypto. Outputs: PEM (PKCS#8 / SPKI), JWK and a public JWK Set with `kid` = RFC 7638 thumbprint, OpenSSH (`authorized_keys` line, unencrypted `openssh-key-v1` private key, SHA256 fingerprint), WireGuard base64 keys for X25519, and base64 / base64url / hex / oct-JWK for secrets. Logic in `keygen/keygen.ts`. Generated keys are held in component state only and never persisted.
+
+**OS / system impact:** clipboard write only. No data leaves the app.
+
+---
+
 ### Pipeline (Encode · Hash · Encrypt tab)
 
 Chains steps, each one feeding its output to the next: text or JSON-field input; encode/decode with every codec of the Encode tab plus Base64 URL and compact hex; hash, HMAC (hex / Base64 / Base64 URL output, key as text, base64 or hex), encrypt/decrypt (the Encrypt tab's algorithms); JWT decode/sign/verify and compact JWS sign/verify (attached or detached payload), on the same `jose` code as the JWT tab; extract by JSON path, regex group or split; and text transforms. Logic lives in `pipelineEngine.ts`, which reuses `encodeCore.ts`, `lib/aesGcm.ts` and `jwt/jwtCrypto.ts`.
