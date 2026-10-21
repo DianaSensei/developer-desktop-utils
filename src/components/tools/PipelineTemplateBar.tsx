@@ -23,7 +23,7 @@ import {
 /** Template id → (template step id → key). Lives in the vault, like the pipeline's own keys. */
 type TemplateKeys = Record<string, Record<string, string>>;
 
-interface PipelineTemplatesProps {
+interface PipelineTemplateBarProps {
   /** Current steps, keys included. */
   steps: PipelineStep[];
   /** Replace the pipeline. `keys` is by the new step ids. */
@@ -31,7 +31,7 @@ interface PipelineTemplatesProps {
   makeId: () => string;
 }
 
-export function PipelineTemplates({ steps, onLoad, makeId }: PipelineTemplatesProps) {
+export function PipelineTemplateBar({ steps, onLoad, makeId }: PipelineTemplateBarProps) {
   const t = useMessages(MESSAGES);
   const sdk = usePluginSdkFor('base64');
   const [saved, setSaved] = usePluginState<PipelineTemplate[]>(sdk, 'pipeline:templates', []);
