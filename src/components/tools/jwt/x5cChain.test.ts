@@ -3,13 +3,18 @@
 // Node rather than jsdom: Web Crypto keys and jose's `instanceof Uint8Array`
 // checks need a single realm (see jwtCrypto.test.ts).
 
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { APPLE_ROOT_CA_G3, verifyX5cChain } from '@/components/tools/jwt/x5cChain';
-import {
-  APPLE_WWDR_G6, TEST_INTERMEDIATE, TEST_LEAF, TEST_LEAF_NO_OID, TEST_ROOT, TEST_SIGNED_BY_LEAF,
-} from '@/components/tools/jwt/x5cChain.fixtures';
+import { APPLE_WWDR_G6, testChain } from '@/components/tools/jwt/x5cChain.fixtures';
 
-const chain = [TEST_LEAF, TEST_INTERMEDIATE, TEST_ROOT];
+let TEST_ROOT: string, TEST_INTERMEDIATE: string, TEST_LEAF: string, TEST_LEAF_NO_OID: string, TEST_SIGNED_BY_LEAF: string;
+let chain: string[];
+
+beforeAll(async () => {
+  const c = await testChain();
+  ({ root: TEST_ROOT, intermediate: TEST_INTERMEDIATE, leaf: TEST_LEAF, leafNoOid: TEST_LEAF_NO_OID, signedByLeaf: TEST_SIGNED_BY_LEAF } = c);
+  chain = [TEST_LEAF, TEST_INTERMEDIATE, TEST_ROOT];
+});
 
 describe('x5c chain', () => {
   it('accepts a chain that ends at the pinned root', async () => {
