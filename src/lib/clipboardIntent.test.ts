@@ -22,7 +22,8 @@ describe('detectClipboardIntent', () => {
     it('nhận diện JWT thật', () => {
       expect(detectClipboardIntent(SAMPLE_JWT)).toEqual({
         kind: 'jwt',
-        toolId: 'jwt',
+        toolId: 'base64',
+        search: '?tab=jwt',
         reasonKey: 'clipboard.reason.jwt',
       });
     });

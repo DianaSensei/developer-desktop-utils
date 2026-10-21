@@ -1,5 +1,4 @@
 import {
-  Binary,
   Braces,
   CaseSensitive,
   Clock,
@@ -47,12 +46,6 @@ export const TOOL_GROUPS: ToolGroup[] = [
     label: 'Format',
     icon: FileCode2,
     toolIds: ['sql-formatter', 'markdown'],
-  },
-  {
-    id: 'g-encode',
-    label: 'Encode & Hash',
-    icon: Binary,
-    toolIds: ['base64', 'jwt'],
   },
   {
     id: 'g-time',

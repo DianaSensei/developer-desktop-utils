@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useMemo, useState } from 'react';
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { ToggleChip } from '@/components/ui/toggle-chip';
 import { usePluginSdkFor, usePluginState, useSecretState } from '@/platform';
 import { Textarea } from '@/components/ui/textarea';
@@ -6,109 +6,70 @@ import { Input } from '@/components/ui/input';
 import { Segmented } from '@/components/ui/segmented';
 import { Button } from '@/components/ui/button';
 import { CopyButton } from '@/components/ui/copy-button';
+import { Spinner } from '@/components/ui/spinner';
 import { JsonEditor } from '@/design-system';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Plus, Trash2, Eye, EyeOff, ChevronDown, ChevronUp,
   Hash, KeyRound, Code2, Type, Scissors, Search, CornerDownRight,
   AlertTriangle, CheckCircle2, ArrowRight, FileText, Braces,
+  Lock, LockOpen, ScanText, ShieldCheck, Stamp, TextSearch, Split, Route,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useQuickPaste } from '@/hooks/useQuickPaste';
-import CryptoJS from 'crypto-js';
 import { useMessages } from '@/contexts/LocaleContext';
 import COMMON from '@/components/tools/common.messages';
 import MESSAGES from '@/components/tools/EncodeHashEncrypt.messages';
+import {
+  ENCRYPT_ALGOS, HASH_ALGORITHMS, HMAC_ALGORITHMS, JWS_ALGORITHMS, JWT_ALGORITHMS,
+  KEY_REQUIRED, PIPELINE_CODECS, SECRET_OPS, STEP_FAILED, StepCache,
+  executePipeline, flattenJson,
+  type DigestFormat, type FieldConfig, type JwtPart, type PipelineStep, type StepOp, type StepResult,
+} from './pipelineEngine';
+import { SECRET_ENCODINGS, isAsymmetric, isHmac, type AlgorithmSpec, type JwtAlgorithm, type SecretEncoding } from './jwt/jwtCrypto';
+import type { EncryptAlgo } from './encodeCore';
+import { PipelineTemplates } from './PipelineTemplates';
 
-// ─── Types ─────────────────────────────────────────────────────────────────────
-
-/**
- * One row in the field table.
- * 'json'   → key from JSON object, value auto-read from parsed JSON
- * 'custom' → key + value both user-defined; can sit anywhere in the list
- */
-interface FieldConfig {
-  id: string;
-  type: 'json' | 'custom';
-  key: string;
-  customValue?: string;
-  enabled: boolean;
-}
-
-type StepOp =
-  | 'text-sunk' | 'json-input' | 'hash' | 'hmac' | 'encode' | 'decode'
-  | 'uppercase' | 'lowercase' | 'trim' | 'prepend' | 'append' | 'replace';
-
-interface PipelineStep {
-  id: string;
-  op: StepOp;
-  // Text input step
-  textValue?: string;
-  // JSON input step
-  jsonText?: string;
-  jsonFields?: FieldConfig[];
-  jsonSeparator?: string;
-  jsonSort?: 'none' | 'asc' | 'desc';
-  jsonFormat?: 'key=value' | 'value';
-  // Hash / HMAC
-  algorithm?: string;
-  key?: string;
-  upperHex?: boolean;
-  // Encode / Decode
-  codec?: string;
-  // Prepend / Append
-  text?: string;
-  // Replace
-  find?: string;
-  replacement?: string;
-}
-
-interface StepResult { output: string; error?: string; }
+export { compareCodeUnits } from './pipelineEngine';
 
 // ─── Operation metadata ────────────────────────────────────────────────────────
 
-interface OpMeta { label: string; hint: string; icon: React.ElementType; color: string; }
+interface OpMeta { icon: React.ElementType; color: string; }
 
 const OP_META: Record<StepOp, OpMeta> = {
-  'text-sunk': { label: 'Text Input',    hint: 'Free text — type or paste any string',                 icon: FileText,        color: 'text-[var(--cat-4)]' },
-  'json-input': { label: 'JSON Input',    hint: 'Parse JSON and assemble fields into a string',         icon: Braces,          color: 'text-[var(--cat-4)]' },
-  hmac:         { label: 'HMAC Sign',     hint: 'Keyed signature — MoMo, ZaloPay, Alipay, REST APIs',  icon: KeyRound,        color: 'text-[var(--cat-3)]'  },
-  hash:         { label: 'Hash',          hint: 'One-way fingerprint — MD5, SHA-256, SHA-512, …',       icon: Hash,            color: 'text-[var(--cat-2)]'    },
-  encode:       { label: 'Encode',        hint: 'Base64, URL-encode, Hex, …',                           icon: Code2,           color: 'text-[var(--cat-5)]'    },
-  decode:       { label: 'Decode',        hint: 'Reverse Base64, URL-encode, Hex, …',                   icon: Code2,           color: 'text-[var(--cat-5)]'    },
-  uppercase:    { label: 'Uppercase',     hint: 'UPPER CASE every letter',                              icon: Type,            color: 'text-fg-mute'   },
-  lowercase:    { label: 'Lowercase',     hint: 'lower case every letter',                              icon: Type,            color: 'text-fg-mute'   },
-  trim:         { label: 'Trim spaces',   hint: 'Remove leading / trailing whitespace',                 icon: Scissors,        color: 'text-fg-mute'   },
-  prepend:      { label: 'Prepend text',  hint: 'Add fixed text before the current value',              icon: CornerDownRight, color: 'text-[var(--cat-1)]'   },
-  append:       { label: 'Append text',   hint: 'Add fixed text after the current value',               icon: CornerDownRight, color: 'text-[var(--cat-1)]'   },
-  replace:      { label: 'Find & Replace',hint: 'Replace every occurrence of a string',                 icon: Search,          color: 'text-[var(--cat-1)]'   },
+  'text-sunk':     { icon: FileText,        color: 'text-[var(--cat-4)]' },
+  'json-input':    { icon: Braces,          color: 'text-[var(--cat-4)]' },
+  encode:          { icon: Code2,           color: 'text-[var(--cat-5)]' },
+  decode:          { icon: Code2,           color: 'text-[var(--cat-5)]' },
+  hash:            { icon: Hash,            color: 'text-[var(--cat-3)]' },
+  hmac:            { icon: KeyRound,        color: 'text-[var(--cat-3)]' },
+  encrypt:         { icon: Lock,            color: 'text-[var(--cat-3)]' },
+  decrypt:         { icon: LockOpen,        color: 'text-[var(--cat-3)]' },
+  'jwt-decode':    { icon: ScanText,        color: 'text-[var(--cat-2)]' },
+  'jwt-sign':      { icon: Stamp,           color: 'text-[var(--cat-2)]' },
+  'jwt-verify':    { icon: ShieldCheck,     color: 'text-[var(--cat-2)]' },
+  'jws-sign':      { icon: Stamp,           color: 'text-[var(--cat-2)]' },
+  'jws-verify':    { icon: ShieldCheck,     color: 'text-[var(--cat-2)]' },
+  'json-path':     { icon: Route,           color: 'text-[var(--cat-1)]' },
+  'regex-extract': { icon: TextSearch,      color: 'text-[var(--cat-1)]' },
+  'split-pick':    { icon: Split,           color: 'text-[var(--cat-1)]' },
+  uppercase:       { icon: Type,            color: 'text-fg-mute' },
+  lowercase:       { icon: Type,            color: 'text-fg-mute' },
+  trim:            { icon: Scissors,        color: 'text-fg-mute' },
+  prepend:         { icon: CornerDownRight, color: 'text-fg-mute' },
+  append:          { icon: CornerDownRight, color: 'text-fg-mute' },
+  replace:         { icon: Search,          color: 'text-fg-mute' },
+  'json-format':   { icon: Braces,          color: 'text-fg-mute' },
 };
 
-const OP_GROUPS: { label: string; ops: StepOp[] }[] = [
-  { label: 'Input',       ops: ['text-sunk', 'json-input'] },
-  { label: 'Sign / Hash', ops: ['hmac', 'hash'] },
-  { label: 'Encode',      ops: ['encode', 'decode'] },
-  { label: 'Text',        ops: ['uppercase', 'lowercase', 'trim', 'prepend', 'append', 'replace'] },
+const OP_GROUPS: { label: 'Input' | 'Encode' | 'Crypto' | 'JWT' | 'Extract' | 'Transform'; ops: StepOp[] }[] = [
+  { label: 'Input',     ops: ['text-sunk', 'json-input'] },
+  { label: 'Encode',    ops: ['encode', 'decode'] },
+  { label: 'Crypto',    ops: ['hash', 'hmac', 'encrypt', 'decrypt'] },
+  { label: 'JWT',       ops: ['jwt-decode', 'jwt-sign', 'jwt-verify', 'jws-sign', 'jws-verify'] },
+  { label: 'Extract',   ops: ['json-path', 'regex-extract', 'split-pick'] },
+  { label: 'Transform', ops: ['uppercase', 'lowercase', 'trim', 'prepend', 'append', 'replace', 'json-format'] },
 ];
-
-const HASH_ALGOS = [
-  { id: 'md5',       label: 'MD5',        bits: 128 },
-  { id: 'sha1',      label: 'SHA-1',      bits: 160 },
-  { id: 'sha256',    label: 'SHA-256',    bits: 256 },
-  { id: 'sha384',    label: 'SHA-384',    bits: 384 },
-  { id: 'sha512',    label: 'SHA-512',    bits: 512 },
-  { id: 'ripemd160', label: 'RIPEMD-160', bits: 160 },
-] as const;
-type HashAlgo = (typeof HASH_ALGOS)[number]['id'];
-
-const CODECS = [
-  { id: 'base64',    label: 'Base64'     },
-  { id: 'base64url', label: 'Base64 URL' },
-  { id: 'url',       label: 'URL Encode' },
-  { id: 'hex',       label: 'Hex'        },
-  { id: 'binary',    label: 'Binary'     },
-] as const;
-type CodecId = (typeof CODECS)[number]['id'];
 
 const SEP_OPTIONS = [
   { id: '&',  label: '& — query string' },
@@ -117,96 +78,11 @@ const SEP_OPTIONS = [
   { id: ',',  label: ', — comma'         },
 ];
 
-export function compareCodeUnits(a: string, b: string): number {
-  if (a === b) return 0;
-  return a < b ? -1 : 1;
-}
-
-// ─── Crypto helpers ────────────────────────────────────────────────────────────
-
-function computeHash(algo: HashAlgo, input: string): string {
-  switch (algo) {
-    case 'md5':       return CryptoJS.MD5(input).toString();
-    case 'sha1':      return CryptoJS.SHA1(input).toString();
-    case 'sha256':    return CryptoJS.SHA256(input).toString();
-    case 'sha384':    return CryptoJS.SHA384(input).toString();
-    case 'sha512':    return CryptoJS.SHA512(input).toString();
-    case 'ripemd160': return CryptoJS.RIPEMD160(input).toString();
-  }
-}
-function computeHmac(algo: HashAlgo, input: string, key: string): string {
-  switch (algo) {
-    case 'md5':       return CryptoJS.HmacMD5(input, key).toString();
-    case 'sha1':      return CryptoJS.HmacSHA1(input, key).toString();
-    case 'sha256':    return CryptoJS.HmacSHA256(input, key).toString();
-    case 'sha384':    return CryptoJS.HmacSHA384(input, key).toString();
-    case 'sha512':    return CryptoJS.HmacSHA512(input, key).toString();
-    case 'ripemd160': return CryptoJS.HmacRIPEMD160(input, key).toString();
-  }
-}
-
-const enc = new TextEncoder(), dec = new TextDecoder();
-const toBytes = (s: string) => enc.encode(s);
-const fromBytes = (b: Uint8Array) => dec.decode(b);
-
-function codecEncode(id: CodecId, input: string): string {
-  switch (id) {
-    case 'base64': {
-      let bin = ''; toBytes(input).forEach((b) => { bin += String.fromCharCode(b); }); return btoa(bin);
-    }
-    case 'base64url': {
-      let bin = ''; toBytes(input).forEach((b) => { bin += String.fromCharCode(b); });
-      return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-    }
-    case 'url':    return encodeURIComponent(input);
-    case 'hex':    return Array.from(toBytes(input)).map((b) => b.toString(16).padStart(2, '0')).join('');
-    case 'binary': return Array.from(toBytes(input)).map((b) => b.toString(2).padStart(8, '0')).join(' ');
-  }
-}
-function codecDecode(id: CodecId, input: string): string {
-  switch (id) {
-    case 'base64': {
-      const bin = atob(input.replace(/\s+/g, ''));
-      return fromBytes(Uint8Array.from(bin, (c) => c.charCodeAt(0)));
-    }
-    case 'base64url': {
-      const s = input.replace(/-/g, '+').replace(/_/g, '/');
-      const padded = s + '='.repeat((4 - s.length % 4) % 4);
-      return fromBytes(Uint8Array.from(atob(padded), (c) => c.charCodeAt(0)));
-    }
-    case 'url':    return decodeURIComponent(input);
-    case 'hex': {
-      const tokens = input.replace(/\s+/g, '').match(/.{1,2}/g) ?? [];
-      return fromBytes(Uint8Array.from(tokens.map((t) => parseInt(t, 16))));
-    }
-    case 'binary':
-      return fromBytes(Uint8Array.from(input.trim().split(/\s+/).map((t) => parseInt(t, 2))));
-  }
-}
-
-// ─── JSON flattening ───────────────────────────────────────────────────────────
-
-/**
- * Recursively flatten any JSON value into a flat string map.
- * Objects use dot notation (user.name), arrays use bracket notation (items[0]).
- */
-function flattenJson(value: unknown, prefix = ''): Record<string, string> {
-  const out: Record<string, string> = {};
-  if (value === null || value === undefined) {
-    if (prefix) out[prefix] = '';
-  } else if (typeof value !== 'object') {
-    if (prefix) out[prefix] = String(value);
-  } else if (Array.isArray(value)) {
-    if (value.length === 0 && prefix) { out[prefix] = '[]'; }
-    else value.forEach((item, i) => Object.assign(out, flattenJson(item, prefix ? `${prefix}[${i}]` : `[${i}]`)));
-  } else {
-    const obj = value as Record<string, unknown>;
-    const keys = Object.keys(obj);
-    if (keys.length === 0 && prefix) { out[prefix] = '{}'; }
-    else keys.forEach((k) => Object.assign(out, flattenJson(obj[k], prefix ? `${prefix}.${k}` : k)));
-  }
-  return out;
-}
+const DIGEST_OPTIONS: { value: DigestFormat; label: string }[] = [
+  { value: 'hex', label: 'Hex' },
+  { value: 'base64', label: 'Base64' },
+  { value: 'base64url', label: 'Base64 URL' },
+];
 
 // ─── JSON field merge ──────────────────────────────────────────────────────────
 
@@ -227,74 +103,10 @@ function mergeJsonFields(existing: FieldConfig[], flatMap: Record<string, string
   return [...kept, ...fresh];
 }
 
-// ─── Step execution ────────────────────────────────────────────────────────────
+// ─── Errors ────────────────────────────────────────────────────────────────────
 
-/** Error produced by the pipeline itself; translated for display (`errorText`). */
-const KEY_REQUIRED = '\u0000secretKeyRequired';
-const STEP_FAILED = '\u0000stepFailed';
 function errorText(error: string, t: (k: 'secretKeyRequired' | 'stepFailed') => string) {
   return error === KEY_REQUIRED ? t('secretKeyRequired') : error === STEP_FAILED ? t('stepFailed') : error;
-}
-
-function executeStep(step: PipelineStep, input: string): StepResult {
-  try {
-    switch (step.op) {
-      case 'text-sunk':
-        return { output: step.textValue ?? '' };
-      case 'json-input': {
-        let flatMap: Record<string, string> = {};
-        try { flatMap = flattenJson(JSON.parse(step.jsonText ?? '')); } catch { /* empty */ }
-        let active = (step.jsonFields ?? []).filter((f) => f.enabled);
-        const sort = step.jsonSort ?? 'none';
-        // Byte (ASCII) order, as payment gateways sign it (OnePay vpc_*,
-        // Alipay, WeChat Pay): `Version` < `amount`, `vpc_MerchTxnRef` <
-        // `vpc_Merchant`. localeCompare would put lowercase first.
-        if (sort === 'asc')  active = [...active].sort((a, b) => compareCodeUnits(a.key, b.key));
-        if (sort === 'desc') active = [...active].sort((a, b) => compareCodeUnits(b.key, a.key));
-        const sep = step.jsonSeparator ?? '&';
-        const fmt = step.jsonFormat ?? 'key=value';
-        const parts = active.map((f) => {
-          const val = f.type === 'custom' ? (f.customValue ?? '') : (flatMap[f.key] ?? '');
-          return fmt === 'key=value' ? `${f.key}=${val}` : val;
-        });
-        return { output: parts.join(sep) };
-      }
-      case 'hash': {
-        if (!input) return { output: '' };
-        const r = computeHash((step.algorithm ?? 'sha256') as HashAlgo, input);
-        return { output: step.upperHex ? r.toUpperCase() : r };
-      }
-      case 'hmac': {
-        if (!input) return { output: '' };
-        if (!step.key) return { output: '', error: KEY_REQUIRED };
-        const r = computeHmac((step.algorithm ?? 'sha256') as HashAlgo, input, step.key);
-        return { output: step.upperHex ? r.toUpperCase() : r };
-      }
-      case 'encode': return { output: codecEncode((step.codec ?? 'base64') as CodecId, input) };
-      case 'decode': return { output: codecDecode((step.codec ?? 'base64') as CodecId, input) };
-      case 'uppercase': return { output: input.toUpperCase() };
-      case 'lowercase': return { output: input.toLowerCase() };
-      case 'trim':      return { output: input.trim() };
-      case 'prepend':   return { output: (step.text ?? '') + input };
-      case 'append':    return { output: input + (step.text ?? '') };
-      case 'replace':   return { output: input.split(step.find ?? '').join(step.replacement ?? '') };
-      default:          return { output: input };
-    }
-  } catch (err) {
-    return { output: '', error: err instanceof Error ? err.message : STEP_FAILED };
-  }
-}
-
-function executePipeline(steps: PipelineStep[]): StepResult[] {
-  const results: StepResult[] = [];
-  let current = '';
-  for (const step of steps) {
-    const res = executeStep(step, current);
-    results.push(res);
-    if (res.error) break;
-    current = res.output;
-  }
-  return results;
 }
 
 // ─── ID helper ─────────────────────────────────────────────────────────────────
@@ -654,6 +466,237 @@ function StepOutputBar({ result }: { result: StepResult | undefined }) {
   );
 }
 
+
+// ─── Step parameter controls ───────────────────────────────────────────────────
+
+const SELECT_CLS = 'h-ctl text-xs rounded-sm';
+
+function ParamLabel({ children }: { children: React.ReactNode }) {
+  return <span className="text-[11px] text-fg-mute font-medium">{children}</span>;
+}
+
+function DigestControls({ step, onUpdate }: { step: PipelineStep; onUpdate: (patch: Partial<PipelineStep>) => void }) {
+  const t = useMessages(MESSAGES);
+  const digest = step.digest ?? 'hex';
+  return (
+    <>
+      <div className="flex items-center gap-1.5">
+        <ParamLabel>{t('digest')}</ParamLabel>
+        <Select value={digest} onValueChange={(v) => onUpdate({ digest: v as DigestFormat })}>
+          <SelectTrigger className={cn(SELECT_CLS, 'w-32')}><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {DIGEST_OPTIONS.map((d) => <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
+      {digest === 'hex' && <HexToggle value={!!step.upperHex} onChange={(v) => onUpdate({ upperHex: v })} />}
+    </>
+  );
+}
+
+function KeyEncodingSelect({ value, onChange }: { value: SecretEncoding; onChange: (v: SecretEncoding) => void }) {
+  const t = useMessages(MESSAGES);
+  return (
+    <Select value={value} onValueChange={(v) => onChange(v as SecretEncoding)}>
+      <SelectTrigger className={cn(SELECT_CLS, 'w-28 shrink-0')} aria-label={t('keyEncoding')} title={t('keyEncoding')}>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {SECRET_ENCODINGS.map((e) => <SelectItem key={e.value} value={e.value}>{e.label}</SelectItem>)}
+      </SelectContent>
+    </Select>
+  );
+}
+
+interface KeyFieldProps {
+  value: string;
+  onChange: (v: string) => void;
+  show: boolean;
+  onToggle: () => void;
+  placeholder: string;
+  /** PEM / JWK: several lines, so a textarea instead of a password box. */
+  multiline?: boolean;
+  /** Shown left of the box (HMAC key encoding). */
+  addon?: React.ReactNode;
+}
+
+function KeyField({ value, onChange, show, onToggle, placeholder, multiline, addon }: KeyFieldProps) {
+  const t = useMessages(MESSAGES);
+  const eye = (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-label={show ? t('hideKey') : t('showKey')}
+      title={show ? t('hideKey') : t('showKey')}
+      aria-pressed={show}
+      className={cn(
+        'absolute right-2.5 rounded text-fg-mute transition-colors hover:text-fg focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus',
+        multiline ? 'top-2' : 'top-1/2 -translate-y-1/2',
+      )}
+    >
+      {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+    </button>
+  );
+
+  if (multiline) {
+    // A textarea cannot mask its text, so a set key collapses to a summary
+    // until the eye is pressed.
+    return (
+      <div className="relative">
+        {show || !value ? (
+          <Textarea
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder={placeholder}
+            className="min-h-[84px] pr-9 font-mono text-[11px] resize-y leading-relaxed"
+            spellCheck={false}
+          />
+        ) : (
+          <div className="flex h-ctl items-center rounded-md border border-line bg-card px-3 pr-9 text-xs text-fg-mute">
+            {t('keyHidden', { n: value.length })}
+          </div>
+        )}
+        {value && eye}
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      {addon}
+      <div className="relative flex-1">
+        <Input
+          type={show ? 'text' : 'password'}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          className="h-ctl pr-9 font-mono text-sm"
+          autoComplete="off"
+        />
+        {eye}
+      </div>
+    </div>
+  );
+}
+
+function JwtAlgSelect({ value, algorithms, onChange }: { value: JwtAlgorithm; algorithms: AlgorithmSpec[]; onChange: (v: JwtAlgorithm) => void }) {
+  const families = [...new Set(algorithms.map((a) => a.familyLabel))];
+  return (
+    <Select value={value} onValueChange={(v) => onChange(v as JwtAlgorithm)}>
+      <SelectTrigger className={cn(SELECT_CLS, 'w-32')}><SelectValue /></SelectTrigger>
+      <SelectContent>
+        {families.map((family) => (
+          <div key={family}>
+            <div className="px-2 pt-2 pb-1 text-[11px] font-semibold text-fg-mute uppercase tracking-wide">{family}</div>
+            {algorithms.filter((a) => a.familyLabel === family).map((a) => (
+              <SelectItem key={a.alg} value={a.alg}>{a.alg}</SelectItem>
+            ))}
+          </div>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
+/** Algorithm + key box for the JWT / JWS steps. The key box follows the algorithm family. */
+function JwtKeyControls({ step, purpose, showKey, onToggleKey, onUpdate }: {
+  step: PipelineStep;
+  purpose: 'sign' | 'verify';
+  showKey: boolean;
+  onToggleKey: () => void;
+  onUpdate: (patch: Partial<PipelineStep>) => void;
+}) {
+  const t = useMessages(MESSAGES);
+  const isJws = step.op === 'jws-sign' || step.op === 'jws-verify';
+  const alg = step.jwtAlg ?? 'HS256';
+  const algorithms = isJws ? JWS_ALGORITHMS : JWT_ALGORITHMS;
+  const spec = algorithms.find((a) => a.alg === alg);
+  // x5c only makes sense for a certificate, i.e. an asymmetric algorithm.
+  const canX5c = purpose === 'verify' && isAsymmetric(alg);
+  const fromX5c = canX5c && step.keySource === 'x5c';
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <JwtAlgSelect value={alg} algorithms={algorithms} onChange={(v) => onUpdate({ jwtAlg: v })} />
+        {canX5c && (
+          <div className="flex items-center gap-1.5">
+            <ParamLabel>{t('keySource')}</ParamLabel>
+            <Segmented
+              value={step.keySource ?? 'key'}
+              onValueChange={(v) => onUpdate(v === 'x5c' ? { keySource: v, x5cTrust: step.x5cTrust ?? 'apple' } : { keySource: v })}
+              size="sm"
+              options={[{ value: 'key', label: t('keySource.key') }, { value: 'x5c', label: t('keySource.x5c') }]}
+              aria-label={t('keySource')}
+            />
+          </div>
+        )}
+      </div>
+      {fromX5c ? (
+        <X5cTrustControls step={step} onUpdate={onUpdate} />
+      ) : spec && <p className="text-[11px] text-fg-mute">{spec.keyHint}</p>}
+      {fromX5c ? null : alg === 'none' ? (
+        <p className="flex items-center gap-1.5 text-[11px] text-warn">
+          <AlertTriangle className="h-3 w-3 shrink-0" />{t('algNone')}
+        </p>
+      ) : isHmac(alg) ? (
+        <KeyField
+          value={step.key ?? ''}
+          onChange={(v) => onUpdate({ key: v })}
+          show={showKey}
+          onToggle={onToggleKey}
+          placeholder={t('secretKeyPlaceholder')}
+          addon={<KeyEncodingSelect value={step.keyEncoding ?? 'utf8'} onChange={(v) => onUpdate({ keyEncoding: v })} />}
+        />
+      ) : isAsymmetric(alg) && (
+        <KeyField
+          value={step.key ?? ''}
+          onChange={(v) => onUpdate({ key: v })}
+          show={showKey}
+          onToggle={onToggleKey}
+          placeholder={purpose === 'sign' ? t('privateKeyPlaceholder') : t('publicKeyPlaceholder')}
+          multiline
+        />
+      )}
+    </div>
+  );
+}
+
+/** Which root an x5c chain must end at. Apple's root is pinned in jwt/x5cChain.ts. */
+function X5cTrustControls({ step, onUpdate }: { step: PipelineStep; onUpdate: (patch: Partial<PipelineStep>) => void }) {
+  const t = useMessages(MESSAGES);
+  const trust = step.x5cTrust ?? 'apple';
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <ParamLabel>{t('x5cTrust')}</ParamLabel>
+        <Segmented
+          value={trust}
+          onValueChange={(v) => onUpdate({ x5cTrust: v })}
+          size="sm"
+          options={(['apple', 'custom', 'none'] as const).map((v) => ({ value: v, label: t(`x5cTrust.${v}`) }))}
+          aria-label={t('x5cTrust')}
+        />
+      </div>
+      {trust === 'custom' && (
+        <Textarea
+          value={step.trustRoot ?? ''}
+          onChange={(e) => onUpdate({ trustRoot: e.target.value })}
+          placeholder={t('trustRootPlaceholder')}
+          className="min-h-[72px] font-mono text-[11px] resize-y"
+          spellCheck={false}
+        />
+      )}
+      {trust === 'none' ? (
+        <p className="flex items-start gap-1.5 text-[11px] text-warn">
+          <AlertTriangle className="h-3 w-3 shrink-0 mt-px" />{t('x5cWarning')}
+        </p>
+      ) : (
+        <p className="text-[11px] text-fg-mute">{t(trust === 'apple' ? 'x5cAppleInfo' : 'x5cCustomInfo')}</p>
+      )}
+    </div>
+  );
+}
+
 // ─── Step card ─────────────────────────────────────────────────────────────────
 
 interface StepCardProps {
@@ -671,6 +714,8 @@ interface StepCardProps {
 
 function StepCard({ step, index, total, result, showKey, onToggleKey, onUpdate, onRemove, onMoveUp, onMoveDown }: StepCardProps) {
   const t = useMessages(MESSAGES);
+  const keyProps = { show: showKey, onToggle: onToggleKey };
+  const cipher = ENCRYPT_ALGOS.find((a) => a.id === (step.cipher ?? 'aes-gcm')) ?? ENCRYPT_ALGOS[0];
 
   return (
     <div className={cn(
@@ -687,13 +732,13 @@ function StepCard({ step, index, total, result, showKey, onToggleKey, onUpdate, 
         </div>
 
         <Select value={step.op} onValueChange={(v) => onUpdate({ op: v as StepOp })}>
-          <SelectTrigger className="h-ctl flex-1 max-w-[180px] text-xs font-semibold border-0 bg-transparent shadow-none focus-visible:ring-0 px-0">
+          <SelectTrigger className="h-ctl flex-1 max-w-[200px] text-xs font-semibold border-0 bg-transparent shadow-none focus-visible:ring-0 px-0">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
             {OP_GROUPS.map((group) => (
               <div key={group.label}>
-                <div className="px-2 pt-2 pb-1 text-[11px] font-semibold text-fg-mute uppercase tracking-wide">{t(`group.${group.label}` as 'group.Text')}</div>
+                <div className="px-2 pt-2 pb-1 text-[11px] font-semibold text-fg-mute uppercase tracking-wide">{t(`group.${group.label}`)}</div>
                 {group.ops.map((op) => {
                   const m = OP_META[op];
                   return (
@@ -755,16 +800,26 @@ function StepCard({ step, index, total, result, showKey, onToggleKey, onUpdate, 
           />
         )}
 
+        {/* Encode / Decode */}
+        {(step.op === 'encode' || step.op === 'decode') && (
+          <Select value={step.codec ?? 'base64'} onValueChange={(v) => onUpdate({ codec: v })}>
+            <SelectTrigger className={cn(SELECT_CLS, 'w-48')}><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {PIPELINE_CODECS.map((c) => <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        )}
+
         {/* Hash */}
         {step.op === 'hash' && (
           <div className="flex flex-wrap items-center gap-2">
             <Select value={step.algorithm ?? 'sha256'} onValueChange={(v) => onUpdate({ algorithm: v })}>
-              <SelectTrigger className="h-ctl w-36 text-xs rounded-sm"><SelectValue /></SelectTrigger>
+              <SelectTrigger className={cn(SELECT_CLS, 'w-40')}><SelectValue /></SelectTrigger>
               <SelectContent>
-                {HASH_ALGOS.map((a) => <SelectItem key={a.id} value={a.id}>{a.label} ({a.bits}-bit)</SelectItem>)}
+                {HASH_ALGORITHMS.map((a) => <SelectItem key={a.id} value={a.id}>{a.label} ({a.bits}-bit)</SelectItem>)}
               </SelectContent>
             </Select>
-            <HexToggle value={!!step.upperHex} onChange={(v) => onUpdate({ upperHex: v })} />
+            <DigestControls step={step} onUpdate={onUpdate} />
           </div>
         )}
 
@@ -773,43 +828,157 @@ function StepCard({ step, index, total, result, showKey, onToggleKey, onUpdate, 
           <div className="space-y-2">
             <div className="flex flex-wrap items-center gap-2">
               <Select value={step.algorithm ?? 'sha256'} onValueChange={(v) => onUpdate({ algorithm: v })}>
-                <SelectTrigger className="h-ctl w-36 text-xs rounded-sm"><SelectValue /></SelectTrigger>
+                <SelectTrigger className={cn(SELECT_CLS, 'w-40')}><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {HASH_ALGOS.map((a) => <SelectItem key={a.id} value={a.id}>{a.label} ({a.bits}-bit)</SelectItem>)}
+                  {HMAC_ALGORITHMS.map((a) => <SelectItem key={a.id} value={a.id}>{a.label} ({a.bits}-bit)</SelectItem>)}
                 </SelectContent>
               </Select>
-              <HexToggle value={!!step.upperHex} onChange={(v) => onUpdate({ upperHex: v })} />
+              <DigestControls step={step} onUpdate={onUpdate} />
             </div>
-            <div className="relative">
+            <KeyField
+              {...keyProps}
+              value={step.key ?? ''}
+              onChange={(v) => onUpdate({ key: v })}
+              placeholder={t('secretKeyPlaceholder')}
+              addon={<KeyEncodingSelect value={step.keyEncoding ?? 'utf8'} onChange={(v) => onUpdate({ keyEncoding: v })} />}
+            />
+          </div>
+        )}
+
+        {/* Encrypt / Decrypt */}
+        {(step.op === 'encrypt' || step.op === 'decrypt') && (
+          <div className="space-y-2">
+            <Select value={cipher.id} onValueChange={(v) => onUpdate({ cipher: v as EncryptAlgo })}>
+              <SelectTrigger className={cn(SELECT_CLS, 'w-44')}><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {ENCRYPT_ALGOS.map((a) => <SelectItem key={a.id} value={a.id}>{a.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <p className={cn('text-[11px]', cipher.weak ? 'text-warn' : 'text-fg-mute')}>{cipher.desc}</p>
+            <KeyField
+              {...keyProps}
+              value={step.key ?? ''}
+              onChange={(v) => onUpdate({ key: v })}
+              placeholder={t('passphrasePlaceholder')}
+            />
+          </div>
+        )}
+
+        {/* JWT / JWS decode */}
+        {step.op === 'jwt-decode' && (
+          <div className="flex items-center gap-1.5">
+            <ParamLabel>{t('jwtPart')}</ParamLabel>
+            <Segmented
+              value={step.jwtPart ?? 'payload'}
+              onValueChange={(v) => onUpdate({ jwtPart: v as JwtPart })}
+              size="sm"
+              options={(['payload', 'header', 'signature', 'all'] as const).map((p) => ({ value: p, label: t(`part.${p}`) }))}
+              aria-label={t('jwtPart')}
+            />
+          </div>
+        )}
+
+        {/* JWT / JWS sign */}
+        {(step.op === 'jwt-sign' || step.op === 'jws-sign') && (
+          <div className="space-y-2">
+            <JwtKeyControls step={step} purpose="sign" showKey={showKey} onToggleKey={onToggleKey} onUpdate={onUpdate} />
+            <div>
+              <p className="text-[11px] text-fg-mute mb-1">{t('extraHeader')}</p>
               <Input
-                type={showKey ? 'text' : 'password'}
-                value={step.key ?? ''}
-                onChange={(e) => onUpdate({ key: e.target.value })}
-                placeholder={t('secretKeyPlaceholder')}
-                className="h-ctl pr-9 font-mono text-sm"
+                value={step.jwtHeader ?? ''}
+                onChange={(e) => onUpdate({ jwtHeader: e.target.value })}
+                placeholder='{ "kid": "key-1" }'
+                className="h-ctl text-xs font-mono"
               />
-              <button
-                type="button"
-                onClick={onToggleKey}
-                aria-label={showKey ? t('hideKey') : t('showKey')}
-                title={showKey ? t('hideKey') : t('showKey')}
-                aria-pressed={showKey}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded text-fg-mute transition-colors hover:text-fg focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus"
-              >
-                {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {step.op === 'jwt-sign' ? (
+                <>
+                  <ToggleChip pressed={step.jwtIssuedAt ?? true} onPressedChange={(v) => onUpdate({ jwtIssuedAt: v })} className="px-2">
+                    {t('issuedAt')}
+                  </ToggleChip>
+                  <ParamLabel>{t('expiresIn')}</ParamLabel>
+                  <Input
+                    value={step.jwtExpiresIn ?? ''}
+                    onChange={(e) => onUpdate({ jwtExpiresIn: e.target.value })}
+                    placeholder={t('expiresInPlaceholder')}
+                    className="h-ctl w-28 text-xs font-mono"
+                  />
+                </>
+              ) : (
+                <ToggleChip pressed={!!step.jwsDetached} onPressedChange={(v) => onUpdate({ jwsDetached: v })} className="px-2">
+                  {t('detached')}
+                </ToggleChip>
+              )}
             </div>
           </div>
         )}
 
-        {/* Encode / Decode */}
-        {(step.op === 'encode' || step.op === 'decode') && (
-          <Select value={step.codec ?? 'base64'} onValueChange={(v) => onUpdate({ codec: v })}>
-            <SelectTrigger className="h-ctl w-44 text-xs rounded-sm"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {CODECS.map((c) => <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>)}
-            </SelectContent>
-          </Select>
+        {/* JWT / JWS verify */}
+        {(step.op === 'jwt-verify' || step.op === 'jws-verify') && (
+          <div className="space-y-2">
+            <JwtKeyControls step={step} purpose="verify" showKey={showKey} onToggleKey={onToggleKey} onUpdate={onUpdate} />
+            {step.op === 'jws-verify' && (
+              <div>
+                <p className="text-[11px] text-fg-mute mb-1">{t('detachedPayload')}</p>
+                <Textarea
+                  value={step.detachedPayload ?? ''}
+                  onChange={(e) => onUpdate({ detachedPayload: e.target.value })}
+                  className="min-h-[56px] font-mono text-xs resize-y"
+                  spellCheck={false}
+                />
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* JSON path */}
+        {step.op === 'json-path' && (
+          <Input
+            value={step.path ?? ''}
+            onChange={(e) => onUpdate({ path: e.target.value })}
+            placeholder={t('jsonPathPlaceholder')}
+            className="h-ctl text-xs font-mono"
+            spellCheck={false}
+          />
+        )}
+
+        {/* Regex extract */}
+        {step.op === 'regex-extract' && (
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="flex-1 min-w-[160px]">
+              <p className="text-[11px] text-fg-mute mb-1">{t('pattern')}</p>
+              <Input value={step.pattern ?? ''} onChange={(e) => onUpdate({ pattern: e.target.value })}
+                placeholder="token=([^&]+)" className="h-ctl text-xs font-mono" spellCheck={false} />
+            </div>
+            <div className="w-16">
+              <p className="text-[11px] text-fg-mute mb-1">{t('flags')}</p>
+              <Input value={step.regexFlags ?? ''} onChange={(e) => onUpdate({ regexFlags: e.target.value })}
+                placeholder="i" className="h-ctl text-xs font-mono" spellCheck={false} />
+            </div>
+            <div className="w-20">
+              <p className="text-[11px] text-fg-mute mb-1">{t('captureGroup')}</p>
+              <Input value={step.group ?? ''} onChange={(e) => onUpdate({ group: e.target.value })}
+                placeholder={t('captureGroupPlaceholder')} className="h-ctl text-xs font-mono" spellCheck={false} />
+            </div>
+            <ToggleChip pressed={!!step.matchAll} onPressedChange={(v) => onUpdate({ matchAll: v })} className="px-2">
+              {t('allMatches')}
+            </ToggleChip>
+          </div>
+        )}
+
+        {/* Split & pick */}
+        {step.op === 'split-pick' && (
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <p className="text-[11px] text-fg-mute mb-1">{t('splitSep')}</p>
+              <Input value={step.splitSep ?? ''} onChange={(e) => onUpdate({ splitSep: e.target.value })} className="h-ctl text-xs font-mono" />
+            </div>
+            <div>
+              <p className="text-[11px] text-fg-mute mb-1">{t('splitIndex')}</p>
+              <Input value={step.splitIndex ?? ''} onChange={(e) => onUpdate({ splitIndex: e.target.value })} placeholder="0" className="h-ctl text-xs font-mono" />
+            </div>
+          </div>
         )}
 
         {/* Prepend / Append */}
@@ -829,16 +998,32 @@ function StepCard({ step, index, total, result, showKey, onToggleKey, onUpdate, 
 
         {/* Replace */}
         {step.op === 'replace' && (
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <p className="text-[11px] text-fg-mute mb-1">{t('findAll')}</p>
-              <Input value={step.find ?? ''} onChange={(e) => onUpdate({ find: e.target.value })} placeholder={t('find')} className="h-ctl text-xs font-mono" />
+          <div className="space-y-2">
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <p className="text-[11px] text-fg-mute mb-1">{t('findAll')}</p>
+                <Input value={step.find ?? ''} onChange={(e) => onUpdate({ find: e.target.value })} placeholder={t('find')} className="h-ctl text-xs font-mono" />
+              </div>
+              <div>
+                <p className="text-[11px] text-fg-mute mb-1">{t('replaceWith')}</p>
+                <Input value={step.replacement ?? ''} onChange={(e) => onUpdate({ replacement: e.target.value })} placeholder={t('replaceWithPlaceholder')} className="h-ctl text-xs font-mono" />
+              </div>
             </div>
-            <div>
-              <p className="text-[11px] text-fg-mute mb-1">{t('replaceWith')}</p>
-              <Input value={step.replacement ?? ''} onChange={(e) => onUpdate({ replacement: e.target.value })} placeholder={t('replaceWithPlaceholder')} className="h-ctl text-xs font-mono" />
-            </div>
+            <ToggleChip pressed={!!step.regex} onPressedChange={(v) => onUpdate({ regex: v })} className="px-2">
+              {t('useRegex')}
+            </ToggleChip>
           </div>
+        )}
+
+        {/* JSON format */}
+        {step.op === 'json-format' && (
+          <Segmented
+            value={step.jsonIndent ?? 'pretty'}
+            onValueChange={(v) => onUpdate({ jsonIndent: v })}
+            size="sm"
+            options={[{ value: 'pretty', label: t('pretty') }, { value: 'minify', label: t('minify') }]}
+            aria-label={t('op.json-format')}
+          />
         )}
 
         {/* No-param ops */}
@@ -863,7 +1048,7 @@ function AddStepPanel({ onAdd }: { onAdd: (op: StepOp) => void }) {
         <div className="w-px h-3 bg-line/50" />
         <Button variant="outline" size="sm" onClick={() => setOpen(true)}
           className="h-ctl px-4 text-xs rounded-full border-dashed gap-1.5 text-fg-mute hover:text-fg">
-          <Plus className="h-3 w-3" />Add step
+          <Plus className="h-3 w-3" />{t('addStep')}
         </Button>
       </div>
     );
@@ -878,13 +1063,14 @@ function AddStepPanel({ onAdd }: { onAdd: (op: StepOp) => void }) {
         </div>
         {OP_GROUPS.map((group) => (
           <div key={group.label}>
-            <p className="text-[11px] font-semibold text-fg-mute uppercase tracking-wide mb-1.5">{t(`group.${group.label}` as 'group.Text')}</p>
+            <p className="text-[11px] font-semibold text-fg-mute uppercase tracking-wide mb-1.5">{t(`group.${group.label}`)}</p>
             <div className="flex flex-wrap gap-1.5">
               {group.ops.map((op) => {
                 const m = OP_META[op]; const Icon = m.icon;
                 return (
                   <button key={op} type="button"
                     onClick={() => { onAdd(op); setOpen(false); }}
+                    title={t(`opHint.${op}`)}
                     className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-line bg-card text-xs font-medium hover:border-acc/40 hover:bg-acc/5 hover:text-acc transition-all">
                     <Icon className={cn('h-3.5 w-3.5', m.color)} />{t(`op.${op}`)}
                   </button>
@@ -900,21 +1086,22 @@ function AddStepPanel({ onAdd }: { onAdd: (op: StepOp) => void }) {
 
 // ─── Final result ──────────────────────────────────────────────────────────────
 
-function FinalResult({ result }: { result: StepResult | undefined }) {
+function FinalResult({ result, running }: { result: StepResult | undefined; running: boolean }) {
   const t = useMessages(MESSAGES);
   if (!result || (!result.output && !result.error)) return null;
   const ok = !!result.output && !result.error;
   return (
-    <div className={cn('rounded-lg border p-4', ok ? 'border-acc/25 bg-acc/5' : 'border-bad/25 bg-bad/5')}>
+    <div className={cn('rounded-lg border p-4 transition-opacity', ok ? 'border-acc/25 bg-acc/5' : 'border-bad/25 bg-bad/5', running && 'opacity-60')}>
       <div className="flex items-center justify-between mb-2.5">
         <span className="flex items-center gap-1.5 text-xs font-semibold">
           {ok ? <CheckCircle2 className="h-4 w-4 text-acc" /> : <AlertTriangle className="h-4 w-4 text-bad" />}
           {ok ? t('finalResult') : t('pipelineError')}
+          {running && <Spinner size="xs" className="ml-1 text-fg-mute" label={t('running')} />}
         </span>
         {ok && <CopyBtn value={result.output} />}
       </div>
       {ok
-        ? <p className="font-mono text-sm leading-relaxed break-all text-fg">{result.output}</p>
+        ? <p className="font-mono text-sm leading-relaxed break-all whitespace-pre-wrap text-fg">{result.output}</p>
         : <p className="text-sm text-bad">{errorText(result.error ?? '', t)}</p>
       }
       {ok && <p className="text-[11px] text-fg-mute/40 mt-1.5">{t('chars', { n: result.output.length })}</p>}
@@ -925,25 +1112,39 @@ function FinalResult({ result }: { result: StepResult | undefined }) {
 // ─── Main ──────────────────────────────────────────────────────────────────────
 
 const STEP_DEFAULTS: Partial<Record<StepOp, Partial<PipelineStep>>> = {
-  'text-sunk': { textValue: '' },
-  'json-input': { jsonText: '', jsonFields: [], jsonSeparator: '&', jsonSort: 'none', jsonFormat: 'key=value' },
-  hmac:         { algorithm: 'sha256', key: '', upperHex: false },
-  hash:         { algorithm: 'sha256', upperHex: false },
-  encode:       { codec: 'base64' },
-  decode:       { codec: 'base64' },
-  prepend:      { text: '' },
-  append:       { text: '' },
-  replace:      { find: '', replacement: '' },
+  'text-sunk':     { textValue: '' },
+  'json-input':    { jsonText: '', jsonFields: [], jsonSeparator: '&', jsonSort: 'none', jsonFormat: 'key=value' },
+  hmac:            { algorithm: 'sha256', upperHex: false, digest: 'hex', keyEncoding: 'utf8' },
+  hash:            { algorithm: 'sha256', upperHex: false, digest: 'hex' },
+  encode:          { codec: 'base64' },
+  decode:          { codec: 'base64' },
+  encrypt:         { cipher: 'aes-gcm' },
+  decrypt:         { cipher: 'aes-gcm' },
+  'jwt-decode':    { jwtPart: 'payload' },
+  'jwt-sign':      { jwtAlg: 'HS256', keyEncoding: 'utf8', jwtIssuedAt: true, jwtExpiresIn: '' },
+  'jwt-verify':    { jwtAlg: 'HS256', keyEncoding: 'utf8' },
+  'jws-sign':      { jwtAlg: 'HS256', keyEncoding: 'utf8', jwsDetached: false },
+  'jws-verify':    { jwtAlg: 'HS256', keyEncoding: 'utf8' },
+  'json-path':     { path: '' },
+  'regex-extract': { pattern: '', regexFlags: '', group: '', matchAll: false },
+  'split-pick':    { splitSep: ',', splitIndex: '0' },
+  prepend:         { text: '' },
+  append:          { text: '' },
+  replace:         { find: '', replacement: '', regex: false },
+  'json-format':   { jsonIndent: 'pretty' },
 };
 
 const DEFAULT_STEPS: PipelineStep[] = [];
+
+/** Delay before a run, so typing in a key box doesn't start one per keystroke. */
+const RUN_DEBOUNCE_MS = 120;
 
 export function PipelineTab({ active }: { active: boolean }) {
   const t = useMessages(MESSAGES);
   const sdk = usePluginSdkFor('base64');
   const [steps, setSteps] = usePluginState<PipelineStep[]>(sdk, 'pipeline:steps-v2', DEFAULT_STEPS, { legacyKey: 'devtool:pipeline:steps-v2' });
-  // HMAC keys are credentials: kept in the vault by step id, never in the
-  // plain settings file that holds the steps.
+  // Keys, passphrases and PEM keys are credentials: kept in the vault by step
+  // id, never in the plain settings file that holds the steps.
   const [stepKeys, setStepKeys, stepKeysReady] = useSecretState<Record<string, string>>(sdk, 'pipeline:step-keys', {});
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
 
@@ -962,7 +1163,7 @@ export function PipelineTab({ active }: { active: boolean }) {
   }, [stepKeysReady, steps, setSteps, setStepKeys]);
 
   const stepsWithKeys = useMemo(
-    () => steps.map((s) => (s.op === 'hmac' ? { ...s, key: stepKeys[s.id] ?? s.key ?? '' } : s)),
+    () => steps.map((s) => (SECRET_OPS.has(s.op) ? { ...s, key: stepKeys[s.id] ?? s.key ?? '' } : s)),
     [steps, stepKeys],
   );
 
@@ -987,8 +1188,28 @@ export function PipelineTab({ active }: { active: boolean }) {
     });
   }, active);
 
+  // Steps can be async (Web Crypto: AES-GCM, JWT/JWS), so results arrive
+  // after render. Keyed by step id so a removed or moved step never shows
+  // another step's output while the next run is in flight.
   const deferredSteps = useDeferredValue(stepsWithKeys);
-  const results = useMemo(() => executePipeline(deferredSteps), [deferredSteps]);
+  const cacheRef = useRef<StepCache | null>(null);
+  const [run, setRun] = useState<{ byId: Record<string, StepResult>; last?: StepResult }>({ byId: {} });
+  const [running, setRunning] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    setRunning(true);
+    const timer = setTimeout(() => {
+      cacheRef.current ??= new StepCache();
+      void executePipeline(deferredSteps, cacheRef.current).then((results) => {
+        if (cancelled) return;
+        const byId: Record<string, StepResult> = {};
+        results.forEach((r, i) => { byId[deferredSteps[i].id] = r; });
+        setRun({ byId, last: results.at(-1) });
+        setRunning(false);
+      });
+    }, RUN_DEBOUNCE_MS);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [deferredSteps]);
 
   const updateStep = (id: string, { key, ...patch }: Partial<PipelineStep>) => {
     if (key !== undefined) setStepKeys((prev) => ({ ...prev, [id]: key }));
@@ -1016,6 +1237,13 @@ export function PipelineTab({ active }: { active: boolean }) {
     });
   };
 
+  const loadTemplate = (next: PipelineStep[], keys: Record<string, string>) => {
+    setSteps(next);
+    // The replaced steps' keys go with them; the template's own come in.
+    setStepKeys(keys);
+    setShowKeys({});
+  };
+
   const addStep = (op: StepOp) => {
     const { key: _key, ...defaults } = STEP_DEFAULTS[op] ?? {};
     setSteps((prev) => [...prev, { id: makeId(), op, ...defaults }]);
@@ -1023,6 +1251,8 @@ export function PipelineTab({ active }: { active: boolean }) {
 
   return (
     <div className="tool-scrollable tool-padding tool-spacer">
+
+      <PipelineTemplates steps={stepsWithKeys} onLoad={loadTemplate} makeId={makeId} />
 
       {/* Empty state */}
       {steps.length === 0 && (
@@ -1038,7 +1268,7 @@ export function PipelineTab({ active }: { active: boolean }) {
           <div key={step.id}>
             <StepCard
               step={step} index={index} total={steps.length}
-              result={results[index]}
+              result={run.byId[step.id]}
               showKey={!!showKeys[step.id]}
               onToggleKey={() => setShowKeys((p) => ({ ...p, [step.id]: !p[step.id] }))}
               onUpdate={(patch) => updateStep(step.id, patch)}
@@ -1056,7 +1286,7 @@ export function PipelineTab({ active }: { active: boolean }) {
         <AddStepPanel onAdd={addStep} />
       </div>
 
-      <FinalResult result={results.at(-1)} />
+      <FinalResult result={steps.length > 0 ? run.last : undefined} running={running} />
     </div>
   );
 }

@@ -17,7 +17,6 @@ This document describes every tool in the app: what computation it performs, wha
 | JSON Formatter | ✓ | — | — | — | Input (localStorage) |
 | Data Converter | ✓ | — | ✓ | — | Input + options (localStorage) |
 | SQL Formatter | ✓ | — | — | — | Input + options (localStorage) |
-| JWT Debugger | — | — | — | — | Input (localStorage) |
 | Regex Tester | — | — | — | — | Input (localStorage) |
 | Diff | — | — | — | — | Input + mode (localStorage) |
 | Markdown Preview | — | — | — | — | Input (localStorage) |
@@ -92,6 +91,20 @@ Computes **MD5, SHA-1, SHA-256, SHA-512** hashes of typed/pasted text using the 
 
 ---
 
+### Pipeline (Encode · Hash · Encrypt tab)
+
+Chains steps, each one feeding its output to the next: text or JSON-field input; encode/decode with every codec of the Encode tab plus Base64 URL and compact hex; hash, HMAC (hex / Base64 / Base64 URL output, key as text, base64 or hex), encrypt/decrypt (the Encrypt tab's algorithms); JWT decode/sign/verify and compact JWS sign/verify (attached or detached payload), on the same `jose` code as the JWT tab; extract by JSON path, regex group or split; and text transforms. Logic lives in `pipelineEngine.ts`, which reuses `encodeCore.ts`, `lib/aesGcm.ts` and `jwt/jwtCrypto.ts`.
+
+Keys, passphrases and PEM/JWK keys of a step are stored in the encrypted vault by step id, never in the saved steps.
+
+JWT/JWS verify can use the leaf certificate of the token's own `x5c` header as the key (Apple App Store / Advanced Commerce signed payloads). That proves the signature matches that certificate — it does not validate the chain to Apple's root.
+
+**Templates** save the steps and settings for reuse (`pipeline:templates`), with built-in examples (Apple Advanced Commerce JWS → `request`, App Store Server Notification → transaction, payment HMAC). Input data is dropped unless "keep input" is ticked; keys are never in a template or its exported JSON — "remember keys" stores them in the vault under the template id (`pipeline:template-keys`).
+
+**OS / system impact:** clipboard read (quick paste) and write. No data leaves the app.
+
+---
+
 ### Date / Time
 
 Converts Unix timestamps to human-readable dates and vice versa. Formats dates in any IANA timezone using `date-fns`. Computes time differences and boundary values (start/end of day, week, month).
@@ -124,9 +137,9 @@ Formats and beautifies SQL queries — keyword casing, whitespace collapse, and 
 
 ---
 
-### JWT Debugger
+### JWT (Encode · Hash · Encrypt tab)
 
-Decodes a JWT by splitting on `.` and base64-decoding each part. **No signature verification is performed.** No network call is made — this tool cannot tell you if a token is valid or expired (it only shows the claims).
+Formerly the separate JWT Debugger tool; now the **JWT** tab of Encode · Hash · Encrypt (the old `/jwt` route redirects to `/base64?tab=jwt`). Decodes a JWT, verifies its signature (HS\*, RS\*, PS\*, ES\*, EdDSA — with PEM, X.509, JWK or JWK Set keys) and signs new ones, using `jose` over Web Crypto. The token and keys live in the vault under `base64/jwt:*`; entries from the old `jwt` plugin are moved there at startup (`migrateVaultMoves`).
 
 **OS / system impact:** none. Tokens you paste are never transmitted anywhere.
 

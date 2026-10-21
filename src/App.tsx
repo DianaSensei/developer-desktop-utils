@@ -814,6 +814,8 @@ function AppContent() {
             />
           ))}
           <Route path="/settings" element={<SettingsComponent />} />
+          {/* JWT Debugger is now a tab of Encode·Hash·Encrypt; keep old links working. */}
+          <Route path="/jwt" element={<Navigate to="/base64?tab=jwt" replace />} />
           {/* No match: go to the first enabled tool instead of a blank page
               (e.g. '/' belongs to a tool the user disabled). `replace` keeps
               the bad URL out of history. */}

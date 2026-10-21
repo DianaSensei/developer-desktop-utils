@@ -33,13 +33,39 @@ const DEFAULT_FEATURES: FeatureSettings = {
   settings: true,
 };
 
+/**
+ * Tools folded into another one: their id → the tool that now hosts them
+ * (JWT Debugger became the JWT tab of Encode·Hash·Encrypt). Someone who had
+ * the old tool on or starred keeps the host on or starred.
+ */
+const MERGED_INTO: Record<string, string> = { jwt: 'base64' };
+
+function migrateMergedFeatures(saved: FeatureSettings): FeatureSettings {
+  const next = { ...saved };
+  for (const [from, to] of Object.entries(MERGED_INTO)) {
+    if (!(from in next)) continue;
+    if (next[from]) next[to] = true;
+    delete next[from];
+  }
+  return next;
+}
+
+function migrateMergedIds(ids: string[]): string[] {
+  const out: string[] = [];
+  for (const id of ids) {
+    const mapped = MERGED_INTO[id] ?? id;
+    if (!out.includes(mapped)) out.push(mapped);
+  }
+  return out;
+}
+
 export function FeatureProvider({ children }: { children: ReactNode }) {
   const [features, setFeatures] = useState<FeatureSettings>(() => {
     try {
       const saved = storageGet('devtool-features');
       if (!saved) return DEFAULT_FEATURES;
       // New tools get their default; existing user choices are kept.
-      return { ...DEFAULT_FEATURES, ...JSON.parse(saved) };
+      return { ...DEFAULT_FEATURES, ...migrateMergedFeatures(JSON.parse(saved)) };
     } catch {
       return DEFAULT_FEATURES;
     }
@@ -48,14 +74,14 @@ export function FeatureProvider({ children }: { children: ReactNode }) {
   const [toolOrder, setToolOrder] = useState<string[]>(() => {
     try {
       const saved = storageGet(TOOL_ORDER_KEY);
-      return saved ? JSON.parse(saved) : [];
+      return saved ? migrateMergedIds(JSON.parse(saved)) : [];
     } catch { return []; }
   });
 
   const [favorites, setFavorites] = useState<string[]>(() => {
     try {
       const saved = storageGet(FAVORITES_KEY);
-      return saved ? JSON.parse(saved) : [];
+      return saved ? migrateMergedIds(JSON.parse(saved)) : [];
     } catch { return []; }
   });
 

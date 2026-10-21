@@ -28,6 +28,8 @@ export interface ClipboardIntent {
   kind: ClipboardIntentKind;
   /** TOOL_DEFS id of the tool to open. */
   toolId: string;
+  /** Query string to open the tool with, e.g. `?tab=jwt` for a tab inside it. */
+  search?: string;
   /** Translation key in lib/i18n.ts, not display text. */
   reasonKey: ClipboardReasonKey;
 }
@@ -119,7 +121,8 @@ export function detectClipboardIntent(rawText: string | null | undefined): Clipb
   const text = rawText.trim();
   if (!text || text.length > 8000) return null; // clipboard quá dài không phải thứ để đoán
 
-  if (isJwt(text)) return { kind: 'jwt', toolId: 'jwt', reasonKey: 'clipboard.reason.jwt' };
+  // JWT is a tab of Encode·Hash·Encrypt (it used to be its own tool).
+  if (isJwt(text)) return { kind: 'jwt', toolId: 'base64', search: '?tab=jwt', reasonKey: 'clipboard.reason.jwt' };
   if (isJson(text)) return { kind: 'json', toolId: 'json', reasonKey: 'clipboard.reason.json' };
   if (UUID_RE.test(text)) return { kind: 'uuid', toolId: 'generator', reasonKey: 'clipboard.reason.uuid' };
   if (isCron(text)) return { kind: 'cron', toolId: 'cron-generator', reasonKey: 'clipboard.reason.cron' };

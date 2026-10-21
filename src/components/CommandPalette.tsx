@@ -131,9 +131,9 @@ export function CommandPalette() {
   }, [selected]);
 
   const select = React.useCallback(
-    (tool: Tool) => {
+    (tool: Tool, search = '') => {
       if (!isFeatureEnabled(tool.featureId)) toggleFeature(tool.featureId);
-      navigate(tool.path);
+      navigate(tool.path + search);
       setOpen(false);
     },
     [isFeatureEnabled, toggleFeature, navigate],
@@ -141,7 +141,7 @@ export function CommandPalette() {
 
   const pick = (item: Item) => {
     if (item.kind === 'tool') {
-      select(item.tool);
+      select(item.tool, item.clipboard ? clipboardIntent?.search : undefined);
     } else if (item.kind === 'workspace') {
       switchWorkspace(item.ws.id);
       setOpen(false);

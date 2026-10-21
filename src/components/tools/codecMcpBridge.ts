@@ -24,7 +24,7 @@ import {
   ALGORITHMS, CODECS, ENCRYPT_ALGOS, HMAC_ALGORITHMS,
   computeHash, computeHmac, doDecrypt, doEncrypt,
   type AlgoId, type CryptoJsAlgo, type EncryptAlgo,
-} from './EncodeHashEncrypt';
+} from './encodeCore';
 import { decryptAesGcm, encryptAesGcm } from '@/lib/aesGcm';
 
 type ToolHandler = (args: Record<string, unknown>) => Promise<unknown>;

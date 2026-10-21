@@ -119,8 +119,9 @@ describe('CommandPalette — gợi ý clipboard', () => {
     renderPalette();
     fireEvent.keyDown(window, { key: 'k', ctrlKey: true });
 
-    await waitFor(() => expect(screen.getByText(/JWT/i)).toBeTruthy());
-    expect(screen.getByText(/dấu chấm|dots/i)).toBeTruthy();
+    // A JWT opens the JWT tab of Encode·Hash·Encrypt (no separate tool any more).
+    await waitFor(() => expect(screen.getByText(/dấu chấm|dots/i)).toBeTruthy());
+    expect(screen.getAllByText(/Encode·Hash·Encrypt/).length).toBeGreaterThan(0);
   });
 
   it('tắt "Gợi ý tool từ clipboard" thì không đọc clipboard', async () => {

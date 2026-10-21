@@ -116,8 +116,9 @@ export async function clearSecrets(): Promise<void> {
 const MIGRATIONS: ReadonlyArray<{ from: string; pluginId: string; key: string }> = [
   // TOTP/HOTP seeds: enough to generate the user's login codes.
   { from: 'devtool:2fa:accounts', pluginId: '2fa', key: 'accounts' },
-  // Tokens pasted into the JWT debugger are usually real bearer tokens.
-  { from: 'devtool:jwt:token', pluginId: 'jwt', key: 'token' },
+  // Tokens pasted into the JWT debugger are usually real bearer tokens. The
+  // debugger is now the JWT tab of `base64` (see VAULT_MOVES).
+  { from: 'devtool:jwt:token', pluginId: 'base64', key: 'jwt:token' },
   // The API Client vault exists to hold values kept out of environments.
   { from: 'devtool:apiclient:vault', pluginId: 'api-client', key: 'vault' },
   // HMAC and AES keys typed into Encode·Hash·Encrypt. The pre-namespace key
@@ -149,6 +150,36 @@ export async function migrateSecretsFromSharedStore(): Promise<string[]> {
     await secretSet(pluginId, key, raw);
     storageRemove(from);
     moved.push(from);
+  }
+  if (moved.length > 0) await flushSecrets();
+  return moved;
+}
+
+/**
+ * Vault entries whose owner changed: the JWT Debugger was its own `jwt`
+ * plugin and is now the JWT tab of `base64`, keeping its keys under `jwt:`.
+ */
+const VAULT_MOVES: ReadonlyArray<{ from: [string, string]; to: [string, string] }> = [
+  ...['token', 'hmac-secret', 'private-key', 'public-key'].map((k) => ({
+    from: ['jwt', k] as [string, string],
+    to: ['base64', `jwt:${k}`] as [string, string],
+  })),
+];
+
+/**
+ * Moves vault entries to their new owner at startup. The destination wins
+ * when both exist; the source is deleted after each copy, so re-running is a
+ * no-op. Desktop only, like the shared-store migration.
+ */
+export async function migrateVaultMoves(): Promise<string[]> {
+  if (!isTauri) return [];
+  const moved: string[] = [];
+  for (const { from, to } of VAULT_MOVES) {
+    const value = await secretGet(...from);
+    if (value === null) continue;
+    if ((await secretGet(...to)) === null) await secretSet(...to, value);
+    await secretDelete(...from);
+    moved.push(vaultKey(...from));
   }
   if (moved.length > 0) await flushSecrets();
   return moved;
