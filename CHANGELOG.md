@@ -6,6 +6,32 @@ the app.
 
 ## Unreleased
 
+### Encode · Hash · Encrypt: JWT tab, key generator, a real pipeline
+
+- **JWT Debugger is now the JWT tab** of Encode · Hash · Encrypt. Your token, keys and
+  settings move over on first launch; old `/jwt` links and the ⌘K suggestion for a
+  copied token open the tab. If you had JWT Debugger on or starred, Encode · Hash ·
+  Encrypt is now.
+- **Keys tab:** generate Ed25519, RSA 2048/3072/4096, EC P-256/384/521 and X25519 key
+  pairs, or HMAC / AES / random secrets. Copy them as PEM, JWK / JWK Set, OpenSSH
+  (`authorized_keys` line + private key + fingerprint) or WireGuard keys. Generated keys
+  are never saved.
+- **Pipeline:** every codec, hash, HMAC (hex / Base64 output, text / base64 / hex keys),
+  encrypt / decrypt, JWT and JWS decode / sign / verify (including detached payloads),
+  JSON path, regex and split extraction, regex replace and JSON pretty / minify.
+  Save pipelines as **templates** (keys stay in the encrypted vault, never in the
+  template or its export), or start from the built-in Apple Advanced Commerce,
+  App Store Server Notification and payment-HMAC examples.
+- **Apple signed payloads:** JWS verify can take the key from the token's `x5c` and
+  checks the whole chain up to the pinned Apple Root CA - G3 (Apple's marker OIDs,
+  validity at `signedDate`). Revocation is not checked.
+
+### Diff shows exactly what changed
+
+Long texts with a few edits no longer light up every line in between: the exact
+characters that differ are highlighted, and Text mode lists every change with its
+line:column on both sides — click one to select it in both panes.
+
 ### Workspaces: keep the tools you're working with one keystroke away
 
 The tools you open now become tabs in the titlebar, and those tabs survive restarting
