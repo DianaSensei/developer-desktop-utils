@@ -28,7 +28,7 @@ import {
 } from './pipelineEngine';
 import { SECRET_ENCODINGS, isAsymmetric, isHmac, type AlgorithmSpec, type JwtAlgorithm, type SecretEncoding } from './jwt/jwtCrypto';
 import type { EncryptAlgo } from './encodeCore';
-import { PipelineTemplates } from './PipelineTemplates';
+import { PipelineTemplateBar } from './PipelineTemplateBar';
 
 export { compareCodeUnits } from './pipelineEngine';
 
@@ -1252,7 +1252,7 @@ export function PipelineTab({ active }: { active: boolean }) {
   return (
     <div className="tool-scrollable tool-padding tool-spacer">
 
-      <PipelineTemplates steps={stepsWithKeys} onLoad={loadTemplate} makeId={makeId} />
+      <PipelineTemplateBar steps={stepsWithKeys} onLoad={loadTemplate} makeId={makeId} />
 
       {/* Empty state */}
       {steps.length === 0 && (
