@@ -238,6 +238,7 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
       'Checksum tab: drag a file in to compute MD5/SHA-1/256/512 with a progress bar, then verify against a known hash.',
       'Password tab: hash a password with bcrypt or Argon2 (id/i/d) and a fresh random salt, or Verify a password against an existing hash (algorithm auto-detected).',
       'Encrypt tab: AES-256 GCM by default — enter a passphrase and encrypt/decrypt. The AES-CBC/CTR/CFB/OFB, 3DES and Rabbit modes below it exist to exchange ciphertext with a crypto-js caller.',
+      'Keys tab: generate Ed25519, RSA 2048/3072/4096, EC P-256/384/521 and X25519 key pairs — as PEM (PKCS#8 / SPKI), JWK and a public JWK Set (kid = RFC 7638 thumbprint), OpenSSH (authorized_keys line + private key, SHA256 fingerprint) or WireGuard keys — and HMAC / AES / random secrets as base64, base64url, hex or an oct JWK.',
       'Pipeline tab: chain steps — Input (text / JSON fields), Encode/Decode (every codec), Hash / HMAC / Encrypt / Decrypt, JWT & JWS (decode, sign, verify), Extract (JSON path, regex, split) and Transform (case, trim, prepend/append, find & replace with regex, JSON pretty/minify). Each step shows its own output; the last is the final result. Save a pipeline as a template to reuse it, or start from an example (Apple Advanced Commerce / App Store notification JWS, payment HMAC).',
       'JWT tab (formerly the JWT Debugger tool) — Decode: paste a JWT (header.payload.signature) — header and payload show as formatted JSON instantly, with exp / nbf / iat rendered as real times and flagged when expired.',
       <>Verify: pick the algorithm you <strong className="text-fg">expect</strong>, paste the key (shared secret for <Tok>HS*</Tok>; PEM public key, X.509 certificate, JWK or a whole JWK Set for the rest), and optionally require an issuer / audience.</>,
@@ -245,6 +246,7 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
       <>Algorithms: <Tok>HS256/384/512</Tok>, <Tok>RS256/384/512</Tok>, <Tok>PS256/384/512</Tok>, <Tok>ES256/384/512</Tok>, <Tok>EdDSA</Tok>, and unsigned <Tok>none</Tok>.</>,
     ],
     know: [
+      'Generated keys are never saved: they exist only while the Keys tab is open. OpenSSH private keys have no passphrase — add one with ssh-keygen -p -f <file>.',
       'Hashes are one-way; most codecs are reversible. Everything runs locally — files and text are never uploaded.',
       'Files are checksummed in chunks (in Rust on desktop, a Web Worker on the web), so the UI stays responsive.',
       'Password hashing uses hash-wasm (WASM bundled inline → offline) and runs on a button since it’s intentionally slow.',

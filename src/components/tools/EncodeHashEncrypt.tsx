@@ -5,9 +5,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Eye, EyeOff, Lock, ArrowLeftRight, Check, X, KeyRound, Code, AlertTriangle, ShieldCheck, Workflow, FileCheck, ImageIcon, Fingerprint } from 'lucide-react';
+import { Eye, EyeOff, Lock, ArrowLeftRight, Check, X, KeyRound, KeySquare, Code, AlertTriangle, ShieldCheck, Workflow, FileCheck, ImageIcon, Fingerprint } from 'lucide-react';
 import { PipelineTab } from './PipelineTab';
 import { JwtDebugger } from './jwt/JwtDebugger';
+import { KeyGenerator } from './keygen/KeyGenerator';
 import { ChecksumTool } from './ChecksumTool';
 import { ImageBase64Tool } from './ImageBase64Tool';
 import { PasswordHash } from './PasswordHash';
@@ -34,8 +35,8 @@ import {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type Tab = 'encode' | 'image' | 'hash' | 'jwt' | 'checksum' | 'password' | 'encrypt' | 'pipeline';
-const TABS: readonly Tab[] = ['encode', 'image', 'hash', 'jwt', 'checksum', 'password', 'encrypt', 'pipeline'];
+type Tab = 'encode' | 'image' | 'hash' | 'jwt' | 'keys' | 'checksum' | 'password' | 'encrypt' | 'pipeline';
+const TABS: readonly Tab[] = ['encode', 'image', 'hash', 'jwt', 'keys', 'checksum', 'password', 'encrypt', 'pipeline'];
 type EncodeMode = 'encode' | 'decode';
 type CryptoMode = 'encrypt' | 'decrypt';
 
@@ -238,6 +239,7 @@ export function EncodeHashEncrypt() {
             { value: 'image', label: m('tab.image'), icon: ImageIcon },
             { value: 'hash', label: m('tab.hash'), icon: Lock },
             { value: 'jwt', label: m('tab.jwt'), icon: KeyRound },
+            { value: 'keys', label: m('tab.keys'), icon: KeySquare },
             { value: 'checksum', label: m('tab.checksum'), icon: FileCheck },
             { value: 'password', label: m('tab.password'), icon: Fingerprint },
             { value: 'encrypt', label: m('tab.encrypt'), icon: ArrowLeftRight },
@@ -458,6 +460,9 @@ export function EncodeHashEncrypt() {
           <JwtDebugger />
         </div>
       )}
+
+      {/* ── Keys tab (key / secret generator) ───────────────────────────────── */}
+      {tab === 'keys' && <KeyGenerator />}
 
       {/* ── Checksum (file hash) tab ─────────────────────────────────────────── */}
       {tab === 'checksum' && (
