@@ -61,15 +61,27 @@ jobs:
       # notices are reported as warnings and do not block (`--deny warnings`
       # would, and those crates come from tauri/lapin/glib — not ours to fix).
       #
-      # No `--ignore` entries: the tree is clean of vulnerabilities. The two
-      # quick-xml denial-of-service advisories (RUSTSEC-2026-0194/0195) that
-      # used to be ignored here are fixed — `plist` 1.10 adopted quick-xml
-      # 0.41, so the lockfile carries the fixed version. Keep this list empty;
-      # if a new advisory has no reachable fix, add it back with a comment
-      # saying why it is not exploitable here.
+      # Ignored advisories — each with why it is not exploitable here.
+      # Remove an entry as soon as a compatible fix reaches Cargo.lock.
+      #
+      # RUSTSEC-2026-0367 / 0368 / 0369 — `zip` 4.x: extraction honours
+      # SUID/SGID bits, symlink targets and permissions through symlinks
+      # outside the destination. No fix in zip 4.x (fixed in 9.0), and `zip`
+      # reaches us only through tauri-plugin-updater 2.x, which pins `^4`
+      # (still so in 2.14.0; only 3.0 alphas move on). Its one use is
+      # `extract_zip`, Windows-only, on an update package that `Update::verify`
+      # has already checked against the minisign public key pinned in
+      # tauri.conf.json — so an attacker-chosen archive needs our release
+      # signing key, at which point they can ship any binary anyway. The
+      # SUID/SGID and Unix-permission advisories do not apply on Windows.
+      # Drop these three once a 2.x updater depends on zip >= 9.
       - name: Audit Cargo.lock
         working-directory: src-tauri
-        run: cargo audit
+        run: >-
+          cargo audit
+          --ignore RUSTSEC-2026-0367
+          --ignore RUSTSEC-2026-0368
+          --ignore RUSTSEC-2026-0369
 
   # NOTE: CodeQL is not run from this workflow — see .github/workflows/codeql.yml
   # (Advanced Setup, replacing the old GitHub-managed "default setup": cached

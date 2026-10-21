@@ -2,21 +2,99 @@
 //
 // A throwaway P-256 chain shaped like Apple's (root → "WWDR" intermediate →
 // "App Store signing" leaf, with Apple's marker OIDs on the intermediate and
-// leaf), made with openssl for these tests. It is NOT Apple's: tests use it
-// with a custom trusted root, and to show the Apple root rejects it.
+// leaf). It is generated when the tests run, so no private key is ever
+// committed — and it is NOT Apple's: tests use it with a custom trusted
+// root, and to show the Apple root rejects it.
 
-export const TEST_ROOT = 'MIIBlTCCATugAwIBAgIUBiBm7K3AVGz4m8NwtIfmnqxt0bIwCgYIKoZIzj0EAwIwFzEVMBMGA1UEAwwMVGVzdCBSb290IENBMCAXDTI2MTAyMDEyNDkzOFoYDzIxMjYwOTI2MTI0OTM4WjAXMRUwEwYDVQQDDAxUZXN0IFJvb3QgQ0EwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAASGyyIsOLi27UjaoECUjfsEhZuL6oTqPWeC4VGxElup31losFQdI9CDCLHQ+cz+gv1Zr3qHgWPMkB1sdsTV5e31o2MwYTAdBgNVHQ4EFgQUlxow+V+HWMExcp5jACTe12ljrNUwHwYDVR0jBBgwFoAUlxow+V+HWMExcp5jACTe12ljrNUwDwYDVR0TAQH/BAUwAwEB/zAOBgNVHQ8BAf8EBAMCAQYwCgYIKoZIzj0EAwIDSAAwRQIgTTOrA3NlT2g4Ddfn6ViCdlZXCaUcKulred6y089/h80CIQD2ZJujYNtd/0RScEWABcDSXIYxFBlhnLj91/t4ZrRvew==';
-export const TEST_INTERMEDIATE = 'MIIBqDCCAU2gAwIBAgIULIgFjy/9eyaP5Qa0tD3FCJwb7rQwCgYIKoZIzj0EAwIwFzEVMBMGA1UEAwwMVGVzdCBSb290IENBMCAXDTI2MTAyMDEyNDkzOFoYDzIxMjYwOTI2MTI0OTM4WjAUMRIwEAYDVQQDDAlUZXN0IFdXRFIwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAATOhfHKZXI/nleMZWIaE1ohpbYsfwk+8bug8ETwj2ZzK5CHXIGzHAfKzCsG3Q5OYVpTmtP1xHFYuEryQsdFfu8io3gwdjASBgNVHRMBAf8ECDAGAQH/AgEAMA4GA1UdDwEB/wQEAwIBBjAQBgoqhkiG92NkBgIBBAIFADAdBgNVHQ4EFgQU3iroHrECqYuBjBUOSwrsbxFhJJQwHwYDVR0jBBgwFoAUlxow+V+HWMExcp5jACTe12ljrNUwCgYIKoZIzj0EAwIDSQAwRgIhAM7FnRG/YwmmBCYwhhSWFWDlug+FtuoH/NjggznYEVUbAiEAifqdbX5LfyrW/YAqz70YROn1n2vaIpA0+L6wSQaFOAo=';
-export const TEST_LEAF = 'MIIBrDCCAVGgAwIBAgIUQMEwA/R65P53NGpXForMeFfrL4wwCgYIKoZIzj0EAwIwFDESMBAGA1UEAwwJVGVzdCBXV0RSMCAXDTI2MTAyMDEyNDkzOFoYDzIxMjYwOTI2MTI0OTM4WjAhMR8wHQYDVQQDDBZUZXN0IEFwcCBTdG9yZSBTaWduaW5nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAElprdJnuwZTOcAa/Scjj0h4fsCQ04S0CrXfGwSAOVrqr9Tas/Xm/F8taMLgZNuXGCCeYw8/V2cnORTVrC0GU+YqNyMHAwDAYDVR0TAQH/BAIwADAOBgNVHQ8BAf8EBAMCB4AwEAYKKoZIhvdjZAYLAQQCBQAwHQYDVR0OBBYEFP2N0XHxS3fRpDR/vgy4sd9blP5dMB8GA1UdIwQYMBaAFN4q6B6xAqmLgYwVDksK7G8RYSSUMAoGCCqGSM49BAMCA0kAMEYCIQCRQsSd3u66JCVFoGhtksVeFwphMAJu41ss0Snvjfl3twIhAMCF0CEXzD699299CpiXCUg48R6FAZyRnRNWPEGcedz8';
-/** Same key and issuer as TEST_LEAF, without Apple's leaf OID. */
-export const TEST_LEAF_NO_OID = 'MIIBmTCCAT+gAwIBAgIUQMEwA/R65P53NGpXForMeFfrL40wCgYIKoZIzj0EAwIwFDESMBAGA1UEAwwJVGVzdCBXV0RSMCAXDTI2MTAyMDEyNDkzOFoYDzIxMjYwOTI2MTI0OTM4WjAhMR8wHQYDVQQDDBZUZXN0IEFwcCBTdG9yZSBTaWduaW5nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAElprdJnuwZTOcAa/Scjj0h4fsCQ04S0CrXfGwSAOVrqr9Tas/Xm/F8taMLgZNuXGCCeYw8/V2cnORTVrC0GU+YqNgMF4wDAYDVR0TAQH/BAIwADAOBgNVHQ8BAf8EBAMCB4AwHQYDVR0OBBYEFP2N0XHxS3fRpDR/vgy4sd9blP5dMB8GA1UdIwQYMBaAFN4q6B6xAqmLgYwVDksK7G8RYSSUMAoGCCqGSM49BAMCA0gAMEUCIB7kjCqQiVv6Yzp3PWUEIXbYrcQEN337Kl8l2thlr2QbAiEA/jCKYxbLOwlSyxfpaWPUAk9iQZP8xJLjkXB4tuKcKIs=';
-/** Issued by TEST_LEAF, which is not a CA. */
-export const TEST_SIGNED_BY_LEAF = 'MIIBnjCCAUSgAwIBAgIUF2rrvQfH4QajT5o+qod4I6ot4DcwCgYIKoZIzj0EAwIwITEfMB0GA1UEAwwWVGVzdCBBcHAgU3RvcmUgU2lnbmluZzAgFw0yNjEwMjAxMjUwMzFaGA8yMTI2MDkyNjEyNTAzMVowGTEXMBUGA1UEAwwOU2lnbmVkIEJ5IExlYWYwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAAS9f4TuniKShY+Ikq0/8iDPtd81BnT0u6q3cTIIjGgpjEdDuxFSAGktL2lrY3d5HCxNtEMvS3uv5Hm+G1WuAUvmo2AwXjAMBgNVHRMBAf8EAjAAMA4GA1UdDwEB/wQEAwIHgDAdBgNVHQ4EFgQUT6DoZmvHfIiE3b/4tn09Q/vxfNAwHwYDVR0jBBgwFoAU/Y3RcfFLd9GkNH++DLix31uU/l0wCgYIKoZIzj0EAwIDSAAwRQIgY68GYsjNMmeH3Qb1HpUy+pdhqVp5Me4Wxatt+JY6LtECIQDu7nl9CsUhMVkEGILYCXbRaEXAqSmHjHwHa6Dwkpmrvg==';
-export const TEST_LEAF_KEY = `-----BEGIN PRIVATE KEY-----
-MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgyyweJCqAs6GMTx/D
-pyVwJpfWiZc3itcwYrLBddhCebqhRANCAASWmt0me7BlM5wBr9JyOPSHh+wJDThL
-QKtd8bBIA5Wuqv1Nqz9eb8Xy1owuBk25cYIJ5jDz9XZyc5FNWsLQZT5i
------END PRIVATE KEY-----`;
+import 'reflect-metadata';
+import {
+  BasicConstraintsExtension, Extension, KeyUsageFlags, KeyUsagesExtension,
+  X509CertificateGenerator, type X509Certificate,
+} from '@peculiar/x509';
 
-/** Apple Worldwide Developer Relations CA - G6, the real intermediate under Apple Root CA - G3. */
+const APPLE_LEAF_OID = '1.2.840.113635.100.6.11.1';
+const APPLE_INTERMEDIATE_OID = '1.2.840.113635.100.6.2.1';
+/** DER of ASN.1 NULL, the value Apple's marker extensions carry. */
+const ASN1_NULL = new Uint8Array([0x05, 0x00]);
+
+const ALG = { name: 'ECDSA', namedCurve: 'P-256', hash: 'SHA-256' } as const;
+const DAY = 86_400_000;
+
+export interface TestChain {
+  root: string;
+  intermediate: string;
+  leaf: string;
+  /** Same issuer as `leaf`, without Apple's leaf OID. */
+  leafNoOid: string;
+  /** Issued by `leaf`, which is not a CA. */
+  signedByLeaf: string;
+  /** Private key of `leaf` (and `leafNoOid`), to sign test JWS with. */
+  leafKey: CryptoKey;
+}
+
+const b64 = (cert: X509Certificate) => cert.toString('base64');
+
+let cached: Promise<TestChain> | undefined;
+
+/** The chain, generated once per test file. */
+export function testChain(): Promise<TestChain> {
+  cached ??= build();
+  return cached;
+}
+
+async function build(): Promise<TestChain> {
+  const keys = () => crypto.subtle.generateKey(ALG, true, ['sign', 'verify']) as Promise<CryptoKeyPair>;
+  const [rootKeys, interKeys, leafKeys, childKeys] = await Promise.all([keys(), keys(), keys(), keys()]);
+  const notBefore = new Date(Date.now() - DAY);
+  const notAfter = new Date(Date.now() + 3650 * DAY);
+  let serial = 1;
+
+  const issue = (opts: {
+    subject: string; issuer: X509Certificate | null; keys: CryptoKeyPair; signer: CryptoKeyPair;
+    ca: boolean; oid?: string;
+  }) => X509CertificateGenerator.create({
+    serialNumber: String(serial++).padStart(2, '0'),
+    subject: opts.subject,
+    issuer: opts.issuer?.subject ?? opts.subject,
+    notBefore,
+    notAfter,
+    signingAlgorithm: ALG,
+    publicKey: opts.keys.publicKey,
+    signingKey: opts.signer.privateKey,
+    extensions: [
+      new BasicConstraintsExtension(opts.ca, opts.ca ? 0 : undefined, true),
+      new KeyUsagesExtension(opts.ca ? KeyUsageFlags.keyCertSign | KeyUsageFlags.cRLSign : KeyUsageFlags.digitalSignature, true),
+      ...(opts.oid ? [new Extension(opts.oid, false, ASN1_NULL)] : []),
+    ],
+  });
+
+  const root = await X509CertificateGenerator.createSelfSigned({
+    serialNumber: '01',
+    name: 'CN=Test Root CA',
+    notBefore,
+    notAfter,
+    signingAlgorithm: ALG,
+    keys: rootKeys,
+    extensions: [
+      new BasicConstraintsExtension(true, undefined, true),
+      new KeyUsagesExtension(KeyUsageFlags.keyCertSign | KeyUsageFlags.cRLSign, true),
+    ],
+  });
+  serial = 2;
+  const inter = await issue({ subject: 'CN=Test WWDR', issuer: root, keys: interKeys, signer: rootKeys, ca: true, oid: APPLE_INTERMEDIATE_OID });
+  const leaf = await issue({ subject: 'CN=Test App Store Signing', issuer: inter, keys: leafKeys, signer: interKeys, ca: false, oid: APPLE_LEAF_OID });
+  const leafNoOid = await issue({ subject: 'CN=Test App Store Signing', issuer: inter, keys: leafKeys, signer: interKeys, ca: false });
+  const signedByLeaf = await issue({ subject: 'CN=Signed By Leaf', issuer: leaf, keys: childKeys, signer: leafKeys, ca: false });
+
+  return {
+    root: b64(root),
+    intermediate: b64(inter),
+    leaf: b64(leaf),
+    leafNoOid: b64(leafNoOid),
+    signedByLeaf: b64(signedByLeaf),
+    leafKey: leafKeys.privateKey,
+  };
+}
+
+/** Apple Worldwide Developer Relations CA - G6, the real intermediate under Apple Root CA - G3 (public certificate). */
 export const APPLE_WWDR_G6 = 'MIIDFjCCApygAwIBAgIUIsGhRwp0c2nvU4YSycafPTjzbNcwCgYIKoZIzj0EAwMwZzEbMBkGA1UEAwwSQXBwbGUgUm9vdCBDQSAtIEczMSYwJAYDVQQLDB1BcHBsZSBDZXJ0aWZpY2F0aW9uIEF1dGhvcml0eTETMBEGA1UECgwKQXBwbGUgSW5jLjELMAkGA1UEBhMCVVMwHhcNMjEwMzE3MjAzNzEwWhcNMzYwMzE5MDAwMDAwWjB1MUQwQgYDVQQDDDtBcHBsZSBXb3JsZHdpZGUgRGV2ZWxvcGVyIFJlbGF0aW9ucyBDZXJ0aWZpY2F0aW9uIEF1dGhvcml0eTELMAkGA1UECwwCRzYxEzARBgNVBAoMCkFwcGxlIEluYy4xCzAJBgNVBAYTAlVTMHYwEAYHKoZIzj0CAQYFK4EEACIDYgAEbsQKC94PrlWmZXnXgtxzdVJL8T0SGYngDRGpngn3N6PT8JMEb7FDi4bBmPhCnZ3/sq6PF/cGcKXWsL5vOteRhyJ45x3ASP7cOB+aao90fcpxSv/EZFbniAbNgZGhIhpIo4H6MIH3MBIGA1UdEwEB/wQIMAYBAf8CAQAwHwYDVR0jBBgwFoAUu7DeoVgziJqkipnevr3rr9rLJKswRgYIKwYBBQUHAQEEOjA4MDYGCCsGAQUFBzABhipodHRwOi8vb2NzcC5hcHBsZS5jb20vb2NzcDAzLWFwcGxlcm9vdGNhZzMwNwYDVR0fBDAwLjAsoCqgKIYmaHR0cDovL2NybC5hcHBsZS5jb20vYXBwbGVyb290Y2FnMy5jcmwwHQYDVR0OBBYEFD8vlCNR01DJmig97bB85c+lkGKZMA4GA1UdDwEB/wQEAwIBBjAQBgoqhkiG92NkBgIBBAIFADAKBggqhkjOPQQDAwNoADBlAjBAXhSq5IyKogMCPtw490BaB677CaEGJXufQB/EqZGd6CSjiCtOnuMTbXVXmxxcxfkCMQDTSPxarZXvNrkxU3TkUMI33yzvFVVRT4wxWJC994OsdcZ4+RGNsYDyR5gmdr0nDGg=';
