@@ -369,16 +369,20 @@ export function ApiClient() {
     if (store.activeCollectionEnv) for (const v of store.activeCollectionEnv.variables) if (v.enabled && v.key) map[v.key] = v.secret ? '••••••••' : v.value;
   };
 
-  // Merged variable map (collection var + envs) for code generation.
-  // Secret-flagged environment variables are masked here too — a generated
-  // snippet is exactly the kind of thing that gets pasted into a chat or a
-  // doc, so it must not carry the real value any more than the Vault's
-  // entries do.
-  const codeVars = useCallback((): VarMap => {
-    const vars: VarMap = { ...store.activeCollectionVars };
-    foldEnvs(vars);
+  // Variable map for code generation — the same one handleSend's
+  // executeRequest call substitutes from (vault < collection var < global env
+  // < collection env), so the snippet is the request Send transmits. Secrets
+  // — Vault entries and secret-flagged environment variables — only go in
+  // when `reveal` is set: a generated snippet is exactly the kind of thing
+  // that gets pasted into a chat or a doc, so the dialog masks them unless
+  // the user asks for a runnable command.
+  const codeVars = useCallback((reveal: boolean): VarMap => {
+    const vars: VarMap = { ...(reveal ? store.vaultVars : {}), ...store.activeCollectionVars };
+    for (const env of [store.activeGlobalEnv, store.activeCollectionEnv]) {
+      if (env) for (const v of env.variables) if (v.enabled && v.key) vars[v.key] = v.secret && !reveal ? '••••••••' : v.value;
+    }
     return vars;
-  }, [store.activeCollectionEnv, store.activeGlobalEnv, store.activeCollectionVars]);
+  }, [store.activeCollectionEnv, store.activeGlobalEnv, store.activeCollectionVars, store.vaultVars]);
 
   // Known variables (name → current value) for {{ }} highlighting, autocomplete,
   // and hover-value tooltips in inputs.
@@ -535,8 +539,9 @@ export function ApiClient() {
         open={codeOpen}
         onClose={() => setCodeOpen(false)}
         request={activeRequest}
-        vars={codeOpen ? codeVars() : {}}
-        inheritedHeaders={activeRequest ? store.getInherited(activeRequest.id).headers : []}
+        getVars={codeVars}
+        inherited={store.inheritedScripts}
+        cookieJar={store.cookiesEnabled ? store.cookies : []}
       />
       {runTarget && (
         <RunnerDialog

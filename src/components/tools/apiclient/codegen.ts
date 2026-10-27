@@ -2,7 +2,7 @@
 // Bruno's "Generate Code" dialog. Each language exposes one or more variants.
 
 import type { ApiRequest, KeyValue, VarMap } from './types';
-import { resolveRequest, shellQuote, type ResolvedRequest } from './request';
+import { resolveRequest, shellQuote, type ResolveContext, type ResolvedRequest } from './request';
 
 export interface CodeTarget {
   lang: string;
@@ -18,9 +18,9 @@ export const CODE_TARGETS: CodeTarget[] = [
 
 export function generateCode(
   request: ApiRequest, vars: VarMap, lang: string, variant: string, interpolate: boolean,
-  inheritedHeaders: KeyValue[][] = [],
+  inheritedHeaders: KeyValue[][] = [], context: ResolveContext = {},
 ): string {
-  const r = resolveRequest(request, vars, interpolate, inheritedHeaders);
+  const r = resolveRequest(request, vars, interpolate, inheritedHeaders, context);
   switch (`${lang}/${variant}`) {
     case 'Shell/curl': return curl(r);
     case 'Shell/httpie': return httpie(r);

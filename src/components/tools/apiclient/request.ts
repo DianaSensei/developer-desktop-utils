@@ -8,7 +8,7 @@
 // user clicks Send.
 
 import { getPluginSdk, type PluginFetchInit } from '@/platform';
-import type { ApiRequest, ApiResponse, KeyValue, OAuth2Auth, VarMap } from './types';
+import type { ApiRequest, ApiResponse, Auth, KeyValue, OAuth2Auth, VarMap } from './types';
 import { newKeyValue } from './types';
 import { substituteVars } from './vars';
 import { buildDigestHeader, parseDigestChallenge } from './digest';
@@ -497,9 +497,20 @@ function resolveBody(req: ApiRequest, sub: Sub): ResolvedBody {
 
 // Resolve a request into the concrete method/url/headers/body used to render a
 // code snippet. `interpolate` toggles {{var}} substitution (Bruno's checkbox).
+//
+// `context` carries what Send adds on top of the request itself, so the
+// snippet runs the same way: the collection/folder auth an `inherit` request
+// falls back to (engine.ts), and the jar cookies sendRequest attaches.
+export interface ResolveContext {
+  inheritedAuth?: Auth | null;
+  cookieJar?: Cookie[];
+}
+
 export function resolveRequest(
   req: ApiRequest, vars: VarMap, interpolate: boolean, inheritedHeaders: KeyValue[][] = [],
+  context: ResolveContext = {},
 ): ResolvedRequest {
+  if (req.auth.type === 'inherit') req = { ...req, auth: context.inheritedAuth ?? { ...req.auth, type: 'none' } };
   const sub: Sub = interpolate ? (s) => substituteVars(s, vars) : (s) => s;
   const url = buildUrl(req, sub) || sub(req.url);
   const finalUrl = url && !/^https?:\/\//i.test(url) ? `http://${url}` : url;
@@ -508,6 +519,10 @@ export function resolveRequest(
   if (!headers.some(([k]) => k.toLowerCase() === 'content-type')) {
     const ct = DISPLAY_CONTENT_TYPE[req.body.mode] ?? (req.body.mode === 'file' ? req.body.fileType : null);
     if (ct) headers.push(['Content-Type', ct]);
+  }
+  if (context.cookieJar?.length && finalUrl && !headers.some(([k]) => k.toLowerCase() === 'cookie')) {
+    const cookie = cookieHeader(context.cookieJar, finalUrl);
+    if (cookie) headers.push(['Cookie', cookie]);
   }
   return { method: req.method, url: finalUrl, headers, body: resolveBody(req, sub) };
 }

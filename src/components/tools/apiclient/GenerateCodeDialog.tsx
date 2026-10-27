@@ -1,5 +1,7 @@
 // "Generate Code" modal (Bruno-style): pick a language + variant, optionally
-// interpolate {{vars}}, preview the snippet, and copy it.
+// interpolate {{vars}}, preview the snippet, and copy it. With interpolation
+// on, the snippet is the request Send would transmit — inherited auth and
+// headers, jar cookies, the active environments — so it runs as-is.
 
 import { useMemo, useState } from 'react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
@@ -10,7 +12,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { CodeViewer } from '@/design-system';
 import { CODE_TARGETS, generateCode } from './codegen';
-import type { ApiRequest, KeyValue, VarMap } from './types';
+import type { Cookie } from './cookies';
+import type { InheritedScripts } from './store';
+import type { ApiRequest, VarMap } from './types';
 // Imported as `tr` because this file uses `t` as a loop variable.
 import { t as tr } from './i18n';
 
@@ -18,24 +22,35 @@ interface Props {
   open: boolean;
   onClose: () => void;
   request: ApiRequest | null;
-  vars: VarMap;
-  // Collection/folder headers that apply ahead of the request's own (see
-  // request.ts's buildHeaders) — included so the generated snippet matches
-  // what Send actually transmits.
-  inheritedHeaders?: KeyValue[][];
+  // Variables for `request`; `reveal` includes Vault and secret-flagged
+  // values instead of masking them (see ApiClient.tsx's codeVars).
+  getVars: (reveal: boolean) => VarMap;
+  // Collection/folder auth and headers that apply ahead of the request's own
+  // (see request.ts's buildHeaders) — included so the generated snippet
+  // matches what Send actually transmits.
+  inherited: InheritedScripts | null;
+  cookieJar?: Cookie[];
 }
 
-export function GenerateCodeDialog({ open, onClose, request, vars, inheritedHeaders = [] }: Props) {
+export function GenerateCodeDialog({ open, onClose, request, getVars, inherited, cookieJar = [] }: Props) {
   const [lang, setLang] = useState('Shell');
   const [variant, setVariant] = useState('curl');
   const [interpolate, setInterpolate] = useState(true);
+  const [reveal, setReveal] = useState(false);
 
   const target = CODE_TARGETS.find((t) => t.lang === lang) ?? CODE_TARGETS[0];
 
-  const code = useMemo(
-    () => (request ? generateCode(request, vars, lang, variant, interpolate, inheritedHeaders) : ''),
-    [request, vars, lang, variant, interpolate, inheritedHeaders],
-  );
+  // Both renderings, so the secrets switch only shows when it would change
+  // anything — most requests use no secret at all.
+  const { masked, revealed } = useMemo(() => {
+    if (!open || !request) return { masked: '', revealed: '' };
+    const context = { inheritedAuth: inherited?.auth ?? null, cookieJar };
+    const render = (r: boolean) =>
+      generateCode(request, getVars(r), lang, variant, interpolate, inherited?.headers ?? [], context);
+    return { masked: render(false), revealed: render(true) };
+  }, [open, request, getVars, lang, variant, interpolate, inherited, cookieJar]);
+  const usesSecrets = masked !== revealed;
+  const code = reveal && usesSecrets ? revealed : masked;
 
   const pickLang = (l: string) => {
     setLang(l);
@@ -86,6 +101,12 @@ export function GenerateCodeDialog({ open, onClose, request, vars, inheritedHead
             {tr('code.interpolate')}
             <Switch checked={interpolate} onCheckedChange={setInterpolate} aria-label={tr('code.interpolate')} />
           </Label>
+          {usesSecrets && (
+            <Label className="flex cursor-pointer items-center gap-2 text-xs" title={tr('code.revealSecretsHint')}>
+              {tr('code.revealSecrets')}
+              <Switch checked={reveal} onCheckedChange={setReveal} aria-label={tr('code.revealSecrets')} />
+            </Label>
+          )}
         </div>
 
         {/* Code preview. The height floor lives on the dialog: `scrollable` gives
