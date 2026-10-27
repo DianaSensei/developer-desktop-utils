@@ -8,7 +8,7 @@
 // user clicks Send.
 
 import { getPluginSdk, type PluginFetchInit } from '@/platform';
-import type { ApiRequest, ApiResponse, Auth, KeyValue, OAuth2Auth, VarMap } from './types';
+import type { ApiRequest, ApiResponse, KeyValue, OAuth2Auth, VarMap } from './types';
 import { newKeyValue } from './types';
 import { substituteVars } from './vars';
 import { buildDigestHeader, parseDigestChallenge } from './digest';
@@ -224,6 +224,15 @@ export function clearOAuthTokenCache(): void {
   tokenCache.clear();
 }
 
+const oauthCacheKey = (o: OAuth2Auth, sub: Sub): string =>
+  JSON.stringify([sub(o.tokenUrl).trim(), o.grantType, sub(o.clientId), sub(o.clientSecret), sub(o.scope), sub(o.username)]);
+
+// The still-valid cached token for these grant parameters, without fetching.
+export function cachedOAuthToken(o: OAuth2Auth, sub: Sub): string | null {
+  const hit = tokenCache.get(oauthCacheKey(o, sub));
+  return hit && hit.expiresAt > Date.now() ? hit.token : null;
+}
+
 // Fetch an OAuth2 access token (client-credentials or password grant).
 async function fetchOAuthToken(o: OAuth2Auth, sub: Sub, signal?: AbortSignal, verifyTls = true): Promise<string> {
   const url = sub(o.tokenUrl).trim();
@@ -233,9 +242,9 @@ async function fetchOAuthToken(o: OAuth2Auth, sub: Sub, signal?: AbortSignal, ve
   const clientSecret = sub(o.clientSecret);
   const scope = sub(o.scope);
   const username = sub(o.username);
-  const cacheKey = JSON.stringify([url, o.grantType, clientId, clientSecret, scope, username]);
-  const hit = tokenCache.get(cacheKey);
-  if (hit && hit.expiresAt > Date.now()) return hit.token;
+  const cacheKey = oauthCacheKey(o, sub);
+  const hit = cachedOAuthToken(o, sub);
+  if (hit) return hit;
 
   const form = new URLSearchParams();
   form.set('grant_type', o.grantType);
@@ -498,11 +507,12 @@ function resolveBody(req: ApiRequest, sub: Sub): ResolvedBody {
 // Resolve a request into the concrete method/url/headers/body used to render a
 // code snippet. `interpolate` toggles {{var}} substitution (Bruno's checkbox).
 //
-// `context` carries what Send adds on top of the request itself, so the
-// snippet runs the same way: the collection/folder auth an `inherit` request
-// falls back to (engine.ts), and the jar cookies sendRequest attaches.
+// Takes a request from engine.ts's prepareRequest (auth resolved, pre-request
+// scripts applied) — the same input sendRequest gets — and builds it with the
+// same buildUrl/buildHeaders. `context` carries what sendRequest adds at the
+// transport step: jar cookies, and an OAuth2 token if one is cached (fetching
+// one is a network call, which only Send makes).
 export interface ResolveContext {
-  inheritedAuth?: Auth | null;
   cookieJar?: Cookie[];
 }
 
@@ -510,12 +520,15 @@ export function resolveRequest(
   req: ApiRequest, vars: VarMap, interpolate: boolean, inheritedHeaders: KeyValue[][] = [],
   context: ResolveContext = {},
 ): ResolvedRequest {
-  if (req.auth.type === 'inherit') req = { ...req, auth: context.inheritedAuth ?? { ...req.auth, type: 'none' } };
   const sub: Sub = interpolate ? (s) => substituteVars(s, vars) : (s) => s;
   const url = buildUrl(req, sub) || sub(req.url);
   const finalUrl = url && !/^https?:\/\//i.test(url) ? `http://${url}` : url;
 
   const headers: [string, string][] = Object.entries(buildHeaders(req, sub, inheritedHeaders));
+  if (req.auth.type === 'oauth2') {
+    const token = cachedOAuthToken(req.auth.oauth2, sub);
+    if (token) headers.push(['Authorization', `Bearer ${token}`]);
+  }
   if (!headers.some(([k]) => k.toLowerCase() === 'content-type')) {
     const ct = DISPLAY_CONTENT_TYPE[req.body.mode] ?? (req.body.mode === 'file' ? req.body.fileType : null);
     if (ct) headers.push(['Content-Type', ct]);

@@ -1,54 +1,81 @@
 // "Generate Code" modal (Bruno-style): pick a language + variant, optionally
-// interpolate {{vars}}, preview the snippet, and copy it. With interpolation
-// on, the snippet is the request Send would transmit — inherited auth and
-// headers, jar cookies, the active environments — so it runs as-is.
+// interpolate {{vars}}, preview the snippet, and copy it. The snippet is built
+// from the same prepared request Send builds from (engine.ts's
+// prepareRequest: inherited auth, pre-request scripts, merged variables), plus
+// the jar cookies Send attaches — so with interpolation on it runs as-is.
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { CopyButton } from '@/components/ui/copy-button';
 import { Label } from '@/components/ui/label';
 import { Segmented } from '@/components/ui/segmented';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Spinner } from '@/components/ui/spinner';
 import { Switch } from '@/components/ui/switch';
 import { CodeViewer } from '@/design-system';
 import { CODE_TARGETS, generateCode } from './codegen';
 import type { Cookie } from './cookies';
-import type { InheritedScripts } from './store';
-import type { ApiRequest, VarMap } from './types';
+import { errToString, type PreparedRequest } from './engine';
+import { redactText } from './store';
+import type { VarMap } from './types';
 // Imported as `tr` because this file uses `t` as a loop variable.
 import { t as tr } from './i18n';
+
+const MASK = '••••••••';
+
+// What must not appear in a snippet unless the user asks for it: the variable
+// names whose values are secret (`vault.<key>`, secret-flagged environment
+// variables) and those values themselves, for when a script copied one into
+// another variable or a header.
+export interface CodeSecrets {
+  keys: string[];
+  values: string[];
+}
 
 interface Props {
   open: boolean;
   onClose: () => void;
-  request: ApiRequest | null;
-  // Variables for `request`; `reveal` includes Vault and secret-flagged
-  // values instead of masking them (see ApiClient.tsx's codeVars).
-  getVars: (reveal: boolean) => VarMap;
-  // Collection/folder auth and headers that apply ahead of the request's own
-  // (see request.ts's buildHeaders) — included so the generated snippet
-  // matches what Send actually transmits.
-  inherited: InheritedScripts | null;
+  // Runs the shared prepare step for the active request — the same call Send
+  // makes before it transmits. Null when no request is open.
+  prepare: ((signal: AbortSignal) => Promise<PreparedRequest>) | null;
+  secrets: CodeSecrets;
   cookieJar?: Cookie[];
 }
 
-export function GenerateCodeDialog({ open, onClose, request, getVars, inherited, cookieJar = [] }: Props) {
+export function GenerateCodeDialog({ open, onClose, prepare, secrets, cookieJar = [] }: Props) {
   const [lang, setLang] = useState('Shell');
   const [variant, setVariant] = useState('curl');
   const [interpolate, setInterpolate] = useState(true);
   const [reveal, setReveal] = useState(false);
+  const [prepared, setPrepared] = useState<PreparedRequest | null>(null);
+  const [failure, setFailure] = useState<string | null>(null);
 
   const target = CODE_TARGETS.find((t) => t.lang === lang) ?? CODE_TARGETS[0];
+
+  // Prepare once per opening (and again if the request or its inputs change
+  // while open). Script-set variables are not persisted — only Send does that.
+  useEffect(() => {
+    if (!open || !prepare) { setPrepared(null); return; }
+    const controller = new AbortController();
+    setPrepared(null);
+    setFailure(null);
+    prepare(controller.signal).then(
+      (p) => { if (!controller.signal.aborted) setPrepared(p); },
+      (e: unknown) => { if (!controller.signal.aborted) setFailure(errToString(e)); },
+    );
+    return () => controller.abort();
+  }, [open, prepare]);
 
   // Both renderings, so the secrets switch only shows when it would change
   // anything — most requests use no secret at all.
   const { masked, revealed } = useMemo(() => {
-    if (!open || !request) return { masked: '', revealed: '' };
-    const context = { inheritedAuth: inherited?.auth ?? null, cookieJar };
-    const render = (r: boolean) =>
-      generateCode(request, getVars(r), lang, variant, interpolate, inherited?.headers ?? [], context);
-    return { masked: render(false), revealed: render(true) };
-  }, [open, request, getVars, lang, variant, interpolate, inherited, cookieJar]);
+    if (!prepared) return { masked: '', revealed: '' };
+    const render = (vars: VarMap) =>
+      generateCode(prepared.request, vars, lang, variant, interpolate, prepared.inheritedHeaders, { cookieJar });
+    const maskedVars = { ...prepared.vars };
+    for (const k of secrets.keys) if (Object.hasOwn(maskedVars, k)) maskedVars[k] = MASK;
+    return { masked: redactText(render(maskedVars), secrets.values), revealed: render(prepared.vars) };
+  }, [prepared, lang, variant, interpolate, cookieJar, secrets]);
   const usesSecrets = masked !== revealed;
   const code = reveal && usesSecrets ? revealed : masked;
 
@@ -109,18 +136,36 @@ export function GenerateCodeDialog({ open, onClose, request, getVars, inherited,
           )}
         </div>
 
+        {/* The same failure would cancel a Send, so say so rather than hand
+            over a snippet that silently differs from what Send would do. */}
+        {prepared && prepared.errors.length > 0 && (
+          <p className="whitespace-pre-wrap border-t bg-bad-tint px-4 py-2 text-xs text-bad">
+            {tr('code.scriptFailed')}{'\n'}{prepared.errors.join('\n')}
+          </p>
+        )}
+
         {/* Code preview. The height floor lives on the dialog: `scrollable` gives
             no definite height, so without it this `flex-1` pane collapses to zero. */}
         <div className="relative flex min-h-0 flex-1 flex-col border-t">
-          <CodeViewer value={code} language="text" />
-          <CopyButton
-            value={() => code}
-            title={tr('copy')}
-            variant="ghost"
-            size="icon"
-            className="absolute right-3 top-3 h-ctl w-ctl text-fg-mute"
-            iconClassName="h-4 w-4"
-          />
+          {prepared ? (
+            <>
+              <CodeViewer value={code} language="text" />
+              <CopyButton
+                value={() => code}
+                title={tr('copy')}
+                variant="ghost"
+                size="icon"
+                className="absolute right-3 top-3 h-ctl w-ctl text-fg-mute"
+                iconClassName="h-4 w-4"
+              />
+            </>
+          ) : failure ? (
+            <p className="p-4 text-xs text-bad">{failure}</p>
+          ) : open && prepare ? (
+            <div className="flex flex-1 items-center justify-center gap-2 text-xs text-fg-mute">
+              <Spinner size="sm" /> {tr('code.preparing')}
+            </div>
+          ) : null}
         </div>
       </DialogContent>
     </Dialog>

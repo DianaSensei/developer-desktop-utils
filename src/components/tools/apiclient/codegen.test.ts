@@ -45,15 +45,6 @@ describe('generateCode — matches what is sent', () => {
 });
 
 describe('generateCode — what Send adds on top of the request', () => {
-  it('uses the collection/folder auth an inherit request falls back to', () => {
-    const req = newRequest({ method: 'GET', url: '{{base}}/me' });
-    req.auth = { ...req.auth, type: 'inherit' };
-    const parent = { ...req.auth, type: 'bearer' as const, token: '{{token}}' };
-    const out = generateCode(req, { base: 'https://api.test', token: 'abc' }, 'Shell', 'curl', true, [], { inheritedAuth: parent });
-    expect(out).toContain("--url 'https://api.test/me'");
-    expect(out).toContain("--header 'Authorization: Bearer abc'");
-  });
-
   it('attaches matching jar cookies unless the request sets its own Cookie', () => {
     const req = newRequest({ method: 'GET', url: 'https://api.test/me' });
     const cookieJar = [{ name: 'sid', value: 'xyz', domain: 'api.test', path: '/' }];
