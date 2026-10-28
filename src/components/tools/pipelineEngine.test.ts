@@ -6,7 +6,7 @@
 import { describe, expect, it } from 'vitest';
 import { createHmac } from 'node:crypto';
 import { decodeJwt } from 'jose';
-import { executePipeline, readJsonPath, StepCache, type PipelineStep } from '@/components/tools/pipelineEngine';
+import { executePipeline, readJsonPath, StepCache, type ComposePart, type PipelineStep } from '@/components/tools/pipelineEngine';
 import { generateKeyPairPem } from '@/components/tools/jwt/jwtCrypto';
 
 let n = 0;
@@ -159,5 +159,103 @@ describe('Pipeline engine — cache', () => {
     expect(b[1].output).toBe(a[1].output);
     const c = await executePipeline([text('hello!'), steps[1]], cache);
     expect(c[1].output).not.toBe(a[1].output);
+  });
+});
+
+describe('Pipeline engine — compose', () => {
+  const part = (p: Partial<ComposePart>): ComposePart => ({ id: `p${n++}`, enabled: true, source: 'text', value: '', label: '', ...p });
+  const payload = JSON.stringify({ data: { amount: 50000, orderId: ' ord-1 ' }, meta: { ts: 1730000000 } });
+
+  it('builds a signing string from several fields, a fixed field and per-part transforms, then signs it', async () => {
+    const results = await executePipeline([
+      text(payload),
+      step({
+        op: 'compose', jsonSeparator: '&', jsonSort: 'asc', jsonFormat: 'key=value',
+        composeParts: [
+          part({ source: 'json-path', value: 'data.orderId', label: 'orderId', steps: [step({ op: 'trim' }), step({ op: 'uppercase' })] }),
+          part({ source: 'json-path', value: 'data.amount', label: 'amount' }),
+          part({ source: 'text', value: 'MERCHANT01', label: 'partner' }),
+          part({ source: 'json-path', value: 'meta.ts', label: 'ts', enabled: false }),
+        ],
+      }),
+      step({ op: 'hmac', algorithm: 'sha256', key: 'secret' }),
+    ]);
+    expect(results[1]).toEqual({ output: 'amount=50000&orderId=ORD-1&partner=MERCHANT01' });
+    expect(results[2].output).toBe(createHmac('sha256', 'secret').update('amount=50000&orderId=ORD-1&partner=MERCHANT01').digest('hex'));
+  });
+
+  it('writes an unlabelled part as the bare value and can join with no separator', async () => {
+    const r = await final([
+      text(payload),
+      step({
+        op: 'compose', jsonSeparator: '', jsonFormat: 'key=value',
+        composeParts: [
+          part({ source: 'json-path', value: 'data.amount', label: 'amount' }),
+          part({ source: 'text', value: '|salt' }),
+        ],
+      }),
+    ]);
+    expect(r).toEqual({ output: 'amount=50000|salt' });
+  });
+
+  it('reads a regex part and the output of an earlier step', async () => {
+    const first = text('token=abc123&x=1');
+    const r = await final([
+      first,
+      step({ op: 'uppercase' }),
+      step({
+        op: 'compose', jsonSeparator: '|', jsonFormat: 'value',
+        composeParts: [
+          part({ source: 'regex', value: 'TOKEN=([^&]+)' }),
+          part({ source: 'step', value: first.id, steps: [step({ op: 'encode', codec: 'base64' })] }),
+        ],
+      }),
+    ]);
+    expect(r).toEqual({ output: `ABC123|${Buffer.from('token=abc123&x=1').toString('base64')}` });
+  });
+
+  it('names the failing part in the error', async () => {
+    const r = await final([
+      text(payload),
+      step({ op: 'compose', composeParts: [part({ source: 'json-path', value: 'data.missing', label: 'fee' })] }),
+    ]);
+    expect(r.error).toMatch(/^fee: Path not found/);
+  });
+
+  it('refuses a step that reads a later step, and credential steps inside a part', async () => {
+    const later = step({ op: 'text-sunk', textValue: 'later' });
+    const ref = await executePipeline([
+      text('x'),
+      step({ op: 'compose', composeParts: [part({ source: 'step', value: later.id, label: 'x' })] }),
+      later,
+    ]);
+    expect(ref[1].error).toMatch(/gone or comes after/);
+
+    const keyed = await final([
+      text('x'),
+      step({ op: 'compose', composeParts: [part({ source: 'text', value: 'v', steps: [step({ op: 'hmac', key: 'k' })] })] }),
+    ]);
+    expect(keyed.error).toMatch(/can't run inside a Compose part/);
+  });
+
+  it('gives empty parts, not errors, while the input is still empty', async () => {
+    const r = await final([
+      text(''),
+      step({ op: 'compose', jsonFormat: 'value', composeParts: [part({ source: 'json-path', value: 'a' }), part({ source: 'text', value: 'k' })] }),
+    ]);
+    expect(r).toEqual({ output: '&k' });
+  });
+
+  it('re-runs when an earlier step it reads changes, even if its own input does not', async () => {
+    // The step right before Compose stays the same, so Compose's own input
+    // does too; only the step its part reads changes.
+    const cache = new StepCache();
+    const src = (v: string): PipelineStep => ({ id: 'src', op: 'text-sunk', textValue: v });
+    const fixed: PipelineStep = { id: 'fixed', op: 'text-sunk', textValue: 'same' };
+    const composeStep = step({ op: 'compose', jsonFormat: 'value', composeParts: [part({ source: 'step', value: 'src' })] });
+    const a = await executePipeline([src('one'), fixed, composeStep], cache);
+    const b = await executePipeline([src('two'), fixed, composeStep], cache);
+    expect(a[2].output).toBe('one');
+    expect(b[2].output).toBe('two');
   });
 });

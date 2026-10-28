@@ -13,7 +13,7 @@ import {
   Plus, Trash2, Eye, EyeOff, ChevronDown, ChevronUp,
   Hash, KeyRound, Code2, Type, Scissors, Search, CornerDownRight,
   AlertTriangle, CheckCircle2, ArrowRight, FileText, Braces,
-  Lock, LockOpen, ScanText, ShieldCheck, Stamp, TextSearch, Split, Route,
+  Lock, LockOpen, ScanText, ShieldCheck, Stamp, TextSearch, Split, Route, Combine,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useQuickPaste } from '@/hooks/useQuickPaste';
@@ -29,6 +29,7 @@ import {
 import { SECRET_ENCODINGS, isAsymmetric, isHmac, type AlgorithmSpec, type JwtAlgorithm, type SecretEncoding } from './jwt/jwtCrypto';
 import type { EncryptAlgo } from './encodeCore';
 import { PipelineTemplateBar } from './PipelineTemplateBar';
+import { ComposeSection } from './PipelineCompose';
 
 export { compareCodeUnits } from './pipelineEngine';
 
@@ -53,7 +54,8 @@ const OP_META: Record<StepOp, OpMeta> = {
   'json-path':     { icon: Route,           color: 'text-[var(--cat-1)]' },
   'regex-extract': { icon: TextSearch,      color: 'text-[var(--cat-1)]' },
   'split-pick':    { icon: Split,           color: 'text-[var(--cat-1)]' },
-  uppercase:       { icon: Type,            color: 'text-fg-mute' },
+  compose:         { icon: Combine,         color: 'text-[var(--cat-1)]' },
+  uppercase:      { icon: Type,            color: 'text-fg-mute' },
   lowercase:       { icon: Type,            color: 'text-fg-mute' },
   trim:            { icon: Scissors,        color: 'text-fg-mute' },
   prepend:         { icon: CornerDownRight, color: 'text-fg-mute' },
@@ -67,7 +69,7 @@ const OP_GROUPS: { label: 'Input' | 'Encode' | 'Crypto' | 'JWT' | 'Extract' | 'T
   { label: 'Encode',    ops: ['encode', 'decode'] },
   { label: 'Crypto',    ops: ['hash', 'hmac', 'encrypt', 'decrypt'] },
   { label: 'JWT',       ops: ['jwt-decode', 'jwt-sign', 'jwt-verify', 'jws-sign', 'jws-verify'] },
-  { label: 'Extract',   ops: ['json-path', 'regex-extract', 'split-pick'] },
+  { label: 'Extract',   ops: ['json-path', 'regex-extract', 'split-pick', 'compose'] },
   { label: 'Transform', ops: ['uppercase', 'lowercase', 'trim', 'prepend', 'append', 'replace', 'json-format'] },
 ];
 
@@ -704,6 +706,10 @@ interface StepCardProps {
   index: number;
   total: number;
   result: StepResult | undefined;
+  /** The previous step's output (Compose lists its JSON fields). */
+  input: string | undefined;
+  /** Steps before this one (a Compose part may read their output). */
+  priorSteps: { id: string; label: string }[];
   showKey: boolean;
   onToggleKey: () => void;
   onUpdate: (patch: Partial<PipelineStep>) => void;
@@ -712,7 +718,7 @@ interface StepCardProps {
   onMoveDown: () => void;
 }
 
-function StepCard({ step, index, total, result, showKey, onToggleKey, onUpdate, onRemove, onMoveUp, onMoveDown }: StepCardProps) {
+function StepCard({ step, index, total, result, input, priorSteps, showKey, onToggleKey, onUpdate, onRemove, onMoveUp, onMoveDown }: StepCardProps) {
   const t = useMessages(MESSAGES);
   const keyProps = { show: showKey, onToggle: onToggleKey };
   const cipher = ENCRYPT_ALGOS.find((a) => a.id === (step.cipher ?? 'aes-gcm')) ?? ENCRYPT_ALGOS[0];
@@ -981,6 +987,18 @@ function StepCard({ step, index, total, result, showKey, onToggleKey, onUpdate, 
           </div>
         )}
 
+        {/* Compose */}
+        {step.op === 'compose' && (
+          <ComposeSection
+            step={step}
+            input={input}
+            priorSteps={priorSteps}
+            onUpdate={onUpdate}
+            makeId={makeId}
+            defaultsFor={partStepDefaults}
+          />
+        )}
+
         {/* Prepend / Append */}
         {(step.op === 'prepend' || step.op === 'append') && (
           <div className="flex items-center gap-2">
@@ -1128,13 +1146,20 @@ const STEP_DEFAULTS: Partial<Record<StepOp, Partial<PipelineStep>>> = {
   'json-path':     { path: '' },
   'regex-extract': { pattern: '', regexFlags: '', group: '', matchAll: false },
   'split-pick':    { splitSep: ',', splitIndex: '0' },
-  prepend:         { text: '' },
+  compose:         { composeParts: [], jsonSeparator: '&', jsonSort: 'none', jsonFormat: 'key=value' },
+  prepend:        { text: '' },
   append:          { text: '' },
   replace:         { find: '', replacement: '', regex: false },
   'json-format':   { jsonIndent: 'pretty' },
 };
 
 const DEFAULT_STEPS: PipelineStep[] = [];
+
+/** Settings for a transform inside a Compose part: a one-line value wants minified JSON. */
+function partStepDefaults(op: StepOp): Partial<PipelineStep> {
+  const { key: _key, ...defaults } = STEP_DEFAULTS[op] ?? {};
+  return op === 'json-format' ? { ...defaults, jsonIndent: 'minify' } : defaults;
+}
 
 /** Delay before a run, so typing in a key box doesn't start one per keystroke. */
 const RUN_DEBOUNCE_MS = 120;
@@ -1269,6 +1294,8 @@ export function PipelineTab({ active }: { active: boolean }) {
             <StepCard
               step={step} index={index} total={steps.length}
               result={run.byId[step.id]}
+              input={index > 0 ? run.byId[steps[index - 1].id]?.output : undefined}
+              priorSteps={steps.slice(0, index).map((s, i) => ({ id: s.id, label: `#${i + 1} ${t(`op.${s.op}`)}` }))}
               showKey={!!showKeys[step.id]}
               onToggleKey={() => setShowKeys((p) => ({ ...p, [step.id]: !p[step.id] }))}
               onUpdate={(patch) => updateStep(step.id, patch)}
