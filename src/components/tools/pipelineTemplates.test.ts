@@ -128,4 +128,32 @@ describe('Pipeline templates — save / load', () => {
     expect(() => parseTemplates('{"name":"bad"}')).toThrow(/not a pipeline template/);
     expect(parseTemplates(JSON.stringify({ id: 'builtin:x', name: 'Y', steps: [] }))[0].id).toBe('');
   });
+
+  describe('compose parts', () => {
+    const composeSteps: PipelineStep[] = [
+      { id: 'c1', op: 'text-sunk', textValue: '{"a":1}' },
+      {
+        id: 'c2', op: 'compose', jsonFormat: 'value',
+        composeParts: [
+          { id: 'p1', enabled: true, source: 'step', value: 'c1', label: '' },
+          { id: 'p2', enabled: true, source: 'step', value: 'not-in-template', label: '' },
+          { id: 'p3', enabled: true, source: 'text', value: 'v', label: '', steps: [{ id: 'q1', op: 'trim', key: 'stray-key' }] },
+        ],
+      },
+    ];
+
+    it('points a part that reads a step at that step’s new id', () => {
+      const { steps: loaded, idMap } = instantiateTemplate({ id: 't', name: 'T', steps: composeSteps, updatedAt: 0 }, ids);
+      const parts = loaded[1].composeParts!;
+      expect(parts[0].value).toBe(idMap.c1);
+      expect(parts[1].value).toBe('not-in-template');
+      expect(parts[2].id).not.toBe('p3');
+      expect(parts[2].steps![0].id).not.toBe('q1');
+    });
+
+    it('keeps keys out of a part’s transforms on save and on import', () => {
+      expect(JSON.stringify(toTemplateSteps(composeSteps, { keepInput: true }))).not.toContain('stray-key');
+      expect(JSON.stringify(parseTemplates(JSON.stringify({ name: 'C', steps: composeSteps })))).not.toContain('stray-key');
+    });
+  });
 });

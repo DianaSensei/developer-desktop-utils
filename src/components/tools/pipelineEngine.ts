@@ -43,9 +43,29 @@ export type StepOp =
   // JWT / JWS
   | 'jwt-decode' | 'jwt-sign' | 'jwt-verify' | 'jws-sign' | 'jws-verify'
   // Extract
-  | 'json-path' | 'regex-extract' | 'split-pick'
+  | 'json-path' | 'regex-extract' | 'split-pick' | 'compose'
   // Transform
   | 'uppercase' | 'lowercase' | 'trim' | 'prepend' | 'append' | 'replace' | 'json-format';
+
+/** Where one part of a Compose step reads its value from. */
+export type ComposeSource = 'json-path' | 'regex' | 'text' | 'step';
+
+/**
+ * One part of a Compose step: a value read from the step's input (or written
+ * out, or taken from an earlier step), put through its own small chain of
+ * transforms, then written as `label=value` (or just the value).
+ */
+export interface ComposePart {
+  id: string;
+  enabled: boolean;
+  source: ComposeSource;
+  /** json-path: the path · regex: the pattern (group 1 when it has one) · text: the literal · step: an earlier step's id. */
+  value: string;
+  /** Written before the value as `label=` in key=value format; empty = the value alone. */
+  label: string;
+  /** Transforms for this part only, in order. Limited to PART_OPS. */
+  steps?: PipelineStep[];
+}
 
 export type X5cTrust = 'apple' | 'custom' | 'none';
 export type DigestFormat = 'hex' | 'base64' | 'base64url';
@@ -100,6 +120,8 @@ export interface PipelineStep {
   matchAll?: boolean;
   splitSep?: string;
   splitIndex?: string;
+  /** Compose: the parts, joined with `jsonSeparator`, sorted by `jsonSort`, written as `jsonFormat`. */
+  composeParts?: ComposePart[];
   // Prepend / Append
   text?: string;
   // Replace
@@ -118,7 +140,23 @@ export const SECRET_OPS: ReadonlySet<StepOp> = new Set<StepOp>([
 ]);
 
 /** Steps that make their own value instead of transforming the previous one. */
-const SOURCE_OPS: ReadonlySet<StepOp> = new Set<StepOp>(['text-sunk', 'json-input', 'prepend', 'append']);
+const SOURCE_OPS: ReadonlySet<StepOp> = new Set<StepOp>(['text-sunk', 'json-input', 'prepend', 'append', 'compose']);
+
+/**
+ * What a Compose part may run on its own value: pure, keyless transforms.
+ * No credential steps — their keys live in the vault by top-level step id —
+ * and no input or nested Compose steps.
+ */
+export const PART_OPS: readonly StepOp[] = [
+  'trim', 'uppercase', 'lowercase', 'prepend', 'append', 'replace',
+  'encode', 'decode', 'hash', 'json-path', 'regex-extract', 'split-pick', 'json-format',
+];
+const PART_OP_SET: ReadonlySet<StepOp> = new Set(PART_OPS);
+
+/** Outputs of the steps that already ran, by step id — what a Compose part with source `step` reads. */
+export interface RunContext {
+  outputs?: Readonly<Record<string, string>>;
+}
 
 // ─── Codecs ────────────────────────────────────────────────────────────────────
 
@@ -388,8 +426,69 @@ function hmacKey(step: PipelineStep): string | CryptoJS.lib.WordArray {
   return CryptoJS.enc.Hex.parse(Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join(''));
 }
 
-async function run(step: PipelineStep, input: string): Promise<string> {
+/** How a part is named in an error when it has no label. */
+function partName(part: ComposePart, index: number): string {
+  if (part.label) return part.label;
+  if (part.source === 'text') return `part ${index + 1}`;
+  return part.value ? `${part.source} ${part.value}` : `part ${index + 1}`;
+}
+
+async function partValue(part: ComposePart, input: string, json: () => unknown, ctx: RunContext): Promise<string> {
+  switch (part.source) {
+    case 'text':
+      return part.value;
+    case 'step': {
+      const out = ctx.outputs?.[part.value];
+      if (out === undefined) throw new Error('The step it reads is gone or comes after this one.');
+      return out;
+    }
+    case 'json-path':
+      // An empty input yields an empty part, as an empty input yields an
+      // empty step: a half-built pipeline shows dashes, not errors.
+      return input ? stringify(readJsonPath(json(), part.value)) : '';
+    case 'regex':
+      return input ? run({ id: part.id, op: 'regex-extract', pattern: part.value }, input, ctx) : '';
+  }
+}
+
+/**
+ * Builds one string out of several values: each enabled part is read, run
+ * through its own transforms, written as `label=value` (or the value alone)
+ * and joined — e.g. the string a payment gateway signs, before an HMAC step.
+ */
+async function compose(step: PipelineStep, input: string, ctx: RunContext): Promise<string> {
+  let parsed: { value: unknown } | undefined;
+  const json = () => (parsed ??= { value: parseJson(input, 'Input') }).value;
+
+  let parts = (step.composeParts ?? []).filter((p) => p.enabled);
+  // Byte order, as in the JSON Input step: what gateways sign by.
+  const sort = step.jsonSort ?? 'none';
+  if (sort === 'asc')  parts = [...parts].sort((a, b) => compareCodeUnits(a.label, b.label));
+  if (sort === 'desc') parts = [...parts].sort((a, b) => compareCodeUnits(b.label, a.label));
+  const keyValue = (step.jsonFormat ?? 'key=value') === 'key=value';
+
+  const out: string[] = [];
+  for (const [i, part] of parts.entries()) {
+    let value: string;
+    try {
+      value = await partValue(part, input, json, ctx);
+      for (const sub of part.steps ?? []) {
+        if (!PART_OP_SET.has(sub.op)) throw new Error(`"${sub.op}" can't run inside a Compose part.`);
+        if (!value && !SOURCE_OPS.has(sub.op)) continue;
+        value = await run(sub, value, ctx);
+      }
+    } catch (e) {
+      throw new Error(`${partName(part, i)}: ${e instanceof Error ? e.message : String(e)}`);
+    }
+    out.push(keyValue && part.label ? `${part.label}=${value}` : value);
+  }
+  return out.join(unescapeSep(step.jsonSeparator ?? '&'));
+}
+
+async function run(step: PipelineStep, input: string, ctx: RunContext = {}): Promise<string> {
   switch (step.op) {
+    case 'compose':
+      return compose(step, input, ctx);
     case 'text-sunk':
       return step.textValue ?? '';
     case 'json-input': {
@@ -510,12 +609,12 @@ async function run(step: PipelineStep, input: string): Promise<string> {
   }
 }
 
-export async function executeStep(step: PipelineStep, input: string): Promise<StepResult> {
+export async function executeStep(step: PipelineStep, input: string, ctx: RunContext = {}): Promise<StepResult> {
   // An empty value flows through untouched, so a half-built pipeline shows
   // dashes rather than a wall of "invalid input" errors.
   if (!input && !SOURCE_OPS.has(step.op)) return { output: '' };
   try {
-    return { output: await run(step, input) };
+    return { output: await run(step, input, ctx) };
   } catch (err) {
     return { output: '', error: err instanceof Error && err.message ? err.message : STEP_FAILED };
   }
@@ -531,12 +630,16 @@ export class StepCache {
   private map = new Map<string, StepResult>();
   constructor(private limit = 200) {}
 
-  async run(step: PipelineStep, input: string): Promise<StepResult> {
+  async run(step: PipelineStep, input: string, ctx: RunContext = {}): Promise<StepResult> {
     const { id: _id, ...config } = step;
-    const k = `${JSON.stringify(config)}\u0000${input}`;
+    // A Compose step also depends on the earlier outputs its parts read.
+    const refs = (step.composeParts ?? [])
+      .filter((p) => p.enabled && p.source === 'step')
+      .map((p) => ctx.outputs?.[p.value] ?? '\u0001');
+    const k = `${JSON.stringify(config)}\u0000${input}\u0000${JSON.stringify(refs)}`;
     const hit = this.map.get(k);
     if (hit) return hit;
-    const res = await executeStep(step, input);
+    const res = await executeStep(step, input, ctx);
     if (this.map.size >= this.limit) this.map.delete(this.map.keys().next().value!);
     this.map.set(k, res);
     return res;
@@ -545,12 +648,15 @@ export class StepCache {
 
 export async function executePipeline(steps: PipelineStep[], cache?: StepCache): Promise<StepResult[]> {
   const results: StepResult[] = [];
+  const outputs: Record<string, string> = {};
   let current = '';
   for (const step of steps) {
-    const res = cache ? await cache.run(step, current) : await executeStep(step, current);
+    const ctx: RunContext = { outputs };
+    const res = cache ? await cache.run(step, current, ctx) : await executeStep(step, current, ctx);
     results.push(res);
     if (res.error) break;
     current = res.output;
+    outputs[step.id] = res.output;
   }
   return results;
 }
