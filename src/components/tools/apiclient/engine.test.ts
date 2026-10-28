@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { executeRequest } from './engine';
+import { generateCode } from './codegen';
+import { executeRequest, prepareRequest } from './engine';
 import { __setSandboxWorkerFactory } from './scriptHost';
 import { runPhase, type PhaseInput, type PhaseOutput } from './scriptPhases';
 import { newRequest, type ApiRequest, type Environment } from './types';
@@ -255,6 +256,49 @@ describe('executeRequest — request mutation from scripts', () => {
     const original = req({ script: { req: "req.setUrl('https://other.test/y');", res: '' } });
     await executeRequest(original, null, null);
     expect(original.url).toBe('https://api.test/x');
+  });
+});
+
+describe('prepareRequest — the step Send and Generate Code share', () => {
+  it('resolves inherited auth and applies pre-request script changes and variables', async () => {
+    const request = req({
+      url: '{{base}}/me',
+      script: { req: "req.setHeader('X-Trace', '{{trace}}'); dt.setEnvVar('trace', 'abc');", res: '' },
+    });
+    request.auth = { ...request.auth, type: 'inherit' };
+    const parentAuth = { ...request.auth, type: 'bearer' as const, token: '{{vault.token}}' };
+    const p = await prepareRequest(
+      request, env({ base: 'https://api.test', trace: 'old' }, 'c1'), null, undefined,
+      { pre: [], post: [], auth: parentAuth, headers: [] }, {}, undefined, { 'vault.token': 's3cret' },
+    );
+    expect(p.errors).toEqual([]);
+    expect(p.request.auth.type).toBe('bearer');
+    expect(p.vars.trace).toBe('abc');
+
+    const code = generateCode(p.request, p.vars, 'Shell', 'curl', true, p.inheritedHeaders);
+    expect(code).toContain("--url 'https://api.test/me'");
+    expect(code).toContain("--header 'X-Trace: abc'");
+    expect(code).toContain("--header 'Authorization: Bearer s3cret'");
+  });
+
+  it('builds the same URL and headers Send transmits', async () => {
+    const spy = stubJson('{}');
+    const request = req({
+      method: 'POST',
+      url: '{{base}}/items',
+      headers: [{ id: 'h1', key: 'X-Id', value: '{{id}}', enabled: true }],
+      script: { req: "dt.setEnvVar('id', '42');", res: '' },
+    });
+    const environment = env({ base: 'https://api.test' }, 'c1');
+    await executeRequest(request, environment, null);
+    const [url, init] = spy.mock.calls[0] as unknown as [string, RequestInit];
+
+    const p = await prepareRequest(request, environment, null);
+    const code = generateCode(p.request, p.vars, 'Shell', 'curl', true, p.inheritedHeaders);
+    expect(code).toContain(`--url '${url}'`);
+    for (const [k, v] of Object.entries(init.headers as Record<string, string>)) {
+      expect(code).toContain(`--header '${k}: ${v}'`);
+    }
   });
 });
 

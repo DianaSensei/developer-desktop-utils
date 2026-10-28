@@ -43,3 +43,16 @@ describe('generateCode — matches what is sent', () => {
     expect(out).not.toMatch(/--data/);
   });
 });
+
+describe('generateCode — what Send adds on top of the request', () => {
+  it('attaches matching jar cookies unless the request sets its own Cookie', () => {
+    const req = newRequest({ method: 'GET', url: 'https://api.test/me' });
+    const cookieJar = [{ name: 'sid', value: 'xyz', domain: 'api.test', path: '/' }];
+    expect(generateCode(req, {}, 'Shell', 'curl', true, [], { cookieJar })).toContain("--header 'Cookie: sid=xyz'");
+
+    req.headers = [{ id: 'h1', key: 'Cookie', value: 'mine=1', enabled: true }];
+    const own = generateCode(req, {}, 'Shell', 'curl', true, [], { cookieJar });
+    expect(own).toContain("--header 'Cookie: mine=1'");
+    expect(own).not.toContain('sid=xyz');
+  });
+});

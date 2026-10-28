@@ -1310,7 +1310,7 @@ state the contract, not a tutorial; the full detail belongs in
 in every tool's always-sent description.
 
 **Deliberately excluded:** the Vault (`store.vault`) — the UI itself keeps
-Vault values out of generated code, cURL export, and history, so exposing it
+Vault values out of generated code (unless the user opts in per snippet), cURL export, and history, so exposing it
 to an MCP client would defeat that boundary.
 
 ---

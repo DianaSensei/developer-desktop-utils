@@ -1,41 +1,99 @@
 // "Generate Code" modal (Bruno-style): pick a language + variant, optionally
-// interpolate {{vars}}, preview the snippet, and copy it.
+// interpolate {{vars}}, preview the snippet, and copy it. The snippet is built
+// from the same prepared request Send builds from (engine.ts's
+// prepareRequest: inherited auth, pre-request scripts, merged variables), plus
+// the jar cookies Send attaches — so with interpolation on it runs as-is.
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { CopyButton } from '@/components/ui/copy-button';
 import { Label } from '@/components/ui/label';
 import { Segmented } from '@/components/ui/segmented';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Callout } from '@/components/ui/callout';
+import { LoadingRow } from '@/components/ui/spinner';
 import { Switch } from '@/components/ui/switch';
 import { CodeViewer } from '@/design-system';
 import { CODE_TARGETS, generateCode } from './codegen';
-import type { ApiRequest, KeyValue, VarMap } from './types';
+import type { Cookie } from './cookies';
+import { errToString, type PreparedRequest } from './engine';
+import { redactText } from './store';
+import type { VarMap } from './types';
 // Imported as `tr` because this file uses `t` as a loop variable.
 import { t as tr } from './i18n';
+
+const MASK = '••••••••';
+
+// What must not appear in a snippet unless the user asks for it: the variable
+// names whose values are secret (`vault.<key>`, secret-flagged environment
+// variables) and those values themselves, for when a script copied one into
+// another variable or a header.
+export interface CodeSecrets {
+  keys: string[];
+  values: string[];
+}
 
 interface Props {
   open: boolean;
   onClose: () => void;
-  request: ApiRequest | null;
-  vars: VarMap;
-  // Collection/folder headers that apply ahead of the request's own (see
-  // request.ts's buildHeaders) — included so the generated snippet matches
-  // what Send actually transmits.
-  inheritedHeaders?: KeyValue[][];
+  // Runs the shared prepare step for the active request — the same call Send
+  // makes before it transmits. Null when no request is open.
+  prepare: ((signal: AbortSignal) => Promise<PreparedRequest>) | null;
+  secrets: CodeSecrets;
+  cookieJar?: Cookie[];
 }
 
-export function GenerateCodeDialog({ open, onClose, request, vars, inheritedHeaders = [] }: Props) {
+export function GenerateCodeDialog({ open, onClose, prepare, secrets, cookieJar = [] }: Props) {
   const [lang, setLang] = useState('Shell');
   const [variant, setVariant] = useState('curl');
   const [interpolate, setInterpolate] = useState(true);
+  const [reveal, setReveal] = useState(false);
+  const [prepared, setPrepared] = useState<PreparedRequest | null>(null);
+  const [failure, setFailure] = useState<string | null>(null);
 
   const target = CODE_TARGETS.find((t) => t.lang === lang) ?? CODE_TARGETS[0];
 
-  const code = useMemo(
-    () => (request ? generateCode(request, vars, lang, variant, interpolate, inheritedHeaders) : ''),
-    [request, vars, lang, variant, interpolate, inheritedHeaders],
-  );
+  // Real values are opt-in per opening: a switch left on from last time would
+  // otherwise put secrets on screen without the user having asked again.
+  useEffect(() => {
+    if (!open) { setReveal(false); setPrepared(null); setFailure(null); }
+  }, [open]);
+
+  // Prepare once per opening (and again if the request or its inputs change
+  // while open). Script-set variables are not persisted — only Send does that.
+  // A re-prepare keeps the previous snippet on screen until the new one is in,
+  // rather than blanking the pane under the user.
+  useEffect(() => {
+    if (!open || !prepare) return;
+    const controller = new AbortController();
+    prepare(controller.signal).then(
+      (p) => { if (!controller.signal.aborted) { setPrepared(p); setFailure(null); } },
+      (e: unknown) => { if (!controller.signal.aborted) { setPrepared(null); setFailure(errToString(e)); } },
+    );
+    return () => controller.abort();
+  }, [open, prepare]);
+
+  // Most requests have no script and prepare in a few ms — only show the
+  // loading line for a wait the user would actually notice.
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    if (prepared || failure || !open) { setSlow(false); return; }
+    const timer = setTimeout(() => setSlow(true), 300);
+    return () => clearTimeout(timer);
+  }, [prepared, failure, open]);
+
+  // Both renderings, so the secrets switch only shows when it would change
+  // anything — most requests use no secret at all.
+  const { masked, revealed } = useMemo(() => {
+    if (!prepared) return { masked: '', revealed: '' };
+    const render = (vars: VarMap) =>
+      generateCode(prepared.request, vars, lang, variant, interpolate, prepared.inheritedHeaders, { cookieJar });
+    const maskedVars = { ...prepared.vars };
+    for (const k of secrets.keys) if (Object.hasOwn(maskedVars, k)) maskedVars[k] = MASK;
+    return { masked: redactText(render(maskedVars), secrets.values), revealed: render(prepared.vars) };
+  }, [prepared, lang, variant, interpolate, cookieJar, secrets]);
+  const usesSecrets = masked !== revealed;
+  const code = reveal && usesSecrets ? revealed : masked;
 
   const pickLang = (l: string) => {
     setLang(l);
@@ -59,7 +117,7 @@ export function GenerateCodeDialog({ open, onClose, request, vars, inheritedHead
         </div>
 
         {/* toolbar */}
-        <div className="flex items-center gap-3 px-4 py-3">
+        <div className="flex flex-wrap items-center gap-3 px-4 py-3">
           <Select value={lang} onValueChange={pickLang}>
             <SelectTrigger className="h-ctl w-40 text-xs"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -86,20 +144,45 @@ export function GenerateCodeDialog({ open, onClose, request, vars, inheritedHead
             {tr('code.interpolate')}
             <Switch checked={interpolate} onCheckedChange={setInterpolate} aria-label={tr('code.interpolate')} />
           </Label>
+          {usesSecrets && (
+            <Label className="flex cursor-pointer items-center gap-2 text-xs" title={tr('code.revealSecretsHint')}>
+              {tr('code.revealSecrets')}
+              <Switch checked={reveal} onCheckedChange={setReveal} aria-label={tr('code.revealSecrets')} />
+            </Label>
+          )}
         </div>
+
+        {/* The same failure would cancel a Send, so say so rather than hand
+            over a snippet that silently differs from what Send would do. */}
+        {prepared && prepared.errors.length > 0 && (
+          <Callout tone="error" size="sm" title={tr('code.scriptFailed')} className="mx-4 mb-3 whitespace-pre-wrap">
+            {prepared.errors.join('\n')}
+          </Callout>
+        )}
+        {reveal && usesSecrets && (
+          <Callout tone="warning" size="sm" className="mx-4 mb-3">{tr('code.revealSecretsHint')}</Callout>
+        )}
 
         {/* Code preview. The height floor lives on the dialog: `scrollable` gives
             no definite height, so without it this `flex-1` pane collapses to zero. */}
         <div className="relative flex min-h-0 flex-1 flex-col border-t">
-          <CodeViewer value={code} language="text" />
-          <CopyButton
-            value={() => code}
-            title={tr('copy')}
-            variant="ghost"
-            size="icon"
-            className="absolute right-3 top-3 h-ctl w-ctl text-fg-mute"
-            iconClassName="h-4 w-4"
-          />
+          {prepared ? (
+            <>
+              <CodeViewer value={code} language="text" />
+              <CopyButton
+                value={() => code}
+                title={tr('copy')}
+                variant="ghost"
+                size="icon"
+                className="absolute right-3 top-3 h-ctl w-ctl text-fg-mute"
+                iconClassName="h-4 w-4"
+              />
+            </>
+          ) : failure ? (
+            <Callout tone="error" size="sm" className="m-4">{failure}</Callout>
+          ) : slow ? (
+            <LoadingRow size="sm" label={tr('code.preparing')} className="m-auto" />
+          ) : null}
         </div>
       </DialogContent>
     </Dialog>

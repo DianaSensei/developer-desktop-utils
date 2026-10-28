@@ -23,10 +23,11 @@ import { HistoryView } from './HistoryView';
 import { SplitPane } from '@/components/ui/split-pane';
 import { EnvironmentEditor } from './EnvironmentEditor';
 import { VaultManager } from './VaultManager';
-import { GenerateCodeDialog } from './GenerateCodeDialog';
+import { GenerateCodeDialog, type CodeSecrets } from './GenerateCodeDialog';
 import { RunnerDialog } from './RunnerDialog';
 import { CookieManager } from './CookieManager';
-import { executeRequest, errToString } from './engine';
+import { executeRequest, errToString, prepareRequest } from './engine';
+import { sensitiveValuesFor } from './useApiRunner';
 import { useMcpBridge } from './mcpBridge';
 import { useApiClientRuntime } from './mcpRuntimeContext';
 import { isScriptSandboxDegraded, stopScriptSandbox, subscribeSandboxStatus } from './scriptHost';
@@ -192,6 +193,35 @@ export function ApiClient() {
   // when the per-tool MCP toggle (Settings → MCP) is off for API Client.
   useMcpBridge(store, runRequest, mcpBridgeActive);
 
+  // The inputs the active request is prepared from (engine.ts's
+  // prepareRequest: inherited auth, pre-request scripts, merged variables).
+  // Send hands them to executeRequest, which prepares and then transmits;
+  // Generate Code prepares from the very same ones and then builds a snippet —
+  // so both see one request.
+  const activeInputs = useCallback(() => ({
+    collectionEnv: store.activeCollectionEnv,
+    globalEnv: store.activeGlobalEnv,
+    inherited: store.inheritedScripts,
+    vault: store.vaultVars,
+    collectionVars: store.activeCollectionVars,
+  }), [store.activeCollectionEnv, store.activeGlobalEnv, store.inheritedScripts, store.vaultVars, store.activeCollectionVars]);
+
+  // The jar both attach at the transport step. Kept out of `activeInputs`:
+  // preparing doesn't read it, so a cookie captured mid-dialog must not
+  // re-run the pre-request scripts.
+  const cookieJar = useMemo(
+    () => (store.cookiesEnabled ? store.cookies : []),
+    [store.cookiesEnabled, store.cookies],
+  );
+
+  const prepareActive = useMemo(() => {
+    if (!activeRequest) return null;
+    return (signal: AbortSignal) => {
+      const i = activeInputs();
+      return prepareRequest(activeRequest, i.collectionEnv, i.globalEnv, signal, i.inherited, {}, scriptTimeoutRef.current, i.vault, i.collectionVars);
+    };
+  }, [activeRequest, activeInputs]);
+
   const send = useCallback(async () => {
     if (!activeRequest) return;
     const id = activeRequest.id;
@@ -205,9 +235,9 @@ export function ApiClient() {
 
     patchRun(id, { sending: true, error: null });
     try {
-      const jar = store.cookiesEnabled ? store.cookies : [];
-      const result = await executeRequest(activeRequest, store.activeCollectionEnv, store.activeGlobalEnv, controller.signal, store.inheritedScripts, jar, {}, scriptTimeoutRef.current, store.vaultVars, store.activeCollectionVars);
-      persistResult(activeRequest, store.activeCollectionEnv, store.activeGlobalEnv, result);
+      const i = activeInputs();
+      const result = await executeRequest(activeRequest, i.collectionEnv, i.globalEnv, controller.signal, i.inherited, cookieJar, {}, scriptTimeoutRef.current, i.vault, i.collectionVars);
+      persistResult(activeRequest, i.collectionEnv, i.globalEnv, result);
       if (!isCurrent()) return;
       patchRun(id, {
         response: result.response,
@@ -227,7 +257,7 @@ export function ApiClient() {
       if (isCurrent()) patchRun(id, { sending: false });
       if (abortRefs.current.get(id) === controller) abortRefs.current.delete(id);
     }
-  }, [activeRequest, store, patchRun, persistResult]);
+  }, [activeRequest, activeInputs, cookieJar, patchRun, persistResult]);
 
   const cancel = useCallback(() => {
     if (activeRequest) abortRefs.current.get(activeRequest.id)?.abort();
@@ -369,16 +399,18 @@ export function ApiClient() {
     if (store.activeCollectionEnv) for (const v of store.activeCollectionEnv.variables) if (v.enabled && v.key) map[v.key] = v.secret ? '••••••••' : v.value;
   };
 
-  // Merged variable map (collection var + envs) for code generation.
-  // Secret-flagged environment variables are masked here too — a generated
-  // snippet is exactly the kind of thing that gets pasted into a chat or a
-  // doc, so it must not carry the real value any more than the Vault's
-  // entries do.
-  const codeVars = useCallback((): VarMap => {
-    const vars: VarMap = { ...store.activeCollectionVars };
-    foldEnvs(vars);
-    return vars;
-  }, [store.activeCollectionEnv, store.activeGlobalEnv, store.activeCollectionVars]);
+  // Secrets Generate Code masks unless the user asks for a runnable command —
+  // a generated snippet is exactly the kind of thing that gets pasted into a
+  // chat or a doc, so it must not carry a Vault or secret-flagged value by
+  // default.
+  const codeSecrets = useMemo((): CodeSecrets => {
+    const secretEnvKeys = [...(store.activeGlobalEnv?.variables ?? []), ...(store.activeCollectionEnv?.variables ?? [])]
+      .filter((v) => v.enabled && v.key && v.secret).map((v) => v.key);
+    return {
+      keys: [...Object.keys(store.vaultVars), ...secretEnvKeys],
+      values: sensitiveValuesFor(store.vaultVars, store.activeCollectionEnv, store.activeGlobalEnv),
+    };
+  }, [store.activeCollectionEnv, store.activeGlobalEnv, store.vaultVars]);
 
   // Known variables (name → current value) for {{ }} highlighting, autocomplete,
   // and hover-value tooltips in inputs.
@@ -534,9 +566,9 @@ export function ApiClient() {
       <GenerateCodeDialog
         open={codeOpen}
         onClose={() => setCodeOpen(false)}
-        request={activeRequest}
-        vars={codeOpen ? codeVars() : {}}
-        inheritedHeaders={activeRequest ? store.getInherited(activeRequest.id).headers : []}
+        prepare={prepareActive}
+        secrets={codeSecrets}
+        cookieJar={cookieJar}
       />
       {runTarget && (
         <RunnerDialog
