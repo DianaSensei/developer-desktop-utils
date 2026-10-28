@@ -19,7 +19,9 @@ tauri-plugin-clipboard-manager = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
 tauri-plugin-process = "2"
-tauri-plugin-updater = "2"
+# 2.14.1 is the first 2.x on zip 9; earlier ones pull zip 4.x
+# (RUSTSEC-2026-0367 / 0368 / 0369), so don't let a resolve go below it.
+tauri-plugin-updater = "2.14.1"
 tauri-plugin-http = "2"
 tauri-plugin-store = "2"
 tauri-plugin-window-state = "2"
