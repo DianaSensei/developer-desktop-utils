@@ -204,8 +204,15 @@ export function ApiClient() {
     inherited: store.inheritedScripts,
     vault: store.vaultVars,
     collectionVars: store.activeCollectionVars,
-    jar: store.cookiesEnabled ? store.cookies : [],
-  }), [store.activeCollectionEnv, store.activeGlobalEnv, store.inheritedScripts, store.vaultVars, store.activeCollectionVars, store.cookiesEnabled, store.cookies]);
+  }), [store.activeCollectionEnv, store.activeGlobalEnv, store.inheritedScripts, store.vaultVars, store.activeCollectionVars]);
+
+  // The jar both attach at the transport step. Kept out of `activeInputs`:
+  // preparing doesn't read it, so a cookie captured mid-dialog must not
+  // re-run the pre-request scripts.
+  const cookieJar = useMemo(
+    () => (store.cookiesEnabled ? store.cookies : []),
+    [store.cookiesEnabled, store.cookies],
+  );
 
   const prepareActive = useMemo(() => {
     if (!activeRequest) return null;
@@ -229,7 +236,7 @@ export function ApiClient() {
     patchRun(id, { sending: true, error: null });
     try {
       const i = activeInputs();
-      const result = await executeRequest(activeRequest, i.collectionEnv, i.globalEnv, controller.signal, i.inherited, i.jar, {}, scriptTimeoutRef.current, i.vault, i.collectionVars);
+      const result = await executeRequest(activeRequest, i.collectionEnv, i.globalEnv, controller.signal, i.inherited, cookieJar, {}, scriptTimeoutRef.current, i.vault, i.collectionVars);
       persistResult(activeRequest, i.collectionEnv, i.globalEnv, result);
       if (!isCurrent()) return;
       patchRun(id, {
@@ -250,7 +257,7 @@ export function ApiClient() {
       if (isCurrent()) patchRun(id, { sending: false });
       if (abortRefs.current.get(id) === controller) abortRefs.current.delete(id);
     }
-  }, [activeRequest, activeInputs, patchRun, persistResult]);
+  }, [activeRequest, activeInputs, cookieJar, patchRun, persistResult]);
 
   const cancel = useCallback(() => {
     if (activeRequest) abortRefs.current.get(activeRequest.id)?.abort();
@@ -561,7 +568,7 @@ export function ApiClient() {
         onClose={() => setCodeOpen(false)}
         prepare={prepareActive}
         secrets={codeSecrets}
-        cookieJar={store.cookiesEnabled ? store.cookies : []}
+        cookieJar={cookieJar}
       />
       {runTarget && (
         <RunnerDialog

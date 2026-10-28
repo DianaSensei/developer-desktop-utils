@@ -10,7 +10,8 @@ import { CopyButton } from '@/components/ui/copy-button';
 import { Label } from '@/components/ui/label';
 import { Segmented } from '@/components/ui/segmented';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Spinner } from '@/components/ui/spinner';
+import { Callout } from '@/components/ui/callout';
+import { LoadingRow } from '@/components/ui/spinner';
 import { Switch } from '@/components/ui/switch';
 import { CodeViewer } from '@/design-system';
 import { CODE_TARGETS, generateCode } from './codegen';
@@ -52,19 +53,34 @@ export function GenerateCodeDialog({ open, onClose, prepare, secrets, cookieJar 
 
   const target = CODE_TARGETS.find((t) => t.lang === lang) ?? CODE_TARGETS[0];
 
+  // Real values are opt-in per opening: a switch left on from last time would
+  // otherwise put secrets on screen without the user having asked again.
+  useEffect(() => {
+    if (!open) { setReveal(false); setPrepared(null); setFailure(null); }
+  }, [open]);
+
   // Prepare once per opening (and again if the request or its inputs change
   // while open). Script-set variables are not persisted — only Send does that.
+  // A re-prepare keeps the previous snippet on screen until the new one is in,
+  // rather than blanking the pane under the user.
   useEffect(() => {
-    if (!open || !prepare) { setPrepared(null); return; }
+    if (!open || !prepare) return;
     const controller = new AbortController();
-    setPrepared(null);
-    setFailure(null);
     prepare(controller.signal).then(
-      (p) => { if (!controller.signal.aborted) setPrepared(p); },
-      (e: unknown) => { if (!controller.signal.aborted) setFailure(errToString(e)); },
+      (p) => { if (!controller.signal.aborted) { setPrepared(p); setFailure(null); } },
+      (e: unknown) => { if (!controller.signal.aborted) { setPrepared(null); setFailure(errToString(e)); } },
     );
     return () => controller.abort();
   }, [open, prepare]);
+
+  // Most requests have no script and prepare in a few ms — only show the
+  // loading line for a wait the user would actually notice.
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    if (prepared || failure || !open) { setSlow(false); return; }
+    const timer = setTimeout(() => setSlow(true), 300);
+    return () => clearTimeout(timer);
+  }, [prepared, failure, open]);
 
   // Both renderings, so the secrets switch only shows when it would change
   // anything — most requests use no secret at all.
@@ -101,7 +117,7 @@ export function GenerateCodeDialog({ open, onClose, prepare, secrets, cookieJar 
         </div>
 
         {/* toolbar */}
-        <div className="flex items-center gap-3 px-4 py-3">
+        <div className="flex flex-wrap items-center gap-3 px-4 py-3">
           <Select value={lang} onValueChange={pickLang}>
             <SelectTrigger className="h-ctl w-40 text-xs"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -139,9 +155,12 @@ export function GenerateCodeDialog({ open, onClose, prepare, secrets, cookieJar 
         {/* The same failure would cancel a Send, so say so rather than hand
             over a snippet that silently differs from what Send would do. */}
         {prepared && prepared.errors.length > 0 && (
-          <p className="whitespace-pre-wrap border-t bg-bad-tint px-4 py-2 text-xs text-bad">
-            {tr('code.scriptFailed')}{'\n'}{prepared.errors.join('\n')}
-          </p>
+          <Callout tone="error" size="sm" title={tr('code.scriptFailed')} className="mx-4 mb-3 whitespace-pre-wrap">
+            {prepared.errors.join('\n')}
+          </Callout>
+        )}
+        {reveal && usesSecrets && (
+          <Callout tone="warning" size="sm" className="mx-4 mb-3">{tr('code.revealSecretsHint')}</Callout>
         )}
 
         {/* Code preview. The height floor lives on the dialog: `scrollable` gives
@@ -160,11 +179,9 @@ export function GenerateCodeDialog({ open, onClose, prepare, secrets, cookieJar 
               />
             </>
           ) : failure ? (
-            <p className="p-4 text-xs text-bad">{failure}</p>
-          ) : open && prepare ? (
-            <div className="flex flex-1 items-center justify-center gap-2 text-xs text-fg-mute">
-              <Spinner size="sm" /> {tr('code.preparing')}
-            </div>
+            <Callout tone="error" size="sm" className="m-4">{failure}</Callout>
+          ) : slow ? (
+            <LoadingRow size="sm" label={tr('code.preparing')} className="m-auto" />
           ) : null}
         </div>
       </DialogContent>
