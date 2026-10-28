@@ -5,7 +5,16 @@
 // remember its keys keeps them in the vault, under the template id (see
 // PipelineTemplates.tsx).
 
-import type { PipelineStep } from './pipelineEngine';
+import type { ComposePart, PipelineStep } from './pipelineEngine';
+
+/**
+ * A Compose part's own transforms without any `key`. Parts only run keyless
+ * steps, but a hand-edited or shared file could still carry one, and steps
+ * are stored in the plain settings file.
+ */
+function withoutPartKeys(parts: ComposePart[] | undefined): ComposePart[] | undefined {
+  return parts?.map((p) => (p.steps ? { ...p, steps: p.steps.map(({ key: _key, ...s }) => s) } : p));
+}
 
 export interface PipelineTemplate {
   id: string;
@@ -73,7 +82,8 @@ export interface SaveOptions {
 
 /** Steps as a template stores them: no keys, and no input data unless asked. */
 export function toTemplateSteps(steps: PipelineStep[], { keepInput }: SaveOptions): PipelineStep[] {
-  return steps.map(({ key: _key, ...s }) => {
+  return steps.map(({ key: _key, ...rest }) => {
+    const s: PipelineStep = rest.composeParts ? { ...rest, composeParts: withoutPartKeys(rest.composeParts) } : rest;
     if (keepInput) return s;
     const out: PipelineStep = { ...s };
     if (out.op === 'text-sunk') out.textValue = '';
@@ -97,15 +107,21 @@ export function instantiateTemplate(
   makeId: () => string,
 ): { steps: PipelineStep[]; idMap: Record<string, string> } {
   const idMap: Record<string, string> = {};
-  const steps = template.steps.map((s) => {
-    const id = makeId();
-    idMap[s.id] = id;
-    return {
-      ...s,
-      id,
-      jsonFields: s.jsonFields?.map((f) => ({ ...f, id: makeId() })),
-    };
-  });
+  for (const s of template.steps) idMap[s.id] = makeId();
+  const steps = template.steps.map((s) => ({
+    ...s,
+    id: idMap[s.id],
+    jsonFields: s.jsonFields?.map((f) => ({ ...f, id: makeId() })),
+    // A part reading an earlier step names it by id, so it follows the
+    // renumbering; one naming a step not in the template stays dangling and
+    // says so when it runs.
+    composeParts: s.composeParts?.map((p) => ({
+      ...p,
+      id: makeId(),
+      value: p.source === 'step' ? (idMap[p.value] ?? p.value) : p.value,
+      steps: p.steps?.map((sub) => ({ ...sub, id: makeId() })),
+    })),
+  }));
   return { steps, idMap };
 }
 
@@ -129,7 +145,11 @@ export function parseTemplates(text: string): PipelineTemplate[] {
       id: typeof o.id === 'string' && !isBuiltin(o.id) ? o.id : '',
       name: o.name.trim(),
       // A shared file must not be able to smuggle a key into the plain settings.
-      steps: (o.steps as PipelineStep[]).map(({ key: _key, ...s }, j) => ({ ...s, id: typeof s.id === 'string' ? s.id : `s${j}` })),
+      steps: (o.steps as PipelineStep[]).map(({ key: _key, ...s }, j) => ({
+        ...s,
+        id: typeof s.id === 'string' ? s.id : `s${j}`,
+        ...(Array.isArray(s.composeParts) ? { composeParts: withoutPartKeys(s.composeParts) } : {}),
+      })),
       updatedAt: typeof o.updatedAt === 'number' ? o.updatedAt : Date.now(),
     };
   });
