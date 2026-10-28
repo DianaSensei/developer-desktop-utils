@@ -234,7 +234,7 @@ jobs:
       # filename (which only encodes arch, e.g. "aarch64"/"amd64"/"x64" — not
       # OS, and not reliably even that if naming ever changes).
       - name: Download all platform bundles
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v6.0.0
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v6.0.0
         with:
           pattern: 'bundle-*'
           path: downloaded
