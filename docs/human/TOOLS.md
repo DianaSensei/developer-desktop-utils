@@ -25,6 +25,7 @@ This document describes every tool in the app: what computation it performs, wha
 | Generator | ✓ | — | ✓ | — | Random + Test Data schema/options (localStorage) |
 | Time Tracker | ✓ | — | — | — | Time entries, projects, tags (localStorage) |
 | QR Code | ✓ (image) | ✓ | ✓ | — | Mode (localStorage) |
+| Text Editor | ✓ (path) | **✓ folders you open** | **✓ folders you open (create/rename/move/delete)** | — | Open folders, tab paths, layout (localStorage); authorised folder list (app data) |
 | Kafka Explorer | ✓ | — | — | **✓ TCP** | Broker configs (app data); produce draft in-memory |
 | RabbitMQ | ✓ | — | — | **✓ HTTP/HTTPS (mgmt API, browse/create) + AMQP 5672/5671 (publish/consume/RPC)** | Connection profiles incl. password & client identity (app data) |
 | Redis | ✓ | — | — | **✓ TCP 6379/6380 (RESP protocol)** | Connection profiles incl. password (app data) |
@@ -287,6 +288,25 @@ Generates QR codes from text/URLs and decodes QR codes from image files.
 
 **Permissions (Tauri):** `dialog:allow-open`, `dialog:allow-save`, `fs:allow-read-file`, `fs:allow-write-file`, `fs:scope-appdata-recursive`.  
 **OS / system impact:** reads the image file you select; writes a PNG only to the path you explicitly choose. No data leaves the machine.
+
+---
+
+### Text Editor
+
+A VS Code-style editor: open one or more folders, browse them as a tree, edit files in tabs (CodeMirror, syntax highlighting picked from the file name), and create, rename, move or delete files and folders.
+
+#### How it works
+
+1. **Open Folder…** calls the Rust `editor_pick_folder` command, which shows the native folder dialog **from Rust**. The folder you choose becomes a *workspace root* and is remembered in `editor-roots.json` in the app data directory. The webview never tells Rust which folder to authorise — so a script running in the webview cannot grant itself a folder you did not pick.
+2. Every other operation is a Rust `editor_*` command (`list_dir`, `list_files`, `stat`, `read_file`, `write_file`, `create_file`, `create_dir`, `rename`, `move`, `delete`) implemented in `src-tauri/src/editor_fs.rs`. Each canonicalises the path and refuses anything that is not inside a workspace root, so `..`, alternate spellings and symlinks cannot reach outside it. A symlink inside a root that points elsewhere is listed but cannot be opened, written or created through; deleting it removes the link, not its target.
+3. Saving overwrites the file in place (permissions and owner are kept) and refuses if the file changed on disk since it was read, so the UI can ask before discarding another program's change. Writing never creates a file — creation is a separate, explicit command that fails if the name already exists.
+4. Files over 10 MB, and binary or non-UTF-8 files, are not loaded. Quick Open (`⌘/Ctrl+P`) walks each root up to 20 000 files, skipping `.git`, `node_modules`, `target` and similar folders, and never following symlinked folders.
+5. There is no background file watcher: when the window regains focus the tool re-lists the folders that are expanded and compares open files' modification times with disk.
+
+**Web (browser) build:** there is no disk access; the tool runs on an in-memory demo folder and says so in a banner.
+
+**Permissions (plugin manifest):** `storage`, `clipboard:write` (Copy Path), `native` restricted to the `editor_` command prefix. No new Tauri capability: the folder dialog is opened by Rust, and the `fs` plugin is not used.
+**OS / system impact:** reads and writes only inside folders you opened. **Delete is permanent** (files do not go to the Trash) and always asks first. Removing a folder from **Recent** revokes the app's access to it. No data leaves the machine.
 
 ---
 

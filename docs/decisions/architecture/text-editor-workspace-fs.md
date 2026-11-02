@@ -1,0 +1,78 @@
+# Text Editor — truy cập thư mục theo "workspace root" cấp qua hộp thoại Rust
+
+## Vấn đề
+
+Tool **Text Editor** (`src/plugins/text-editor`, `src/components/tools/editor/`) cần làm
+những việc một editor kiểu VS Code làm: mở thư mục, liệt kê cây, đọc/ghi file, tạo / đổi tên
+/ di chuyển / xoá file và thư mục. SDK hiện có (`sdk.files`) chỉ đọc/ghi **từng file** người
+dùng chọn qua hộp thoại — không liệt kê thư mục, không tạo/xoá/đổi tên. Còn `fs` plugin của
+Tauri thì scope chỉ có `fs:scope-appdata-recursive`.
+
+Hai cách hiển nhiên đều sai:
+
+1. **Nới capability `fs` (`fs:allow-read-dir`, `fs:allow-remove`, scope `**`)** — biến webview
+   thành "làm gì cũng được với mọi file của user", trái với hướng `dropped.rs` đã vạch ra
+   (một XSS là đủ phá).
+2. **Lệnh Rust nhận đường dẫn tuỳ ý** (`delete(path)`) — y hệt vấn đề trên, chỉ chuyển chỗ.
+
+## Phương án đã chọn
+
+Ranh giới ở **cấp thư mục**, giống ý tưởng của `dropped.rs` ở cấp file:
+
+- **Workspace root** chỉ được thêm bởi `editor_pick_folder` — lệnh này **tự mở hộp thoại chọn
+  thư mục từ Rust** (`tauri_plugin_dialog::DialogExt`) rồi ghi folder người dùng chọn vào
+  `Roots`. Webview không bao giờ gửi "hãy cấp quyền cho folder X". Danh sách root được lưu ở
+  `<app_data>/editor-roots.json` (chỉ Rust ghi) nên mở lại "Recent" sau khi khởi động lại vẫn
+  an toàn. Xoá khỏi Recent (`editor_forget_root`) = thu hồi quyền.
+- Mọi lệnh khác (`editor_list_dir`, `_list_files`, `_stat`, `_read_file`, `_write_file`,
+  `_create_file`, `_create_dir`, `_rename`, `_move`, `_delete`) đi qua `Roots` trong
+  `src-tauri/src/editor_fs.rs` (Rust thuần, không phụ thuộc Tauri → test được không cần
+  WebKit):
+  - `resolve(p)`: canonicalize **cả đường dẫn** (đi theo symlink) rồi kiểm tra nằm trong một
+    root — dùng cho đọc / ghi / liệt kê. Symlink trỏ ra ngoài → `denied`.
+  - `resolve_entry(p)`: canonicalize **chỉ thư mục cha** + tên — dùng cho xoá / đổi tên / di
+    chuyển, để thao tác lên chính symlink chứ không phải đích của nó. Root không bao giờ là
+    entry (không xoá/đổi tên được workspace từ cây).
+  - Tạo file/thư mục lồng nhau (`a/b/c.txt`) tạo **từng cấp** và kiểm tra lại containment ở
+    mỗi cấp — `create_dir_all` sẽ đi xuyên một symlink có sẵn và tạo thư mục bên ngoài trước
+    khi kịp kiểm tra (xem experience-log 2026-11-02).
+  - `write_text` không bao giờ tạo file mới; ghi đè tại chỗ (giữ quyền, owner, hard link) và
+    trả `conflict` nếu mtime trên đĩa khác mtime editor đã đọc.
+- Manifest chỉ khai `native` với allowlist `['editor_']` + `storage` + `clipboard:write`.
+  **Không thêm capability Tauri nào** (hộp thoại mở từ Rust không đi qua IPC permission).
+
+### Frontend
+
+- `store.ts` — store phạm vi module (shell unmount tool khi chuyển tool; chỉnh sửa chưa lưu
+  phải sống sót). Giữ `EditorState` của CodeMirror cho **từng tab** (undo history, selection,
+  scroll riêng); **một** `EditorView` duy nhất được `setState` khi đổi tab. Theme / ngôn ngữ /
+  word-wrap là `Compartment` dùng chung; khi một state được đưa vào view thì theme + wrap được
+  reconfigure lại (state cất trong Map giữ cấu hình của lúc nó được tạo).
+- Lưu bền qua `sdk.storage` (gộp 250 ms, chỉ ghi key đổi): folder đang mở, đường dẫn các tab,
+  tab đang active, thư mục đang mở rộng, word wrap. **Nội dung chưa lưu không được lưu bền.**
+- Không có file watcher: khi cửa sổ được focus lại, re-list các thư mục đang mở rộng và `stat`
+  các tab — tab sạch tự reload, tab có thay đổi chưa lưu hiện banner Reload / Keep Mine.
+- Bản web (`npm run dev`, test) chạy trên `memoryFs.ts` cùng ngữ nghĩa và mã lỗi với Rust,
+  nên test của store/component chạy thật đầu-cuối trong jsdom.
+- Highlight theo tên file qua `@codemirror/language-data` — mỗi grammar là một dynamic import
+  riêng, chỉ tải khi mở file loại đó.
+- Kéo-thả trong cây dùng pointer event (HTML5 DnD không tới được webview vì Tauri chặn để nhận
+  file thả từ OS — cùng lý do với cây của API Client).
+
+## Đã cân nhắc, chưa làm
+
+- **Xoá vào Thùng rác** (crate `trash`) — UX tốt hơn, nhưng thêm dependency native cho cả ba
+  OS mà môi trường CI/agent không build thử được macOS/Windows. Hiện xoá vĩnh viễn, luôn qua
+  `ConfirmDialog` nói rõ "không vào Thùng rác". Ứng viên đầu tiên nếu có phản hồi.
+- **File watcher** (`notify` crate) — chính xác hơn focus-refresh nhưng tốn tài nguyên với
+  workspace lớn và cần quản lý vòng đời watcher theo root.
+- **Tìm trong toàn workspace** (⌘⇧F) và **hot exit** (lưu buffer chưa lưu qua restart).
+- **Encoding khác UTF-8** — file không phải UTF-8 hiện bị coi là nhị phân (không mở) để không
+  ghi hỏng khi lưu.
+
+## File
+
+- `src-tauri/src/editor_fs.rs` — luật filesystem + 18 test (symlink, `..`, prefix, root…)
+- `src-tauri/src/editor.rs` — lệnh Tauri, state, lưu `editor-roots.json`, hộp thoại
+- `src/components/tools/editor/` — `store.ts` (+ test), `fs.ts`, `memoryFs.ts`, `Explorer.tsx`,
+  `EditorTabs.tsx`, `EditorPane.tsx`, `StatusBar.tsx`, `QuickOpen.tsx`, `fileRanking.ts`

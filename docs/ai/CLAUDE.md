@@ -890,6 +890,7 @@ git push origin main --tags
 | `data-converter` | Data Converter | ✅ | JSON ↔ YAML ↔ TOML ↔ XML ↔ .properties |
 | `generator` | Generator | ✅ | UUID, random, fake datasets (JSON/CSV/SQL) |
 | `qrcode` | QR Code | ✅ | Generate + decode |
+| `text-editor` | Text Editor | ✅ | VS Code-style: open folders, file tree, tabs, create/rename/move/delete, Quick Open (Rust `editor_*` commands) |
 | `2fa` | 2FA Authenticator | ✅ | TOTP/HOTP, SHA-1/256/512, 6/8 digits |
 | `color-picker` | Color Picker | ❌ | HEX/RGB/HSL/CMYK, image eyedropper |
 | `regex` | Regex Tester | ❌ | Live match highlighting, Web Worker |
@@ -1056,6 +1057,14 @@ Key files:
 - `commands.ts` — CLI Console autocomplete reference list
 
 ---
+
+### Text Editor (`src/components/tools/editor/`, `src-tauri/src/editor.rs`, `src-tauri/src/editor_fs.rs`)
+
+- **Filesystem boundary**: a folder becomes reachable only through `editor_pick_folder`, which opens the OS folder dialog *from Rust* and records the pick in `<app_data>/editor-roots.json`. Every other `editor_*` command checks the canonical path is inside one of those roots (`Roots::resolve` follows symlinks — read/write/list; `Roots::resolve_entry` resolves only the parent — delete/rename/move act on a link, not its target). Never add an `editor_*` command that takes a root from the webview. Decision + rationale: `docs/decisions/architecture/text-editor-workspace-fs.md`.
+- **Store** (`store.ts`) is module-scope (the shell unmounts tools on switch; unsaved edits must survive). One `EditorView`; each tab owns an `EditorState` that the store swaps in (`attachView` / `syncView`). Theme, language and wrap are shared `Compartment`s — reconfigure theme+wrap whenever a stored state is put into the view. Cursor position has its own subscription (`subscribeCursor`) so typing doesn't re-render the tree.
+- **Backends** (`fs.ts`): `createNativeFs(sdk)` (Tauri) and `createMemoryFs()` (`memoryFs.ts`, browser build + tests, same error codes). Store and component tests drive the real UI on the memory backend.
+- **Shortcuts** (one `window` keydown listener in `WorkspaceEditor.tsx`, ignored while a `[role="dialog"]` is open; matched on `e.code` because ⌥ changes `e.key` on macOS): ⌘S save · ⌘⌥S save all · ⌘W close tab (asks about unsaved) · ⌘P Go to File · ⌘N new file in the selected folder · Ctrl+Tab / Ctrl+⇧Tab cycle tabs · ⌥Z word wrap. Tree (focused): arrows, Enter, F2 rename, Delete / ⌘⌫ delete, ⌘X / ⌘V cut-paste move, pointer drag onto a folder moves.
+- **Saving** keeps LF/CRLF (detected on read) and a UTF-8 BOM; a stale mtime returns `conflict` and the UI offers Overwrite / Discard & Reload. No file watcher — window focus triggers `store.checkAll()`.
 
 ### MCP bridge — API Client + Mock Server + Redis/Kafka/RabbitMQ/Container Clients + Encode·Hash·Encrypt + JWT Debugger + JSON Formatter (`src-tauri/src/mcp_bridge.rs`, `src-tauri/src/bin/devtool-mcp-server.rs`, `src/components/tools/{apiclient,mockserver,redis,kafka,rabbit,container}/mcpBridge.ts`, `src/components/tools/{codec,jwt,json}McpBridge.ts`)
 

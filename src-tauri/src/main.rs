@@ -3,6 +3,8 @@
 
 mod checksum;
 mod dropped;
+mod editor;
+mod editor_fs;
 mod netinfo;
 mod files;
 mod mcp_bridge;
@@ -107,6 +109,7 @@ fn main() {
             _ => {}
         })
         .manage(mockserver::MockState::default())
+        .manage(editor::EditorState::default())
         .manage(service_host::ServiceRegistry::default())
         .manage(secrets_vault::VaultState::default())
         .manage(artifact_installer::InstalledIndex::default())
@@ -163,6 +166,19 @@ fn main() {
             mockserver::mock_status,
             mockserver::mock_update_rules,
             mockserver::mock_test_script,
+            editor::editor_pick_folder,
+            editor::editor_roots,
+            editor::editor_forget_root,
+            editor::editor_list_dir,
+            editor::editor_list_files,
+            editor::editor_stat,
+            editor::editor_read_file,
+            editor::editor_write_file,
+            editor::editor_create_file,
+            editor::editor_create_dir,
+            editor::editor_rename,
+            editor::editor_move,
+            editor::editor_delete,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

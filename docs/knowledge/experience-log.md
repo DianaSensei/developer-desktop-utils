@@ -617,3 +617,42 @@
   `impl Deserialize` thủ công qua `serde_json::Value` trung gian, không phải cố ép bằng attribute
   — và luôn seed test bằng bytes do CHÍNH code cũ tạo ra, không phải JSON viết tay theo trí nhớ
   về hình dạng của nó.
+
+## [2026-11-02] editor_fs.rs — `create_dir_all` đi xuyên symlink có sẵn, tạo thư mục bên ngoài workspace trước khi kịp kiểm tra
+- Nguyên nhân: lệnh tạo file lồng nhau (`a/b/c.txt`, như VS Code) ban đầu ghép đường dẫn từ
+  các component đã validate (không `..`, không `/`), gọi `std::fs::create_dir_all(parent)`
+  rồi MỚI canonicalize `parent` để kiểm tra nằm trong root. Nếu `a` đã tồn tại sẵn là một
+  symlink trỏ ra ngoài root, `create_dir_all` đi theo nó và tạo `b` ở bên ngoài — kiểm tra
+  sau đó có trả `denied` thì thư mục ngoài root cũng đã bị tạo rồi. Validate từng component
+  là chưa đủ: component sạch vẫn có thể là một symlink có sẵn trên đĩa.
+- Số lần thử: 1/5 (bắt được khi tự review trước khi chạy test; thêm test
+  `linkdir/sub/new.txt` khẳng định không có thư mục nào được tạo xuyên qua link).
+- Kết quả: Đã fix
+- Cách fix: tạo từng cấp một. Với mỗi component trung gian: nếu đã tồn tại thì canonicalize
+  và kiểm tra containment (và phải là thư mục) TRƯỚC khi đi tiếp; nếu chưa có thì
+  `create_dir` đúng một cấp. Lá (file/thư mục mới) tạo bằng `create_new`/`create_dir` để
+  không ghi đè.
+- Bài học chung: với mọi ranh giới "chỉ được đụng bên trong thư mục X", kiểm tra phải đứng
+  TRƯỚC mọi side effect, ở từng bước mà hệ điều hành có thể đi theo symlink. Các hàm tiện ích
+  "làm cả chuỗi" (`create_dir_all`, `remove_dir_all` trên đường dẫn đã resolve, `copy` đệ
+  quy) gộp nhiều bước resolve lại thành một — không có chỗ chen kiểm tra vào giữa. Kiểm tra
+  sau khi gọi chỉ phát hiện, không ngăn được.
+
+## [2026-11-02] tooling — thêm plugin mới làm đỏ 3 test đếm + 1 test trùng tên khác hoa/thường
+- Nguyên nhân: (1) `src/fileNameCase.test.ts` cấm hai module chỉ khác hoa/thường —
+  `editor/QuickOpen.tsx` (component) cạnh `editor/quickOpen.ts` (ranking) vỡ trên macOS/Windows
+  vốn không phân biệt hoa thường. (2) Ngoài `registry.test.ts` (bảng pin), số plugin còn bị
+  khoá cứng ở `platform/registry.installer.test.ts` (`expect(before).toBe(N)`) và số mục
+  sidebar ở `lib/toolGroups.test.ts` (`toHaveLength(N)`).
+- Số lần thử: 1/5
+- Kết quả: Đã fix (đổi `quickOpen.ts` → `fileRanking.ts`; tăng hai con số; thêm plugin vào bốn
+  bảng pin của `registry.test.ts`).
+- Ghi chú môi trường: `cargo check` toàn crate trên Linux cần `libwebkit2gtk-4.1-dev`
+  `libgtk-3-dev` `librsvg2-dev` `libsoup-3.0-dev`, một thư mục `dist/` tồn tại (macro
+  `generate_context!` kiểm `frontendDist`), và placeholder
+  `src-tauri/binaries/devtool-svc-echo-<triple>` (build.rs chỉ tự tạo placeholder cho
+  `devtool-mcp-server`). Code Rust thuần (không kiểu Tauri) như `editor_fs.rs` có thể test
+  nhanh bằng một crate tạm `#[path = ".../editor_fs.rs"] mod editor_fs;`.
+- Bài học chung: thêm plugin = chạy TOÀN BỘ `npx vitest run`, không chỉ test của plugin —
+  repo có nhiều test "đếm/pin" cố ý đỏ khi tập plugin đổi. Và đặt tên file component khác hẳn
+  tên module logic cùng thư mục (`QuickOpen.tsx` + `fileRanking.ts`), đừng chỉ khác chữ hoa.

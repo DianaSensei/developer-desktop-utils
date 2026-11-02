@@ -336,6 +336,25 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
     caveat: ['No editor syntax highlighting; no tables/footnotes/strikethrough (basic CommonMark); panes don’t sync-scroll.'],
   }),
 
+  'text-editor': makeGuide({
+    use: [
+      <><strong className="text-fg">Open Folder…</strong> picks a folder in the system dialog; it shows in the Explorer as a tree. Add more folders the same way — a closed one stays under <strong className="text-fg">Recent</strong>.</>,
+      'Click a file to open it in a tab. Right-click any row for New File / New Folder, Rename, Cut / Paste, Copy Path and Delete; drag a row onto a folder to move it.',
+      <>New File accepts a path — <Tok>src/util/x.ts</Tok> creates the missing folders too. <Key>F2</Key> renames, <Key>Delete</Key> (or <Key>{mod}</Key>+<Key>⌫</Key>) deletes, arrow keys walk the tree.</>,
+      <><Key>{mod}</Key>+<Key>S</Key> saves, <Key>{mod}</Key>+<Key>P</Key> jumps to any file by name, <Key>{mod}</Key>+<Key>W</Key> closes the tab, <Key>Ctrl</Key>+<Key>Tab</Key> cycles tabs, <Key>{mod}</Key>+<Key>F</Key> finds/replaces in the file, <Key>Alt</Key>+<Key>Z</Key> toggles word wrap.</>,
+    ],
+    know: [
+      'Syntax highlighting is picked from the file name (~150 languages). Line endings (LF/CRLF) and a UTF-8 BOM are kept when you save.',
+      'Unsaved edits survive switching to another tool, and each tab keeps its own undo history. Open folders and tabs come back after a restart.',
+      'When you return to the window, open folders are re-listed and open files are compared with disk: an unchanged tab reloads on its own; one with unsaved edits asks first. Saving over a file another program changed asks before overwriting.',
+      'The app can only reach folders you opened through the dialog. Remove one from Recent to revoke that access.',
+    ],
+    caveat: [
+      'Delete is permanent — files do not go to the Trash.',
+      'Binary files and files over 10 MB are not opened. Symlinks that point outside the opened folder are listed but cannot be opened.',
+    ],
+  }),
+
   deduplicate: makeGuide({
     use: [
       'Paste one item per line on the left; unique items appear on the right.',
