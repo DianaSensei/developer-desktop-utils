@@ -1,13 +1,17 @@
 // The open-file tab strip. A dirty tab shows a dot where its × sits (hover
 // turns it back into ×), two tabs with the same file name get their folder
 // name added, and the usual tab gestures apply: middle-click closes,
-// right-click for Close Others / to the Right / Saved / All.
+// right-click for Close Others / to the Right / Saved / All. At the end of
+// the strip: + for a new untitled tab and the Recently Closed menu.
 
-import { useEffect, useMemo, useRef } from 'react';
-import { Copy, Locate, X } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Copy, History, Locate, Plus, Save, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ContextMenu, useContextMenu, type ContextMenuEntry } from '@/components/ui/context-menu';
 import { Spinner } from '@/components/ui/spinner';
+import { IconButton } from '@/components/ui/icon-button';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { RecentlyClosed } from './RecentlyClosed';
 import { useMessages } from '@/contexts/LocaleContext';
 import MESSAGES from './WorkspaceEditor.messages';
 import type { EditorSnapshot, EditorStore, Tab } from './store';
@@ -19,9 +23,11 @@ interface Props {
   snap: EditorSnapshot;
   onRequestClose: (ids: string[]) => void;
   onCopyPath: (path: string, relative: boolean) => void;
+  onSaveAs: (id: string) => void;
+  onNewUntitled: () => void;
 }
 
-export function EditorTabs({ store, snap, onRequestClose, onCopyPath }: Props) {
+export function EditorTabs({ store, snap, onRequestClose, onCopyPath, onSaveAs, onNewUntitled }: Props) {
   const m = useMessages(MESSAGES);
   const menu = useContextMenu();
   const stripRef = useRef<HTMLDivElement>(null);
@@ -46,23 +52,31 @@ export function EditorTabs({ store, snap, onRequestClose, onCopyPath }: Props) {
     const others = ids.filter((id) => id !== tab.id);
     const right = ids.slice(idx + 1);
     const saved = tabs.filter((t) => !t.dirty).map((t) => t.id);
-    return [
+    const saveAs: ContextMenuEntry = { icon: <Save className="h-3.5 w-3.5" />, label: m('saveAs'), sep: true, onClick: () => onSaveAs(tab.id) };
+    const common: ContextMenuEntry[] = [
       { label: m('close'), onClick: () => onRequestClose([tab.id]) },
       { label: m('closeOthers'), disabled: others.length === 0, onClick: () => onRequestClose(others) },
       { label: m('closeRight'), disabled: right.length === 0, onClick: () => onRequestClose(right) },
       { label: m('closeSaved'), disabled: saved.length === 0, onClick: () => store.closeTabs(saved) },
       { label: m('closeAll'), onClick: () => onRequestClose(ids) },
-      { icon: <Copy className="h-3.5 w-3.5" />, label: m('copyPath'), sep: true, onClick: () => onCopyPath(tab.path, false) },
+    ];
+    if (tab.kind === 'untitled') return [...common, saveAs];
+    return [
+      ...common,
+      { ...saveAs },
+      { icon: <Copy className="h-3.5 w-3.5" />, label: m('copyPath'), onClick: () => onCopyPath(tab.path, false) },
       { icon: <Copy className="h-3.5 w-3.5" />, label: m('copyRelativePath'), onClick: () => onCopyPath(tab.path, true) },
       { icon: <Locate className="h-3.5 w-3.5" />, label: m('revealInExplorer'), onClick: () => store.select(tab.path) },
     ];
   };
 
   return (
+    <div className="flex h-ctl shrink-0 items-stretch border-b border-line bg-chrome">
     <div
       ref={stripRef}
       role="tablist"
-      className="flex h-ctl shrink-0 items-stretch overflow-x-auto no-scrollbar border-b border-line bg-chrome"
+      onDoubleClick={(e) => { if (e.target === e.currentTarget) onNewUntitled(); }}
+      className="flex min-w-0 flex-1 items-stretch overflow-x-auto no-scrollbar"
     >
       {tabs.map((tab) => {
         const active = tab.id === activeId;
@@ -73,7 +87,7 @@ export function EditorTabs({ store, snap, onRequestClose, onCopyPath }: Props) {
             role="tab"
             aria-selected={active}
             data-active={active || undefined}
-            title={tab.path}
+            title={tab.kind === 'untitled' ? `${tab.name} — ${m('untitledHint')}` : tab.path}
             tabIndex={active ? 0 : -1}
             onClick={() => store.activate(tab.id)}
             onAuxClick={(e) => { if (e.button === 1) { e.preventDefault(); onRequestClose([tab.id]); } }}
@@ -115,7 +129,33 @@ export function EditorTabs({ store, snap, onRequestClose, onCopyPath }: Props) {
           </div>
         );
       })}
+    </div>
+      <div className="flex shrink-0 items-center gap-0.5 border-l border-line px-1">
+        <IconButton size="xs" title={m('newTextFile')} aria-label={m('newTextFile')} onClick={onNewUntitled}>
+          <Plus className="h-3.5 w-3.5" />
+        </IconButton>
+        {snap.closed.length > 0 && <ClosedMenu store={store} snap={snap} />}
+      </div>
       {menu.state && <ContextMenu state={menu.state} onClose={menu.close} width={230} />}
     </div>
+  );
+}
+
+function ClosedMenu({ store, snap }: { store: EditorStore; snap: EditorSnapshot }) {
+  const m = useMessages(MESSAGES);
+  const [open, setOpen] = useState(false);
+  return (
+    <DropdownMenu open={open} onOpenChange={setOpen}>
+      <DropdownMenuTrigger
+        title={m('recentlyClosed')}
+        aria-label={m('recentlyClosed')}
+        className="grid h-6 w-6 place-items-center rounded-sm text-fg-mute transition-colors hover:bg-acc hover:text-fg focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus"
+      >
+        <History className="h-3.5 w-3.5" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-80 p-1.5">
+        <RecentlyClosed store={store} closed={snap.closed} limit={15} onDone={() => setOpen(false)} />
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

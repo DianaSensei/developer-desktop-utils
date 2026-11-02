@@ -6,7 +6,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import {
-  ChevronRight, ClipboardPaste, Copy, FilePlus, FolderInput, FolderPlus, FolderX, History, ListCollapse,
+  ChevronRight, ClipboardPaste, Copy, FileInput, FilePlus, FolderInput, FolderPlus, FolderX, History, ListCollapse,
   Pencil, RefreshCw, Scissors, Trash2, X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -218,6 +218,9 @@ export function Explorer({
         <SectionLabel className="mr-auto">{m('explorer')}</SectionLabel>
         <IconButton size="xs" title={m('openFolder')} aria-label={m('openFolder')} onClick={() => void store.openFolder()}>
           <FolderInput className="h-3.5 w-3.5" />
+        </IconButton>
+        <IconButton size="xs" title={m('openFile')} aria-label={m('openFile')} onClick={() => void store.openFilePicker()}>
+          <FileInput className="h-3.5 w-3.5" />
         </IconButton>
         {snap.folders.length > 0 && (
           <>
@@ -463,7 +466,7 @@ function NameField({ ctx, depth, kind, initial, placeholder, onCommit }: {
         spellCheck={false}
         autoCorrect="off"
         autoCapitalize="off"
-        className="h-6 min-w-0 flex-1 rounded-xs border border-acc/60 bg-card px-1.5 text-dense text-fg outline-hidden ring-2 ring-focus placeholder:text-fg-mute/70"
+        className="h-6 min-w-0 flex-1 rounded-xs border border-acc/60 bg-card px-1.5 text-dense text-fg outline-hidden ring-[3px] ring-focus placeholder:text-fg-mute/70"
       />
     </div>
   );

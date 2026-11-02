@@ -656,3 +656,21 @@
 - Bài học chung: thêm plugin = chạy TOÀN BỘ `npx vitest run`, không chỉ test của plugin —
   repo có nhiều test "đếm/pin" cố ý đỏ khi tập plugin đổi. Và đặt tên file component khác hẳn
   tên module logic cùng thư mục (`QuickOpen.tsx` + `fileRanking.ts`), đừng chỉ khác chữ hoa.
+
+## [2026-11-02] guard tests — `motion.test.tsx` không thấy file mới cho tới khi commit; focus vào editor đang `hidden` bị nuốt
+- Nguyên nhân: (1) test "mọi `ring-[3px]` đi kèm `ring-focus`" lấy danh sách file bằng
+  `git ls-files`, nên file **chưa được `git add`** bị bỏ qua hoàn toàn: lần đầu chạy toàn bộ
+  suite (file còn untracked) xanh, sau khi commit mới đỏ vì `Explorer.tsx` có một
+  `ring-2 ring-focus` (đếm 1 width vs 2 color). (2) ⌘N lần đầu (chưa có tab nào) gọi
+  `view.focus()` ngay khi tạo tab — lúc đó container của CodeMirror vẫn đang `hidden`
+  (`display: none`) vì React chưa render lại, focus vào phần tử ẩn không có tác dụng, chữ gõ
+  ngay sau đó rơi mất. Chỉ lộ ra qua ảnh chụp Playwright (tab đầu không có chữ), test jsdom
+  không bắt được.
+- Số lần thử: 1/5 mỗi lỗi
+- Kết quả: Đã fix (`ring-[3px] ring-focus` cho ô nhập tên; `store.focusEditor()` focus trong
+  `requestAnimationFrame`).
+- Bài học chung: (1) chạy lại toàn bộ `npx vitest run` SAU `git add -A` — guard dựa trên
+  `git ls-files` âm thầm bỏ qua file mới. (2) Bất cứ thao tác DOM nào (focus, scroll, đo kích
+  thước) ngay sau một thay đổi state làm phần tử từ ẩn thành hiện phải chờ tới sau lần render
+  (rAF / effect), không làm đồng bộ trong handler. Kiểm tra luồng bàn phím thật bằng trình
+  duyệt thật, không chỉ jsdom.

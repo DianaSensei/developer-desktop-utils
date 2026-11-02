@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { AppConfigProvider } from '@/contexts/AppConfigContext';
 import { WorkspaceEditor } from './WorkspaceEditor';
-import { resetEditorSession } from './session';
+import { getEditorStore, resetEditorSession } from './session';
+import { getPluginSdk } from '@/platform';
 import { storageKeys, storageRemove } from '@/lib/persistentStore';
 
 // The browser build (no Tauri) runs on the seeded in-memory workspace, which
@@ -65,5 +66,24 @@ describe('WorkspaceEditor (browser demo workspace)', () => {
     expect(await screen.findByText('Delete "package.json"?')).toBeTruthy();
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Delete' })); });
     await waitFor(() => expect(screen.queryByText('package.json')).toBeNull());
+  });
+
+  it('⌘N opens an untitled tab with no folder; closing it offers Restore', async () => {
+    renderEditor();
+    await screen.findByText('No folder opened');
+    await act(async () => { fireEvent.keyDown(window, { key: 'n', code: 'KeyN', ctrlKey: true }); });
+    expect(await screen.findByRole('tab', { name: /Untitled-1/ })).toBeTruthy();
+
+    // Give it some text, then close it from the tab's × button.
+    const store = getEditorStore(getPluginSdk('text-editor'));
+    act(() => { store.closeTab(store.getSnapshot().activeId!); });
+    act(() => { store.newUntitled('meeting notes\n- item'); });
+    const tab = await screen.findByRole('tab', { name: /meeting notes/ });
+    await act(async () => { fireEvent.click(within(tab).getByRole('button')); });
+    expect(screen.queryByRole('tab', { name: /meeting notes/ })).toBeNull();
+    expect(await screen.findByText(/kept under Recently Closed/)).toBeTruthy();
+
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Restore' })); });
+    expect(await screen.findByRole('tab', { name: /meeting notes/ })).toBeTruthy();
   });
 });

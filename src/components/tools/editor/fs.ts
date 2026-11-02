@@ -84,6 +84,12 @@ export interface EditorFs {
   pickFolder(): Promise<string | null>;
   /** Every authorised folder, oldest first. */
   roots(): Promise<string[]>;
+  /** Single files authorised through Save As / Open File, oldest first. */
+  authorisedFiles(): Promise<string[]>;
+  /** OS file picker for one file; resolves to it (now authorised) or null. */
+  pickFile(): Promise<string | null>;
+  /** OS Save dialog; writes `content` there and resolves to the path, or null. */
+  saveAs(content: string, suggestedName: string, opts?: { bom?: boolean }): Promise<string | null>;
   forgetRoot(path: string): Promise<void>;
   listDir(path: string): Promise<DirListing>;
   listFiles(root: string, limit?: number): Promise<FileList>;
@@ -96,6 +102,15 @@ export interface EditorFs {
   rename(path: string, newName: string): Promise<string>;
   move(path: string, targetDir: string): Promise<string>;
   delete(path: string): Promise<void>;
+  /** Content of untitled tabs, one entry per key, outside the settings store. */
+  readonly backups: BackupStore;
+}
+
+export interface BackupStore {
+  list(): Promise<string[]>;
+  read(key: string): Promise<string | null>;
+  write(key: string, content: string): Promise<void>;
+  delete(key: string): Promise<void>;
 }
 
 export function createNativeFs(sdk: PluginSdk): EditorFs {
@@ -110,6 +125,10 @@ export function createNativeFs(sdk: PluginSdk): EditorFs {
     kind: 'native',
     pickFolder: () => call<string | null>('editor_pick_folder'),
     roots: () => call<string[]>('editor_roots'),
+    authorisedFiles: () => call<string[]>('editor_authorised_files'),
+    pickFile: () => call<string | null>('editor_pick_file'),
+    saveAs: (content, suggestedName, opts = {}) =>
+      call<string | null>('editor_save_as', { content, suggestedName, bom: opts.bom ?? false }),
     forgetRoot: async (path) => { await call<boolean>('editor_forget_root', { path }); },
     listDir: (path) => call<DirListing>('editor_list_dir', { path }),
     listFiles: (root, limit) => call<FileList>('editor_list_files', { root, limit }),
@@ -123,5 +142,11 @@ export function createNativeFs(sdk: PluginSdk): EditorFs {
     rename: (path, newName) => call<string>('editor_rename', { path, newName }),
     move: (path, targetDir) => call<string>('editor_move', { path, targetDir }),
     delete: (path) => call<void>('editor_delete', { path }),
+    backups: {
+      list: () => call<string[]>('editor_backup_list'),
+      read: (key) => call<string | null>('editor_backup_read', { key }),
+      write: (key, content) => call<void>('editor_backup_write', { key, content }),
+      delete: (key) => call<void>('editor_backup_delete', { key }),
+    },
   };
 }

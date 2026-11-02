@@ -25,7 +25,7 @@ This document describes every tool in the app: what computation it performs, wha
 | Generator | ✓ | — | ✓ | — | Random + Test Data schema/options (localStorage) |
 | Time Tracker | ✓ | — | — | — | Time entries, projects, tags (localStorage) |
 | QR Code | ✓ (image) | ✓ | ✓ | — | Mode (localStorage) |
-| Text Editor | ✓ (path) | **✓ folders you open** | **✓ folders you open (create/rename/move/delete)** | — | Open folders, tab paths, layout (localStorage); authorised folder list (app data) |
+| Text Editor | ✓ (path) | **✓ folders / files you open** | **✓ folders you open (create/rename/move/delete), files you Save As** | — | Open folders, tab paths, layout (localStorage); authorised folder/file list and **untitled-tab backups** (app data) |
 | Kafka Explorer | ✓ | — | — | **✓ TCP** | Broker configs (app data); produce draft in-memory |
 | RabbitMQ | ✓ | — | — | **✓ HTTP/HTTPS (mgmt API, browse/create) + AMQP 5672/5671 (publish/consume/RPC)** | Connection profiles incl. password & client identity (app data) |
 | Redis | ✓ | — | — | **✓ TCP 6379/6380 (RESP protocol)** | Connection profiles incl. password (app data) |
@@ -302,10 +302,12 @@ A VS Code-style editor: open one or more folders, browse them as a tree, edit fi
 3. Saving overwrites the file in place (permissions and owner are kept) and refuses if the file changed on disk since it was read, so the UI can ask before discarding another program's change. Writing never creates a file — creation is a separate, explicit command that fails if the name already exists.
 4. Files over 10 MB, and binary or non-UTF-8 files, are not loaded. Quick Open (`⌘/Ctrl+P`) walks each root up to 20 000 files, skipping `.git`, `node_modules`, `target` and similar folders, and never following symlinked folders.
 5. There is no background file watcher: when the window regains focus the tool re-lists the folders that are expanded and compares open files' modification times with disk.
+6. **Single files.** **Open File…** (`editor_pick_file`) and **Save As** (`editor_save_as`) also open their OS dialogs from Rust. The chosen file — only that file — is authorised for read, write and stat (not delete/rename, not its folder), and remembered in the same `editor-roots.json`.
+7. **Untitled tabs (⌘/Ctrl+N).** A tab that is not a file yet. Its text is backed up continuously (debounced while typing) to `editor-backups/<key>.txt` in the app data directory — atomically, owner-only on macOS/Linux — through `editor_backup_*` commands that accept only a key (`[A-Za-z0-9_-]{1,64}`), never a path. Closing an untitled tab with text keeps the backup and lists it under **Recently Closed** (last 30); **Discard** / **Clear List** delete the backup, and backups nothing refers to are removed at startup. Save As turns the tab into a normal file tab and deletes its backup. Treat untitled tabs like any scratch file on disk: if you paste a secret into one, it is stored in that backup file until you discard it.
 
 **Web (browser) build:** there is no disk access; the tool runs on an in-memory demo folder and says so in a banner.
 
-**Permissions (plugin manifest):** `storage`, `clipboard:write` (Copy Path), `native` restricted to the `editor_` command prefix. No new Tauri capability: the folder dialog is opened by Rust, and the `fs` plugin is not used.
+**Permissions (plugin manifest):** `storage`, `clipboard:write` (Copy Path), `native` restricted to the `editor_` command prefix. No new Tauri capability: the folder/file dialogs are opened by Rust, and the `fs` plugin is not used.
 **OS / system impact:** reads and writes only inside folders you opened. **Delete is permanent** (files do not go to the Trash) and always asks first. Removing a folder from **Recent** revokes the app's access to it. No data leaves the machine.
 
 ---

@@ -5,13 +5,20 @@
 // and the React tree only renders them.
 //
 // What survives an app restart goes through `sdk.storage`: the open folders,
-// the open tab paths, the active tab, expanded folders, word wrap. Unsaved
-// buffer contents do not — the tab strip's dot is the reminder to save.
+// the open tab paths, the active tab, expanded folders, word wrap, and the
+// list of untitled / recently closed tabs. Unsaved edits to *files* do not —
+// the tab strip's dot is the reminder to save.
+//
+// Untitled tabs (⌘N) are the exception, VS Code's "hot exit": their text is
+// backed up continuously to `fs.backups` (one file per tab in the app data
+// folder, see editor_backup.rs), so it survives closing the app. Closing an
+// untitled tab with text in it never asks — it moves to Recently closed
+// (`snap.closed`), backup and all, and can be restored from there.
 
 import { EditorView, basicSetup } from 'codemirror';
 import { keymap } from '@codemirror/view';
 import { indentWithTab } from '@codemirror/commands';
-import { Compartment, EditorState, type Extension, type StateEffect, type Text, type TransactionSpec } from '@codemirror/state';
+import { Compartment, EditorState, Text, type Extension, type StateEffect, type TransactionSpec } from '@codemirror/state';
 import { codeThemeWithHighlight, smartBracketSkip } from '@/components/ui/code-theme';
 import { toFsError, type EditorFsError, type DirEntry, type EditorFs, type WalkEntry } from './fs';
 import { loadLanguage } from './languages';
@@ -33,6 +40,11 @@ export type TabStatus = 'idle' | 'loading' | 'ready' | 'binary' | 'error';
 
 export interface Tab {
   id: string;
+  /** `file`: a path on disk. `untitled`: an in-app buffer (⌘N) whose `path`
+   *  is the pseudo-path `untitled:<key>`, `<key>` naming its backup. */
+  kind: 'file' | 'untitled';
+  /** N of "Untitled-N", the name shown until the first line has text. */
+  untitledNo: number | null;
   path: string;
   name: string;
   status: TabStatus;
@@ -53,9 +65,20 @@ export interface Tab {
 export interface Notice {
   tone: 'error' | 'info';
   text: string;
-  /** FsError code, so the UI can show a localised sentence. */
+  /** FsError code (or `closedUntitled`), so the UI can show a localised sentence. */
   code?: string;
+  /** Recently-closed entry the notice offers to restore. */
+  restoreKey?: string;
 }
+
+/** A closed tab that can be reopened (⌘⇧T / Recently closed). Untitled
+ *  entries keep their text in `fs.backups` under `key`. */
+export type ClosedEntry =
+  | { kind: 'untitled'; key: string; name: string; untitledNo: number; closedAt: number }
+  | { kind: 'file'; key: string; path: string; name: string; closedAt: number };
+
+export const UNTITLED_PREFIX = 'untitled:';
+const MAX_CLOSED = 30;
 
 export interface EditorSnapshot {
   hydrated: boolean;
@@ -71,6 +94,8 @@ export interface EditorSnapshot {
   /** An entry marked with Cut, waiting for Paste on a folder. */
   cut: string | null;
   notice: Notice | null;
+  /** Most recent first. */
+  closed: ClosedEntry[];
 }
 
 export interface Cursor {
@@ -79,7 +104,7 @@ export interface Cursor {
   selected: number;
 }
 
-export type SaveResult = 'saved' | 'conflict' | 'failed' | 'skipped';
+export type SaveResult = 'saved' | 'conflict' | 'failed' | 'skipped' | 'cancelled';
 
 const KEYS = {
   folders: 'folders',
@@ -87,6 +112,8 @@ const KEYS = {
   active: 'active',
   expanded: 'expanded',
   wrap: 'wrap',
+  untitled: 'untitled',
+  closed: 'closed',
 } as const;
 
 function readJson<T>(storage: StorageLike, key: string, fallback: T): T {
@@ -105,10 +132,33 @@ function detectEol(text: string): '\n' | '\r\n' {
 
 let nextId = 1;
 
+function newKey(): string {
+  const c = globalThis.crypto as Crypto | undefined;
+  if (c?.randomUUID) return c.randomUUID();
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+/** An untitled tab is named after its first line with text, as in VS Code. */
+export function untitledTitle(doc: Text, no: number): string {
+  const lines = Math.min(doc.lines, 50);
+  for (let i = 1; i <= lines; i++) {
+    const text = doc.line(i).text.trim();
+    if (text) return text.length > 40 ? `${text.slice(0, 40)}…` : text;
+  }
+  return `Untitled-${no}`;
+}
+
+/** File name Save As suggests for an untitled tab. */
+export function suggestFileName(tab: Pick<Tab, 'name' | 'kind'>): string {
+  if (tab.kind !== 'untitled') return tab.name;
+  const base = tab.name.replace(/…$/, '').replace(/[\\/:*?"<>|\u0000-\u001f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 50) || 'Untitled';
+  return /\.[A-Za-z0-9]{1,8}$/.test(base) ? base : `${base}.txt`;
+}
+
 export class EditorStore {
   private snap: EditorSnapshot = {
     hydrated: false, folders: [], recent: [], dirs: {}, expanded: {}, selected: null,
-    tabs: [], activeId: null, wrap: false, cut: null, notice: null,
+    tabs: [], activeId: null, wrap: false, cut: null, notice: null, closed: [],
   };
   private listeners = new Set<() => void>();
   private cursorListeners = new Set<() => void>();
@@ -160,8 +210,8 @@ export class EditorStore {
     return id ? this.snap.tabs.find((t) => t.id === id) ?? null : null;
   }
 
-  notify(text: string, tone: Notice['tone'] = 'error', code?: string) {
-    this.set({ notice: { tone, text, code } });
+  notify(text: string, tone: Notice['tone'] = 'error', code?: string, restoreKey?: string) {
+    this.set({ notice: { tone, text, code, restoreKey } });
   }
   dismissNotice() {
     this.set({ notice: null });
@@ -192,6 +242,10 @@ export class EditorStore {
       [KEYS.active]: this.tab(s.activeId)?.path ?? null,
       [KEYS.expanded]: Object.keys(s.expanded),
       [KEYS.wrap]: s.wrap,
+      [KEYS.untitled]: s.tabs
+        .filter((t) => t.kind === 'untitled')
+        .map((t) => ({ key: t.path.slice(UNTITLED_PREFIX.length), no: t.untitledNo })),
+      [KEYS.closed]: s.closed,
     };
     for (const [key, value] of Object.entries(values)) {
       const json = JSON.stringify(value);
@@ -199,6 +253,42 @@ export class EditorStore {
       this.written.set(key, json);
       this.storage.set(key, json);
     }
+    void this.flushBackups();
+  }
+
+  // ── untitled backups ───────────────────────────────────────────────────
+
+  private pendingBackups = new Set<string>();
+  private backupTimer: ReturnType<typeof setTimeout> | null = null;
+  private backupWarned = false;
+
+  /** Debounced: a pause in typing writes the backup of each changed tab. */
+  private scheduleBackup(id: string) {
+    this.pendingBackups.add(id);
+    if (this.backupTimer) clearTimeout(this.backupTimer);
+    this.backupTimer = setTimeout(() => void this.flushBackups(), 400);
+  }
+
+  /** Writes every pending untitled backup now. */
+  async flushBackups(): Promise<void> {
+    if (this.backupTimer) clearTimeout(this.backupTimer);
+    this.backupTimer = null;
+    const ids = [...this.pendingBackups];
+    this.pendingBackups.clear();
+    await Promise.all(ids.map(async (id) => {
+      const tab = this.tab(id);
+      const state = this.currentState(id);
+      if (!tab || tab.kind !== 'untitled' || !state) return;
+      try {
+        await this.fs.backups.write(tab.path.slice(UNTITLED_PREFIX.length), state.doc.toString());
+      } catch (e) {
+        // Say it once per session; the tab itself keeps working.
+        if (!this.backupWarned) {
+          this.backupWarned = true;
+          this.fail(e);
+        }
+      }
+    }));
   }
 
   // ── startup ────────────────────────────────────────────────────────────
@@ -217,20 +307,52 @@ export class EditorStore {
     const activePath = readJson<string | null>(this.storage, KEYS.active, null);
     const expanded = readJson<string[]>(this.storage, KEYS.expanded, []);
     const wrap = readJson<boolean>(this.storage, KEYS.wrap, false);
+    const untitledMeta = readJson<{ key: string; no: number | null }[]>(this.storage, KEYS.untitled, []);
+    const closedSaved = readJson<ClosedEntry[]>(this.storage, KEYS.closed, []);
 
     let authorised: string[] = [];
+    let files: string[] = [];
+    let backupKeys: string[] = [];
     try {
-      authorised = await this.fs.roots();
+      [authorised, files, backupKeys] = await Promise.all([
+        this.fs.roots(), this.fs.authorisedFiles(), this.fs.backups.list(),
+      ]);
     } catch (e) {
       this.fail(e);
     }
     // A folder forgotten (or deleted) since is no longer reachable; drop it
     // instead of showing a tree that can only error.
     const open = folders.filter((f) => authorised.includes(f));
-    const tabs: Tab[] = tabPaths
-      .filter((p) => open.some((f) => isUnder(p, f)))
-      .map((p) => this.newTab(p));
+
+    // Untitled tabs come back with their text from the backups. One whose
+    // backup is gone (e.g. never written because it was empty) comes back
+    // empty, which is what it was.
+    const untitled = new Map<string, Tab>();
+    await Promise.all(untitledMeta.map(async ({ key, no }) => {
+      let content = '';
+      try { content = (await this.fs.backups.read(key)) ?? ''; } catch { /* empty */ }
+      untitled.set(key, this.makeUntitled(key, no ?? 1, content));
+    }));
+    const tabs: Tab[] = [];
+    for (const p of tabPaths) {
+      if (p.startsWith(UNTITLED_PREFIX)) {
+        const tab = untitled.get(p.slice(UNTITLED_PREFIX.length));
+        if (tab) { tabs.push(tab); untitled.delete(p.slice(UNTITLED_PREFIX.length)); }
+      } else if (open.some((f) => isUnder(p, f)) || files.includes(p)) {
+        tabs.push(this.newTab(p));
+      }
+    }
+    tabs.push(...untitled.values());
     const active = tabs.find((t) => t.path === activePath) ?? tabs[tabs.length - 1] ?? null;
+    const closed = closedSaved.filter((c) => c.kind === 'file' || backupKeys.includes(c.key)).slice(0, MAX_CLOSED);
+
+    // Backups nothing refers to any more (a tab discarded while the app was
+    // closing, an old crash) are removed.
+    const keep = new Set([
+      ...tabs.filter((t) => t.kind === 'untitled').map((t) => t.path.slice(UNTITLED_PREFIX.length)),
+      ...closed.filter((c) => c.kind === 'untitled').map((c) => c.key),
+    ]);
+    for (const key of backupKeys) if (!keep.has(key)) void this.fs.backups.delete(key).catch(() => {});
     this.set({
       hydrated: true,
       folders: open,
@@ -241,7 +363,9 @@ export class EditorStore {
       tabs,
       activeId: active?.id ?? null,
       wrap,
+      closed,
     });
+    this.syncView(true);
     await Promise.all(Object.keys(this.snap.expanded).map((p) => this.loadDir(p)));
     if (active) await this.ensureLoaded(active.id);
   }
@@ -465,7 +589,7 @@ export class EditorStore {
   /** Deletes from disk; tabs under it close without saving. */
   async remove(path: string): Promise<void> {
     await this.fs.delete(path);
-    this.closeTabs(this.snap.tabs.filter((t) => isUnder(t.path, path)).map((t) => t.id));
+    this.closeTabs(this.snap.tabs.filter((t) => isUnder(t.path, path)).map((t) => t.id), { remember: false });
     const keep = <T>(rec: Record<string, T>) => Object.fromEntries(Object.entries(rec).filter(([p]) => !isUnder(p, path)));
     this.set({
       expanded: keep(this.snap.expanded),
@@ -504,9 +628,95 @@ export class EditorStore {
 
   private newTab(path: string): Tab {
     return {
-      id: `t${nextId++}`, path, name: basename(path), status: 'idle', error: null, errorCode: null, dirty: false, saving: false,
+      id: `t${nextId++}`, kind: 'file', untitledNo: null, path, name: basename(path), status: 'idle', error: null, errorCode: null, dirty: false, saving: false,
       eol: '\n', bom: false, modified: 0, size: 0, language: null, external: null,
     };
+  }
+
+  /** An untitled tab with its editor state ready (not yet in the strip). */
+  private makeUntitled(key: string, no: number, content: string): Tab {
+    const tab: Tab = {
+      ...this.newTab(`${UNTITLED_PREFIX}${key}`),
+      kind: 'untitled', untitledNo: no, status: 'ready', dirty: content.length > 0,
+    };
+    const state = this.createState(tab.id, content);
+    tab.name = untitledTitle(state.doc, no);
+    this.states.set(tab.id, state);
+    this.saved.set(tab.id, Text.empty);
+    return tab;
+  }
+
+  /** Lowest "Untitled-N" number not used by an open untitled tab. */
+  private nextUntitledNo(): number {
+    const used = new Set(this.snap.tabs.map((t) => t.untitledNo));
+    let n = 1;
+    while (used.has(n)) n++;
+    return n;
+  }
+
+  private insertTab(tab: Tab) {
+    const tabs = [...this.snap.tabs];
+    const at = tabs.findIndex((t) => t.id === this.snap.activeId);
+    tabs.splice(at < 0 ? tabs.length : at + 1, 0, tab);
+    this.set({ tabs, activeId: tab.id });
+    this.persist();
+    this.syncView(true);
+  }
+
+  /** ⌘N — a new untitled tab, no folder or file name needed. */
+  newUntitled(content = '', key = newKey(), no = this.nextUntitledNo()): string {
+    const tab = this.makeUntitled(key, no, content);
+    this.insertTab(tab);
+    if (content) this.scheduleBackup(tab.id);
+    return tab.id;
+  }
+
+  /** Opens one file through the OS dialog (it need not be in an open folder). */
+  async openFilePicker() {
+    try {
+      const path = await this.fs.pickFile();
+      if (path) await this.openFile(path);
+    } catch (e) {
+      this.fail(e);
+    }
+  }
+
+  // ── recently closed ────────────────────────────────────────────────────
+
+  /** Reopens a closed tab (the most recent one without `key`). */
+  async reopenClosed(key?: string) {
+    const entry = key ? this.snap.closed.find((c) => c.key === key) : this.snap.closed[0];
+    if (!entry) return;
+    this.set({ closed: this.snap.closed.filter((c) => c !== entry) });
+    this.persist();
+    if (entry.kind === 'file') {
+      await this.openFile(entry.path);
+      return;
+    }
+    let content = '';
+    try {
+      content = (await this.fs.backups.read(entry.key)) ?? '';
+    } catch (e) {
+      this.fail(e);
+    }
+    const busy = this.snap.tabs.some((t) => t.untitledNo === entry.untitledNo);
+    this.newUntitled(content, entry.key, busy ? this.nextUntitledNo() : entry.untitledNo);
+    if (this.snap.notice?.restoreKey === entry.key) this.dismissNotice();
+  }
+
+  /** Forgets a closed entry for good (its backup is deleted). */
+  discardClosed(key: string) {
+    const entry = this.snap.closed.find((c) => c.key === key);
+    if (!entry) return;
+    this.set({ closed: this.snap.closed.filter((c) => c !== entry) });
+    if (entry.kind === 'untitled') void this.fs.backups.delete(key).catch(() => {});
+    this.persist();
+  }
+
+  clearClosed() {
+    for (const c of this.snap.closed) if (c.kind === 'untitled') void this.fs.backups.delete(c.key).catch(() => {});
+    this.set({ closed: [] });
+    this.persist();
   }
 
   async openFile(path: string) {
@@ -542,11 +752,48 @@ export class EditorStore {
     this.activate(tabs[(i + delta + tabs.length) % tabs.length].id);
   }
 
-  /** Closes without asking — callers check `dirty` first. */
-  closeTabs(ids: string[]) {
+  /** Closes without asking — callers check `dirty` first. An untitled tab
+   *  with text moves to Recently closed (its backup kept); an empty one is
+   *  discarded. With `remember` false (the file was deleted) a file tab is
+   *  not offered for reopening. */
+  closeTabs(ids: string[], { remember = true }: { remember?: boolean } = {}) {
     if (ids.length === 0) return;
     const drop = new Set(ids);
     const { tabs, activeId } = this.snap;
+    const now = Date.now();
+    const closedNow: ClosedEntry[] = [];
+    for (const t of tabs) {
+      if (!drop.has(t.id)) continue;
+      if (t.kind === 'untitled') {
+        const key = t.path.slice(UNTITLED_PREFIX.length);
+        const doc = this.currentState(t.id)?.doc;
+        if (doc && doc.length > 0) {
+          // The latest text must be on disk before the tab's state is gone.
+          void this.fs.backups.write(key, doc.toString()).catch((e) => this.fail(e));
+          closedNow.push({ kind: 'untitled', key, name: t.name, untitledNo: t.untitledNo ?? 1, closedAt: now });
+        } else {
+          void this.fs.backups.delete(key).catch(() => {});
+        }
+        this.pendingBackups.delete(t.id);
+      } else if (remember && t.status !== 'error') {
+        closedNow.push({ kind: 'file', key: `f${now}-${t.id}`, path: t.path, name: t.name, closedAt: now });
+      }
+    }
+    if (closedNow.length) {
+      const paths = new Set(closedNow.map((c) => (c.kind === 'file' ? c.path : c.key)));
+      const merged = [
+        ...closedNow.reverse(),
+        ...this.snap.closed.filter((c) => !paths.has(c.kind === 'file' ? c.path : c.key)),
+      ];
+      for (const evicted of merged.slice(MAX_CLOSED)) {
+        if (evicted.kind === 'untitled') void this.fs.backups.delete(evicted.key).catch(() => {});
+      }
+      this.set({ closed: merged.slice(0, MAX_CLOSED) });
+      const untitledClosed = closedNow.filter((c) => c.kind === 'untitled');
+      if (untitledClosed.length === 1) {
+        this.notify(untitledClosed[0].name, 'info', 'closedUntitled', untitledClosed[0].key);
+      }
+    }
     let nextActive = activeId;
     if (activeId && drop.has(activeId)) {
       // The neighbour that remains — right first, then left — like VS Code.
@@ -615,7 +862,7 @@ export class EditorStore {
   /** Throws away unsaved edits and re-reads the file from disk. */
   async reload(id: string) {
     const tab = this.tab(id);
-    if (!tab) return;
+    if (!tab || tab.kind === 'untitled') return;
     if (tab.status !== 'ready') {
       await this.load(id);
       return;
@@ -655,6 +902,7 @@ export class EditorStore {
     const tab = this.tab(id);
     const state = this.currentState(id);
     if (!tab || !state || tab.status !== 'ready') return 'skipped';
+    if (tab.kind === 'untitled') return this.saveAs(id);
     let content = state.doc.toString();
     if (tab.eol === '\r\n') content = content.replace(/\n/g, '\r\n');
     this.patchTab(id, { saving: true });
@@ -689,13 +937,65 @@ export class EditorStore {
     }
   }
 
+  /** Save As: the OS Save dialog picks the place. An untitled tab becomes a
+   *  normal file tab (its backup is dropped); a file tab moves to the copy. */
+  async saveAs(id: string): Promise<SaveResult> {
+    const tab = this.tab(id);
+    const state = this.currentState(id);
+    if (!tab || !state || tab.status !== 'ready') return 'skipped';
+    let content = state.doc.toString();
+    if (tab.eol === '\r\n') content = content.replace(/\n/g, '\r\n');
+    let path: string | null;
+    this.patchTab(id, { saving: true });
+    try {
+      path = await this.fs.saveAs(content, suggestFileName(tab), { bom: tab.bom });
+    } catch (e) {
+      this.patchTab(id, { saving: false });
+      this.fail(e);
+      return 'failed';
+    }
+    if (!path) {
+      this.patchTab(id, { saving: false });
+      return 'cancelled';
+    }
+    // Another tab showing that file holds what was just overwritten.
+    const other = this.snap.tabs.find((t) => t.path === path && t.id !== id);
+    if (other) this.closeTabs([other.id], { remember: false });
+    let modified = 0;
+    let size = content.length;
+    try {
+      const stat = await this.fs.stat(path);
+      modified = stat.modified;
+      size = stat.size;
+    } catch { /* the conflict check is simply skipped next time */ }
+    const wasUntitled = tab.kind === 'untitled';
+    this.saved.set(id, state.doc);
+    const now = this.currentState(id);
+    this.patchTab(id, {
+      kind: 'file', untitledNo: null, path, name: basename(path), saving: false, modified, size,
+      external: null, dirty: now ? !now.doc.eq(state.doc) : false,
+    });
+    if (wasUntitled) {
+      this.pendingBackups.delete(id);
+      void this.fs.backups.delete(tab.path.slice(UNTITLED_PREFIX.length)).catch(() => {});
+    }
+    this.persist();
+    this.fileCache.clear();
+    if (this.rootOf(path)) {
+      void this.loadDir(dirname(path));
+      this.select(path);
+    }
+    await this.applyLanguage(id);
+    return 'saved';
+  }
+
   // ── external changes ───────────────────────────────────────────────────
 
   /** Compares a loaded tab with disk: reloads a clean tab silently, flags a
    *  dirty one. Run on window focus and on tab activation. */
   async checkTab(id: string) {
     const tab = this.tab(id);
-    if (!tab || (tab.status !== 'ready' && tab.status !== 'binary') || tab.saving) return;
+    if (!tab || tab.kind === 'untitled' || (tab.status !== 'ready' && tab.status !== 'binary') || tab.saving) return;
     try {
       const stat = await this.fs.stat(tab.path);
       const current = this.tab(id);
@@ -752,9 +1052,17 @@ export class EditorStore {
 
   private onDocChanged(id: string, state: EditorState) {
     this.states.set(id, state);
+    const tab = this.tab(id);
     const saved = this.saved.get(id);
     const dirty = !saved || !state.doc.eq(saved);
-    if (this.tab(id)?.dirty !== dirty) this.patchTab(id, { dirty });
+    const patch: Partial<Tab> = {};
+    if (tab?.dirty !== dirty) patch.dirty = dirty;
+    if (tab?.kind === 'untitled') {
+      const name = untitledTitle(state.doc, tab.untitledNo ?? 1);
+      if (name !== tab.name) patch.name = name;
+      this.scheduleBackup(id);
+    }
+    if (Object.keys(patch).length) this.patchTab(id, patch);
   }
 
   private updateCursor(state: EditorState) {
@@ -800,8 +1108,11 @@ export class EditorStore {
     if (view) this.syncView();
   }
 
+  /** Focuses the editor after the next paint: right after the first tab
+   *  opens, the view's container is still `hidden` (display: none) until
+   *  React re-renders, and focusing a hidden element does nothing. */
   focusEditor() {
-    this.view?.focus();
+    requestAnimationFrame(() => this.view?.focus());
   }
 
   /** Puts the active tab's state into the view. `force` re-installs it even

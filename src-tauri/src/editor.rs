@@ -7,8 +7,10 @@
 // so only a folder the user chose in the OS dialog may become one. If the
 // webview picked the folder and then told Rust "add this root", any script in
 // the webview could name any folder. Reopening a recent folder is allowed
-// because that list is also written only here, after a pick.
+// because that list is also written only here, after a pick. The same goes
+// for single files chosen in the Save As / Open File dialogs.
 
+use crate::editor_backup;
 use crate::editor_fs::{DirListing, FileContent, FileList, FileStat, FsError, FsResult, Roots};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
@@ -25,12 +27,29 @@ fn roots_path(app: &AppHandle) -> Option<PathBuf> {
     app.path().app_data_dir().ok().map(|d| d.join(ROOTS_FILE))
 }
 
+#[derive(serde::Serialize, serde::Deserialize, Default)]
+struct Saved {
+    #[serde(default)]
+    roots: Vec<String>,
+    #[serde(default)]
+    files: Vec<String>,
+}
+
 fn load(app: &AppHandle) -> Roots {
-    let saved: Vec<String> = roots_path(app)
+    let saved = roots_path(app)
         .and_then(|p| std::fs::read_to_string(p).ok())
-        .and_then(|s| serde_json::from_str(&s).ok())
+        .map(|s| parse_saved(&s))
         .unwrap_or_default();
-    Roots::from_saved(saved)
+    Roots::from_saved(saved.roots, saved.files)
+}
+
+/// The first version stored a bare array of folder paths; read that too.
+fn parse_saved(s: &str) -> Saved {
+    if let Ok(saved) = serde_json::from_str::<Saved>(s) {
+        return saved;
+    }
+    let roots = serde_json::from_str::<Vec<String>>(s).unwrap_or_default();
+    Saved { roots, files: Vec::new() }
 }
 
 fn persist(app: &AppHandle, roots: &Roots) {
@@ -38,7 +57,8 @@ fn persist(app: &AppHandle, roots: &Roots) {
     if let Some(dir) = path.parent() {
         let _ = std::fs::create_dir_all(dir);
     }
-    if let Ok(json) = serde_json::to_string(&roots.list()) {
+    let saved = Saved { roots: roots.list(), files: roots.list_authorised_files() };
+    if let Ok(json) = serde_json::to_string(&saved) {
         // Best-effort: failing to remember a folder only means picking it
         // again after a restart.
         let _ = std::fs::write(path, json);
@@ -84,6 +104,87 @@ pub async fn editor_pick_folder(app: AppHandle) -> FsResult<Option<String>> {
         .map_err(|e| FsError { code: "io", message: e.to_string() })?;
     let added = mutate(&app, |roots| roots.add(&path))?;
     Ok(Some(added.to_string_lossy().into_owned()))
+}
+
+/// Writes an untitled buffer to a path the user picks in the OS Save dialog
+/// and authorises that file. `None` when the dialog was cancelled.
+#[tauri::command]
+pub async fn editor_save_as(
+    app: AppHandle,
+    content: String,
+    suggested_name: Option<String>,
+    bom: Option<bool>,
+) -> FsResult<Option<String>> {
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    let mut dialog = app.dialog().file().set_title("Save As");
+    if let Some(name) = suggested_name.filter(|n| !n.trim().is_empty()) {
+        dialog = dialog.set_file_name(name);
+    }
+    dialog.save_file(move |picked| {
+        let _ = tx.send(picked);
+    });
+    let picked = rx.await.map_err(|e| FsError { code: "io", message: e.to_string() })?;
+    let Some(picked) = picked else { return Ok(None) };
+    let path = picked
+        .into_path()
+        .map_err(|e| FsError { code: "io", message: e.to_string() })?;
+    let app2 = app.clone();
+    let saved = blocking(move || mutate(&app2, |roots| roots.save_chosen(&path, &content, bom.unwrap_or(false)))).await?;
+    Ok(Some(saved))
+}
+
+/// Opens one file through the OS dialog and authorises it.
+#[tauri::command]
+pub async fn editor_pick_file(app: AppHandle) -> FsResult<Option<String>> {
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    app.dialog().file().set_title("Open File").pick_file(move |picked| {
+        let _ = tx.send(picked);
+    });
+    let picked = rx.await.map_err(|e| FsError { code: "io", message: e.to_string() })?;
+    let Some(picked) = picked else { return Ok(None) };
+    let path = picked
+        .into_path()
+        .map_err(|e| FsError { code: "io", message: e.to_string() })?;
+    let added = mutate(&app, |roots| roots.add_file(&path))?;
+    Ok(Some(added.to_string_lossy().into_owned()))
+}
+
+/// Single files authorised through Save As / Open File (oldest first).
+#[tauri::command]
+pub fn editor_authorised_files(app: AppHandle) -> Vec<String> {
+    snapshot(&app).list_authorised_files()
+}
+
+fn backup_dir(app: &AppHandle) -> FsResult<PathBuf> {
+    app.path()
+        .app_data_dir()
+        .map(|d| d.join(editor_backup::BACKUP_DIR))
+        .map_err(|e| FsError { code: "io", message: e.to_string() })
+}
+
+/// Saves the content of an untitled tab (see editor_backup.rs).
+#[tauri::command]
+pub async fn editor_backup_write(app: AppHandle, key: String, content: String) -> FsResult<()> {
+    let dir = backup_dir(&app)?;
+    blocking(move || editor_backup::write(&dir, &key, &content)).await
+}
+
+#[tauri::command]
+pub async fn editor_backup_read(app: AppHandle, key: String) -> FsResult<Option<String>> {
+    let dir = backup_dir(&app)?;
+    blocking(move || editor_backup::read(&dir, &key)).await
+}
+
+#[tauri::command]
+pub async fn editor_backup_delete(app: AppHandle, key: String) -> FsResult<()> {
+    let dir = backup_dir(&app)?;
+    blocking(move || editor_backup::delete(&dir, &key)).await
+}
+
+#[tauri::command]
+pub async fn editor_backup_list(app: AppHandle) -> FsResult<Vec<String>> {
+    let dir = backup_dir(&app)?;
+    blocking(move || editor_backup::list(&dir)).await
 }
 
 /// Every folder ever opened (oldest first) that still exists.
@@ -162,4 +263,21 @@ pub async fn editor_move(app: AppHandle, path: String, target_dir: String) -> Fs
 pub async fn editor_delete(app: AppHandle, path: String) -> FsResult<()> {
     let roots = snapshot(&app);
     blocking(move || roots.delete(&path)).await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn reads_both_saved_formats() {
+        let old = parse_saved(r#"["/a","/b"]"#);
+        assert_eq!(old.roots, vec!["/a", "/b"]);
+        assert!(old.files.is_empty());
+        let new = parse_saved(r#"{"roots":["/a"],"files":["/f.txt"]}"#);
+        assert_eq!(new.roots, vec!["/a"]);
+        assert_eq!(new.files, vec!["/f.txt"]);
+        let junk = parse_saved("not json");
+        assert!(junk.roots.is_empty() && junk.files.is_empty());
+    }
 }

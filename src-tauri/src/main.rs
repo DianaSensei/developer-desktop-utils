@@ -4,6 +4,7 @@
 mod checksum;
 mod dropped;
 mod editor;
+mod editor_backup;
 mod editor_fs;
 mod netinfo;
 mod files;
@@ -167,6 +168,13 @@ fn main() {
             mockserver::mock_update_rules,
             mockserver::mock_test_script,
             editor::editor_pick_folder,
+            editor::editor_pick_file,
+            editor::editor_save_as,
+            editor::editor_authorised_files,
+            editor::editor_backup_write,
+            editor::editor_backup_read,
+            editor::editor_backup_delete,
+            editor::editor_backup_list,
             editor::editor_roots,
             editor::editor_forget_root,
             editor::editor_list_dir,

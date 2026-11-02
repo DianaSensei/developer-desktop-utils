@@ -16,8 +16,10 @@ export function StatusBar({ store, tab, wrap }: { store: EditorStore; tab: Tab |
   const ready = tab?.status === 'ready';
   return (
     <div className="flex h-6 shrink-0 items-center gap-3 overflow-hidden border-t border-line bg-chrome px-3 text-[11px] text-fg-mute">
-      <span className="min-w-0 truncate" title={tab?.path}>
-        {tab ? (root ? relativeTo(tab.path, root) || tab.name : tab.path) : ''}
+      <span className="min-w-0 truncate" title={tab?.kind === 'untitled' ? m('untitledHint') : tab?.path}>
+        {tab?.kind === 'untitled'
+          ? <>{tab.name} <span className="text-fg-mute/80">· {m('untitledHint')}</span></>
+          : tab ? (root ? relativeTo(tab.path, root) || tab.name : tab.path) : ''}
       </span>
       {tab?.saving && <span className="flex items-center gap-1"><Spinner size="xs" />{m('saving')}</span>}
       <span className="ml-auto" />

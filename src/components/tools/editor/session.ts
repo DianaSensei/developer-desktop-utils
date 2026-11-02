@@ -14,7 +14,7 @@ export function getEditorStore(sdk: PluginSdk): EditorStore {
       ? createNativeFs(sdk)
       // The browser build has no disk access: a seeded in-memory folder,
       // pre-authorised so it shows under Recent.
-      : createMemoryFs({ authorised: [DEMO_ROOT] });
+      : createMemoryFs({ authorised: [DEMO_ROOT], backupStorage: sdk.storage });
     session = new EditorStore(fs, sdk.storage);
     if (typeof window !== 'undefined') {
       // Don't lose the last few hundred ms of layout changes on quit.

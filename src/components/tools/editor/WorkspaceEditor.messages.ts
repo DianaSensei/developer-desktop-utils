@@ -30,6 +30,27 @@ export default defineMessages({
   pathCopied: { vi: 'Đã sao chép đường dẫn', en: 'Path copied' },
   symlink: { vi: 'Liên kết tượng trưng', en: 'Symbolic link' },
 
+  openFile: { vi: 'Mở file…', en: 'Open File…' },
+
+  // Untitled tabs & recently closed
+  newTextFile: { vi: 'Tab mới', en: 'New Text File' },
+  saveAs: { vi: 'Lưu thành…', en: 'Save As…' },
+  recentlyClosed: { vi: 'Đã đóng gần đây', en: 'Recently Closed' },
+  reopenLast: { vi: 'Mở lại tab vừa đóng', en: 'Reopen Closed Tab' },
+  restore: { vi: 'Khôi phục', en: 'Restore' },
+  clearClosed: { vi: 'Xoá danh sách', en: 'Clear List' },
+  discard: { vi: 'Bỏ hẳn', en: 'Discard' },
+  closedUntitledNotice: {
+    vi: 'Đã đóng "{{name}}" — nội dung vẫn được giữ trong "Đã đóng gần đây".',
+    en: 'Closed "{{name}}" — its text is kept under Recently Closed.',
+  },
+  untitledHint: {
+    vi: 'Chưa lưu thành file — nội dung được tự động giữ lại',
+    en: 'Not saved to a file — the text is kept automatically',
+  },
+  closedFile: { vi: 'file', en: 'file' },
+  closedText: { vi: 'văn bản', en: 'text' },
+
   // Delete confirmation
   deleteTitle: { vi: 'Xoá "{{name}}"?', en: 'Delete "{{name}}"?' },
   deleteFileDesc: {
@@ -91,7 +112,9 @@ export default defineMessages({
   shortcutClose: { vi: 'Đóng tab', en: 'Close Tab' },
   shortcutFind: { vi: 'Tìm / thay thế trong file', en: 'Find / Replace in File' },
   shortcutWrap: { vi: 'Bật/tắt xuống dòng', en: 'Toggle Word Wrap' },
-  shortcutNewFile: { vi: 'File mới', en: 'New File' },
+  shortcutNewFile: { vi: 'Tab mới (không cần chọn nơi lưu)', en: 'New Text File (no location needed)' },
+  shortcutSaveAs: { vi: 'Lưu thành…', en: 'Save As…' },
+  shortcutReopen: { vi: 'Mở lại tab vừa đóng', en: 'Reopen Closed Tab' },
   binary: {
     vi: 'File này là nhị phân hoặc không phải văn bản UTF-8 nên không hiển thị.',
     en: 'This file is binary or not UTF-8 text, so it is not shown.',

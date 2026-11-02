@@ -8,6 +8,10 @@
 // granularity: a path is only touched when it sits inside a *workspace root*,
 // and a root only ever enters `Roots` through the native folder picker
 // (editor::editor_pick_folder) — never from a path string the webview sends.
+// Single files can be authorised the same way: one the user chose in the
+// native Save As or Open File dialog may be read and written (not deleted,
+// renamed or listed around), so an untitled tab saved outside any open folder
+// keeps working as a normal file tab.
 //
 // Containment is checked on canonical paths, so `..`, a trailing slash, or a
 // symlink pointing outside the root cannot be used to escape it. Operations
@@ -24,7 +28,7 @@ use std::io;
 use std::path::{Component, Path, PathBuf};
 use std::time::UNIX_EPOCH;
 
-/// Above this many remembered roots the oldest is dropped.
+/// Above this many remembered roots (or single files) the oldest is dropped.
 pub const MAX_ROOTS: usize = 64;
 /// Files larger than this are not loaded into the editor.
 pub const MAX_TEXT_BYTES: u64 = 10 * 1024 * 1024;
@@ -188,24 +192,68 @@ fn split_relative(input: &str) -> FsResult<Vec<&str>> {
     Ok(parts)
 }
 
-/// Folders the user has opened through the native picker.
+/// Folders the user has opened through the native picker, plus single files
+/// chosen in a native Save As / Open File dialog.
 #[derive(Debug, Default, Clone)]
 pub struct Roots {
     roots: Vec<PathBuf>,
+    files: Vec<PathBuf>,
 }
 
 impl Roots {
-    pub fn from_saved(paths: impl IntoIterator<Item = String>) -> Self {
+    pub fn from_saved(
+        paths: impl IntoIterator<Item = String>,
+        files: impl IntoIterator<Item = String>,
+    ) -> Self {
         let mut r = Self::default();
         for p in paths {
             // A folder deleted or unmounted since is dropped silently.
             let _ = r.add(Path::new(&p));
+        }
+        for f in files {
+            let _ = r.add_file(Path::new(&f));
         }
         r
     }
 
     pub fn list(&self) -> Vec<String> {
         self.roots.iter().map(|p| to_string(p)).collect()
+    }
+
+    pub fn list_authorised_files(&self) -> Vec<String> {
+        self.files.iter().map(|p| to_string(p)).collect()
+    }
+
+    /// Authorises one existing file (most recent last). A file already inside
+    /// a root needs no entry of its own.
+    pub fn add_file(&mut self, p: &Path) -> FsResult<PathBuf> {
+        let c = canon(p)?;
+        if !c.is_file() {
+            return Err(FsError::new("is_dir", "Only a file can be opened on its own."));
+        }
+        if self.within(&c) {
+            return Ok(c);
+        }
+        self.files.retain(|f| f != &c);
+        self.files.push(c.clone());
+        if self.files.len() > MAX_ROOTS {
+            let excess = self.files.len() - MAX_ROOTS;
+            self.files.drain(0..excess);
+        }
+        Ok(c)
+    }
+
+    /// Writes `content` to a path the user just chose in the native Save As
+    /// dialog (which already confirmed any overwrite), then authorises it.
+    /// Only ever called by Rust with the dialog's answer.
+    pub fn save_chosen(&mut self, p: &Path, content: &str, bom: bool) -> FsResult<String> {
+        let mut data = Vec::with_capacity(content.len() + 3);
+        if bom {
+            data.extend_from_slice(&[0xEF, 0xBB, 0xBF]);
+        }
+        data.extend_from_slice(content.as_bytes());
+        std::fs::write(p, data)?;
+        Ok(to_string(&self.add_file(p)?))
     }
 
     /// Adds a folder (most recent last). Returns its canonical form.
@@ -244,6 +292,19 @@ impl Roots {
             if e.kind() == io::ErrorKind::NotFound { FsError::from(e) } else { FsError::denied() }
         })?;
         if self.within(&c) { Ok(c) } else { Err(FsError::denied()) }
+    }
+
+    /// Like `resolve`, but also accepts a single authorised file — for the
+    /// operations an open file tab needs (read, write, stat) and nothing more.
+    fn resolve_file(&self, p: &str) -> FsResult<PathBuf> {
+        match self.resolve(p) {
+            Ok(c) => Ok(c),
+            Err(e) if e.code == "denied" => {
+                let c = canon(Path::new(p)).map_err(|_| FsError::denied())?;
+                if self.files.contains(&c) { Ok(c) } else { Err(e) }
+            }
+            Err(e) => Err(e),
+        }
     }
 
     /// The entry itself (not what a symlink points to): canonical parent +
@@ -307,13 +368,13 @@ impl Roots {
     }
 
     pub fn stat(&self, p: &str) -> FsResult<FileStat> {
-        let c = self.resolve(p)?;
+        let c = self.resolve_file(p)?;
         let meta = std::fs::metadata(&c)?;
         Ok(FileStat { size: meta.len(), modified: millis(&meta), is_dir: meta.is_dir() })
     }
 
     pub fn read_text(&self, p: &str) -> FsResult<FileContent> {
-        let c = self.resolve(p)?;
+        let c = self.resolve_file(p)?;
         let meta = std::fs::metadata(&c)?;
         if meta.is_dir() {
             return Err(FsError::new("is_dir", "That is a folder."));
@@ -354,7 +415,7 @@ impl Roots {
         bom: bool,
         expected_modified: Option<u64>,
     ) -> FsResult<FileStat> {
-        let c = self.resolve(p)?;
+        let c = self.resolve_file(p)?;
         let meta = std::fs::metadata(&c)?;
         if meta.is_dir() {
             return Err(FsError::new("is_dir", "That is a folder."));
@@ -794,6 +855,38 @@ mod tests {
     }
 
     #[test]
+    fn a_file_chosen_in_save_as_is_readable_and_writable_but_nothing_around_it() {
+        let t = tmp("single");
+        let mut roots = Roots::default();
+        let chosen = t.0.join("notes.txt");
+        let sibling = t.0.join("other.txt");
+        fs::write(&sibling, "secret").unwrap();
+        let path = roots.save_chosen(&chosen, "hello", false).unwrap();
+        assert_eq!(fs::read_to_string(&chosen).unwrap(), "hello");
+        assert_eq!(roots.read_text(&path).unwrap().content, "hello");
+        roots.write_text(&path, "edited", false, None).unwrap();
+        assert_eq!(roots.stat(&path).unwrap().size, 6);
+        // Only that file: not its siblings, its folder, or delete/rename.
+        assert_eq!(roots.read_text(&s(&sibling)).unwrap_err().code, "denied");
+        assert_eq!(roots.list_dir(&s(&t.0)).unwrap_err().code, "denied");
+        assert_eq!(roots.delete(&path).unwrap_err().code, "denied");
+        assert_eq!(roots.rename(&path, "x.txt").unwrap_err().code, "denied");
+        assert_eq!(roots.create_file(&s(&t.0), "new.txt").unwrap_err().code, "denied");
+        assert!(chosen.exists());
+        // Survives a restart through the saved list.
+        let restored = Roots::from_saved(Vec::<String>::new(), roots.list_authorised_files());
+        assert_eq!(restored.read_text(&path).unwrap().content, "edited");
+    }
+
+    #[test]
+    fn a_file_inside_a_root_gets_no_separate_entry() {
+        let (_t, root, mut roots) = workspace("inside");
+        fs::write(root.join("a.txt"), "").unwrap();
+        roots.add_file(&root.join("a.txt")).unwrap();
+        assert!(roots.list_authorised_files().is_empty());
+    }
+
+    #[test]
     fn roots_are_deduplicated_capped_and_forgettable() {
         let t = tmp("roots");
         let a = t.0.join("a");
@@ -810,7 +903,7 @@ mod tests {
         assert!(roots.list().is_empty());
 
         let saved = vec![s(&a), s(&t.0.join("gone"))];
-        let restored = Roots::from_saved(saved);
+        let restored = Roots::from_saved(saved, Vec::<String>::new());
         assert_eq!(restored.list(), vec![s(&canon(&a).unwrap())]);
     }
 }

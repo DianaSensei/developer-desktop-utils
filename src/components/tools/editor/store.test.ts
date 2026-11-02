@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { EditorView } from 'codemirror';
 import { EditorState } from '@codemirror/state';
 import { createMemoryFs, DEMO_ROOT, type MemoryFs } from './memoryFs';
-import { EditorStore, type StorageLike } from './store';
+import { EditorStore, suggestFileName, type StorageLike } from './store';
 
 const R = DEMO_ROOT;
 
@@ -196,5 +196,133 @@ describe('EditorStore — file operations', () => {
   it('Quick Open lists every file in the open folders', async () => {
     const { files } = await store.allFiles();
     expect(files.map((f) => f.rel)).toEqual(['a.txt', 'src/main.ts', 'win.txt']);
+  });
+});
+
+describe('EditorStore — untitled tabs (hot exit)', () => {
+  const docOf = (id: string) => store.currentState(id)!.doc.toString();
+
+  it('opens without any folder, is named after its first line, and is backed up', async () => {
+    const id = store.newUntitled();
+    expect(activeTab().kind).toBe('untitled');
+    expect(activeTab().name).toBe('Untitled-1');
+    type('\n  shopping list  \nmilk');
+    expect(activeTab().name).toBe('shopping list');
+    expect(activeTab().dirty).toBe(true);
+    await store.flushBackups();
+    const key = activeTab().path.replace('untitled:', '');
+    expect(await fs.backups.read(key)).toBe('\n  shopping list  \nmilk');
+    expect(docOf(id)).toContain('milk');
+  });
+
+  it('numbers untitled tabs with the lowest free number', () => {
+    store.newUntitled();
+    store.newUntitled();
+    expect(snap().tabs.map((t) => t.name)).toEqual(['Untitled-1', 'Untitled-2']);
+    store.closeTab(snap().tabs[0].id);
+    store.newUntitled();
+    expect(snap().tabs.map((t) => t.name).sort()).toEqual(['Untitled-1', 'Untitled-2']);
+  });
+
+  it('comes back with its text after a restart, in tab order', async () => {
+    await store.openFolder();
+    store.newUntitled('first draft');
+    await store.openFile(`${R}/a.txt`);
+    store.newUntitled('second draft');
+    store.flushPersist();
+    await store.flushBackups();
+
+    const again = makeStore();
+    await again.hydrate();
+    const tabs = again.getSnapshot().tabs;
+    expect(tabs.map((t) => t.name)).toEqual(['first draft', 'a.txt', 'second draft']);
+    expect(again.tab(again.getSnapshot().activeId)?.name).toBe('second draft');
+    expect(view.state.doc.toString()).toBe('second draft');
+  });
+
+  it('closing one with text keeps it under Recently Closed and offers Restore', async () => {
+    store.newUntitled('keep me');
+    const key = activeTab().path.replace('untitled:', '');
+    store.closeTab(activeTab().id);
+    expect(snap().tabs).toEqual([]);
+    expect(snap().closed[0]).toMatchObject({ kind: 'untitled', key, name: 'keep me' });
+    expect(snap().notice).toMatchObject({ code: 'closedUntitled', restoreKey: key });
+
+    await store.reopenClosed(key);
+    expect(activeTab().name).toBe('keep me');
+    expect(view.state.doc.toString()).toBe('keep me');
+    expect(snap().closed).toEqual([]);
+  });
+
+  it('an empty one is simply discarded', () => {
+    store.newUntitled();
+    store.closeTab(activeTab().id);
+    expect(snap().closed).toEqual([]);
+    expect(snap().notice).toBeNull();
+  });
+
+  it('Recently Closed survives a restart and can still be restored', async () => {
+    store.newUntitled('closed before quitting');
+    store.closeTab(activeTab().id);
+    store.flushPersist();
+
+    const again = makeStore();
+    await again.hydrate();
+    expect(again.getSnapshot().closed.map((c) => c.name)).toEqual(['closed before quitting']);
+    await again.reopenClosed();
+    expect(view.state.doc.toString()).toBe('closed before quitting');
+  });
+
+  it('⌘⇧T also reopens closed file tabs', async () => {
+    await store.openFolder();
+    await store.openFile(`${R}/a.txt`);
+    store.closeTab(activeTab().id);
+    await store.reopenClosed();
+    expect(activeTab().path).toBe(`${R}/a.txt`);
+  });
+
+  it('discard and clear delete the backups; orphans are cleaned up on start', async () => {
+    store.newUntitled('one');
+    store.closeTab(activeTab().id);
+    store.newUntitled('two');
+    store.closeTab(activeTab().id);
+    const [two, one] = snap().closed;
+    store.discardClosed(two.key);
+    expect(await fs.backups.read(two.key)).toBeNull();
+    store.clearClosed();
+    expect(await fs.backups.read(one.key)).toBeNull();
+
+    await fs.backups.write('orphan', 'left behind');
+    const again = makeStore();
+    await again.hydrate();
+    await Promise.resolve();
+    expect(await fs.backups.list()).toEqual([]);
+  });
+
+  it('Save As turns it into a normal file tab and drops the backup', async () => {
+    await store.openFolder();
+    store.newUntitled('notes body');
+    const key = activeTab().path.replace('untitled:', '');
+    await store.flushBackups();
+    expect(await store.save(activeTab().id)).toBe('saved');
+    expect(activeTab()).toMatchObject({ kind: 'file', path: `${R}/notes body.txt`, name: 'notes body.txt', dirty: false });
+    expect((await fs.readFile(`${R}/notes body.txt`)).content).toBe('notes body');
+    expect(await fs.backups.read(key)).toBeNull();
+
+    type('!');
+    expect(await store.save(activeTab().id)).toBe('saved');
+    expect((await fs.readFile(`${R}/notes body.txt`)).content).toBe('notes body!');
+    // Closing it now is an ordinary file close (no Recently Closed text).
+    store.closeTab(activeTab().id);
+    expect(snap().closed[0]).toMatchObject({ kind: 'file' });
+  });
+});
+
+describe('suggestFileName', () => {
+  it('uses the first line, strips path characters, adds .txt', () => {
+    expect(suggestFileName({ kind: 'untitled', name: 'a/b: c?' })).toBe('a b c.txt');
+    expect(suggestFileName({ kind: 'untitled', name: 'query.sql' })).toBe('query.sql');
+    expect(suggestFileName({ kind: 'untitled', name: 'Untitled-3' })).toBe('Untitled-3.txt');
+    expect(suggestFileName({ kind: 'file', name: 'x.ts' })).toBe('x.ts');
   });
 });

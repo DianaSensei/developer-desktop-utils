@@ -59,6 +59,36 @@ Ranh giới ở **cấp thư mục**, giống ý tưởng của `dropped.rs` ở
 - Kéo-thả trong cây dùng pointer event (HTML5 DnD không tới được webview vì Tauri chặn để nhận
   file thả từ OS — cùng lý do với cây của API Client).
 
+## Tab Untitled ("hot exit") — bổ sung 2026-11-02
+
+Yêu cầu: tab mới (⌘N) gõ tuỳ ý, không phải chọn nơi lưu, **không mất khi đóng** và khôi
+phục lại được.
+
+- **Nội dung không nằm trong `sdk.storage`.** Store dùng chung (`app-settings.json`, plugin
+  store của Tauri, autosave 100 ms) ghi lại TOÀN BỘ file mỗi lần đổi — nhét buffer có thể vài
+  MB vào đó làm phình và làm chậm mọi lần lưu setting của cả app. Thay vào đó mỗi tab untitled
+  có một file `<app_data>/editor-backups/<key>.txt` (`src-tauri/src/editor_backup.rs`): ghi
+  nguyên tử (tmp + rename), quyền 0600, tối đa 20 MB. Lệnh chỉ nhận **key**
+  (`[A-Za-z0-9_-]{1,64}`), thư mục cố định — không thành đường đọc/ghi tuỳ ý.
+  `sdk.storage` chỉ giữ metadata nhỏ: `untitled` (key + số "Untitled-N" theo thứ tự tab) và
+  `closed` (danh sách Recently Closed).
+- **Đóng tab untitled không bao giờ hỏi.** Có chữ → chuyển vào Recently Closed (giữ backup) +
+  thông báo có nút Khôi phục; rỗng → bỏ luôn. ⌘⇧T mở lại tab vừa đóng (cả tab file). Giữ tối đa
+  30 mục; mục bị đẩy ra, Discard, Clear List đều xoá backup. Lúc khởi động, backup không còn ai
+  tham chiếu (crash, tab bị bỏ khi đang thoát) bị dọn.
+- Ghi backup debounce 400 ms sau lần gõ cuối, và flush cùng `flushPersist()` (cả `pagehide`).
+  Đóng tab ghi bản cuối ngay trước khi bỏ `EditorState`.
+- Tên tab = dòng đầu có chữ (tối đa 40 ký tự), như VS Code; Save As gợi ý tên đó + `.txt`.
+- **Save As / Open File cấp quyền từng file**: `Roots.files` bên cạnh `Roots.roots`. File được
+  chọn trong hộp thoại OS (mở từ Rust) chỉ được đọc / ghi / stat — `resolve_entry` vẫn đòi thư
+  mục cha nằm trong root nên không xoá / đổi tên / liệt kê quanh nó được. `editor-roots.json`
+  chuyển từ mảng sang `{ roots, files }`, vẫn đọc được định dạng cũ.
+- ⌘N đổi nghĩa từ "file mới trong thư mục đang chọn" sang "tab untitled" (đúng VS Code); tạo
+  file trong cây vẫn có ở nút Explorer và menu chuột phải.
+
+Rủi ro: backup là văn bản thuần trên đĩa — ai dán secret vào tab nháp thì secret nằm trong file
+đó tới khi Discard (đã ghi trong TOOLS.md). Mã hoá bằng khoá vault là hướng làm nếu cần.
+
 ## Đã cân nhắc, chưa làm
 
 - **Xoá vào Thùng rác** (crate `trash`) — UX tốt hơn, nhưng thêm dependency native cho cả ba
@@ -66,7 +96,8 @@ Ranh giới ở **cấp thư mục**, giống ý tưởng của `dropped.rs` ở
   `ConfirmDialog` nói rõ "không vào Thùng rác". Ứng viên đầu tiên nếu có phản hồi.
 - **File watcher** (`notify` crate) — chính xác hơn focus-refresh nhưng tốn tài nguyên với
   workspace lớn và cần quản lý vòng đời watcher theo root.
-- **Tìm trong toàn workspace** (⌘⇧F) và **hot exit** (lưu buffer chưa lưu qua restart).
+- **Tìm trong toàn workspace** (⌘⇧F), và hot exit cho chỉnh sửa chưa lưu của **file** (hiện
+  chỉ tab untitled được backup).
 - **Encoding khác UTF-8** — file không phải UTF-8 hiện bị coi là nhị phân (không mở) để không
   ghi hỏng khi lưu.
 
@@ -74,5 +105,6 @@ Ranh giới ở **cấp thư mục**, giống ý tưởng của `dropped.rs` ở
 
 - `src-tauri/src/editor_fs.rs` — luật filesystem + 18 test (symlink, `..`, prefix, root…)
 - `src-tauri/src/editor.rs` — lệnh Tauri, state, lưu `editor-roots.json`, hộp thoại
+- `src-tauri/src/editor_backup.rs` — backup tab untitled + test
 - `src/components/tools/editor/` — `store.ts` (+ test), `fs.ts`, `memoryFs.ts`, `Explorer.tsx`,
   `EditorTabs.tsx`, `EditorPane.tsx`, `StatusBar.tsx`, `QuickOpen.tsx`, `fileRanking.ts`

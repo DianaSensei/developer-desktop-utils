@@ -4,7 +4,7 @@
 // renamed or deleted from inside, and a stale save is a `conflict`.
 
 import {
-  EditorFsError, type DirEntry, type EditorFs, type FileContent, type FileList, type FileStat,
+  EditorFsError, type BackupStore, type DirEntry, type EditorFs, type FileContent, type FileList, type FileStat,
 } from './fs';
 import { basename, dirname, isUnder, join, relativeTo } from './paths';
 
@@ -40,6 +40,11 @@ export interface MemoryFsOptions {
   pickResult?: string | null;
   /** Folders authorised from the start (as if picked in an earlier session). */
   authorised?: string[];
+  /** Folder Save As "chooses" (the name is the suggested one, de-duplicated). */
+  saveDir?: string;
+  /** Where untitled-tab backups go. Defaults to a Map (lost on reload); the
+   *  browser build passes its plugin storage so the demo keeps them too. */
+  backupStorage?: { get(key: string): string | null; set(key: string, value: string): void; remove?(key: string): void };
   /** Clock, for deterministic mtimes in tests. */
   now?: () => number;
 }
@@ -69,7 +74,8 @@ export function createMemoryFs(opts: MemoryFsOptions = {}): MemoryFs {
     nodes.set(path, { kind: 'file', content, modified: now() });
   }
 
-  const within = (p: string) => roots.some((r) => isUnder(p, r));
+  const files: string[] = [];
+  const within = (p: string) => roots.some((r) => isUnder(p, r)) || files.includes(p);
   const resolve = (p: string): Node => {
     const node = nodes.get(p);
     if (!node) throw new EditorFsError(within(p) ? 'not_found' : 'denied', `No such file: ${p}`);
@@ -78,6 +84,8 @@ export function createMemoryFs(opts: MemoryFsOptions = {}): MemoryFs {
   };
   const resolveEntry = (p: string): Node => {
     if (roots.includes(p)) throw new EditorFsError('root', 'A workspace folder cannot be changed from inside itself.');
+    // A file authorised on its own may be read and written, nothing more.
+    if (!roots.some((r) => isUnder(p, r))) throw new EditorFsError('denied', 'That path is outside the folders opened in the editor.');
     return resolve(p);
   };
   const resolveDir = (p: string) => {
@@ -118,8 +126,32 @@ export function createMemoryFs(opts: MemoryFsOptions = {}): MemoryFs {
     return target;
   };
 
+  const backupMap = new Map<string, string>();
+  const bs = opts.backupStorage;
+  const INDEX = 'backup-index';
+  const index = (): string[] => {
+    if (!bs) return [...backupMap.keys()];
+    try { return JSON.parse(bs.get(INDEX) ?? '[]') as string[]; } catch { return []; }
+  };
+  const backups: BackupStore = {
+    async list() { return index().sort(); },
+    async read(key) { return bs ? bs.get(`backup:${key}`) : backupMap.get(key) ?? null; },
+    async write(key, content) {
+      if (!bs) { backupMap.set(key, content); return; }
+      bs.set(`backup:${key}`, content);
+      const keys = index();
+      if (!keys.includes(key)) bs.set(INDEX, JSON.stringify([...keys, key]));
+    },
+    async delete(key) {
+      if (!bs) { backupMap.delete(key); return; }
+      if (bs.remove) bs.remove(`backup:${key}`); else bs.set(`backup:${key}`, '');
+      bs.set(INDEX, JSON.stringify(index().filter((k) => k !== key)));
+    },
+  };
+
   return {
     kind: 'memory',
+    backups,
     async pickFolder() {
       const picked = opts.pickResult === undefined ? DEMO_ROOT : opts.pickResult;
       if (!picked) return null;
@@ -130,6 +162,20 @@ export function createMemoryFs(opts: MemoryFsOptions = {}): MemoryFs {
       return picked;
     },
     async roots() { return roots.filter((r) => nodes.has(r)); },
+    async authorisedFiles() { return files.filter((f) => nodes.has(f)); },
+    async pickFile() { return null; },
+    async saveAs(content, suggestedName) {
+      const dir = opts.saveDir ?? DEMO_ROOT;
+      mkdirp(dir);
+      const dot = suggestedName.lastIndexOf('.');
+      const stem = dot > 0 ? suggestedName.slice(0, dot) : suggestedName;
+      const ext = dot > 0 ? suggestedName.slice(dot) : '';
+      let path = join(dir, suggestedName);
+      for (let i = 1; nodes.has(path); i++) path = join(dir, `${stem}-${i}${ext}`);
+      nodes.set(path, { kind: 'file', content, modified: now() });
+      if (!roots.some((r) => isUnder(path, r))) files.push(path);
+      return path;
+    },
     async forgetRoot(path) {
       const i = roots.indexOf(path);
       if (i >= 0) roots.splice(i, 1);

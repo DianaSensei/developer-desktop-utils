@@ -7,7 +7,7 @@
 import { useEffect, useRef, useSyncExternalStore } from 'react';
 import { EditorView } from 'codemirror';
 import { EditorState } from '@codemirror/state';
-import { FileCode2, FileWarning } from 'lucide-react';
+import { FileCode2, FileInput, FilePlus2, FileWarning } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Callout } from '@/components/ui/callout';
@@ -18,6 +18,7 @@ import { useIsDark } from '@/hooks/useIsDark';
 import { useMessages } from '@/contexts/LocaleContext';
 import MESSAGES from './WorkspaceEditor.messages';
 import type { EditorSnapshot, EditorStore } from './store';
+import { RecentlyClosed } from './RecentlyClosed';
 
 interface Props {
   store: EditorStore;
@@ -77,7 +78,7 @@ export function EditorPane({ store, snap }: Props) {
         aria-hidden={!showEditor}
       />
 
-      {!tab && <Welcome hasFolder={snap.folders.length > 0} />}
+      {!tab && <Welcome store={store} snap={snap} />}
       {tab && (tab.status === 'loading' || tab.status === 'idle') && (
         <LoadingRow label={m('loading')} className="m-auto" />
       )}
@@ -96,13 +97,16 @@ export function EditorPane({ store, snap }: Props) {
   );
 }
 
-function Welcome({ hasFolder }: { hasFolder: boolean }) {
+function Welcome({ store, snap }: Props) {
   const m = useMessages(MESSAGES);
+  const hasFolder = snap.folders.length > 0;
   const alt = IS_MAC ? '⌥' : 'Alt+';
   const rows: [React.ReactNode, string][] = [
     [<Keycap mod>P</Keycap>, m('shortcutQuickOpen')],
     [<Keycap mod>N</Keycap>, m('shortcutNewFile')],
+    [<Keycap mod>⇧T</Keycap>, m('shortcutReopen')],
     [<Keycap mod>S</Keycap>, m('shortcutSave')],
+    [<Keycap mod>⇧S</Keycap>, m('shortcutSaveAs')],
     [<Keycap mod>{`${alt}S`}</Keycap>, m('shortcutSaveAll')],
     [<Keycap mod>W</Keycap>, m('shortcutClose')],
     [<Keycap mod>F</Keycap>, m('shortcutFind')],
@@ -112,6 +116,15 @@ function Welcome({ hasFolder }: { hasFolder: boolean }) {
     <div className="m-auto flex flex-col items-center gap-5 p-8 text-center motion-safe:animate-fade-in-up">
       <FileCode2 className="h-12 w-12 text-fg-mute/30" />
       <p className="text-sm text-fg-mute">{hasFolder ? m('noEditor') : m('noFolderHint')}</p>
+      <div className="flex flex-wrap justify-center gap-2">
+        <Button size="sm" className="gap-1.5" onClick={() => { store.newUntitled(); store.focusEditor(); }}>
+          <FilePlus2 className="h-3.5 w-3.5" />{m('newTextFile')}
+        </Button>
+        <Button size="sm" variant="outline" className="gap-1.5" onClick={() => void store.openFilePicker()}>
+          <FileInput className="h-3.5 w-3.5" />{m('openFile')}
+        </Button>
+      </div>
+      <RecentlyClosed store={store} closed={snap.closed} limit={8} className="w-full max-w-md text-left" />
       <dl className="grid grid-cols-[auto_auto] items-center gap-x-4 gap-y-2 text-xs">
         {rows.map(([keys, label]) => (
           <div key={label} className="contents">

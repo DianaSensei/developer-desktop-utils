@@ -341,13 +341,16 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
       <><strong className="text-fg">Open Folder…</strong> picks a folder in the system dialog; it shows in the Explorer as a tree. Add more folders the same way — a closed one stays under <strong className="text-fg">Recent</strong>.</>,
       'Click a file to open it in a tab. Right-click any row for New File / New Folder, Rename, Cut / Paste, Copy Path and Delete; drag a row onto a folder to move it.',
       <>New File accepts a path — <Tok>src/util/x.ts</Tok> creates the missing folders too. <Key>F2</Key> renames, <Key>Delete</Key> (or <Key>{mod}</Key>+<Key>⌫</Key>) deletes, arrow keys walk the tree.</>,
-      <><Key>{mod}</Key>+<Key>S</Key> saves, <Key>{mod}</Key>+<Key>P</Key> jumps to any file by name, <Key>{mod}</Key>+<Key>W</Key> closes the tab, <Key>Ctrl</Key>+<Key>Tab</Key> cycles tabs, <Key>{mod}</Key>+<Key>F</Key> finds/replaces in the file, <Key>Alt</Key>+<Key>Z</Key> toggles word wrap.</>,
+      <><Key>{mod}</Key>+<Key>N</Key> opens a new untitled tab — type anything, no folder or file name needed. Its text is kept automatically (also across restarts); <Key>{mod}</Key>+<Key>S</Key> on it asks where to save it as a file.</>,
+      <>Closing an untitled tab never loses it: it goes to <strong className="text-fg">Recently Closed</strong> (the clock icon at the end of the tab strip, or the welcome screen). <Key>{mod}</Key>+<Key>⇧</Key>+<Key>T</Key> reopens the last closed tab.</>,
+      <><Key>{mod}</Key>+<Key>S</Key> saves, <Key>{mod}</Key>+<Key>⇧</Key>+<Key>S</Key> saves as, <Key>{mod}</Key>+<Key>P</Key> jumps to any file by name, <Key>{mod}</Key>+<Key>W</Key> closes the tab, <Key>Ctrl</Key>+<Key>Tab</Key> cycles tabs, <Key>{mod}</Key>+<Key>F</Key> finds/replaces in the file, <Key>Alt</Key>+<Key>Z</Key> toggles word wrap.</>,
     ],
     know: [
       'Syntax highlighting is picked from the file name (~150 languages). Line endings (LF/CRLF) and a UTF-8 BOM are kept when you save.',
       'Unsaved edits survive switching to another tool, and each tab keeps its own undo history. Open folders and tabs come back after a restart.',
       'When you return to the window, open folders are re-listed and open files are compared with disk: an unchanged tab reloads on its own; one with unsaved edits asks first. Saving over a file another program changed asks before overwriting.',
-      'The app can only reach folders you opened through the dialog. Remove one from Recent to revoke that access.',
+      'The app can only reach folders you opened through the dialog, plus single files you picked in Open File… / Save As. Remove a folder from Recent to revoke that access.',
+      'Recently Closed keeps the last 30 closed tabs; Discard (×) or the bin icon removes their text for good.',
     ],
     caveat: [
       'Delete is permanent — files do not go to the Trash.',
@@ -475,4 +478,6 @@ export const TOOL_GUIDE_VERSIONS: Record<string, number> = {
   'cron-generator': 2,
   // 2 — match count + jump, keyboard tree navigation.
   json: 2,
+  // 2 — untitled tabs (⌘N), Recently Closed, Save As, Open File.
+  'text-editor': 2,
 };

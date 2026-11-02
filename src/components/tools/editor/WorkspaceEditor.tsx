@@ -22,7 +22,7 @@ import { StatusBar } from './StatusBar';
 import { QuickOpen } from './QuickOpen';
 import { getEditorStore } from './session';
 import { toFsError } from './fs';
-import { basename, dirname, isUnder, relativeTo } from './paths';
+import { basename, isUnder, relativeTo } from './paths';
 
 type Choice = 'primary' | 'secondary' | 'cancel';
 
@@ -67,10 +67,11 @@ export function WorkspaceEditor() {
     };
   }, [store]);
 
-  // Info notices (e.g. "Path copied") fade on their own; errors stay.
+  // Info notices (e.g. "Path copied") fade on their own; errors stay. One
+  // that offers Restore stays long enough to reach the button.
   useEffect(() => {
     if (snap.notice?.tone !== 'info') return;
-    const t = setTimeout(() => store.dismissNotice(), 2000);
+    const t = setTimeout(() => store.dismissNotice(), snap.notice.restoreKey ? 8000 : 2000);
     return () => clearTimeout(t);
   }, [snap.notice, store]);
 
@@ -86,6 +87,7 @@ export function WorkspaceEditor() {
   const save = useCallback(async (id: string): Promise<boolean> => {
     const result = await store.save(id);
     if (result !== 'conflict') return result === 'saved' || result === 'skipped';
+    // (Untitled tabs go through Save As inside store.save; 'cancelled' → false.)
     const tab = store.tab(id);
     const choice = await ask({
       title: m('conflictTitle'),
@@ -99,9 +101,10 @@ export function WorkspaceEditor() {
     return false;
   }, [store, ask, m]);
 
-  /** Closes tabs, asking first about unsaved ones. Resolves false on Cancel. */
+  /** Closes tabs, asking first about unsaved files. Untitled tabs never ask:
+   *  their text moves to Recently Closed. Resolves false on Cancel. */
   const requestClose = useCallback(async (ids: string[]): Promise<boolean> => {
-    const dirty = ids.map((id) => store.tab(id)).filter((t) => t?.dirty);
+    const dirty = ids.map((id) => store.tab(id)).filter((t) => t?.dirty && t.kind === 'file');
     if (dirty.length > 0) {
       const choice = await ask({
         title: dirty.length === 1
@@ -138,8 +141,15 @@ export function WorkspaceEditor() {
   }, [sdk, store, m]);
 
   // ── keyboard ───────────────────────────────────────────────────────────
-  const handlers = useRef({ save, requestClose, setQuickOpen, setPending });
-  handlers.current = { save, requestClose, setQuickOpen, setPending };
+  const newUntitled = useCallback(() => {
+    store.newUntitled();
+    store.focusEditor();
+  }, [store]);
+
+  const saveAs = useCallback(async (id: string) => { await store.saveAs(id); }, [store]);
+
+  const handlers = useRef({ save, saveAs, requestClose, setQuickOpen, newUntitled });
+  handlers.current = { save, saveAs, requestClose, setQuickOpen, newUntitled };
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -153,9 +163,15 @@ export function WorkspaceEditor() {
       if (mod && e.altKey && e.code === 'KeyS') {
         e.preventDefault();
         void (async () => { for (const t of store.getSnapshot().tabs) if (t.dirty) await h.save(t.id); })();
+      } else if (mod && !e.altKey && e.shiftKey && e.code === 'KeyS') {
+        e.preventDefault();
+        if (active) void h.saveAs(active);
       } else if (mod && !e.altKey && !e.shiftKey && e.code === 'KeyS') {
         e.preventDefault();
         if (active) void h.save(active);
+      } else if (mod && !e.altKey && e.shiftKey && e.code === 'KeyT') {
+        e.preventDefault();
+        void store.reopenClosed();
       } else if (mod && !e.altKey && e.code === 'KeyW') {
         e.preventDefault();
         if (active) void h.requestClose([active]);
@@ -163,13 +179,10 @@ export function WorkspaceEditor() {
         e.preventDefault();
         h.setQuickOpen(true);
       } else if (mod && !e.altKey && !e.shiftKey && e.code === 'KeyN') {
+        // VS Code: ⌘N is a new untitled tab; New File in a folder lives in
+        // the Explorer (button, right-click).
         e.preventDefault();
-        const sel = snapNow.selected;
-        const dir = sel && store.rootOf(sel) ? (store.isDir(sel) ? sel : dirname(sel)) : snapNow.folders[0];
-        if (dir) {
-          void store.toggleDir(dir, true);
-          h.setPending({ kind: 'file', dir });
-        }
+        h.newUntitled();
       } else if (e.ctrlKey && e.key === 'Tab') {
         e.preventDefault();
         store.activateRelative(e.shiftKey ? -1 : 1);
@@ -182,7 +195,9 @@ export function WorkspaceEditor() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [store]);
 
-  const noticeText = snap.notice
+  const noticeText = snap.notice?.code === 'closedUntitled'
+    ? m('closedUntitledNotice', { name: snap.notice.text })
+    : snap.notice
     ? (snap.notice.code && MESSAGES[`err.${snap.notice.code}` as keyof typeof MESSAGES]
       ? m(`err.${snap.notice.code}` as keyof typeof MESSAGES)
       : snap.notice.text)
@@ -222,6 +237,8 @@ export function WorkspaceEditor() {
               snap={snap}
               onRequestClose={(ids) => void requestClose(ids)}
               onCopyPath={(p, rel) => void copyPath(p, rel)}
+              onSaveAs={(id) => void saveAs(id)}
+              onNewUntitled={newUntitled}
             />
             {noticeText && (
               <Callout
@@ -229,7 +246,14 @@ export function WorkspaceEditor() {
                 size="sm"
                 className="m-2 mb-0"
                 actions={(
-                  <Button size="sm" variant="ghost" onClick={() => store.dismissNotice()}>{m('dismiss')}</Button>
+                  <>
+                    {snap.notice!.restoreKey && (
+                      <Button size="sm" variant="outline" onClick={() => void store.reopenClosed(snap.notice!.restoreKey)}>
+                        {m('restore')}
+                      </Button>
+                    )}
+                    <Button size="sm" variant="ghost" onClick={() => store.dismissNotice()}>{m('dismiss')}</Button>
+                  </>
                 )}
               >
                 {noticeText}
