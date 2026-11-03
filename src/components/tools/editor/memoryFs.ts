@@ -4,7 +4,7 @@
 // renamed or deleted from inside, and a stale save is a `conflict`.
 
 import {
-  EditorFsError, type BackupStore, type DirEntry, type HistoryEntry, type HistoryStore, type EditorFs, type FileContent, type FileList, type FileStat,
+  EditorFsError, type BackupStore, type DirEntry, type HistoryEntry, type HistoryStore, type ViewerStore, type ViewLine, type EditorFs, type FileContent, type FileList, type FileStat,
 } from './fs';
 import { basename, dirname, isUnder, join, relativeTo } from './paths';
 
@@ -195,10 +195,67 @@ export function createMemoryFs(opts: MemoryFsOptions = {}): MemoryFs {
     clear(path) { return run(() => { historyMap.delete(historyKey(path)); }); },
   };
 
+  // The large-file viewer over an in-memory file: same line, search and
+  // tail semantics as editor_view.rs, without the index (it is all in RAM).
+  const viewers = new Map<number, string>();
+  let viewerSeq = 0;
+  const viewLines = (id: number): string[] => {
+    const path = viewers.get(id);
+    if (path === undefined) throw new EditorFsError('not_found', 'That viewer was closed.');
+    const n = nodes.get(path);
+    if (n?.kind !== 'file') return [];
+    const lines = n.content.split('\n');
+    if (lines.at(-1) === '') lines.pop();
+    return lines.map((l) => (l.endsWith('\r') ? l.slice(0, -1) : l));
+  };
+  const viewStatus = (id: number) => {
+    const n = nodes.get(viewers.get(id) ?? '');
+    const size = n?.kind === 'file' ? n.content.length : 0;
+    return { size, lines: viewLines(id).length, scanned: size, done: true, binary: n?.kind === 'file' && n.content.includes('\0'), generation: 0 };
+  };
+  const viewer: ViewerStore = {
+    open(path) {
+      return run(() => {
+        if (resolve(path).kind !== 'file') throw new EditorFsError('is_dir', 'That is a folder.');
+        const id = ++viewerSeq;
+        viewers.set(id, path);
+        return { id, status: viewStatus(id) };
+      });
+    },
+    status(id) { return run(() => viewStatus(id)); },
+    lines(id, start, count) {
+      return run(() => viewLines(id).slice(start, start + Math.min(count, 2000)).map((text): ViewLine => ({ text, truncated: false })));
+    },
+    refresh(id) { return run(() => viewStatus(id)); },
+    search(id, o) {
+      return run(() => {
+        if (!o.query) return { hits: [], nextLine: null, partial: false };
+        let re: RegExp;
+        try {
+          re = new RegExp(o.regex ? o.query : o.query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), o.caseSensitive ? '' : 'i');
+        } catch (e) {
+          throw new EditorFsError('invalid_regex', (e as Error).message);
+        }
+        const lines = viewLines(id);
+        const hits = [];
+        const max = o.maxHits ?? 200;
+        for (let i = o.fromLine; i < lines.length; i++) {
+          const m = re.exec(lines[i]);
+          if (!m) continue;
+          hits.push({ line: i, column: m.index, lineColumn: m.index, length: m[0].length, preview: lines[i] });
+          if (hits.length >= max) return { hits, nextLine: i + 1, partial: true };
+        }
+        return { hits, nextLine: null, partial: false };
+      });
+    },
+    close(id) { return run(() => { viewers.delete(id); }); },
+  };
+
   return {
     kind: 'memory',
     backups,
     history,
+    viewer,
     pickFolder() { return run(() => {
       const picked = opts.pickResult === undefined ? DEMO_ROOT : opts.pickResult;
       if (!picked) return null;

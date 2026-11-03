@@ -30,6 +30,65 @@ export interface FileContent {
   modified: number;
 }
 
+/** Above this a file opens in the read-only viewer instead of the editor
+ *  (matches MAX_EDIT_BYTES in editor_fs.rs). */
+export const MAX_EDIT_BYTES = 200 * 1024 * 1024;
+/** Above this an editable file runs in "large file" mode: no highlighting,
+ *  bracket colors, indent guides, formatting or Local History (VS Code turns
+ *  the same things off for large files). */
+export const LARGE_FILE_BYTES = 10 * 1024 * 1024;
+
+export interface ViewStatus {
+  size: number;
+  lines: number;
+  scanned: number;
+  done: boolean;
+  binary: boolean;
+  /** Bumped when the file shrank and indexing started over. */
+  generation: number;
+}
+
+export interface ViewLine {
+  text: string;
+  truncated: boolean;
+}
+
+export interface SearchHit {
+  line: number;
+  /** Match offset (characters) within `preview`. */
+  column: number;
+  /** Match offset (characters) within the whole line. */
+  lineColumn: number;
+  length: number;
+  preview: string;
+}
+
+export interface SearchResult {
+  hits: SearchHit[];
+  nextLine: number | null;
+  partial: boolean;
+}
+
+export interface SearchOptions {
+  query: string;
+  regex: boolean;
+  caseSensitive: boolean;
+  fromLine: number;
+  maxHits?: number;
+}
+
+/** The read-only large-file viewer (editor_view.rs): lines are read from disk
+ *  on demand through a background-built line index. */
+export interface ViewerStore {
+  open(path: string): Promise<{ id: number; status: ViewStatus }>;
+  status(id: number): Promise<ViewStatus>;
+  lines(id: number, start: number, count: number): Promise<ViewLine[]>;
+  /** Indexes what was appended since last time (tail -f). */
+  refresh(id: number): Promise<ViewStatus>;
+  search(id: number, opts: SearchOptions): Promise<SearchResult>;
+  close(id: number): Promise<void>;
+}
+
 export interface FileStat {
   size: number;
   modified: number;
@@ -50,7 +109,7 @@ export interface FileList {
 /** Codes match `FsError::code` in editor_fs.rs. */
 export type FsErrorCode =
   | 'denied' | 'not_found' | 'exists' | 'conflict' | 'too_large' | 'invalid_name'
-  | 'root' | 'invalid_move' | 'not_dir' | 'is_dir' | 'permission' | 'io' | 'unknown';
+  | 'root' | 'invalid_move' | 'not_dir' | 'is_dir' | 'permission' | 'io' | 'invalid_regex' | 'unknown';
 
 export class EditorFsError extends Error {
   constructor(public code: FsErrorCode, message: string) {
@@ -106,6 +165,7 @@ export interface EditorFs {
   readonly backups: BackupStore;
   /** Local History: snapshots of a file taken on save (editor_history.rs). */
   readonly history: HistoryStore;
+  readonly viewer: ViewerStore;
 }
 
 export type SnapshotSource = 'save' | 'previous' | 'restore';
@@ -156,10 +216,32 @@ export function createNativeFs(sdk: PluginSdk): EditorFs {
     listDir: (path) => call<DirListing>('editor_list_dir', { path }),
     listFiles: (root, limit) => call<FileList>('editor_list_files', { root, limit }),
     stat: (path) => call<FileStat>('editor_stat', { path }),
-    readFile: (path) => call<FileContent>('editor_read_file', { path }),
-    writeFile: (path, content, opts = {}) => call<FileStat>('editor_write_file', {
-      path, content, bom: opts.bom ?? false, expectedModified: opts.expectedModified,
-    }),
+    // Both directions as raw bytes: a 200 MB file must not become a JSON
+    // string on the way through the IPC bridge.
+    readFile: async (path) => decodeFramed(await call<ArrayBuffer>('editor_read_file', { path })),
+    writeFile: async (path, content, opts = {}) => {
+      try {
+        return await sdk.native.invoke<FileStat>('editor_write_file', new TextEncoder().encode(content), {
+          headers: {
+            'x-path': encodeURIComponent(path),
+            'x-bom': opts.bom ? '1' : '0',
+            ...(opts.expectedModified ? { 'x-expected-modified': String(opts.expectedModified) } : {}),
+          },
+        });
+      } catch (e) {
+        throw toFsError(e);
+      }
+    },
+    viewer: {
+      open: (path) => call<{ id: number; status: ViewStatus }>('editor_view_open', { path }),
+      status: (id) => call<ViewStatus>('editor_view_status', { id }),
+      lines: (id, start, count) => call<ViewLine[]>('editor_view_lines', { id, start, count }),
+      refresh: (id) => call<ViewStatus>('editor_view_refresh', { id }),
+      search: (id, o) => call<SearchResult>('editor_view_search', {
+        id, query: o.query, regex: o.regex, caseSensitive: o.caseSensitive, fromLine: o.fromLine, maxHits: o.maxHits,
+      }),
+      close: async (id) => { await call<void>('editor_view_close', { id }); },
+    },
     createFile: (dir, name) => call<string>('editor_create_file', { dir, name }),
     createDir: (dir, name) => call<string>('editor_create_dir', { dir, name }),
     rename: (path, newName) => call<string>('editor_rename', { path, newName }),
@@ -179,4 +261,14 @@ export function createNativeFs(sdk: PluginSdk): EditorFs {
       delete: (key) => call<void>('editor_backup_delete', { key }),
     },
   };
+}
+
+/** Unpacks `editor_read_file`'s reply: u32 LE metadata length, metadata JSON,
+ *  then the UTF-8 text (see `Roots::read_framed`). */
+export function decodeFramed(buf: ArrayBuffer): FileContent {
+  const view = new DataView(buf);
+  const metaLen = view.getUint32(0, true);
+  const meta = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 4, metaLen))) as Omit<FileContent, 'content'>;
+  const content = meta.binary ? '' : new TextDecoder().decode(new Uint8Array(buf, 4 + metaLen));
+  return { ...meta, content };
 }

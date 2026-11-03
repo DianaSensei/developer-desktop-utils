@@ -153,6 +153,22 @@ const channel = await sdk.native.channel<MyChunk>((chunk) => {
 // truyền `channel` làm tham số cho invoke tới lệnh Rust nhận Channel
 ```
 
+**Dữ liệu lớn — body nhị phân.** Tham số thứ hai có thể là `Uint8Array` /
+`ArrayBuffer` thay cho object, kèm `options.headers` cho phần metadata; lệnh
+Rust nhận nó qua `tauri::ipc::Request` (`request.body()` là
+`InvokeBody::Raw`, `request.headers()`). Chiều ngược lại, lệnh trả về
+`tauri::ipc::Response` thì `invoke` resolve ra `ArrayBuffer`. Dùng cho mọi thứ
+cỡ MB trở lên (Text Editor đọc/ghi file tới 200 MB như vậy) — JSON hoá một
+chuỗi vài trăm MB qua cầu IPC vừa chậm vừa tốn bộ nhớ gấp nhiều lần. Header
+chỉ được chứa ASCII: mã hoá giá trị bằng `encodeURIComponent`.
+
+```ts
+await sdk.native.invoke('my_save', new TextEncoder().encode(text), {
+  headers: { 'x-path': encodeURIComponent(path) },
+});
+const buf = await sdk.native.invoke<ArrayBuffer>('my_read', { path });
+```
+
 `invoke` khớp CẢ hai điều kiện trước khi cho qua: có quyền `native` VÀ tên
 lệnh khớp một mục (hoặc tiền tố một mục) trong `commands`. `channel()`/
 `listen()` chỉ kiểm quyền `native` — không có tên lệnh cụ thể để đối chiếu

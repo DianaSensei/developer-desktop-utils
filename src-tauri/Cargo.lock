@@ -1196,6 +1196,7 @@ dependencies = [
  "keyring",
  "local-ip-address",
  "md-5",
+ "memchr",
  "netstat2",
  "regex",
  "reqwest 0.12.28",

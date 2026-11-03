@@ -708,3 +708,20 @@
   khi số test xanh. (Cùng phiên: `codecMcpBridge.decryptError.test.ts` đỏ một lần khi chạy cả
   suite rồi xanh 5/5 khi chạy riêng và xanh ở lần chạy suite kế tiếp — test có sẵn, phụ thuộc
   ciphertext ngẫu nhiên của crypto-js, không liên quan thay đổi editor.)
+
+## [2026-11-03] CI — SonarCloud quality gate đỏ vì "Reliability D / Security C on New Code" dù không có bug thật nghiêm trọng
+- Nguyên nhân: quality gate của repo đòi rating **A** cho Reliability và Security trên code mới,
+  và với rating theo impact của SonarCloud, A nghĩa là **không có issue nào** thuộc loại đó, ở bất
+  kỳ mức độ nào. Một `Math.random()` làm fallback tạo id (không phải bí mật) đủ để Security
+  xuống C; các issue "reliability" nhẹ như hàm `async` không có `await` (S7503), `sort()` không
+  hàm so sánh (S2871 — mức HIGH, kéo xuống D), regex có thể backtrack (S8786), phần tử có
+  `onClick` mà không có phím tương ứng (S1082/S6848) cộng lại thành D. Issue maintainability
+  (độ phức tạp, props readonly…) không nằm trong gate.
+- Số lần thử: 1/5 (lấy danh sách bằng API công khai
+  `https://sonarcloud.io/api/issues/search?componentKeys=DianaSensei_developer-desktop-utils&pullRequest=<n>&impactSoftwareQualities=RELIABILITY,SECURITY`, sửa hết 43 issue, gate xanh ở lần quét kế tiếp).
+- Kết quả: Đã fix (xem commit "fix SonarCloud reliability and security findings").
+- Bài học chung: trước khi mở PR lớn trong repo này, coi các mẫu sau là lỗi luôn: `Math.random`
+  ở bất cứ đâu dính tới id/khoá (dùng `crypto`), `async` không `await` (trả `Promise` tường minh),
+  `sort()` không comparator, regex có lượng từ lồng/chồng lấn hay `\s` dưới cờ `/m` (giới hạn độ
+  dài, tách mẫu, hoặc quét tay), phần tử không phải nút mà nhận click (thêm role + tabIndex + phím).
+  Lọc API theo `impactSoftwareQualities` để chỉ thấy đúng những gì làm gate đỏ.

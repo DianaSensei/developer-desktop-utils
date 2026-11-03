@@ -24,7 +24,8 @@ import { codeThemeWithVscodeHighlight, smartBracketSkip } from '@/components/ui/
 import { bracketPairColorization, detectIndent, indentGuides, type DetectedIndent } from '@/components/ui/code-vscode';
 import { FormatError, PRETTIER_CONFIG_FILES, formatWithTool, formatterFor, parsePrettierConfig } from './format';
 import {
-  toFsError, type EditorFsError, type DirEntry, type EditorFs, type HistoryEntry, type SnapshotSource, type WalkEntry,
+  LARGE_FILE_BYTES, MAX_EDIT_BYTES, toFsError,
+  type EditorFsError, type DirEntry, type EditorFs, type HistoryEntry, type SnapshotSource, type WalkEntry,
 } from './fs';
 import { guessLanguage, loadLanguage, loadLanguageByName } from './languages';
 import { basename, dirname, isUnder, join, rebase } from './paths';
@@ -50,6 +51,12 @@ export interface Tab {
   kind: 'file' | 'untitled';
   /** N of "Untitled-N", the name shown until the first line has text. */
   untitledNo: number | null;
+  /** `viewer`: read-only, streamed from disk (files over MAX_EDIT_BYTES, or
+   *  opened that way on purpose — e.g. to follow a log). */
+  mode: 'edit' | 'viewer';
+  /** An editable file over LARGE_FILE_BYTES: highlighting, bracket colors,
+   *  indent guides, formatting and Local History are off. */
+  large: boolean;
   path: string;
   name: string;
   status: TabStatus;
@@ -133,6 +140,7 @@ const KEYS = {
   closed: 'closed',
   formatOnSave: 'formatOnSave',
   history: 'localHistory',
+  viewerTabs: 'viewerTabs',
 } as const;
 
 const DEFAULT_INDENT: DetectedIndent = { useTabs: false, size: 4 };
@@ -238,7 +246,12 @@ export class EditorStore {
   readonly wrapSlot = new Compartment();
   readonly indentSlot = new Compartment();
 
-  constructor(readonly fs: EditorFs, private storage: StorageLike) {}
+  constructor(
+    readonly fs: EditorFs,
+    private storage: StorageLike,
+    /** Size thresholds (bytes); overridable so tests needn't build 200 MB files. */
+    readonly limits = { maxEdit: MAX_EDIT_BYTES, large: LARGE_FILE_BYTES },
+  ) {}
 
   // ── subscription ────────────────────────────────────────────────────────
 
@@ -307,6 +320,7 @@ export class EditorStore {
       [KEYS.closed]: s.closed,
       [KEYS.formatOnSave]: s.formatOnSave,
       [KEYS.history]: s.historyEnabled,
+      [KEYS.viewerTabs]: s.tabs.filter((t) => t.mode === 'viewer').map((t) => t.path),
     };
     for (const [key, value] of Object.entries(values)) {
       const json = JSON.stringify(value);
@@ -371,6 +385,7 @@ export class EditorStore {
     const untitledMeta = readJson<{ key: string; no: number | null; lang?: string | null }[]>(this.storage, KEYS.untitled, []);
     const formatOnSave = readJson<boolean>(this.storage, KEYS.formatOnSave, false);
     const historyEnabled = readJson<boolean>(this.storage, KEYS.history, false);
+    const viewerTabs = new Set(readJson<string[]>(this.storage, KEYS.viewerTabs, []));
     const closedSaved = readJson<ClosedEntry[]>(this.storage, KEYS.closed, []);
 
     let authorised: string[] = [];
@@ -404,7 +419,7 @@ export class EditorStore {
         const tab = untitled.get(p.slice(UNTITLED_PREFIX.length));
         if (tab) { tabs.push(tab); untitled.delete(p.slice(UNTITLED_PREFIX.length)); }
       } else if (open.some((f) => isUnder(p, f)) || files.includes(p)) {
-        tabs.push(this.newTab(p));
+        tabs.push({ ...this.newTab(p), mode: viewerTabs.has(p) ? 'viewer' : 'edit' });
       }
     }
     tabs.push(...untitled.values());
@@ -696,7 +711,7 @@ export class EditorStore {
 
   private newTab(path: string): Tab {
     return {
-      id: `t${nextId++}`, kind: 'file', untitledNo: null, path, name: basename(path), status: 'idle', error: null, errorCode: null, dirty: false, saving: false,
+      id: `t${nextId++}`, kind: 'file', untitledNo: null, mode: 'edit', large: false, path, name: basename(path), status: 'idle', error: null, errorCode: null, dirty: false, saving: false,
       eol: '\n', bom: false, modified: 0, size: 0, language: null, languageOverride: null,
       indent: DEFAULT_INDENT, external: null,
     };
@@ -881,6 +896,7 @@ export class EditorStore {
       this.saved.delete(id);
       this.scroll.delete(id);
       this.langApplied.delete(id);
+      this.closeViewer(id);
       const timer = this.guessTimers.get(id);
       if (timer) clearTimeout(timer);
       this.guessTimers.delete(id);
@@ -906,18 +922,28 @@ export class EditorStore {
     if (!tab) return;
     this.patchTab(id, { status: 'loading', error: null, errorCode: null });
     try {
+      // Size first: too big to edit means the viewer, which reads from disk
+      // on demand instead of loading the file.
+      const stat = await this.fs.stat(tab.path);
+      if (!this.tab(id)) return;
+      if (tab.mode === 'viewer' || stat.size > this.limits.maxEdit) {
+        this.patchTab(id, { mode: 'viewer', status: 'ready', size: stat.size, modified: stat.modified, external: null });
+        this.persist();
+        return;
+      }
       const file = await this.fs.readFile(tab.path);
       if (!this.tab(id)) return;
       if (file.binary) {
         this.patchTab(id, { status: 'binary', size: file.size, modified: file.modified, external: null });
         return;
       }
+      const large = file.size > this.limits.large;
       const indent = detectIndent(file.content, DEFAULT_INDENT);
-      const state = this.createState(id, file.content, indent);
+      const state = this.createState(id, file.content, indent, large);
       this.states.set(id, state);
       this.saved.set(id, state.doc);
       this.patchTab(id, {
-        status: 'ready', dirty: false, eol: detectEol(file.content), bom: file.bom, indent,
+        status: 'ready', dirty: false, eol: detectEol(file.content), bom: file.bom, indent, large,
         size: file.size, modified: file.modified, external: null,
       });
       this.syncView(true);
@@ -933,7 +959,12 @@ export class EditorStore {
    *  untitled tab) a guess from the text. */
   private async applyLanguage(id: string) {
     const tab = this.tab(id);
-    if (!tab || tab.status !== 'ready') return;
+    if (!tab || tab.status !== 'ready' || tab.mode === 'viewer') return;
+    if (tab.large) {
+      // Parsing a 100 MB document for highlighting would stall typing.
+      this.patchTab(id, { language: null });
+      return;
+    }
     let lang;
     if (tab.languageOverride) {
       lang = tab.languageOverride === PLAIN_TEXT ? null : await loadLanguageByName(tab.languageOverride);
@@ -1013,6 +1044,10 @@ export class EditorStore {
     const tab = this.tab(id);
     const state = this.currentState(id);
     if (!tab || !state || tab.status !== 'ready') return 'unsupported';
+    if (tab.large) {
+      this.notify('', 'info', 'largeNoFormat');
+      return 'unsupported';
+    }
     const info = formatterFor(tab.language);
     if (!info) {
       this.notify(tab.language ?? '', 'info', 'noFormatter');
@@ -1067,7 +1102,7 @@ export class EditorStore {
   /** Throws away unsaved edits and re-reads the file from disk. */
   async reload(id: string) {
     const tab = this.tab(id);
-    if (!tab || tab.kind === 'untitled') return;
+    if (!tab || tab.kind === 'untitled' || tab.mode === 'viewer') return;
     if (tab.status !== 'ready') {
       await this.load(id);
       return;
@@ -1108,7 +1143,7 @@ export class EditorStore {
     const state = this.currentState(id);
     if (!tab || !state || tab.status !== 'ready') return 'skipped';
     if (tab.kind === 'untitled') return this.saveAs(id);
-    if (this.snap.formatOnSave && formatterFor(tab.language)) {
+    if (this.snap.formatOnSave && !tab.large && formatterFor(tab.language)) {
       // A formatting error is reported but does not block the save.
       await this.format(id);
     }
@@ -1121,7 +1156,8 @@ export class EditorStore {
     // this records the version from before the first save (or an outside
     // change that was reloaded since).
     const previous = this.saved.get(id);
-    if (this.snap.historyEnabled && previous) {
+    const recordHistory = this.snap.historyEnabled && !tab.large;
+    if (recordHistory && previous) {
       await this.snapshot(tab.path, withEol(previous.toString(), tab.eol), 'previous');
     }
     this.patchTab(id, { saving: true });
@@ -1146,7 +1182,7 @@ export class EditorStore {
         saving: false, modified: stat.modified, size: stat.size, external: null,
         dirty: now ? !now.doc.eq(live.doc) : false,
       });
-      if (this.snap.historyEnabled) await this.snapshot(tab.path, content, 'save');
+      if (recordHistory) await this.snapshot(tab.path, content, 'save');
       return 'saved';
     } catch (e) {
       const err = toFsError(e);
@@ -1208,6 +1244,73 @@ export class EditorStore {
     if (this.snap.historyEnabled) await this.snapshot(path, content, 'save');
     await this.applyLanguage(id);
     return 'saved';
+  }
+
+  // ── large-file viewer ──────────────────────────────────────────────────
+
+  private viewerHandles = new Map<string, Promise<number>>();
+  /** First visible line per viewer tab, so switching tabs keeps the place. */
+  readonly viewerTopLine = new Map<string, number>();
+
+  /** The tab's backend viewer, opened once and kept until the tab closes
+   *  (re-opening would index a multi-GB file again). */
+  viewerHandle(id: string): Promise<number> {
+    const tab = this.tab(id);
+    if (!tab) return Promise.reject(new Error('No such tab'));
+    let handle = this.viewerHandles.get(id);
+    if (!handle) {
+      handle = this.fs.viewer.open(tab.path).then((r) => r.id);
+      handle.catch(() => this.viewerHandles.delete(id));
+      this.viewerHandles.set(id, handle);
+    }
+    return handle;
+  }
+
+  private closeViewer(id: string) {
+    const handle = this.viewerHandles.get(id);
+    if (!handle) return;
+    this.viewerHandles.delete(id);
+    this.viewerTopLine.delete(id);
+    void handle.then((h) => this.fs.viewer.close(h)).catch(() => {});
+  }
+
+  /** Opens a file read-only in the viewer — any size; handy to follow a log.
+   *  An open editor tab for it switches over unless it has unsaved edits. */
+  async openInViewer(path: string) {
+    const existing = this.snap.tabs.find((t) => t.path === path);
+    if (existing?.dirty) {
+      this.activate(existing.id);
+      this.notify(existing.name, 'info', 'saveBeforeViewer');
+      return;
+    }
+    if (existing) {
+      this.states.delete(existing.id);
+      this.saved.delete(existing.id);
+      if (this.viewTabId === existing.id) this.viewTabId = null;
+      this.patchTab(existing.id, { mode: 'viewer', status: 'ready', large: false, language: null });
+      this.set({ activeId: existing.id, selected: path });
+      this.persist();
+      this.syncView();
+      return;
+    }
+    const tab: Tab = { ...this.newTab(path), mode: 'viewer', status: 'idle' };
+    this.insertTab(tab);
+    this.set({ selected: path });
+    await this.ensureLoaded(tab.id);
+  }
+
+  /** Back from the viewer to the editor (only for files small enough). */
+  async openInEditor(id: string) {
+    const tab = this.tab(id);
+    if (!tab || tab.mode !== 'viewer') return;
+    if (tab.size > this.limits.maxEdit) {
+      this.notify(tab.name, 'info', 'tooLargeToEdit');
+      return;
+    }
+    this.closeViewer(id);
+    this.patchTab(id, { mode: 'edit', status: 'idle' });
+    this.persist();
+    await this.ensureLoaded(id);
   }
 
   // ── Local History ──────────────────────────────────────────────────────
@@ -1276,7 +1379,7 @@ export class EditorStore {
    *  dirty one. Run on window focus and on tab activation. */
   async checkTab(id: string) {
     const tab = this.tab(id);
-    if (!tab || tab.kind === 'untitled' || (tab.status !== 'ready' && tab.status !== 'binary') || tab.saving) return;
+    if (!tab || tab.kind === 'untitled' || tab.mode === 'viewer' || (tab.status !== 'ready' && tab.status !== 'binary') || tab.saving) return;
     try {
       const stat = await this.fs.stat(tab.path);
       const current = this.tab(id);
@@ -1312,15 +1415,15 @@ export class EditorStore {
     return codeThemeWithVscodeHighlight(this.dark, { gutter: 'flush', paddingX: 8 });
   }
 
-  private createState(id: string, doc: string, indent: DetectedIndent = DEFAULT_INDENT): EditorState {
+  private createState(id: string, doc: string, indent: DetectedIndent = DEFAULT_INDENT, large = false): EditorState {
     return EditorState.create({
       doc,
       extensions: [
         keymap.of([indentWithTab]),
         basicSetup,
         smartBracketSkip,
-        bracketPairColorization(),
-        indentGuides(),
+        // Both walk the document on every viewport change; skipped for large files.
+        ...(large ? [] : [bracketPairColorization(), indentGuides()]),
         this.indentSlot.of(indentExtension(indent)),
         EditorView.contentAttributes.of({ autocorrect: 'off', autocapitalize: 'off', spellcheck: 'false' }),
         this.themeSlot.of(this.themeExtension()),

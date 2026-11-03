@@ -25,10 +25,28 @@ import { Timeline, absoluteTime } from './Timeline';
 import { SnapshotDiff } from './SnapshotDiff';
 import type { HistoryEntry } from './fs';
 import { getEditorStore } from './session';
+import type { Notice } from './store';
 import { toFsError } from './fs';
 import { basename, isUnder, relativeTo } from './paths';
 
 type Choice = 'primary' | 'secondary' | 'cancel';
+
+/** The localised sentence for a store notice (its `code` picks it; `text`
+ *  carries the name/detail it mentions, or the backend's own message). */
+function noticeMessage(notice: Notice, m: ReturnType<typeof useMessages<typeof MESSAGES>>): string {
+  switch (notice.code) {
+    case 'closedUntitled': return m('closedUntitledNotice', { name: notice.text });
+    case 'noFormatter': return m('noFormatter', { lang: notice.text || m('plainTextLower') });
+    case 'formatFailed': return m('formatFailed', { msg: notice.text });
+    case 'largeNoFormat': return m('largeNoFormat');
+    case 'saveBeforeViewer': return m('saveBeforeViewer', { name: notice.text });
+    case 'tooLargeToEdit': return m('tooLargeToEdit', { name: notice.text });
+    default: {
+      const key = `err.${notice.code}` as keyof typeof MESSAGES;
+      return notice.code && MESSAGES[key] ? m(key) : notice.text;
+    }
+  }
+}
 
 interface ChoicePrompt {
   title: string;
@@ -213,17 +231,7 @@ export function WorkspaceEditor() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [store]);
 
-  const noticeText = snap.notice?.code === 'closedUntitled'
-    ? m('closedUntitledNotice', { name: snap.notice.text })
-    : snap.notice?.code === 'noFormatter'
-    ? m('noFormatter', { lang: snap.notice.text || m('plainTextLower') })
-    : snap.notice?.code === 'formatFailed'
-    ? m('formatFailed', { msg: snap.notice.text })
-    : snap.notice
-    ? (snap.notice.code && MESSAGES[`err.${snap.notice.code}` as keyof typeof MESSAGES]
-      ? m(`err.${snap.notice.code}` as keyof typeof MESSAGES)
-      : snap.notice.text)
-    : null;
+  const noticeText = snap.notice ? noticeMessage(snap.notice, m) : null;
   const deleteIsDir = deletePath ? store.isDir(deletePath) : false;
   const deleteHasDirty = deletePath ? snap.tabs.some((t) => t.dirty && isUnder(t.path, deletePath)) : false;
 

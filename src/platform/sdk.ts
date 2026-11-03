@@ -144,7 +144,17 @@ export interface PluginSdk {
   /** Standard `fetch`, routed through tauri-plugin-http in the app. */
   http: { fetch(input: string, init?: PluginFetchInit): Promise<Response> };
   native: {
-    invoke<T>(command: string, args?: Record<string, unknown>): Promise<T>;
+    /**
+     * Runs an allowlisted Rust command. `args` is usually an object (sent as
+     * JSON); pass a `Uint8Array`/`ArrayBuffer` plus `options.headers` to send
+     * a raw body instead — what a command taking `tauri::ipc::Request` reads,
+     * and the only sane way to move a large file across the IPC boundary.
+     */
+    invoke<T>(
+      command: string,
+      args?: Record<string, unknown> | Uint8Array | ArrayBuffer,
+      options?: { headers?: Record<string, string> },
+    ): Promise<T>;
     /**
      * Creates a Tauri `Channel` for commands that stream data. Gated by
      * 'native' so streaming tools stay behind the SDK checkpoint. `label`
@@ -334,7 +344,11 @@ export function createPluginSdk(manifest: PluginManifest): PluginSdk {
     },
 
     native: {
-      async invoke<T>(command: string, args?: Record<string, unknown>): Promise<T> {
+      async invoke<T>(
+        command: string,
+        args?: Record<string, unknown> | Uint8Array | ArrayBuffer,
+        options?: { headers?: Record<string, string> },
+      ): Promise<T> {
         // One audit entry covering both the permission and the allowlist.
         const granted = manifest.permissions?.includes('native') ?? false;
         const allowed = granted && commandAllowed(manifest, command);
@@ -349,7 +363,7 @@ export function createPluginSdk(manifest: PluginManifest): PluginSdk {
         if (!granted) throw new PluginPermissionError(id, 'native', command);
         if (!allowed) throw new PluginCommandError(id, command);
         const { invoke } = await import('@tauri-apps/api/core');
-        return invoke<T>(command, args);
+        return options ? invoke<T>(command, args, { headers: options.headers ?? {} }) : invoke<T>(command, args);
       },
 
       async listen<T>(event: string, handler: (payload: T) => void): Promise<() => void> {

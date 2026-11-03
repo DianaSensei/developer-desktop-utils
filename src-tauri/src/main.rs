@@ -6,6 +6,7 @@ mod dropped;
 mod editor;
 mod editor_backup;
 mod editor_history;
+mod editor_view;
 mod editor_fs;
 mod netinfo;
 mod files;
@@ -112,6 +113,7 @@ fn main() {
         })
         .manage(mockserver::MockState::default())
         .manage(editor::EditorState::default())
+        .manage(editor::ViewerRegistry::default())
         .manage(service_host::ServiceRegistry::default())
         .manage(secrets_vault::VaultState::default())
         .manage(artifact_installer::InstalledIndex::default())
@@ -193,6 +195,12 @@ fn main() {
             editor::editor_rename,
             editor::editor_move,
             editor::editor_delete,
+            editor::editor_view_open,
+            editor::editor_view_status,
+            editor::editor_view_lines,
+            editor::editor_view_refresh,
+            editor::editor_view_search,
+            editor::editor_view_close,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

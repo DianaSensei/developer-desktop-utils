@@ -35,7 +35,8 @@ const ITEM = cn(
 export function StatusBar({ store, tab, wrap, formatOnSave, onFormat, onChangeLanguage }: Props) {
   const m = useMessages(MESSAGES);
   const root = tab ? store.rootOf(tab.path) : null;
-  const ready = tab?.status === 'ready';
+  const viewer = tab?.mode === 'viewer';
+  const ready = tab?.status === 'ready' && !viewer;
   const fmt = ready ? formatterFor(tab.language) : null;
   const formatKeys = IS_MAC ? '⇧⌥F' : 'Shift+Alt+F';
   return (
@@ -47,6 +48,7 @@ export function StatusBar({ store, tab, wrap, formatOnSave, onFormat, onChangeLa
       </span>
       {tab?.saving && <span className="flex items-center gap-1"><Spinner size="xs" />{m('saving')}</span>}
       <span className="ml-auto" />
+      {viewer && <span className="px-1">{m('viewerReadOnly')}</span>}
       {ready && <CursorReadout store={store} />}
       {ready && (
         <DropdownMenu className="h-full">

@@ -7,7 +7,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import {
   ChevronRight, ClipboardPaste, Copy, FileInput, FilePlus, FolderInput, FolderPlus, FolderX, History, ListCollapse,
-  Pencil, RefreshCw, Scissors, Trash2, X,
+  Pencil, RefreshCw, Scissors, ScrollText, Trash2, X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { IconButton } from '@/components/ui/icon-button';
@@ -87,7 +87,10 @@ export function Explorer({
         out.push({ icon: icon(ClipboardPaste), label: `${m('paste')} — ${basename(snap.cut)}`, onClick: () => void store.paste(path) });
       }
     } else {
-      out.push({ icon: icon(FilePlus), label: m('open'), onClick: () => void store.openFile(path) });
+      out.push(
+        { icon: icon(FilePlus), label: m('open'), onClick: () => void store.openFile(path) },
+        { icon: icon(ScrollText), label: m('openInViewer'), onClick: () => void store.openInViewer(path) },
+      );
     }
     out.push(
       { icon: icon(Copy), label: m('copyPath'), sep: true, onClick: () => onCopyPath(path, false) },

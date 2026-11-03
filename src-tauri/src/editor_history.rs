@@ -11,7 +11,7 @@
 // editor may open right now — the same boundary as reading the file itself.
 
 use crate::checksum::to_hex;
-use crate::editor_fs::{FsError, FsResult, MAX_TEXT_BYTES};
+use crate::editor_fs::{FsError, FsResult, MAX_SNAPSHOT_BYTES};
 use serde::{Deserialize, Serialize};
 use sha2::Digest;
 use std::path::{Path, PathBuf};
@@ -76,7 +76,7 @@ fn check_id(id: &str) -> FsResult<()> {
 /// Records a snapshot unless it matches the newest one. Returns the entry
 /// written, or `None` when skipped as a duplicate.
 pub fn add(base: &Path, canonical_path: &str, content: &str, source: &str, now_ms: u64) -> FsResult<Option<HistoryEntry>> {
-    if content.len() as u64 > MAX_TEXT_BYTES {
+    if content.len() as u64 > MAX_SNAPSHOT_BYTES {
         return Err(FsError { code: "too_large", message: "The file is too large for Local History.".into() });
     }
     let source = match source {

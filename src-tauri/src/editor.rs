@@ -11,8 +11,11 @@
 // for single files chosen in the Save As / Open File dialogs.
 
 use crate::editor_backup;
+use crate::editor_view;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 use crate::editor_history;
-use crate::editor_fs::{DirListing, FileContent, FileList, FileStat, FsError, FsResult, Roots};
+use crate::editor_fs::{DirListing, FileList, FileStat, FsError, FsResult, Roots};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use tauri::{AppHandle, Manager};
@@ -273,22 +276,156 @@ pub async fn editor_stat(app: AppHandle, path: String) -> FsResult<FileStat> {
     blocking(move || roots.stat(&path)).await
 }
 
+/// The file as raw bytes (`Roots::read_framed`: length-prefixed JSON
+/// metadata, then the UTF-8 text) — a 200 MB file must not be turned into a
+/// JSON string to cross the IPC boundary.
 #[tauri::command]
-pub async fn editor_read_file(app: AppHandle, path: String) -> FsResult<FileContent> {
+pub async fn editor_read_file(app: AppHandle, path: String) -> FsResult<tauri::ipc::Response> {
     let roots = snapshot(&app);
-    blocking(move || roots.read_text(&path)).await
+    let framed = blocking(move || roots.read_framed(&path)).await?;
+    Ok(tauri::ipc::Response::new(framed))
+}
+
+fn header<'a>(request: &'a tauri::ipc::Request<'_>, name: &str) -> Option<&'a str> {
+    request.headers().get(name).and_then(|v| v.to_str().ok())
+}
+
+/// Decodes the `x-path` header, which the frontend sends through
+/// `encodeURIComponent` (header values must be ASCII; paths need not be).
+fn percent_decode(s: &str) -> FsResult<String> {
+    let bytes = s.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%' {
+            let hex = s.get(i + 1..i + 3).and_then(|h| u8::from_str_radix(h, 16).ok());
+            let Some(b) = hex else {
+                return Err(FsError { code: "invalid_name", message: "Malformed path header.".into() });
+            };
+            out.push(b);
+            i += 3;
+        } else {
+            out.push(bytes[i]);
+            i += 1;
+        }
+    }
+    String::from_utf8(out).map_err(|_| FsError { code: "invalid_name", message: "Malformed path header.".into() })
+}
+
+/// Saves the raw request body (UTF-8 text) to the file named by the `x-path`
+/// header. `x-bom: 1` prepends a BOM; `x-expected-modified` is the conflict
+/// check (see `Roots::write_text`).
+#[tauri::command]
+pub async fn editor_write_file(app: AppHandle, request: tauri::ipc::Request<'_>) -> FsResult<FileStat> {
+    let tauri::ipc::InvokeBody::Raw(body) = request.body() else {
+        return Err(FsError { code: "io", message: "Expected the file content as raw bytes.".into() });
+    };
+    let path = percent_decode(header(&request, "x-path").unwrap_or_default())?;
+    let bom = header(&request, "x-bom") == Some("1");
+    let expected = header(&request, "x-expected-modified").and_then(|v| v.parse::<u64>().ok());
+    let body = body.clone();
+    let roots = snapshot(&app);
+    blocking(move || roots.write_bytes(&path, &body, bom, expected)).await
+}
+
+// ── Large-file viewer (editor_view.rs) ─────────────────────────────────────
+
+/// Open viewers by id. Bounded: opening past the cap closes the oldest.
+#[derive(Default)]
+pub struct ViewerRegistry {
+    viewers: Mutex<Vec<(u64, Arc<editor_view::Viewer>)>>,
+    next: AtomicU64,
+}
+
+const MAX_VIEWERS: usize = 16;
+
+fn viewer(app: &AppHandle, id: u64) -> FsResult<Arc<editor_view::Viewer>> {
+    let reg = app.state::<ViewerRegistry>();
+    let list = reg.viewers.lock().unwrap_or_else(|e| e.into_inner());
+    list.iter()
+        .find(|(i, _)| *i == id)
+        .map(|(_, v)| v.clone())
+        .ok_or_else(|| FsError { code: "not_found", message: "That viewer was closed.".into() })
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ViewerOpened {
+    id: u64,
+    status: editor_view::ViewStatus,
+}
+
+/// Opens a file in the read-only viewer and starts indexing its lines in the
+/// background; poll `editor_view_status` for progress.
+#[tauri::command]
+pub async fn editor_view_open(app: AppHandle, path: String) -> FsResult<ViewerOpened> {
+    let roots = snapshot(&app);
+    let v = blocking(move || {
+        let canonical = roots.resolve_file(&path)?;
+        editor_view::Viewer::open(&canonical)
+    })
+    .await?;
+    let v = Arc::new(v);
+    let id = {
+        let reg = app.state::<ViewerRegistry>();
+        let id = reg.next.fetch_add(1, Ordering::Relaxed) + 1;
+        let mut list = reg.viewers.lock().unwrap_or_else(|e| e.into_inner());
+        while list.len() >= MAX_VIEWERS {
+            let (_, old) = list.remove(0);
+            old.close();
+        }
+        list.push((id, v.clone()));
+        id
+    };
+    let status = v.status();
+    let worker = v.clone();
+    std::thread::spawn(move || {
+        let _ = worker.extend();
+    });
+    Ok(ViewerOpened { id, status })
 }
 
 #[tauri::command]
-pub async fn editor_write_file(
+pub fn editor_view_status(app: AppHandle, id: u64) -> FsResult<editor_view::ViewStatus> {
+    Ok(viewer(&app, id)?.status())
+}
+
+#[tauri::command]
+pub async fn editor_view_lines(app: AppHandle, id: u64, start: u64, count: u64) -> FsResult<Vec<editor_view::ViewLine>> {
+    let v = viewer(&app, id)?;
+    blocking(move || v.read_lines(start, count)).await
+}
+
+/// Indexes whatever was appended since the last pass (`tail -f`).
+#[tauri::command]
+pub async fn editor_view_refresh(app: AppHandle, id: u64) -> FsResult<editor_view::ViewStatus> {
+    let v = viewer(&app, id)?;
+    blocking(move || v.extend()).await
+}
+
+#[tauri::command]
+pub async fn editor_view_search(
     app: AppHandle,
-    path: String,
-    content: String,
-    bom: Option<bool>,
-    expected_modified: Option<u64>,
-) -> FsResult<FileStat> {
-    let roots = snapshot(&app);
-    blocking(move || roots.write_text(&path, &content, bom.unwrap_or(false), expected_modified)).await
+    id: u64,
+    query: String,
+    regex: bool,
+    case_sensitive: bool,
+    from_line: u64,
+    max_hits: Option<usize>,
+) -> FsResult<editor_view::SearchResult> {
+    let v = viewer(&app, id)?;
+    let max = max_hits.unwrap_or(200).min(1000);
+    blocking(move || v.search(&query, regex, case_sensitive, from_line, max, std::time::Duration::from_millis(1500))).await
+}
+
+#[tauri::command]
+pub fn editor_view_close(app: AppHandle, id: u64) {
+    let reg = app.state::<ViewerRegistry>();
+    let mut list = reg.viewers.lock().unwrap_or_else(|e| e.into_inner());
+    if let Some(pos) = list.iter().position(|(i, _)| *i == id) {
+        let (_, v) = list.remove(pos);
+        v.close();
+    }
 }
 
 #[tauri::command]
@@ -348,5 +485,18 @@ mod tests {
         assert_eq!(new.files, vec!["/f.txt"]);
         let junk = parse_saved("not json");
         assert!(junk.roots.is_empty() && junk.files.is_empty());
+    }
+}
+
+#[cfg(test)]
+mod header_tests {
+    use super::percent_decode;
+
+    #[test]
+    fn decodes_encode_uri_component_output() {
+        assert_eq!(percent_decode("%2Fhome%2Fme%2Fghi%20ch%C3%BA.md").unwrap(), "/home/me/ghi chú.md");
+        assert_eq!(percent_decode("C%3A%5Cws%5Ca.txt").unwrap(), "C:\\ws\\a.txt");
+        assert!(percent_decode("%zz").is_err());
+        assert!(percent_decode("%C3").is_err(), "not UTF-8");
     }
 }
