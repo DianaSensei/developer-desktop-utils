@@ -39,49 +39,17 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  # Cheap up-front check so a change touching only, say, GitHub Actions YAML
-  # doesn't also pay for a Rust analyze build, and vice versa. Always true on
-  # schedule/workflow_dispatch/push-to-main so those keep full coverage.
-  changes:
-    name: Detect changed languages
-    runs-on: ubuntu-22.04
-    timeout-minutes: 5
-    outputs:
-      rust: ${{ steps.filter.outputs.rust }}
-      js: ${{ steps.filter.outputs.js }}
-      actions: ${{ steps.filter.outputs.actions }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-
-      # Plain `git diff` against the merge-base (PR) or the pre-push commit
-      # (push to main) instead of a third-party paths-filter action — no
-      # extra dependency to keep pinned/updated for what's a two-line check.
-      - name: Detect changed languages
-        id: filter
-        run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            base=$(git merge-base "origin/${{ github.event.pull_request.base.ref }}" HEAD)
-          else
-            base="${{ github.event.before }}"
-          fi
-          changed=$(git diff --name-only "$base" "${{ github.sha }}")
-          echo "$changed"
-
-          echo "rust=$(echo "$changed" | grep -qE '^(src-tauri/|Cargo\.lock$)' && echo true || echo false)" >> "$GITHUB_OUTPUT"
-          echo "js=$(echo "$changed" | grep -qE '^(src/|package(-lock)?\.json$|tsconfig.*\.json$|vite\.config\.ts$)' && echo true || echo false)" >> "$GITHUB_OUTPUT"
-          echo "actions=$(echo "$changed" | grep -qE '^\.github/' && echo true || echo false)" >> "$GITHUB_OUTPUT"
-
-  # Three explicit jobs instead of one matrix: a matrix's `language`/`build-mode`
-  # values only exist inside the job (strategy/steps/outputs) — `jobs.<id>.if`
-  # cannot reference `matrix.*` ("Unrecognized named-value: 'matrix'"), so
-  # per-language gating on `needs.changes.outputs.*` has to live on separate
-  # jobs' own `if:` instead.
+  # Every language is analyzed on every PR (docs-only changes are skipped by
+  # `paths-ignore` above). This used to gate each language on whether the PR
+  # touched it, but code scanning compares a PR against every configuration
+  # (`category`) present on main: a PR that skipped one — e.g. no `.github/`
+  # change, so no `/language:actions` — gets a neutral "1 configuration not
+  # found" CodeQL check, and the repository ruleset's code-scanning rule then
+  # keeps the PR blocked even with every other check green (PRs #204, #207
+  # and #208 all had to be merged by hand). The three jobs run in parallel;
+  # actions and javascript-typescript take about a minute, rust about nine.
   analyze-actions:
     name: Analyze (actions)
-    needs: changes
-    if: github.event_name != 'pull_request' || needs.changes.outputs.actions == 'true'
     runs-on: ubuntu-22.04
     timeout-minutes: 15
     permissions:
@@ -103,8 +71,6 @@ jobs:
 
   analyze-js:
     name: Analyze (javascript-typescript)
-    needs: changes
-    if: github.event_name != 'pull_request' || needs.changes.outputs.js == 'true'
     runs-on: ubuntu-22.04
     timeout-minutes: 15
     permissions:
@@ -126,8 +92,6 @@ jobs:
 
   analyze-rust:
     name: Analyze (rust)
-    needs: changes
-    if: github.event_name != 'pull_request' || needs.changes.outputs.rust == 'true'
     runs-on: ubuntu-22.04
     timeout-minutes: 25
     permissions:

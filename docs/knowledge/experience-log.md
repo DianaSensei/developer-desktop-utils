@@ -725,3 +725,19 @@
   `sort()` không comparator, regex có lượng từ lồng/chồng lấn hay `\s` dưới cờ `/m` (giới hạn độ
   dài, tách mẫu, hoặc quét tay), phần tử không phải nút mà nhận click (thêm role + tabIndex + phím).
   Lọc API theo `impactSoftwareQualities` để chỉ thấy đúng những gì làm gate đỏ.
+
+## [2026-11-03] CI — PR xanh hết check vẫn "blocked": CodeQL thiếu một cấu hình vì job theo ngôn ngữ bị skip trên PR
+- Nguyên nhân: `codeql.yml` chỉ chạy từng ngôn ngữ (`actions` / `javascript-typescript` / `rust`)
+  khi PR có sửa file của ngôn ngữ đó. Code scanning so PR với **mọi cấu hình (category) đang có
+  trên main** — main luôn có đủ 3 vì push lên main chạy hết. PR không sửa `.github/` thiếu
+  `/language:actions` → check "CodeQL" ra **neutral** ("1 configuration not found") → luật
+  code scanning trong ruleset không đánh giá được → PR `mergeable_state: blocked`, auto-merge
+  không bao giờ chạy; #204, #207, #208 đều phải merge tay bằng quyền owner.
+- Số lần thử: 1/5 (đối chiếu check run CodeQL neutral giống hệt nhau ở #204/#207/#208).
+- Kết quả: Đã fix — bỏ job `changes` và các `if:` lọc theo ngôn ngữ; cả 3 job phân tích chạy
+  trên mọi PR (vẫn giữ `paths-ignore` cho docs).
+- Bài học chung: khi code scanning là luật bắt buộc để merge, **đừng tối ưu bằng cách bỏ bớt
+  ngôn ngữ trên PR** — tập cấu hình của PR phải bằng tập trên nhánh đích. Một check "neutral"
+  của CodeQL trên PR là dấu hiệu sẽ bị chặn merge, không phải "bỏ qua được". (Còn để ý: PR chỉ
+  sửa tài liệu không kích hoạt workflow vì `paths-ignore`; nếu một PR như vậy cũng bị chặn thì
+  cần chạy CodeQL cả khi chỉ đổi docs.)
