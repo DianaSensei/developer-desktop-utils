@@ -48,6 +48,9 @@ axum = "0.8"
 # "sync" makes Engine Send + Sync so mockserver.rs can share one instance.
 rhai = { version = "1", features = ["sync"] }
 regex = "1"
+# Newline scanning for the Text Editor's large-file viewer (editor_view.rs);
+# already in the tree through regex.
+memchr = "2"
 base64 = "0.23"
 # MCP SDK, used only by the devtool-mcp-server bin. >=1.4 avoids
 # GHSA-89vp-x53w-74fx (HTTP transport only; this bin uses stdio).

@@ -114,4 +114,25 @@ describe('WorkspaceEditor (browser demo workspace)', () => {
     await waitFor(() => expect(screen.queryByText('Before save')).toBeNull());
     expect(screen.getByText('Saved')).toBeTruthy();
   });
+
+  it('opens a file in the read-only viewer: lines, search, go to line', async () => {
+    renderEditor();
+    fireEvent.click(await screen.findByTitle('/demo-workspace'));
+    fireEvent.contextMenu(await screen.findByText('README.md'));
+    await act(async () => { fireEvent.click(await screen.findByRole('menuitem', { name: /Open in Viewer/ })); });
+    expect((await screen.findAllByText('Read-only')).length).toBeGreaterThan(0); // badge + status bar
+    expect(await screen.findByText('# Demo workspace')).toBeTruthy();
+
+    fireEvent.change(screen.getByLabelText('Find'), { target: { value: 'quick open' } });
+    await act(async () => { fireEvent.submit(screen.getByLabelText('Find').closest('form')!); });
+    expect(await screen.findByText('1 results')).toBeTruthy();
+    // Highlighted in the result list and on the line it jumped to.
+    expect(screen.getAllByText('Quick Open', { selector: 'mark' })).toHaveLength(2);
+
+    fireEvent.change(screen.getByLabelText('Go to line'), { target: { value: '6' } });
+    await act(async () => { fireEvent.submit(screen.getByLabelText('Go to line').closest('form')!); });
+    // Back to the editor from the toolbar.
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Open in Editor/ })); });
+    await waitFor(() => expect(screen.queryByLabelText('Find')).toBeNull());
+  });
 });

@@ -103,6 +103,40 @@ export default defineMessages({
   restoredNotice: { vi: 'Đã khôi phục — lưu để ghi ra file, hoặc ⌘Z để hoàn tác.', en: 'Restored — save to write it to the file, or undo to go back.' },
   justNow: { vi: 'vừa xong', en: 'just now' },
 
+  // Large files
+  largeFileNotice: {
+    vi: 'File lớn ({{size}}): đã tắt tô màu cú pháp, tô màu ngoặc, đường kẻ thụt lề, định dạng và lịch sử để giữ editor mượt.',
+    en: 'Large file ({{size}}): highlighting, bracket colors, indent guides, formatting and Local History are off to keep editing smooth.',
+  },
+  largeNoFormat: { vi: 'Định dạng bị tắt với file lớn.', en: 'Formatting is off for large files.' },
+  saveBeforeViewer: { vi: '"{{name}}" có thay đổi chưa lưu — lưu trước khi mở trong viewer.', en: '"{{name}}" has unsaved changes — save it before opening it in the viewer.' },
+  tooLargeToEdit: { vi: '"{{name}}" quá lớn để sửa (giới hạn 200 MB).', en: '"{{name}}" is too large to edit (200 MB limit).' },
+  openInViewer: { vi: 'Mở trong viewer (chỉ đọc)', en: 'Open in Viewer (read-only)' },
+  openInEditor: { vi: 'Mở trong editor', en: 'Open in Editor' },
+  viewerReadOnly: { vi: 'Chỉ đọc', en: 'Read-only' },
+  viewerHint: {
+    vi: 'File được đọc trực tiếp từ ổ đĩa theo từng đoạn — không nạp cả file vào bộ nhớ.',
+    en: 'Read straight from disk, a piece at a time — the file is never loaded whole.',
+  },
+  viewerLines: { vi: '{{n}} dòng', en: '{{n}} lines' },
+  viewerIndexing: { vi: 'Đang lập chỉ mục… {{pct}}%', en: 'Indexing… {{pct}}%' },
+  viewerBinary: { vi: 'File có vẻ là nhị phân — hiển thị dưới dạng văn bản.', en: 'This looks like a binary file — shown as text anyway.' },
+  goToLine: { vi: 'Đến dòng', en: 'Go to line' },
+  goToLinePlaceholder: { vi: 'Dòng số…', en: 'Line number…' },
+  find: { vi: 'Tìm', en: 'Find' },
+  findPlaceholder: { vi: 'Tìm trong toàn file…', en: 'Search the whole file…' },
+  matchCase: { vi: 'Phân biệt hoa thường', en: 'Match Case' },
+  useRegex: { vi: 'Dùng biểu thức chính quy', en: 'Use Regular Expression' },
+  searching: { vi: 'Đang tìm…', en: 'Searching…' },
+  noHits: { vi: 'Không tìm thấy', en: 'No results' },
+  hitsCount: { vi: '{{n}} kết quả', en: '{{n}} results' },
+  moreHits: { vi: 'Tìm tiếp', en: 'Find more' },
+  searchedTo: { vi: 'đã tìm tới dòng {{line}}', en: 'searched up to line {{line}}' },
+  follow: { vi: 'Theo dõi đuôi file', en: 'Follow (tail -f)' },
+  followHint: { vi: 'Tự cập nhật dòng mới và cuộn xuống cuối', en: 'Load new lines as the file grows and stay at the end' },
+  lineTruncated: { vi: 'Dòng quá dài — chỉ hiện phần đầu', en: 'Line too long — only the start is shown' },
+  'err.invalid_regex': { vi: 'Biểu thức chính quy không hợp lệ.', en: 'That regular expression is not valid.' },
+
   // Delete confirmation
   deleteTitle: { vi: 'Xoá "{{name}}"?', en: 'Delete "{{name}}"?' },
   deleteFileDesc: {

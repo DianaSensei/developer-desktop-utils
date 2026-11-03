@@ -30,8 +30,11 @@ use std::time::UNIX_EPOCH;
 
 /// Above this many remembered roots (or single files) the oldest is dropped.
 pub const MAX_ROOTS: usize = 64;
-/// Files larger than this are not loaded into the editor.
-pub const MAX_TEXT_BYTES: u64 = 10 * 1024 * 1024;
+/// Files larger than this are not loaded into the editor; the read-only
+/// large-file viewer (editor_view.rs) opens them instead.
+pub const MAX_EDIT_BYTES: u64 = 200 * 1024 * 1024;
+/// Local History snapshots and similar copies stay below this.
+pub const MAX_SNAPSHOT_BYTES: u64 = 10 * 1024 * 1024;
 /// A folder listing stops after this many entries (and says so).
 pub const MAX_DIR_ENTRIES: usize = 5_000;
 /// Quick Open's file walk stops after this many files (and says so).
@@ -296,7 +299,7 @@ impl Roots {
 
     /// Like `resolve`, but also accepts a single authorised file — for the
     /// operations an open file tab needs (read, write, stat) and nothing more.
-    fn resolve_file(&self, p: &str) -> FsResult<PathBuf> {
+    pub fn resolve_file(&self, p: &str) -> FsResult<PathBuf> {
         match self.resolve(p) {
             Ok(c) => Ok(c),
             Err(e) if e.code == "denied" => {
@@ -396,7 +399,23 @@ impl Roots {
         Ok(FileStat { size: meta.len(), modified: millis(&meta), is_dir: meta.is_dir() })
     }
 
+    /// The file as a string — test convenience; the app reads `read_framed`.
+    #[cfg(test)]
     pub fn read_text(&self, p: &str) -> FsResult<FileContent> {
+        let (meta, body) = self.read_bytes(p)?;
+        let content = match body {
+            // Already validated as UTF-8 by read_bytes.
+            Some(bytes) => String::from_utf8(bytes).unwrap_or_default(),
+            None => String::new(),
+        };
+        Ok(FileContent { content, ..meta })
+    }
+
+    /// The file's text as UTF-8 bytes (BOM stripped) plus its metadata;
+    /// `None` for the bytes when it is binary or not UTF-8. The editor reads
+    /// through this (see `read_framed`) so a large file crosses the IPC
+    /// boundary as raw bytes, not as a JSON string.
+    pub fn read_bytes(&self, p: &str) -> FsResult<(FileContent, Option<Vec<u8>>)> {
         let c = self.resolve_file(p)?;
         let meta = std::fs::metadata(&c)?;
         if meta.is_dir() {
@@ -404,33 +423,51 @@ impl Roots {
         }
         let size = meta.len();
         let modified = millis(&meta);
-        if size > MAX_TEXT_BYTES {
+        if size > MAX_EDIT_BYTES {
             return Err(FsError::new(
                 "too_large",
-                format!("The file is too large to open in the editor ({size} bytes; limit {MAX_TEXT_BYTES})."),
+                format!("The file is too large to edit ({size} bytes; limit {MAX_EDIT_BYTES}). Open it in the viewer."),
             ));
         }
-        let bytes = std::fs::read(&c)?;
+        let mut bytes = std::fs::read(&c)?;
+        let binary = FileContent { content: String::new(), binary: true, bom: false, size, modified };
         // NUL in the first 8 KiB is the usual "this is binary" heuristic (git
         // uses the same); invalid UTF-8 anywhere is treated the same way,
         // since saving it back would corrupt it.
-        let head = &bytes[..bytes.len().min(8192)];
-        if head.contains(&0) {
-            return Ok(FileContent { content: String::new(), binary: true, bom: false, size, modified });
+        if bytes[..bytes.len().min(8192)].contains(&0) {
+            return Ok((binary, None));
         }
-        let (body, bom) = match bytes.strip_prefix(&[0xEF, 0xBB, 0xBF]) {
-            Some(rest) => (rest, true),
-            None => (&bytes[..], false),
-        };
-        match std::str::from_utf8(body) {
-            Ok(s) => Ok(FileContent { content: s.to_string(), binary: false, bom, size, modified }),
-            Err(_) => Ok(FileContent { content: String::new(), binary: true, bom: false, size, modified }),
+        let bom = bytes.starts_with(&[0xEF, 0xBB, 0xBF]);
+        if bom {
+            bytes.drain(..3);
         }
+        if std::str::from_utf8(&bytes).is_err() {
+            return Ok((binary, None));
+        }
+        Ok((FileContent { content: String::new(), binary: false, bom, size, modified }, Some(bytes)))
+    }
+
+    /// `read_bytes` as one buffer: a little-endian u32 length, that many bytes
+    /// of JSON metadata (`FileContent` without `content`), then the text.
+    pub fn read_framed(&self, p: &str) -> FsResult<Vec<u8>> {
+        let (meta, body) = self.read_bytes(p)?;
+        let json = serde_json::json!({
+            "binary": meta.binary, "bom": meta.bom, "size": meta.size, "modified": meta.modified,
+        })
+        .to_string();
+        let body = body.unwrap_or_default();
+        let mut out = Vec::with_capacity(4 + json.len() + body.len());
+        out.extend_from_slice(&(json.len() as u32).to_le_bytes());
+        out.extend_from_slice(json.as_bytes());
+        out.extend_from_slice(&body);
+        Ok(out)
     }
 
     /// Overwrites an existing file. With `expected_modified`, refuses when the
     /// file changed on disk since it was read (someone else wrote it), so the
-    /// editor can ask instead of silently discarding that change.
+    /// editor can ask instead of silently discarding that change. (Tests use
+    /// this string form; the app sends bytes to `write_bytes`.)
+    #[cfg(test)]
     pub fn write_text(
         &self,
         p: &str,
@@ -438,6 +475,20 @@ impl Roots {
         bom: bool,
         expected_modified: Option<u64>,
     ) -> FsResult<FileStat> {
+        self.write_bytes(p, content.as_bytes(), bom, expected_modified)
+    }
+
+    /// `write_text` for UTF-8 bytes the editor sent as a raw IPC body.
+    pub fn write_bytes(
+        &self,
+        p: &str,
+        content: &[u8],
+        bom: bool,
+        expected_modified: Option<u64>,
+    ) -> FsResult<FileStat> {
+        if std::str::from_utf8(content).is_err() {
+            return Err(FsError::new("io", "The editor sent text that is not valid UTF-8."));
+        }
         let c = self.resolve_file(p)?;
         let meta = std::fs::metadata(&c)?;
         if meta.is_dir() {
@@ -453,7 +504,7 @@ impl Roots {
         if bom {
             data.extend_from_slice(&[0xEF, 0xBB, 0xBF]);
         }
-        data.extend_from_slice(content.as_bytes());
+        data.extend_from_slice(content);
         // In place rather than write-temp-and-rename: keeps the file's
         // permissions, owner, hard links and any watcher on it intact.
         std::fs::write(&c, data)?;
@@ -745,6 +796,35 @@ mod tests {
         // Without an expectation (Overwrite) it goes through.
         roots.write_text(&s(&f), "mine", false, None).unwrap();
         assert_eq!(fs::read_to_string(&f).unwrap(), "mine");
+    }
+
+    #[test]
+    fn framed_read_carries_metadata_then_text() {
+        let (_t, root, roots) = workspace("framed");
+        let f = root.join("a.txt");
+        fs::write(&f, [0xEF, 0xBB, 0xBF, b'h', 0xC3, 0xA9]).unwrap();
+        let framed = roots.read_framed(&s(&f)).unwrap();
+        let len = u32::from_le_bytes(framed[..4].try_into().unwrap()) as usize;
+        let meta: serde_json::Value = serde_json::from_slice(&framed[4..4 + len]).unwrap();
+        assert_eq!(meta["bom"], true);
+        assert_eq!(meta["binary"], false);
+        assert_eq!(meta["size"], 6);
+        assert_eq!(&framed[4 + len..], "hé".as_bytes());
+        fs::write(&f, [b'a', 0, b'b']).unwrap();
+        let framed = roots.read_framed(&s(&f)).unwrap();
+        let len = u32::from_le_bytes(framed[..4].try_into().unwrap()) as usize;
+        assert_eq!(framed.len(), 4 + len, "no body for a binary file");
+    }
+
+    #[test]
+    fn write_bytes_refuses_invalid_utf8() {
+        let (_t, root, roots) = workspace("wbytes");
+        let f = root.join("a.txt");
+        fs::write(&f, "keep").unwrap();
+        assert!(roots.write_bytes(&s(&f), &[0xff, 0xfe], false, None).is_err());
+        assert_eq!(fs::read_to_string(&f).unwrap(), "keep");
+        roots.write_bytes(&s(&f), "mới".as_bytes(), false, None).unwrap();
+        assert_eq!(fs::read_to_string(&f).unwrap(), "mới");
     }
 
     #[test]

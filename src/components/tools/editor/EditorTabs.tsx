@@ -5,7 +5,7 @@
 // the strip: + for a new untitled tab and the Recently Closed menu.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Copy, History, Locate, Plus, Save, Wand2, X } from 'lucide-react';
+import { Copy, FilePen, History, Locate, Plus, Save, ScrollText, Wand2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ContextMenu, useContextMenu, type ContextMenuEntry } from '@/components/ui/context-menu';
 import { Spinner } from '@/components/ui/spinner';
@@ -96,10 +96,13 @@ export function EditorTabs({ store, snap, onRequestClose, onCopyPath, onSaveAs, 
     ];
     const formatEntry: ContextMenuEntry = { icon: <Wand2 className="h-3.5 w-3.5" />, label: m('formatDocument'), onClick: () => onFormat(tab.id) };
     if (tab.kind === 'untitled') return [...common, saveAs, formatEntry];
+    const modeEntry: ContextMenuEntry = tab.mode === 'viewer'
+      ? { icon: <FilePen className="h-3.5 w-3.5" />, label: m('openInEditor'), sep: true, onClick: () => void store.openInEditor(tab.id) }
+      : { icon: <ScrollText className="h-3.5 w-3.5" />, label: m('openInViewer'), sep: true, onClick: () => void store.openInViewer(tab.path) };
     return [
       ...common,
-      { ...saveAs },
-      formatEntry,
+      ...(tab.mode === 'viewer' ? [] : [{ ...saveAs }, formatEntry]),
+      modeEntry,
       { icon: <Copy className="h-3.5 w-3.5" />, label: m('copyPath'), onClick: () => onCopyPath(tab.path, false) },
       { icon: <Copy className="h-3.5 w-3.5" />, label: m('copyRelativePath'), onClick: () => onCopyPath(tab.path, true) },
       { icon: <Locate className="h-3.5 w-3.5" />, label: m('revealInExplorer'), onClick: () => store.select(tab.path) },

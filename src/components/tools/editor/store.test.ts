@@ -502,3 +502,75 @@ describe('EditorStore — Local History', () => {
     expect(again.getSnapshot().historyEnabled).toBe(true);
   });
 });
+
+describe('EditorStore — large files', () => {
+  let small: EditorStore;
+  const big = `${R}/big.log`;
+  const mid = `${R}/mid.json`;
+
+  beforeEach(async () => {
+    fs.touch(big, Array.from({ length: 3000 }, (_, i) => `${i} ${i % 500 === 0 ? 'ERROR boom' : 'ok'}`).join('\n') + '\n');
+    fs.touch(mid, `{"a": [${'1,'.repeat(300)}1]}`);
+    store.attachView(null);
+    // 2 KB editable limit, 500 B "large" threshold.
+    small = new EditorStore(fs, storage, { maxEdit: 2048, large: 500 });
+    small.attachView(view);
+    await small.hydrate();
+    await small.openFolder();
+  });
+
+  const tabOf = (s: EditorStore) => s.tab(s.getSnapshot().activeId)!;
+
+  it('a file over the edit limit opens in the read-only viewer', async () => {
+    await small.openFile(big);
+    expect(tabOf(small)).toMatchObject({ mode: 'viewer', status: 'ready' });
+    expect(small.currentState(tabOf(small).id)).toBeNull();
+    expect(await small.save(tabOf(small).id)).toBe('skipped');
+    const h = await small.viewerHandle(tabOf(small).id);
+    expect((await fs.viewer.status(h)).lines).toBe(3000);
+    expect((await fs.viewer.lines(h, 1000, 2)).map((l) => l.text)).toEqual(['1000 ERROR boom', '1001 ok']);
+    const r = await fs.viewer.search(h, { query: 'error', regex: false, caseSensitive: false, fromLine: 0, maxHits: 4 });
+    expect(r.hits.map((x) => x.line)).toEqual([0, 500, 1000, 1500]);
+    expect(r.partial).toBe(true);
+  });
+
+  it('an editable large file has highlighting, formatting and history off', async () => {
+    small.setHistoryEnabled(true);
+    await small.openFile(mid);
+    const t = tabOf(small);
+    expect(t).toMatchObject({ mode: 'edit', large: true, language: null });
+    expect(await small.format(t.id)).toBe('unsupported');
+    expect(small.getSnapshot().notice?.code).toBe('largeNoFormat');
+    view.dispatch({ changes: { from: 0, insert: ' ' } });
+    expect(await small.save(t.id)).toBe('saved');
+    expect(await small.listHistory(mid)).toEqual([]);
+  });
+
+  it('switches a tab between editor and viewer, and remembers viewer tabs', async () => {
+    await small.openFile(`${R}/a.txt`);
+    await small.openInViewer(`${R}/a.txt`);
+    expect(tabOf(small)).toMatchObject({ mode: 'viewer', path: `${R}/a.txt` });
+    expect(small.getSnapshot().tabs).toHaveLength(1);
+    small.flushPersist();
+    const again = new EditorStore(fs, storage, { maxEdit: 2048, large: 500 });
+    await again.hydrate();
+    expect(again.getSnapshot().tabs[0].mode).toBe('viewer');
+
+    await small.openInEditor(tabOf(small).id);
+    expect(tabOf(small)).toMatchObject({ mode: 'edit', status: 'ready' });
+    expect(view.state.doc.toString()).toBe('alpha\n');
+  });
+
+  it('will not drop unsaved edits to open the viewer, nor edit a too-large file', async () => {
+    await small.openFile(`${R}/a.txt`);
+    view.dispatch({ changes: { from: 0, insert: 'x' } });
+    await small.openInViewer(`${R}/a.txt`);
+    expect(tabOf(small).mode).toBe('edit');
+    expect(small.getSnapshot().notice?.code).toBe('saveBeforeViewer');
+
+    await small.openFile(big);
+    await small.openInEditor(tabOf(small).id);
+    expect(tabOf(small).mode).toBe('viewer');
+    expect(small.getSnapshot().notice?.code).toBe('tooLargeToEdit');
+  });
+});

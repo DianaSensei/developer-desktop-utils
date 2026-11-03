@@ -19,6 +19,8 @@ import { useMessages } from '@/contexts/LocaleContext';
 import MESSAGES from './WorkspaceEditor.messages';
 import type { EditorSnapshot, EditorStore } from './store';
 import { RecentlyClosed } from './RecentlyClosed';
+import { LargeFileViewer } from './LargeFileViewer';
+import { formatSize } from './Timeline';
 
 interface Props {
   store: EditorStore;
@@ -44,7 +46,8 @@ export function EditorPane({ store, snap }: Props) {
     };
   }, [store]);
 
-  const showEditor = tab?.status === 'ready';
+  const viewer = tab?.mode === 'viewer' && tab.status === 'ready';
+  const showEditor = tab?.status === 'ready' && !viewer;
   const errText = tab?.errorCode && MESSAGES[`err.${tab.errorCode}` as keyof typeof MESSAGES]
     ? m(`err.${tab.errorCode}` as keyof typeof MESSAGES)
     : tab?.error;
@@ -69,6 +72,10 @@ export function EditorPane({ store, snap }: Props) {
       {tab?.external === 'deleted' && (
         <Callout tone="warning" size="sm" className="m-2 mb-0">{m('deletedOnDisk')}</Callout>
       )}
+      {showEditor && tab.large && (
+        <Callout tone="info" size="sm" className="m-2 mb-0">{m('largeFileNotice', { size: formatSize(tab.size) })}</Callout>
+      )}
+      {viewer && <LargeFileViewer key={tab.id} store={store} tab={tab} />}
 
       {/* The view stays mounted (only hidden) so switching tabs is a state
           swap, not an editor rebuild. */}

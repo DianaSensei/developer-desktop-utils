@@ -150,6 +150,32 @@ Yêu cầu: có công tắc; khi bật, mỗi lần lưu file giữ một snapsh
   `ConfirmDialog`.
 - Tab untitled không có lịch sử (đã có backup hot exit). Bản web: lịch sử trong bộ nhớ.
 
+## File lớn — bổ sung 2026-11-03
+
+Yêu cầu: mở được CSV/log rất lớn. Trước đó editor từ chối file > 10 MB.
+
+- **Hai bậc.** ≤ 200 MB (`MAX_EDIT_BYTES`): vẫn sửa trong CodeMirror. > 10 MB
+  (`LARGE_FILE_BYTES`) bật chế độ `large`: không grammar, không tô màu ngoặc, không đường kẻ thụt
+  lề, không format, không Local History — các thứ duyệt cả tài liệu (VS Code cũng tắt đúng các
+  thứ này cho file lớn). > 200 MB, hoặc khi người dùng chọn "Open in Viewer": **viewer chỉ đọc**.
+- **IPC nhị phân.** `editor_read_file` trả `tauri::ipc::Response` (u32 độ dài + JSON metadata +
+  văn bản UTF-8), `editor_write_file` nhận `tauri::ipc::Request` (body thô, `x-path` mã hoá bằng
+  `encodeURIComponent`, `x-bom`, `x-expected-modified`). JSON hoá một chuỗi 200 MB qua cầu IPC
+  tốn bộ nhớ gấp nhiều lần và chậm. Việc này cần mở rộng `sdk.native.invoke` với tham số
+  `options` (tương thích ngược; ghi trong `docs/plugin-sdk/03-sdk-reference.md`).
+- **Viewer** (`src-tauri/src/editor_view.rs`): luồng nền ghi offset của mỗi dòng thứ 1024
+  (`memchr`; ~800 KB cho 100 triệu dòng), đọc dòng = seek tới checkpoint gần nhất rồi đi tiếp,
+  mỗi dòng đọc bằng buffer có giới hạn (dòng 2 GB không làm nổ bộ nhớ, chỉ giữ 8 KB để hiện,
+  256 KB để tìm). Tìm kiếm chạy trong Rust (`regex::bytes`, có ngân sách 1,5 s/lần, trả
+  `nextLine` để tìm tiếp; tìm mới huỷ tìm cũ qua epoch). `tail -f` = `extend()` chỉ quét phần
+  mới ghi thêm; file ngắn đi (truncate/rotate) thì lập chỉ mục lại (`generation` tăng). Đo trên
+  file 427 MB / 4 triệu dòng (cache ấm): lập chỉ mục 0,14 s, đọc 60 dòng ở dòng 3,5 triệu
+  0,26 ms, tìm toàn file 0,27 s.
+- **Frontend** (`LargeFileViewer.tsx`): cuộn ảo, khối 256 dòng cache LRU 300 khối; quá 8 triệu px
+  thì thanh cuộn ánh xạ tỉ lệ sang số dòng (trình duyệt giới hạn chiều cao phần tử). Handle viewer
+  sống theo tab trong store (chuyển tab không phải lập chỉ mục lại); dòng đầu đang xem cũng
+  được nhớ.
+
 ## Đã cân nhắc, chưa làm
 
 - **Xoá vào Thùng rác** (crate `trash`) — UX tốt hơn, nhưng thêm dependency native cho cả ba
@@ -170,5 +196,6 @@ Yêu cầu: có công tắc; khi bật, mỗi lần lưu file giữ một snapsh
 - `src-tauri/src/editor.rs` — lệnh Tauri, state, lưu `editor-roots.json`, hộp thoại
 - `src-tauri/src/editor_backup.rs` — backup tab untitled + test
 - `src-tauri/src/editor_history.rs` — Local History + test
+- `src-tauri/src/editor_view.rs` — viewer file lớn + test
 - `src/components/tools/editor/` — `store.ts` (+ test), `fs.ts`, `memoryFs.ts`, `Explorer.tsx`,
   `EditorTabs.tsx`, `EditorPane.tsx`, `StatusBar.tsx`, `QuickOpen.tsx`, `fileRanking.ts`

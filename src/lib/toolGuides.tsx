@@ -348,6 +348,7 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
     know: [
       'Highlighting uses VS Code’s Light+ / Dark+ colors, with bracket pairs colored by depth and indentation guides. The language comes from the file name (~150 languages) or, for an untitled tab, from what you type; click the language in the status bar to change it.',
       <><strong className="text-fg">Format Document</strong> — <Key>⇧</Key>+<Key>Alt</Key>+<Key>F</Key>, the formatter name in the status bar, or right-click a tab: Prettier for JS/TS/JSX, JSON, CSS/SCSS/LESS, HTML, Vue, Markdown, YAML and XML (your project’s <Tok>.prettierrc</Tok> or <Tok>package.json</Tok> “prettier” is used), sql-formatter for SQL dialects, and re-indenting by the grammar for every other language. Turn on <strong className="text-fg">Format on Save</strong> from the same status-bar menu.</>,
+      <><strong className="text-fg">Large files</strong> — up to 200 MB stay editable; above 10 MB highlighting, bracket colors, indent guides, formatting and Local History turn off to keep typing smooth. Bigger files (GB-size logs, CSV exports) open in a <strong className="text-fg">read-only viewer</strong> that reads from disk as you scroll: go to line, search the whole file (text or regex), and <strong className="text-fg">Follow</strong> to tail a growing log. Right-click any file → Open in Viewer to use it for smaller logs too.</>,
       <><strong className="text-fg">Local History</strong> — the switch in the <strong className="text-fg">Timeline</strong> at the bottom of the Explorer. While on, every save keeps a snapshot of the file (the first save also keeps the version from before it). Click a snapshot to compare it with the current text; restore it into the editor or delete it from there or from the row’s buttons.</>,
       'Indentation (spaces or tabs, and the size) is detected per file, as VS Code does; change it from “Spaces: N” in the status bar. Line endings (LF/CRLF) and a UTF-8 BOM are kept when you save.',
       'Unsaved edits survive switching to another tool, and each tab keeps its own undo history. Open folders and tabs come back after a restart.',
@@ -358,7 +359,7 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
     ],
     caveat: [
       'Delete is permanent — files do not go to the Trash.',
-      'Binary files and files over 10 MB are not opened. Symlinks that point outside the opened folder are listed but cannot be opened.',
+      'Binary files are not opened in the editor. Symlinks that point outside the opened folder are listed but cannot be opened.',
     ],
   }),
 
@@ -482,6 +483,6 @@ export const TOOL_GUIDE_VERSIONS: Record<string, number> = {
   'cron-generator': 2,
   // 2 — match count + jump, keyboard tree navigation.
   json: 2,
-  // 4 — Local History (Timeline): snapshots on save, compare, restore, delete.
-  'text-editor': 4,
+  // 5 — large files: 200 MB editable, read-only viewer with search and tail -f.
+  'text-editor': 5,
 };
