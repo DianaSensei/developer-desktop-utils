@@ -4,7 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import { Layers, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { allTools } from '@/lib/toolRegistry';
-import { toolMatchesQuery } from '@/lib/toolSearch';
+import { searchTools } from '@/lib/toolSearch';
+import { getRecentTools } from '@/lib/recentTools';
 import { DEFAULT_TOOL_ORDER } from '@/lib/toolDefs';
 import { detectClipboardIntent, type ClipboardIntent } from '@/lib/clipboardIntent';
 import { readTextFromClipboard } from '@/lib/clipboard';
@@ -26,6 +27,7 @@ type Item =
   | { kind: 'newWorkspace'; name: string };
 
 const OPEN_EVENT = 'devtool:open-command-palette';
+const RECENT_SHOWN = 4;
 
 /** Opens ⌘K from elsewhere in the shell (the workspace bar's "+"). */
 export function requestCommandPalette() {
@@ -50,7 +52,7 @@ export function CommandPalette() {
   const { isFeatureEnabled, toggleFeature, toolOrder } = useFeatures();
   const { t } = useLocale();
   const navigate = useNavigate();
-  const { workspaces, active: activeWs, switchWorkspace, promptCreateWorkspace } = useWorkspaces();
+  const { workspaces, active: activeWs, switchWorkspace, promptCreateWorkspace, activeToolId } = useWorkspaces();
 
   // ⌘K / Ctrl+K toggles from anywhere; other keys pass through.
   React.useEffect(() => {
@@ -94,11 +96,27 @@ export function CommandPalette() {
     return (id: string) => rank.get(id) ?? Number.MAX_SAFE_INTEGER;
   }, [toolOrder]);
 
-  // With a query: matches. Without: every tool in sidebar order.
+  // Recently used tools other than the current one, newest first — read
+  // when the palette opens. ⌘K then Enter goes back to the previous tool.
+  const recentIds = React.useMemo(
+    () => (open ? getRecentTools().filter((id) => id !== activeToolId && isFeatureEnabled(id)).slice(0, RECENT_SHOWN) : []),
+    [open, activeToolId, isFeatureEnabled],
+  );
+
+  // With a query: matches, best first. Without: recent tools, then every
+  // other tool in sidebar order.
   const results = React.useMemo(() => {
-    if (query.trim()) return allTools.filter((tool) => toolMatchesQuery(tool, query));
-    return [...allTools].sort((a, b) => rankOf(a.featureId) - rankOf(b.featureId));
-  }, [query, rankOf]);
+    if (query.trim()) return searchTools(allTools, query);
+    const recent = recentIds
+      .map((id) => allTools.find((tool) => tool.featureId === id))
+      .filter((tool): tool is Tool => !!tool);
+    const rest = allTools
+      .filter((tool) => !recentIds.includes(tool.featureId))
+      .sort((a, b) => rankOf(a.featureId) - rankOf(b.featureId));
+    return [...recent, ...rest];
+  }, [query, rankOf, recentIds]);
+  const firstOther = results.findIndex((tool) => !recentIds.includes(tool.featureId));
+  const recentCount = query.trim() ? 0 : Math.max(0, firstOther === -1 ? results.length : firstOther);
 
   // The clipboard suggestion only shows when not searching.
   const clipboardTool: Tool | null =
@@ -127,6 +145,7 @@ export function CommandPalette() {
     ...results.map((tool) => ({ kind: 'tool' as const, tool })),
   ];
   const activeItem = items[selected] ?? null;
+  const toolStart = items.findIndex((it) => it.kind === 'tool' && !it.clipboard);
 
   React.useEffect(() => {
     itemRefs.current[selected]?.scrollIntoView({ block: 'nearest' });
@@ -250,9 +269,19 @@ export function CommandPalette() {
                     </div>
                   );
                 }
+                // Section captions when recent tools lead the list.
+                const k = index - toolStart;
+                const caption = recentCount > 0 && (k === 0 || k === recentCount)
+                  ? t(k === 0 ? 'palette.section.recent' : 'palette.section.allTools')
+                  : null;
                 return (
+                  <React.Fragment key={item.tool.featureId}>
+                  {caption && (
+                    <p className={cn('px-2.5 pb-1 pt-1.5 text-[11px] font-semibold uppercase tracking-wide text-fg-mute', k > 0 && 'mt-1.5 border-t border-line-soft pt-2.5')}>
+                      {caption}
+                    </p>
+                  )}
                   <ToolRow
-                    key={item.tool.featureId}
                     tool={item.tool}
                     active={selected === index}
                     enabled={isFeatureEnabled(item.tool.featureId)}
@@ -261,6 +290,7 @@ export function CommandPalette() {
                     onPick={() => pick(item)}
                     refCb={refCb}
                   />
+                  </React.Fragment>
                 );
               })}
             </div>

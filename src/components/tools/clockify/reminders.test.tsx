@@ -6,6 +6,7 @@ import { FeatureProvider } from '@/contexts/FeatureContext';
 import { LocaleProvider } from '@/contexts/LocaleContext';
 import { MeetingsProvider } from '@/lib/meetings';
 import { TaskReminders } from './reminders';
+import { navBadges, useNavBadges } from '@/lib/navBadges';
 import { registerTaskHandlers, takePendingOpen } from './taskBus';
 import type { Task } from './store';
 
@@ -154,5 +155,21 @@ describe('TaskReminders', () => {
       focus.mockRestore();
       vi.unstubAllGlobals();
     }
+  });
+
+  it('publishes overdue + due-today tasks as a sidebar badge', () => {
+    const today = new Date().setHours(0, 0, 0, 0);
+    storageSet(TASKS, JSON.stringify([
+      { id: 'a', name: 'late', projectId: null, parentId: null, linkedIds: [], completed: false, createdAt: 1, dueAt: today - 864e5 },
+      { id: 'b', name: 'today', projectId: null, parentId: null, linkedIds: [], completed: false, createdAt: 1, dueAt: today },
+      { id: 'c', name: 'done', projectId: null, parentId: null, linkedIds: [], completed: true, createdAt: 1, dueAt: today },
+      { id: 'd', name: 'later', projectId: null, parentId: null, linkedIds: [], completed: false, createdAt: 1, dueAt: today + 5 * 864e5 },
+    ]));
+    navBadges.set('task-tracker', null);
+    let seen: ReturnType<typeof useNavBadges> = {};
+    function Probe() { seen = useNavBadges(); return null; }
+    render(<Probe />);
+    renderRuntime();
+    expect(seen['task-tracker']).toEqual({ count: 2, tone: 'bad', label: '1 overdue · 1 due today' });
   });
 });

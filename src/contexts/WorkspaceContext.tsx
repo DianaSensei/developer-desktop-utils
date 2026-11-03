@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { recordToolVisit } from '@/lib/recentTools';
 import { allTools, toolPath } from '@/lib/toolRegistry';
 import { storageGet, storageSet } from '@/lib/persistentStore';
 import { useFeatures } from '@/contexts/FeatureContext';
@@ -79,6 +80,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!activeToolId) return;
     setState((s) => visitTool(s, activeToolId));
+    recordToolVisit(activeToolId);
   }, [activeToolId, location.key]);
 
   const active = activeWorkspace(state);

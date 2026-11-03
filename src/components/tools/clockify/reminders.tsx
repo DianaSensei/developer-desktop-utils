@@ -15,6 +15,8 @@ import { getPlugin, getPluginSdk, type PluginSdk } from '@/platform';
 import { useFeatures } from '@/contexts/FeatureContext';
 import { useLocale, useMessages } from '@/contexts/LocaleContext';
 import { useMeetings } from '@/lib/meetings';
+import { liveConnections } from '@/lib/liveConnections';
+import { navBadges } from '@/lib/navBadges';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
@@ -24,7 +26,7 @@ import MESSAGES from './reminders.messages';
 import { DEFAULT_SETTINGS, type Settings, type Task } from './store';
 import { playBeep } from './time';
 import {
-  dueReminders, nextReminderAt, pruneReminderState, readReminderState, statusPatch,
+  dueBucket, dueReminders, nextReminderAt, statusOf, pruneReminderState, readReminderState, statusPatch,
   type DueReminder, type ReminderState,
 } from './todo';
 import { completeTaskInSuite, onTasksChanged, requestOpen } from './taskBus';
@@ -81,6 +83,7 @@ function ReminderRuntime() {
       state: stateRef.current,
     };
     const due = dueReminders(input);
+    publishDueBadge(input.tasks, now, mRef.current);
     const fresh = due.filter((r) => !announced.current.has(r.key));
     if (fresh.length) {
       for (const r of fresh) announced.current.add(r.key);
@@ -95,6 +98,13 @@ function ReminderRuntime() {
     const next = nextReminderAt(input);
     const delay = next == null ? POLL_MS : Math.min(POLL_MS, Math.max(1000, next - now + 50));
     timer.current = window.setTimeout(evaluate, delay);
+  }, [sdk]);
+
+  // A timer left running last session: show the "running" dot right away,
+  // before the Time Tracker is opened (its provider keeps it up to date).
+  useEffect(() => {
+    const entries = readJson<Array<{ end: number | null }>>(sdk.storage.get('clockify:entries'), []);
+    if (Array.isArray(entries) && entries.some((e) => e.end === null)) liveConnections.set(PLUGIN_ID, true);
   }, [sdk]);
 
   useEffect(() => {
@@ -155,6 +165,20 @@ function ReminderRuntime() {
       onOpen={open}
     />
   );
+}
+
+/** Overdue + due-today open tasks as a sidebar badge on the Time Tracker. */
+function publishDueBadge(tasks: Task[], now: number, m: Translate) {
+  let overdue = 0;
+  let today = 0;
+  for (const t of tasks) {
+    if (statusOf(t) === 'done') continue;
+    const bucket = dueBucket(t, now);
+    if (bucket === 'overdue') overdue++;
+    else if (bucket === 'today') today++;
+  }
+  const parts = [overdue && m('badgeOverdue', { n: overdue }), today && m('badgeToday', { n: today })].filter(Boolean);
+  navBadges.set(PLUGIN_ID, { count: overdue + today, tone: overdue ? 'bad' : 'info', label: parts.join(' · ') });
 }
 
 function sameKeys(a: DueReminder[], b: DueReminder[]): boolean {

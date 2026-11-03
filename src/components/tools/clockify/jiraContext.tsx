@@ -10,7 +10,7 @@ import { usePluginSdkFor, usePluginState } from '@/platform';
 import { useClockify, type Task } from './store';
 import {
   DEFAULT_JQL, JiraError, categoryForStatus, TOKEN_SECRET, createJiraClient, issueUrl, mergeIssues, normalizeSite,
-  pendingStatusPushes, pendingWorklogs, pickTransition, worklogSeconds,
+  pendingStatusPushes, pendingWorklogs, pickTransition, worklogSeconds, autoLogCandidates,
   type JiraClient, type JiraConfig, type StatusCategory,
 } from './jira';
 import { statusOf } from './todo';
@@ -41,12 +41,17 @@ interface JiraContextValue {
   error: JiraError | null;
   /** Checks the credentials against /myself, then saves them. */
   connect: (input: ConnectInput) => Promise<string>;
-  updateConfig: (patch: Partial<Pick<JiraConfig, 'jql' | 'pushStatus'>>) => void;
+  updateConfig: (patch: Partial<Pick<JiraConfig, 'jql' | 'pushStatus' | 'autoLogSince'>>) => void;
   disconnect: () => Promise<void>;
   sync: () => Promise<void>;
   openIssue: (task: Task) => void;
   /** Sends the task's unlogged time; resolves to what was sent. */
   logWork: (task: Task) => Promise<{ count: number; seconds: number }>;
+  /** Sends unlogged time on every linked task. */
+  logAll: () => Promise<{ count: number; seconds: number }>;
+  /** Links one issue by key (quick add), even if done or hidden; resolves to
+   *  the task id and whether it was already here. */
+  addIssue: (key: string) => Promise<{ taskId: string; existed: boolean }>;
   /** Deleting a linked task here: keep the next sync from re-adding it. */
   hideIssue: (key: string) => void;
   unhideAll: () => void;
@@ -106,12 +111,13 @@ export function JiraProvider({ children }: { children: ReactNode }) {
       accountName: me.displayName,
       lastSync: prev?.site === site ? prev.lastSync ?? null : null,
       hiddenKeys: prev?.site === site ? prev.hiddenKeys ?? [] : [],
+      autoLogSince: prev?.site === site ? prev.autoLogSince ?? null : null,
     }));
     setError(null);
     return me.displayName;
   }, [sdk, setConfig]);
 
-  const updateConfig = useCallback((patch: Partial<Pick<JiraConfig, 'jql' | 'pushStatus'>>) => {
+  const updateConfig = useCallback((patch: Partial<Pick<JiraConfig, 'jql' | 'pushStatus' | 'autoLogSince'>>) => {
     setConfig((prev) => (prev ? { ...prev, ...patch } : prev));
   }, [setConfig]);
 
@@ -237,6 +243,61 @@ export function JiraProvider({ children }: { children: ReactNode }) {
     return { count, seconds };
   }, [client, updateEntry]);
 
+  const logAll = useCallback(async () => {
+    const c = configRef.current;
+    let count = 0;
+    let seconds = 0;
+    for (const t of tasksRef.current) {
+      if (t.jira?.site !== c?.site || pendingWorklogs(entriesRef.current, t.id).length === 0) continue;
+      const r = await logWork(t);
+      count += r.count;
+      seconds += r.seconds;
+    }
+    return { count, seconds };
+  }, [logWork]);
+
+  // Auto-log: a timer entry on a linked task that finishes after the switch
+  // was turned on goes to Jira by itself. A failed entry is not retried in a
+  // loop; it stays pending for "Log …" and shows the error banner.
+  const autoFailed = useRef(new Set<string>());
+  const autoBusy = useRef(new Set<string>());
+  useEffect(() => {
+    const c = config;
+    if (!connected || !c?.autoLogSince) return;
+    const api = client();
+    if (!api) return;
+    for (const { entry, task } of autoLogCandidates(entries, tasks, c.site, c.autoLogSince)) {
+      if (autoFailed.current.has(entry.id) || autoBusy.current.has(entry.id)) continue;
+      autoBusy.current.add(entry.id);
+      api.addWorklog(task.jira!.key, { started: entry.start, seconds: worklogSeconds(entry), comment: entry.subtask ?? undefined })
+        .then(({ id }) => updateEntry(entry.id, { jiraWorklogId: id }))
+        .catch((e: unknown) => {
+          autoFailed.current.add(entry.id);
+          setError(e instanceof JiraError ? e : new JiraError('network', String(e)));
+        })
+        .finally(() => autoBusy.current.delete(entry.id));
+    }
+  }, [entries, tasks, config, connected, client, updateEntry]);
+
+  const addIssue = useCallback(async (key: string) => {
+    const c = configRef.current;
+    const api = client();
+    if (!c || !api) throw new JiraError('auth', 'not connected');
+    const existing = tasksRef.current.find((t) => t.jira?.site === c.site && t.jira.key === key);
+    if (existing) return { taskId: existing.id, existed: true };
+    const issues = await api.search(`key = "${key.replaceAll('"', '')}"`);
+    if (issues.length === 0) throw new JiraError('notFound', key);
+    let taskId = '';
+    applyTasks((prev) => {
+      const r = mergeIssues(prev, issues, c.site, Date.now(), { forceKeys: new Set([issues[0].key]) });
+      taskId = r.tasks.find((t) => t.jira?.site === c.site && t.jira.key === issues[0].key)?.id ?? '';
+      return r.tasks;
+    });
+    // It was asked for by name, so a past delete no longer hides it.
+    setConfig((prev) => (prev ? { ...prev, hiddenKeys: (prev.hiddenKeys ?? []).filter((k) => k !== issues[0].key) } : prev));
+    return { taskId, existed: false };
+  }, [client, applyTasks, setConfig]);
+
   const hideIssue = useCallback((key: string) => {
     setConfig((prev) => (prev ? { ...prev, hiddenKeys: [...new Set([...(prev.hiddenKeys ?? []), key])] } : prev));
   }, [setConfig]);
@@ -247,8 +308,8 @@ export function JiraProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<JiraContextValue>(() => ({
     config, connected, syncing, lastResult, error,
-    connect, updateConfig, disconnect, sync, openIssue, logWork, hideIssue, unhideAll, retryPush, pushing,
-  }), [config, connected, syncing, lastResult, error, connect, updateConfig, disconnect, sync, openIssue, logWork, hideIssue, unhideAll, retryPush, pushing]);
+    connect, updateConfig, disconnect, sync, openIssue, logWork, logAll, addIssue, hideIssue, unhideAll, retryPush, pushing,
+  }), [config, connected, syncing, lastResult, error, connect, updateConfig, disconnect, sync, openIssue, logWork, logAll, addIssue, hideIssue, unhideAll, retryPush, pushing]);
 
   return <JiraContext.Provider value={value}>{children}</JiraContext.Provider>;
 }

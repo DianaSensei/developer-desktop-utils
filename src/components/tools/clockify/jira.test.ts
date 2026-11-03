@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Task, TimeEntry } from './store';
 import {
+  autoLogCandidates, parseIssueRef, pendingAcrossTasks,
   jiraDateTime, jiraMessage, mergeIssues, normalizeSite, parseIssue, pendingStatusPushes, pendingWorklogs,
   pickTransition, priorityFromJira, worklogSeconds, type JiraIssue, type JiraLink,
 } from './jira';
@@ -135,5 +136,52 @@ describe('worklogs', () => {
     expect(pendingWorklogs(list, 't1').map((x) => x.id)).toEqual(['1']);
     expect(worklogSeconds({ start: 0, end: 90_000 })).toBe(120);
     expect(worklogSeconds({ start: 0, end: 61_000 })).toBe(60);
+  });
+});
+
+describe('parseIssueRef', () => {
+  it('takes a key or an issue URL on the connected site', () => {
+    expect(parseIssueRef('PAY-42', SITE)).toBe('PAY-42');
+    expect(parseIssueRef(' https://acme.atlassian.net/browse/PAY-42 ', SITE)).toBe('PAY-42');
+    expect(parseIssueRef('https://acme.atlassian.net/jira/software/projects/PAY/boards/3?selectedIssue=PAY-7', SITE)).toBe('PAY-7');
+  });
+  it('leaves ordinary task names and other sites alone', () => {
+    expect(parseIssueRef('Fix PAY-42 rounding', SITE)).toBeNull();
+    expect(parseIssueRef('pay-42', SITE)).toBeNull();
+    expect(parseIssueRef('https://other.atlassian.net/browse/PAY-42', SITE)).toBeNull();
+    expect(parseIssueRef('https://acme.atlassian.net/jira/your-work', SITE)).toBeNull();
+  });
+});
+
+describe('mergeIssues forceKeys', () => {
+  it('adds an issue asked for by key even when done or hidden', () => {
+    const r = mergeIssues([], [issue({ statusCategory: 'done', statusName: 'Done' })], SITE, NOW, {
+      hiddenKeys: ['PAY-1'], forceKeys: new Set(['PAY-1']),
+    });
+    expect(r.tasks[0]).toMatchObject({ status: 'done', completed: true, completedAt: NOW, jira: { key: 'PAY-1' } });
+  });
+});
+
+describe('auto-log / log all', () => {
+  const e = (patch: Partial<TimeEntry>): TimeEntry => ({
+    id: 'e', description: '', projectId: null, taskId: 't1', tagIds: [], start: 0, end: 30 * 60_000, source: 'tracker', ...patch,
+  });
+  const linked = task({ id: 't1', jira: link() });
+  const local = task({ id: 't2' });
+
+  it('only picks entries on linked tasks that finished after the switch went on', () => {
+    const entries = [
+      e({ id: 'old', end: 10 * 60_000 }),
+      e({ id: 'new', start: 20 * 60_000, end: 50 * 60_000 }),
+      e({ id: 'running', start: 40 * 60_000, end: null }),
+      e({ id: 'local', taskId: 't2', start: 20 * 60_000, end: 50 * 60_000 }),
+      e({ id: 'sent', start: 20 * 60_000, end: 50 * 60_000, jiraWorklogId: 'w' }),
+    ];
+    expect(autoLogCandidates(entries, [linked, local], SITE, 15 * 60_000).map((c) => c.entry.id)).toEqual(['new']);
+  });
+
+  it('totals unlogged time across linked tasks', () => {
+    const entries = [e({ id: 'a' }), e({ id: 'b', start: 0, end: 15 * 60_000 }), e({ id: 'c', taskId: 't2' })];
+    expect(pendingAcrossTasks(entries, [linked, local], SITE)).toEqual({ tasks: 1, seconds: 45 * 60 });
   });
 });

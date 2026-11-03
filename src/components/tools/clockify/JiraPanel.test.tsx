@@ -28,6 +28,8 @@ function fakeJira() {
     if (call.auth !== `Basic ${btoa('me@acme.io:tok-123')}`) return json(401, { errorMessages: ['Unauthorized'] });
     if (call.path === '/rest/api/3/myself') return json(200, { accountId: 'u1', displayName: 'Mai Tran' });
     if (call.path === '/rest/api/3/search/jql') {
+      const jql = (call.body as { jql: string }).jql;
+      if (/^key = "/.test(jql) && jql !== 'key = "PAY-42"') return json(200, { isLast: true, issues: [] });
       return json(200, {
         isLast: true,
         issues: [{
@@ -158,5 +160,68 @@ describe('Jira in the Tasks tab', () => {
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Sync' })).toBeTruthy());
     expect(saved()).toEqual([]);
     expect(JSON.parse(storageGet(CONFIG)!).hiddenKeys).toEqual(['PAY-42']);
+  });
+
+  it('pasting an issue key links it; an unknown key says so', async () => {
+    renderSuite();
+    await connect();
+    await waitFor(() => screen.getByText('Refund rounding'));
+    // Delete it, so adding by key is what brings it back.
+    fireEvent.click(screen.getByRole('button', { name: 'Delete task' }));
+    fireEvent.click(screen.getByRole('button', { name: /again/i }));
+    const input = screen.getByLabelText('Add a new task');
+    fireEvent.change(input, { target: { value: 'PAY-99' } });
+    expect(screen.getByText('↵ adds PAY-99 from Jira')).toBeTruthy();
+    await act(async () => { fireEvent.keyDown(input, { key: 'Enter' }); });
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toMatch(/PAY-99 wasn't found/));
+    expect((input as HTMLInputElement).value).toBe('PAY-99');
+
+    fireEvent.change(input, { target: { value: `${SITE}/browse/PAY-42` } });
+    await act(async () => { fireEvent.keyDown(input, { key: 'Enter' }); });
+    await waitFor(() => expect(screen.getByText('Added PAY-42.')).toBeTruthy());
+    expect(saved().map((t) => t.jira?.key)).toEqual(['PAY-42']);
+    expect(JSON.parse(storageGet(CONFIG)!).hiddenKeys).toEqual([]);
+    expect((input as HTMLInputElement).value).toBe('');
+  });
+
+  it('with auto-log on, stopping the timer on a Jira task logs the time', async () => {
+    renderSuite();
+    await connect();
+    await waitFor(() => screen.getByText('Refund rounding'));
+    fireEvent.click(screen.getByRole('button', { name: 'Jira settings' }));
+    const dialog = screen.getByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('switch', { name: /automatically when I stop a timer/ }));
+    await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: 'Test & save' })); });
+    expect(JSON.parse(storageGet(CONFIG)!).autoLogSince).toEqual(expect.any(Number));
+
+    vi.useFakeTimers({ toFake: ['Date'], now: Date.now() });
+    try {
+      fireEvent.click(screen.getByRole('button', { name: 'Track time on this task' }));
+      vi.setSystemTime(Date.now() + 20 * 60_000);
+      fireEvent.click(screen.getByRole('button', { name: 'Stop tracking' }));
+    } finally {
+      vi.useRealTimers();
+    }
+    await waitFor(() => expect(jira.calls.filter((c) => c.path.endsWith('/worklog'))).toHaveLength(1));
+    expect(jira.calls.find((c) => c.path.endsWith('/worklog'))!.body).toMatchObject({ timeSpentSeconds: 1200 });
+    await waitFor(() => expect((JSON.parse(storageGet(ENTRIES)!) as TimeEntry[])[0].jiraWorklogId).toMatch(/^wl-/));
+  });
+
+  it('"Log …" in the toolbar sends pending time on every Jira task', async () => {
+    renderSuite();
+    await connect();
+    await waitFor(() => screen.getByText('Refund rounding'));
+    const taskId = saved()[0].id;
+    const start = new Date(2026, 10, 3, 9, 0).getTime();
+    cleanup();
+    storageSet(ENTRIES, JSON.stringify([
+      { id: 'e1', description: '', projectId: null, taskId, tagIds: [], start, end: start + 30 * 60_000, source: 'tracker' },
+      { id: 'e2', description: '', projectId: null, taskId, tagIds: [], start: start + 3600_000, end: start + 5400_000, source: 'tracker' },
+    ]));
+    renderSuite();
+    await waitFor(() => screen.getByRole('button', { name: 'Sync' }));
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Log 1h 0m' })); });
+    await waitFor(() => expect(screen.getByText('Logged 1h 0m to Jira (2 worklogs).')).toBeTruthy());
+    expect(jira.calls.filter((c) => c.path.endsWith('/worklog'))).toHaveLength(2);
   });
 });

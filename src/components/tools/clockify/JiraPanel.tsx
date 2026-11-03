@@ -3,7 +3,7 @@
 // (status in Jira, push errors, log time). State lives in jiraContext.tsx.
 
 import { useMemo, useState } from 'react';
-import { AlertTriangle, ExternalLink, Link2, RefreshCw, Settings2 } from 'lucide-react';
+import { AlertTriangle, Clock, ExternalLink, Link2, RefreshCw, Settings2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -15,7 +15,7 @@ import MESSAGES from './jira.messages';
 import { useClockify, type Task } from './store';
 import { Modal, Toggle } from './ui';
 import { fmtTotal } from './time';
-import { API_TOKEN_URL, DEFAULT_JQL, JiraError, normalizeSite, pendingWorklogs, worklogSeconds } from './jira';
+import { API_TOKEN_URL, DEFAULT_JQL, JiraError, normalizeSite, pendingAcrossTasks, pendingWorklogs, worklogSeconds } from './jira';
 import { useJira } from './jiraContext';
 
 type Translate = ReturnType<typeof useMessages<typeof MESSAGES>>;
@@ -54,6 +54,7 @@ export function JiraToolbar() {
   const last = jira.config?.lastSync;
   return (
     <div className="flex items-center gap-1">
+      <LogAllButton />
       <Button
         variant="outline"
         size="sm"
@@ -78,6 +79,39 @@ export function JiraToolbar() {
   );
 }
 
+/** "Log 2h 10m": every linked task's unlogged time in one go (end of day). */
+function LogAllButton() {
+  const m = useMessages(MESSAGES);
+  const jira = useJira();
+  const { tasks, entries } = useClockify();
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState<string | null>(null);
+  const site = jira.config?.site ?? '';
+  const pending = useMemo(() => pendingAcrossTasks(entries, tasks, site), [entries, tasks, site]);
+  if (pending.tasks === 0 && !done) return null;
+  if (pending.tasks === 0) return <span role="status" className="text-[11px] text-ok">{done}</span>;
+  const total = fmtTotal(pending.seconds * 1000);
+  return (
+    <Button
+      variant="tint"
+      size="sm"
+      className="gap-1.5 text-xs"
+      busy={busy}
+      title={m('logAllTitle', { n: pending.tasks })}
+      onClick={() => {
+        setBusy(true);
+        jira.logAll()
+          .then((r) => setDone(m('loggedAll', { t: fmtTotal(r.seconds * 1000), n: r.count })))
+          .catch(() => { /* the error banner explains it */ })
+          .finally(() => setBusy(false));
+      }}
+    >
+      <Clock className="h-3.5 w-3.5" />
+      {m('logAll', { t: total })}
+    </Button>
+  );
+}
+
 /** Sync / auth problem under the toolbar, with the fix one click away. */
 export function JiraErrorBanner() {
   const m = useMessages(MESSAGES);
@@ -85,7 +119,7 @@ export function JiraErrorBanner() {
   const [dialog, setDialog] = useState(false);
   if (!jira.error) return null;
   return (
-    <div role="alert" className="flex items-center gap-2 border-b border-line bg-[hsl(var(--warn-c)/0.08)] px-3 py-1.5 text-xs text-warn">
+    <div role="alert" className="flex items-center gap-2 border-b border-line bg-warn/10 px-3 py-1.5 text-xs text-warn">
       <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
       <span className="min-w-0 flex-1">{jiraErrorText(jira.error, m)}</span>
       {jira.error.kind === 'auth' ? (
@@ -108,6 +142,7 @@ export function JiraConnectDialog({ onClose }: { onClose: () => void }) {
   const [token, setToken] = useState('');
   const [jql, setJql] = useState(cfg?.jql ?? DEFAULT_JQL);
   const [pushStatus, setPushStatus] = useState(cfg?.pushStatus ?? true);
+  const [autoLog, setAutoLog] = useState(!!cfg?.autoLogSince);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const siteOk = !site.trim() || normalizeSite(site) != null;
@@ -118,11 +153,11 @@ export function JiraConnectDialog({ onClose }: { onClose: () => void }) {
     setBusy(true);
     setError(null);
     try {
-      if (keepToken) {
-        jira.updateConfig({ jql: jql.trim() || DEFAULT_JQL, pushStatus });
-      } else {
-        await jira.connect({ site, email, token, jql, pushStatus });
-      }
+      if (!keepToken) await jira.connect({ site, email, token, jql, pushStatus });
+      // Keep the original "since" while it stays on, so turning the dialog
+      // over doesn't skip entries that finished in between.
+      const autoLogSince = autoLog ? cfg?.autoLogSince ?? Date.now() : null;
+      jira.updateConfig({ jql: jql.trim() || DEFAULT_JQL, pushStatus, autoLogSince });
       onClose();
       void jira.sync();
     } catch (e) {
@@ -183,6 +218,10 @@ export function JiraConnectDialog({ onClose }: { onClose: () => void }) {
           <Textarea id="jira-jql" value={jql} onChange={(e) => setJql(e.target.value)} rows={2} className="font-mono text-xs" />
         </div>
         <Toggle label={m('pushStatus')} checked={pushStatus} onChange={setPushStatus} />
+        <div className="space-y-1">
+          <Toggle label={m('autoLog')} checked={autoLog} onChange={setAutoLog} />
+          <p className="text-[11px] text-fg-mute">{m('autoLogHint')}</p>
+        </div>
         {cfg?.hiddenKeys && cfg.hiddenKeys.length > 0 && (
           <p className="flex items-center gap-2 text-[11px] text-fg-mute">
             {m('hiddenIssues', { n: cfg.hiddenKeys.length })}

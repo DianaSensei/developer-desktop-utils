@@ -123,7 +123,7 @@ function Welcome({ store, snap }: Props) {
   return (
     <div className="m-auto flex flex-col items-center gap-5 p-8 text-center motion-safe:animate-fade-in-up">
       <FileCode2 className="h-12 w-12 text-fg-mute/30" />
-      <p className="text-sm text-fg-mute">{hasFolder ? m('noEditor') : m('noFolderHint')}</p>
+      <p className="text-sm text-fg-mute">{hasFolder ? m('noEditor') : m('noEditorNoFolder')}</p>
       <div className="flex flex-wrap justify-center gap-2">
         <Button size="sm" className="gap-1.5" onClick={() => { store.newUntitled(); store.focusEditor(); }}>
           <FilePlus2 className="h-3.5 w-3.5" />{m('newTextFile')}
