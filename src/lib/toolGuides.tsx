@@ -346,7 +346,9 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
       <><Key>{mod}</Key>+<Key>S</Key> saves, <Key>{mod}</Key>+<Key>⇧</Key>+<Key>S</Key> saves as, <Key>{mod}</Key>+<Key>P</Key> jumps to any file by name, <Key>{mod}</Key>+<Key>W</Key> closes the tab, <Key>Ctrl</Key>+<Key>Tab</Key> cycles tabs, <Key>{mod}</Key>+<Key>F</Key> finds/replaces in the file, <Key>Alt</Key>+<Key>Z</Key> toggles word wrap.</>,
     ],
     know: [
-      'Syntax highlighting is picked from the file name (~150 languages). Line endings (LF/CRLF) and a UTF-8 BOM are kept when you save.',
+      'Highlighting uses VS Code’s Light+ / Dark+ colors, with bracket pairs colored by depth and indentation guides. The language comes from the file name (~150 languages) or, for an untitled tab, from what you type; click the language in the status bar to change it.',
+      <><strong className="text-fg">Format Document</strong> — <Key>⇧</Key>+<Key>Alt</Key>+<Key>F</Key>, the formatter name in the status bar, or right-click a tab: Prettier for JS/TS/JSX, JSON, CSS/SCSS/LESS, HTML, Vue, Markdown, YAML and XML (your project’s <Tok>.prettierrc</Tok> or <Tok>package.json</Tok> “prettier” is used), sql-formatter for SQL dialects, and re-indenting by the grammar for every other language. Turn on <strong className="text-fg">Format on Save</strong> from the same status-bar menu.</>,
+      'Indentation (spaces or tabs, and the size) is detected per file, as VS Code does; change it from “Spaces: N” in the status bar. Line endings (LF/CRLF) and a UTF-8 BOM are kept when you save.',
       'Unsaved edits survive switching to another tool, and each tab keeps its own undo history. Open folders and tabs come back after a restart.',
       'When you return to the window, open folders are re-listed and open files are compared with disk: an unchanged tab reloads on its own; one with unsaved edits asks first. Saving over a file another program changed asks before overwriting.',
       'The app can only reach folders you opened through the dialog, plus single files you picked in Open File… / Save As. Remove a folder from Recent to revoke that access.',
@@ -478,6 +480,6 @@ export const TOOL_GUIDE_VERSIONS: Record<string, number> = {
   'cron-generator': 2,
   // 2 — match count + jump, keyboard tree navigation.
   json: 2,
-  // 2 — untitled tabs (⌘N), Recently Closed, Save As, Open File.
-  'text-editor': 2,
+  // 3 — VS Code highlighting, Change Language Mode, Format Document / on Save.
+  'text-editor': 3,
 };

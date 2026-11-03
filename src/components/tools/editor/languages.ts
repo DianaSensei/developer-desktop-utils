@@ -47,3 +47,52 @@ export async function loadLanguage(fileName: string): Promise<LoadedLanguage | n
     return null;
   }
 }
+
+/** Every language name the editor can highlight, A→Z (for "Change Language Mode"). */
+export async function listLanguageNames(): Promise<string[]> {
+  const data = await import('@codemirror/language-data');
+  return [...new Set(data.languages.map((l) => l.name))].sort((a, b) => a.localeCompare(b));
+}
+
+/** The grammar for a language picked by name; null for unknown / plain text. */
+export async function loadLanguageByName(name: string): Promise<LoadedLanguage | null> {
+  try {
+    const [data, lang] = await Promise.all([import('@codemirror/language-data'), import('@codemirror/language')]);
+    const desc = lang.LanguageDescription.matchLanguageName(data.languages, name, false);
+    if (!desc) return null;
+    return { name: desc.name, support: await desc.load() };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * A best guess at what was typed or pasted into an untitled tab (VS Code
+ * auto-detects too). Cheap, ordered heuristics over the first few KB; null
+ * when nothing is convincing, which keeps the tab plain text.
+ */
+export function guessLanguage(text: string): string | null {
+  const head = text.slice(0, 4000).trimStart();
+  if (!head) return null;
+  if (/^#!.*\b(bash|sh|zsh)\b/.test(head)) return 'Shell';
+  if (/^#!.*\bpython/.test(head)) return 'Python';
+  if (/^#!.*\bnode\b/.test(head)) return 'JavaScript';
+  if (/^<\?xml\b/i.test(head)) return 'XML';
+  if (/^<!doctype html|^<html[\s>]/i.test(head)) return 'HTML';
+  if (/^[[{]/.test(head)) {
+    try { JSON.parse(text); return 'JSON'; } catch { /* not JSON */ }
+  }
+  if (/^<([a-z][\w-]*)[\s>][\s\S]*<\/\1>\s*$/i.test(head)) return 'HTML';
+  if (/^(SELECT|WITH|INSERT\s+INTO|UPDATE\s+\w+\s+SET|DELETE\s+FROM|CREATE\s+(TABLE|INDEX|VIEW|OR\s+REPLACE)|ALTER\s+TABLE|DROP\s+TABLE)\b/i.test(head)) return 'SQL';
+  if (/^(import\s.+\sfrom\s|export\s+(default\s+)?(function|const|class|interface|type)\b)/m.test(head)) {
+    return /:\s*(string|number|boolean|any)\b|\binterface\s+\w+|\btype\s+\w+\s*=/.test(head) ? 'TypeScript' : 'JavaScript';
+  }
+  if (/^(def\s+\w+\(.*\)\s*(->.*)?:|class\s+\w+(\(.*\))?:|from\s+[\w.]+\s+import\s|import\s+[\w.]+\s*$)/m.test(head)) return 'Python';
+  if (/^(package\s+\w+|func\s+\w+\(.*\)\s*\{)/m.test(head) && /\bfunc\b/.test(head)) return 'Go';
+  if (/^\s*(fn\s+\w+|use\s+[\w:]+;|impl\b|pub\s+(fn|struct|enum)\b)/m.test(head)) return 'Rust';
+  if (/^(function\s+\w+\s*\(|const\s+\w+\s*=|let\s+\w+\s*=|console\.log\()/m.test(head)) return 'JavaScript';
+  if (/^[.#]?[\w-]+(\s*[,>+~]\s*[.#]?[\w-]+)*\s*\{[^}]*:[^}]*;[^}]*\}/m.test(head)) return 'CSS';
+  if (/^(#{1,6}\s+\S|[-*]\s+\[[ x]\]\s)/m.test(head) || /\[[^\]]+\]\([^)]+\)/.test(head)) return 'Markdown';
+  if (/^---\s*$|^[\w-]+:\s+\S.*\n[\w-]+:\s+\S/m.test(head) && !/[;{}]/.test(head)) return 'YAML';
+  return null;
+}

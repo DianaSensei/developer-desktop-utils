@@ -5,7 +5,7 @@
 // the strip: + for a new untitled tab and the Recently Closed menu.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Copy, History, Locate, Plus, Save, X } from 'lucide-react';
+import { Copy, History, Locate, Plus, Save, Wand2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ContextMenu, useContextMenu, type ContextMenuEntry } from '@/components/ui/context-menu';
 import { Spinner } from '@/components/ui/spinner';
@@ -24,10 +24,11 @@ interface Props {
   onRequestClose: (ids: string[]) => void;
   onCopyPath: (path: string, relative: boolean) => void;
   onSaveAs: (id: string) => void;
+  onFormat: (id: string) => void;
   onNewUntitled: () => void;
 }
 
-export function EditorTabs({ store, snap, onRequestClose, onCopyPath, onSaveAs, onNewUntitled }: Props) {
+export function EditorTabs({ store, snap, onRequestClose, onCopyPath, onSaveAs, onFormat, onNewUntitled }: Props) {
   const m = useMessages(MESSAGES);
   const menu = useContextMenu();
   const stripRef = useRef<HTMLDivElement>(null);
@@ -60,10 +61,12 @@ export function EditorTabs({ store, snap, onRequestClose, onCopyPath, onSaveAs, 
       { label: m('closeSaved'), disabled: saved.length === 0, onClick: () => store.closeTabs(saved) },
       { label: m('closeAll'), onClick: () => onRequestClose(ids) },
     ];
-    if (tab.kind === 'untitled') return [...common, saveAs];
+    const formatEntry: ContextMenuEntry = { icon: <Wand2 className="h-3.5 w-3.5" />, label: m('formatDocument'), onClick: () => onFormat(tab.id) };
+    if (tab.kind === 'untitled') return [...common, saveAs, formatEntry];
     return [
       ...common,
       { ...saveAs },
+      formatEntry,
       { icon: <Copy className="h-3.5 w-3.5" />, label: m('copyPath'), onClick: () => onCopyPath(tab.path, false) },
       { icon: <Copy className="h-3.5 w-3.5" />, label: m('copyRelativePath'), onClick: () => onCopyPath(tab.path, true) },
       { icon: <Locate className="h-3.5 w-3.5" />, label: m('revealInExplorer'), onClick: () => store.select(tab.path) },

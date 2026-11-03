@@ -89,6 +89,40 @@ phục lại được.
 Rủi ro: backup là văn bản thuần trên đĩa — ai dán secret vào tab nháp thì secret nằm trong file
 đó tới khi Discard (đã ghi trong TOOLS.md). Mã hoá bằng khoá vault là hướng làm nếu cần.
 
+## Highlight và formatter kiểu VS Code — bổ sung 2026-11-03
+
+- **Bảng màu**: `vscodeHighlight` (`src/components/ui/code-theme.ts`) lấy màu từ token
+  `--vsc-*` (Light+ / Dark+ của VS Code) và phủ mọi tag mà các grammar trong language-data phát
+  ra (khai báo vs điều khiển luồng, type, function, property, hằng, tag/attribute, markup,
+  diff). Chỉ Text Editor dùng; các editor nhỏ trong app giữ `codeHighlight` (`--sql-*`) để không
+  đổi giao diện tool khác.
+- **Tô màu cặp ngoặc** (`code-vscode.ts`): tự viết, ~60 dòng — đếm độ sâu từ đầu tài liệu (tối
+  đa 300 000 ký tự trước viewport) tới hết viewport, bỏ qua ngoặc trong node có tên dạng
+  string/comment/regexp/template (khớp không phân biệt hoa thường để chạy với cả grammar lezer
+  lẫn legacy mode), ngoặc đóng thừa tô đỏ. Không thêm package vì các package có sẵn đều cũ hoặc
+  chỉ hỗ trợ JS.
+- **Đường kẻ thụt lề**: `@replit/codemirror-indentation-markers`. Pseudo-element của nó có
+  `z-index: -1`, nên phải đặt `isolation: isolate` cho `.cm-content`, không thì bị nền của khung
+  editor che (xem experience-log).
+- **Nhận dạng thụt lề** (`detectIndent`): tab vs space theo số dòng, độ rộng = bước tăng phổ biến
+  nhất (làm tròn về 2/4/8), bỏ qua bước 1 space (JSDoc ` * `). Gắn qua compartment
+  `indentSlot` cho từng `EditorState`; status bar đổi được.
+- **Formatter** (`format.ts`): Prettier standalone (mỗi parser là một dynamic import, chunk
+  riêng — typescript ~0,9 MB chỉ tải khi format TS), `sql-formatter` cho các dialect SQL,
+  còn lại dùng `indentRange` của CodeMirror + xoá khoảng trắng cuối dòng. Kết quả được áp thành
+  **một** thay đổi tối thiểu (bỏ prefix/suffix chung) để con trỏ và scroll đứng yên, ⌘Z một lần
+  là hoàn tác. Lỗi cú pháp → thông báo kèm dòng:cột, văn bản không bị đụng.
+  - Config Prettier: `.prettierrc(.json/.yaml/.yml)` / `package.json#prettier` gần nhất, đi lên
+    tới thư mục workspace; config thắng thụt lề đã nhận dạng (như extension VS Code).
+    `parser`, `plugins`, `overrides` trong config bị bỏ qua; file config dạng JS không bao giờ
+    được chạy.
+  - XML: plugin mặc định `xmlWhitespaceSensitivity: 'strict'` (không re-indent gì cả) → đặt
+    mặc định `ignore` như cách VS Code format XML; config dự án vẫn ghi đè được.
+  - Format on Save (tắt mặc định, như VS Code), lưu trong `sdk.storage`.
+- **Change Language Mode** (`LanguagePicker.tsx`) + tự đoán cho tab untitled (`guessLanguage`,
+  heuristic có thứ tự, chạy lại 500 ms sau khi ngừng gõ nếu người dùng chưa chọn). Lựa chọn của
+  tab untitled được lưu cùng metadata của nó.
+
 ## Đã cân nhắc, chưa làm
 
 - **Xoá vào Thùng rác** (crate `trash`) — UX tốt hơn, nhưng thêm dependency native cho cả ba
@@ -98,6 +132,8 @@ Rủi ro: backup là văn bản thuần trên đĩa — ai dán secret vào tab 
   workspace lớn và cần quản lý vòng đời watcher theo root.
 - **Tìm trong toàn workspace** (⌘⇧F), và hot exit cho chỉnh sửa chưa lưu của **file** (hiện
   chỉ tab untitled được backup).
+- **Formatter cho Python/Go/Rust/Java…** (ruff/gofmt/rustfmt bản WASM): nặng và mỗi ngôn ngữ một
+  runtime; hiện các ngôn ngữ này chỉ được re-indent theo grammar.
 - **Encoding khác UTF-8** — file không phải UTF-8 hiện bị coi là nhị phân (không mở) để không
   ghi hỏng khi lưu.
 

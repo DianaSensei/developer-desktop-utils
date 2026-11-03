@@ -674,3 +674,23 @@
   thước) ngay sau một thay đổi state làm phần tử từ ẩn thành hiện phải chờ tới sau lần render
   (rAF / effect), không làm đồng bộ trong handler. Kiểm tra luồng bàn phím thật bằng trình
   duyệt thật, không chỉ jsdom.
+
+## [2026-11-03] Text Editor — đường kẻ thụt lề (`@replit/codemirror-indentation-markers`) có trong DOM nhưng không hiện
+- Nguyên nhân: package vẽ marker bằng `.cm-indent-markers::before` với `z-index: -1`. `.cm-line`
+  chỉ `position: relative` (không tạo stacking context), nên pseudo-element rơi xuống stacking
+  context gần nhất phía trên — ở tận khung app — và bị nền `bg-bg` của pane editor (nằm giữa)
+  vẽ đè lên. Computed style hoàn toàn đúng (gradient, màu, kích thước), chỉ là bị che.
+  Thêm nữa, truyền `var(--…)` làm màu cho package cũng hỏng âm thầm: nó nối màu vào chuỗi
+  gradient và có màu mặc định riêng cho light (`#F0F1F2`, gần như trùng nền sáng của app).
+- Số lần thử: 2/5 (lần 1 chỉ đổi màu, vẫn không thấy; lần 2 soi `getComputedStyle(el, '::before')`
+  + chụp phóng to mới thấy là bị che).
+- Kết quả: Đã fix — `EditorView.baseTheme({ '.cm-content': { isolation: 'isolate' } })` tạo
+  stacking context trong suốt ngay trên các dòng; màu dùng giá trị literal của VS Code
+  (`#d3d3d3`/`#939393` light, `#404040`/`#707070` dark).
+- Bài học chung: phần tử `z-index` âm chỉ hiện nếu không có nền nào nằm giữa nó và stacking
+  context của nó — khi nhúng extension CodeMirror (hay bất kỳ widget nào) dùng `z-index: -1`
+  vào layout có nhiều lớp nền, luôn tạo `isolation: isolate` ở container gần nhất. Khi "style
+  đúng mà không thấy", kiểm tra stacking context và chụp ảnh phóng to trước khi đổi màu/kích
+  thước. (Cùng phiên: `tsc` của `npm run build` kiểm cả file `*.test.ts` — vitest chạy xanh
+  không có nghĩa build xanh; plugin XML của Prettier mặc định không re-indent gì vì
+  `xmlWhitespaceSensitivity: 'strict'`.)

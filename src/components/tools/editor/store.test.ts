@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { EditorView } from 'codemirror';
 import { EditorState } from '@codemirror/state';
 import { createMemoryFs, DEMO_ROOT, type MemoryFs } from './memoryFs';
-import { EditorStore, suggestFileName, type StorageLike } from './store';
+import { EditorStore, minimalChange, suggestFileName, type StorageLike } from './store';
 
 const R = DEMO_ROOT;
 
@@ -324,5 +324,102 @@ describe('suggestFileName', () => {
     expect(suggestFileName({ kind: 'untitled', name: 'query.sql' })).toBe('query.sql');
     expect(suggestFileName({ kind: 'untitled', name: 'Untitled-3' })).toBe('Untitled-3.txt');
     expect(suggestFileName({ kind: 'file', name: 'x.ts' })).toBe('x.ts');
+  });
+});
+
+describe('EditorStore — highlighting, indentation, formatting', () => {
+  const settle = async () => { for (let i = 0; i < 5; i++) await new Promise((r) => setTimeout(r, 0)); };
+
+  it('detects each file\'s indentation and lets the status bar change it', async () => {
+    fs.touch(`${R}/two.ts`, 'if (a) {\n  b();\n}\n');
+    await store.openFolder();
+    await store.openFile(`${R}/two.ts`);
+    expect(activeTab().indent).toEqual({ useTabs: false, size: 2 });
+    store.setIndent(activeTab().id, { useTabs: true, size: 4 });
+    expect(activeTab().indent).toEqual({ useTabs: true, size: 4 });
+    expect(view.state.tabSize).toBe(4);
+    store.setIndent(activeTab().id, null);
+    expect(activeTab().indent.size).toBe(2);
+  });
+
+  it('formats a file with Prettier as one undoable change, using the detected indent', async () => {
+    fs.touch(`${R}/x.ts`, 'function f(){\n  return {a:1}}\n');
+    await store.openFolder();
+    await store.openFile(`${R}/x.ts`);
+    expect(activeTab().language).toBe('TypeScript');
+    expect(await store.format(activeTab().id)).toBe('formatted');
+    expect(view.state.doc.toString()).toBe('function f() {\n  return { a: 1 };\n}\n');
+    expect(activeTab().dirty).toBe(true);
+    expect(await store.format(activeTab().id)).toBe('unchanged');
+  });
+
+  it('uses the nearest .prettierrc above the file', async () => {
+    fs.touch(`${R}/.prettierrc`, '{ "singleQuote": true, "semi": false }');
+    fs.touch(`${R}/src/q.js`, 'const s = "x";\n');
+    await store.openFolder();
+    await store.openFile(`${R}/src/q.js`);
+    await store.format(activeTab().id);
+    expect(view.state.doc.toString()).toBe("const s = 'x'\n");
+  });
+
+  it('a syntax error is reported and the text is left alone', async () => {
+    fs.touch(`${R}/bad.js`, 'let x = ;\n');
+    await store.openFolder();
+    await store.openFile(`${R}/bad.js`);
+    expect(await store.format(activeTab().id)).toBe('failed');
+    expect(snap().notice?.code).toBe('formatFailed');
+    expect(view.state.doc.toString()).toBe('let x = ;\n');
+  });
+
+  it('format on save formats before writing', async () => {
+    fs.touch(`${R}/s.json`, '{"a":1}');
+    await store.openFolder();
+    await store.openFile(`${R}/s.json`);
+    store.setFormatOnSave(true);
+    type(' ');
+    expect(await store.save(activeTab().id)).toBe('saved');
+    expect((await fs.readFile(`${R}/s.json`)).content).toBe('{ "a": 1 }\n');
+    expect(activeTab().dirty).toBe(false);
+  });
+
+  it('re-indents languages without a formatter and trims trailing spaces', async () => {
+    store.newUntitled('class A {\nvoid f() {\nrun();   \n}\n}');
+    await store.setLanguage(activeTab().id, 'Java');
+    expect(await store.format(activeTab().id)).toBe('formatted');
+    expect(view.state.doc.toString()).toBe('class A {\n    void f() {\n        run();\n    }\n}');
+  });
+
+  it('an untitled tab guesses its language, and a chosen one sticks across a restart', async () => {
+    store.newUntitled('{"a": [1, 2]}');
+    await settle();
+    expect(activeTab().language).toBe('JSON');
+    await store.format(activeTab().id);
+    expect(view.state.doc.toString()).toBe('{ "a": [1, 2] }\n');
+
+    await store.setLanguage(activeTab().id, 'YAML');
+    expect(activeTab().language).toBe('YAML');
+    store.flushPersist();
+    await store.flushBackups();
+    const again = makeStore();
+    await again.hydrate();
+    await settle();
+    const t = again.tab(again.getSnapshot().activeId)!;
+    expect(t.languageOverride).toBe('YAML');
+    expect(t.language).toBe('YAML');
+  });
+
+  it('plain text has no formatter', async () => {
+    store.newUntitled('just words');
+    await store.setLanguage(activeTab().id, 'Plain Text');
+    expect(activeTab().language).toBeNull();
+    expect(await store.format(activeTab().id)).toBe('unsupported');
+    expect(snap().notice?.code).toBe('noFormatter');
+  });
+});
+
+describe('minimalChange', () => {
+  it('replaces only the differing middle', () => {
+    expect(minimalChange('abcXYZdef', 'abcQdef')).toEqual({ from: 3, to: 6, insert: 'Q' });
+    expect(minimalChange('same', 'same')).toEqual({ from: 4, to: 4, insert: '' });
   });
 });

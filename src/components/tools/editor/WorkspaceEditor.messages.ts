@@ -51,6 +51,29 @@ export default defineMessages({
   closedFile: { vi: 'file', en: 'file' },
   closedText: { vi: 'văn bản', en: 'text' },
 
+  // Formatting, language, indentation
+  formatDocument: { vi: 'Định dạng tài liệu', en: 'Format Document' },
+  formatOnSave: { vi: 'Định dạng khi lưu', en: 'Format on Save' },
+  formatter: { vi: 'Formatter: {{name}}', en: 'Formatter: {{name}}' },
+  noFormatter: {
+    vi: 'Không có formatter cho {{lang}}. Chọn ngôn ngữ ở thanh trạng thái trước.',
+    en: 'There is no formatter for {{lang}}. Pick a language in the status bar first.',
+  },
+  plainTextLower: { vi: 'văn bản thuần', en: 'plain text' },
+  formatFailed: { vi: 'Không định dạng được: {{msg}}', en: 'Could not format: {{msg}}' },
+  changeLanguage: { vi: 'Đổi ngôn ngữ', en: 'Change Language Mode' },
+  languageSearch: { vi: 'Chọn ngôn ngữ…', en: 'Select language mode…' },
+  autoDetect: { vi: 'Tự nhận dạng', en: 'Auto Detect' },
+  autoDetectHint: { vi: 'theo tên file / nội dung', en: 'from the file name / content' },
+  current: { vi: 'đang dùng', en: 'current' },
+  spaces: { vi: 'Dấu cách: {{n}}', en: 'Spaces: {{n}}' },
+  tabSize: { vi: 'Tab: {{n}}', en: 'Tab Size: {{n}}' },
+  indentUsingSpaces: { vi: 'Thụt lề bằng dấu cách', en: 'Indent Using Spaces' },
+  indentUsingTabs: { vi: 'Thụt lề bằng Tab', en: 'Indent Using Tabs' },
+  detectIndent: { vi: 'Nhận dạng lại từ nội dung', en: 'Detect Indentation from Content' },
+  indentSize: { vi: 'Độ rộng {{n}}', en: 'Size {{n}}' },
+  shortcutFormat: { vi: 'Định dạng tài liệu', en: 'Format Document' },
+
   // Delete confirmation
   deleteTitle: { vi: 'Xoá "{{name}}"?', en: 'Delete "{{name}}"?' },
   deleteFileDesc: {

@@ -19,10 +19,13 @@ import { EditorView, basicSetup } from 'codemirror';
 import { keymap } from '@codemirror/view';
 import { indentWithTab } from '@codemirror/commands';
 import { Compartment, EditorState, Text, type Extension, type StateEffect, type TransactionSpec } from '@codemirror/state';
-import { codeThemeWithHighlight, smartBracketSkip } from '@/components/ui/code-theme';
+import { indentUnit, indentRange } from '@codemirror/language';
+import { codeThemeWithVscodeHighlight, smartBracketSkip } from '@/components/ui/code-theme';
+import { bracketPairColorization, detectIndent, indentGuides, type DetectedIndent } from '@/components/ui/code-vscode';
+import { FormatError, PRETTIER_CONFIG_FILES, formatWithTool, formatterFor, parsePrettierConfig } from './format';
 import { toFsError, type EditorFsError, type DirEntry, type EditorFs, type WalkEntry } from './fs';
-import { loadLanguage } from './languages';
-import { basename, dirname, isUnder, rebase } from './paths';
+import { guessLanguage, loadLanguage, loadLanguageByName } from './languages';
+import { basename, dirname, isUnder, join, rebase } from './paths';
 
 export interface StorageLike {
   get(key: string): string | null;
@@ -58,6 +61,10 @@ export interface Tab {
   modified: number;
   size: number;
   language: string | null;
+  /** Language chosen in Change Language Mode (beats the file name / guess). */
+  languageOverride: string | null;
+  /** Indentation in effect: detected from the file, or chosen in the status bar. */
+  indent: DetectedIndent;
   /** Disk changed under a tab with unsaved edits (or was deleted). */
   external: null | 'changed' | 'deleted';
 }
@@ -96,7 +103,11 @@ export interface EditorSnapshot {
   notice: Notice | null;
   /** Most recent first. */
   closed: ClosedEntry[];
+  /** Run Format Document before every save of a file (VS Code's editor.formatOnSave). */
+  formatOnSave: boolean;
 }
+
+export type FormatResult = 'formatted' | 'unchanged' | 'unsupported' | 'failed';
 
 export interface Cursor {
   line: number;
@@ -114,7 +125,32 @@ const KEYS = {
   wrap: 'wrap',
   untitled: 'untitled',
   closed: 'closed',
+  formatOnSave: 'formatOnSave',
 } as const;
+
+const DEFAULT_INDENT: DetectedIndent = { useTabs: false, size: 4 };
+
+/** Change Language Mode's explicit "Plain Text" (vs `null` = automatic). */
+export const PLAIN_TEXT = 'Plain Text';
+
+function indentExtension(indent: DetectedIndent): Extension {
+  return [
+    indentUnit.of(indent.useTabs ? '\t' : ' '.repeat(indent.size)),
+    EditorState.tabSize.of(indent.size),
+  ];
+}
+
+/** The single replacement turning `a` into `b`: common prefix and suffix are
+ *  left alone, so a format that changes one line moves nothing else. */
+export function minimalChange(a: string, b: string): { from: number; to: number; insert: string } {
+  let start = 0;
+  const max = Math.min(a.length, b.length);
+  while (start < max && a.charCodeAt(start) === b.charCodeAt(start)) start++;
+  let endA = a.length;
+  let endB = b.length;
+  while (endA > start && endB > start && a.charCodeAt(endA - 1) === b.charCodeAt(endB - 1)) { endA--; endB--; }
+  return { from: start, to: endA, insert: b.slice(start, endB) };
+}
 
 function readJson<T>(storage: StorageLike, key: string, fallback: T): T {
   try {
@@ -158,7 +194,7 @@ export function suggestFileName(tab: Pick<Tab, 'name' | 'kind'>): string {
 export class EditorStore {
   private snap: EditorSnapshot = {
     hydrated: false, folders: [], recent: [], dirs: {}, expanded: {}, selected: null,
-    tabs: [], activeId: null, wrap: false, cut: null, notice: null, closed: [],
+    tabs: [], activeId: null, wrap: false, cut: null, notice: null, closed: [], formatOnSave: false,
   };
   private listeners = new Set<() => void>();
   private cursorListeners = new Set<() => void>();
@@ -178,6 +214,7 @@ export class EditorStore {
   readonly themeSlot = new Compartment();
   readonly langSlot = new Compartment();
   readonly wrapSlot = new Compartment();
+  readonly indentSlot = new Compartment();
 
   constructor(readonly fs: EditorFs, private storage: StorageLike) {}
 
@@ -244,8 +281,9 @@ export class EditorStore {
       [KEYS.wrap]: s.wrap,
       [KEYS.untitled]: s.tabs
         .filter((t) => t.kind === 'untitled')
-        .map((t) => ({ key: t.path.slice(UNTITLED_PREFIX.length), no: t.untitledNo })),
+        .map((t) => ({ key: t.path.slice(UNTITLED_PREFIX.length), no: t.untitledNo, lang: t.languageOverride })),
       [KEYS.closed]: s.closed,
+      [KEYS.formatOnSave]: s.formatOnSave,
     };
     for (const [key, value] of Object.entries(values)) {
       const json = JSON.stringify(value);
@@ -307,7 +345,8 @@ export class EditorStore {
     const activePath = readJson<string | null>(this.storage, KEYS.active, null);
     const expanded = readJson<string[]>(this.storage, KEYS.expanded, []);
     const wrap = readJson<boolean>(this.storage, KEYS.wrap, false);
-    const untitledMeta = readJson<{ key: string; no: number | null }[]>(this.storage, KEYS.untitled, []);
+    const untitledMeta = readJson<{ key: string; no: number | null; lang?: string | null }[]>(this.storage, KEYS.untitled, []);
+    const formatOnSave = readJson<boolean>(this.storage, KEYS.formatOnSave, false);
     const closedSaved = readJson<ClosedEntry[]>(this.storage, KEYS.closed, []);
 
     let authorised: string[] = [];
@@ -328,10 +367,12 @@ export class EditorStore {
     // backup is gone (e.g. never written because it was empty) comes back
     // empty, which is what it was.
     const untitled = new Map<string, Tab>();
-    await Promise.all(untitledMeta.map(async ({ key, no }) => {
+    await Promise.all(untitledMeta.map(async ({ key, no, lang }) => {
       let content = '';
       try { content = (await this.fs.backups.read(key)) ?? ''; } catch { /* empty */ }
-      untitled.set(key, this.makeUntitled(key, no ?? 1, content));
+      const tab = this.makeUntitled(key, no ?? 1, content);
+      tab.languageOverride = lang ?? null;
+      untitled.set(key, tab);
     }));
     const tabs: Tab[] = [];
     for (const p of tabPaths) {
@@ -364,8 +405,10 @@ export class EditorStore {
       activeId: active?.id ?? null,
       wrap,
       closed,
+      formatOnSave,
     });
     this.syncView(true);
+    for (const t of tabs) if (t.kind === 'untitled') void this.applyLanguage(t.id);
     await Promise.all(Object.keys(this.snap.expanded).map((p) => this.loadDir(p)));
     if (active) await this.ensureLoaded(active.id);
   }
@@ -629,17 +672,19 @@ export class EditorStore {
   private newTab(path: string): Tab {
     return {
       id: `t${nextId++}`, kind: 'file', untitledNo: null, path, name: basename(path), status: 'idle', error: null, errorCode: null, dirty: false, saving: false,
-      eol: '\n', bom: false, modified: 0, size: 0, language: null, external: null,
+      eol: '\n', bom: false, modified: 0, size: 0, language: null, languageOverride: null,
+      indent: DEFAULT_INDENT, external: null,
     };
   }
 
   /** An untitled tab with its editor state ready (not yet in the strip). */
   private makeUntitled(key: string, no: number, content: string): Tab {
+    const indent = detectIndent(content, DEFAULT_INDENT);
     const tab: Tab = {
       ...this.newTab(`${UNTITLED_PREFIX}${key}`),
-      kind: 'untitled', untitledNo: no, status: 'ready', dirty: content.length > 0,
+      kind: 'untitled', untitledNo: no, status: 'ready', dirty: content.length > 0, indent,
     };
-    const state = this.createState(tab.id, content);
+    const state = this.createState(tab.id, content, indent);
     tab.name = untitledTitle(state.doc, no);
     this.states.set(tab.id, state);
     this.saved.set(tab.id, Text.empty);
@@ -667,7 +712,10 @@ export class EditorStore {
   newUntitled(content = '', key = newKey(), no = this.nextUntitledNo()): string {
     const tab = this.makeUntitled(key, no, content);
     this.insertTab(tab);
-    if (content) this.scheduleBackup(tab.id);
+    if (content) {
+      this.scheduleBackup(tab.id);
+      void this.applyLanguage(tab.id);
+    }
     return tab.id;
   }
 
@@ -807,6 +855,10 @@ export class EditorStore {
       this.states.delete(id);
       this.saved.delete(id);
       this.scroll.delete(id);
+      this.langApplied.delete(id);
+      const timer = this.guessTimers.get(id);
+      if (timer) clearTimeout(timer);
+      this.guessTimers.delete(id);
     }
     this.set({ tabs: tabs.filter((t) => !drop.has(t.id)), activeId: nextActive });
     this.persist();
@@ -835,14 +887,16 @@ export class EditorStore {
         this.patchTab(id, { status: 'binary', size: file.size, modified: file.modified, external: null });
         return;
       }
-      const state = this.createState(id, file.content);
+      const indent = detectIndent(file.content, DEFAULT_INDENT);
+      const state = this.createState(id, file.content, indent);
       this.states.set(id, state);
       this.saved.set(id, state.doc);
       this.patchTab(id, {
-        status: 'ready', dirty: false, eol: detectEol(file.content), bom: file.bom,
+        status: 'ready', dirty: false, eol: detectEol(file.content), bom: file.bom, indent,
         size: file.size, modified: file.modified, external: null,
       });
       this.syncView(true);
+      this.langApplied.delete(id); // a fresh state has no grammar yet
       await this.applyLanguage(id);
     } catch (e) {
       const err = toFsError(e);
@@ -850,13 +904,139 @@ export class EditorStore {
     }
   }
 
+  /** Picks the grammar: the user's choice, else the file name, else (for an
+   *  untitled tab) a guess from the text. */
   private async applyLanguage(id: string) {
     const tab = this.tab(id);
     if (!tab || tab.status !== 'ready') return;
-    const lang = await loadLanguage(tab.name);
-    if (!this.tab(id)) return;
+    let lang;
+    if (tab.languageOverride) {
+      lang = tab.languageOverride === PLAIN_TEXT ? null : await loadLanguageByName(tab.languageOverride);
+    } else if (tab.kind === 'untitled') {
+      const guess = guessLanguage(this.currentState(id)?.doc.sliceString(0, 4000) ?? '');
+      lang = guess ? await loadLanguageByName(guess) : null;
+    } else {
+      lang = await loadLanguage(tab.name);
+    }
+    const now = this.tab(id);
+    if (!now) return;
+    if ((lang?.name ?? null) === now.language && this.langApplied.has(id)) return;
+    this.langApplied.add(id);
     this.dispatchTo(id, this.langSlot.reconfigure(lang?.support ?? []));
     this.patchTab(id, { language: lang?.name ?? null });
+  }
+  private langApplied = new Set<string>();
+
+  /** Change Language Mode. `null` goes back to automatic (file name / guess). */
+  async setLanguage(id: string, name: string | null) {
+    if (!this.tab(id)) return;
+    this.patchTab(id, { languageOverride: name });
+    this.langApplied.delete(id);
+    this.persist();
+    await this.applyLanguage(id);
+  }
+
+  /** Indent Using Spaces / Tabs and the size, from the status bar. `null`
+   *  re-detects from the current text. */
+  setIndent(id: string, indent: DetectedIndent | null) {
+    const tab = this.tab(id);
+    const state = this.currentState(id);
+    if (!tab || !state) return;
+    const next = indent ?? detectIndent(state.doc.sliceString(0, 200_000), DEFAULT_INDENT);
+    this.patchTab(id, { indent: next });
+    this.dispatchTo(id, this.indentSlot.reconfigure(indentExtension(next)));
+  }
+
+  // ── format ─────────────────────────────────────────────────────────────
+
+  private prettierConfigCache = new Map<string, Promise<Record<string, unknown> | null>>();
+
+  /** The nearest .prettierrc / package.json "prettier" above a file, up to
+   *  its workspace folder (or just its own folder for a lone file). */
+  private prettierConfigFor(path: string): Promise<Record<string, unknown> | null> {
+    const root = this.rootOf(path);
+    const dirs: string[] = [];
+    for (let d = dirname(path); ; d = dirname(d)) {
+      dirs.push(d);
+      if (!root || d === root || dirname(d) === d) break;
+    }
+    const lookup = async (i: number): Promise<Record<string, unknown> | null> => {
+      if (i >= dirs.length) return null;
+      const dir = dirs[i];
+      let cached = this.prettierConfigCache.get(dir);
+      if (!cached) {
+        cached = (async () => {
+          for (const name of PRETTIER_CONFIG_FILES) {
+            try {
+              const file = await this.fs.readFile(join(dir, name));
+              const cfg = await parsePrettierConfig(name, file.content);
+              if (cfg) return cfg;
+            } catch { /* not there */ }
+          }
+          return null;
+        })();
+        this.prettierConfigCache.set(dir, cached);
+      }
+      return (await cached) ?? lookup(i + 1);
+    };
+    return lookup(0);
+  }
+
+  /** Format Document. Replaces only the span that changed, as one undoable
+   *  step, so the cursor and scroll stay put when little moves. */
+  async format(id: string): Promise<FormatResult> {
+    const tab = this.tab(id);
+    const state = this.currentState(id);
+    if (!tab || !state || tab.status !== 'ready') return 'unsupported';
+    const info = formatterFor(tab.language);
+    if (!info) {
+      this.notify(tab.language ?? '', 'info', 'noFormatter');
+      return 'unsupported';
+    }
+    const before = state.doc.toString();
+    let after: string | null;
+    try {
+      const prettierConfig = info.id === 'prettier' && tab.kind === 'file' ? await this.prettierConfigFor(tab.path) : null;
+      after = await formatWithTool(before, tab.language, tab.kind === 'file' ? tab.name : suggestFileName(tab), {
+        tabWidth: tab.indent.size, useTabs: tab.indent.useTabs, prettierConfig,
+      });
+    } catch (e) {
+      const err = e instanceof FormatError ? e : new FormatError(String((e as Error)?.message ?? e));
+      const where = err.line ? ` (${err.line}:${err.column ?? 1})` : '';
+      this.notify(`${err.message}${where}`, 'error', 'formatFailed');
+      return 'failed';
+    }
+    const current = this.currentState(id);
+    if (!current || current.doc.toString() !== before) return 'failed'; // edited meanwhile
+    if (after === null) return this.reindent(id);
+    if (after === before) return 'unchanged';
+    this.dispatchSpec(id, { changes: minimalChange(before, after), userEvent: 'format' });
+    return 'formatted';
+  }
+
+  /** Languages without a formatter: re-indent every line by the grammar's
+   *  rules and trim trailing whitespace. */
+  private reindent(id: string): FormatResult {
+    const state = this.currentState(id);
+    if (!state) return 'unsupported';
+    const indentChanges = indentRange(state, 0, state.doc.length);
+    const trimmed = state.update({ changes: indentChanges }).state;
+    const trims: { from: number; to: number }[] = [];
+    for (let i = 1; i <= trimmed.doc.lines; i++) {
+      const line = trimmed.doc.line(i);
+      const m = /[ \t]+$/.exec(line.text);
+      if (m) trims.push({ from: line.from + m.index, to: line.to });
+    }
+    const after = trimmed.update({ changes: trims }).state.doc.toString();
+    const before = state.doc.toString();
+    if (after === before) return 'unchanged';
+    this.dispatchSpec(id, { changes: minimalChange(before, after), userEvent: 'format' });
+    return 'formatted';
+  }
+
+  setFormatOnSave(on: boolean) {
+    this.set({ formatOnSave: on });
+    this.persist();
   }
 
   /** Throws away unsaved edits and re-reads the file from disk. */
@@ -903,7 +1083,13 @@ export class EditorStore {
     const state = this.currentState(id);
     if (!tab || !state || tab.status !== 'ready') return 'skipped';
     if (tab.kind === 'untitled') return this.saveAs(id);
-    let content = state.doc.toString();
+    if (this.snap.formatOnSave && formatterFor(tab.language)) {
+      // A formatting error is reported but does not block the save.
+      await this.format(id);
+    }
+    if (PRETTIER_CONFIG_FILES.includes(tab.name)) this.prettierConfigCache.clear();
+    const live = this.currentState(id) ?? state;
+    let content = live.doc.toString();
     if (tab.eol === '\r\n') content = content.replace(/\n/g, '\r\n');
     this.patchTab(id, { saving: true });
     try {
@@ -921,11 +1107,11 @@ export class EditorStore {
         stat = await this.fs.writeFile(created, content, { bom: tab.bom });
         void this.loadDir(dirname(tab.path));
       }
-      this.saved.set(id, state.doc);
+      this.saved.set(id, live.doc);
       const now = this.currentState(id);
       this.patchTab(id, {
         saving: false, modified: stat.modified, size: stat.size, external: null,
-        dirty: now ? !now.doc.eq(state.doc) : false,
+        dirty: now ? !now.doc.eq(live.doc) : false,
       });
       return 'saved';
     } catch (e) {
@@ -1028,16 +1214,19 @@ export class EditorStore {
   }
 
   private themeExtension(): Extension {
-    return codeThemeWithHighlight(this.dark, { gutter: 'flush', paddingX: 8 });
+    return codeThemeWithVscodeHighlight(this.dark, { gutter: 'flush', paddingX: 8 });
   }
 
-  private createState(id: string, doc: string): EditorState {
+  private createState(id: string, doc: string, indent: DetectedIndent = DEFAULT_INDENT): EditorState {
     return EditorState.create({
       doc,
       extensions: [
         keymap.of([indentWithTab]),
         basicSetup,
         smartBracketSkip,
+        bracketPairColorization(),
+        indentGuides(),
+        this.indentSlot.of(indentExtension(indent)),
         EditorView.contentAttributes.of({ autocorrect: 'off', autocapitalize: 'off', spellcheck: 'false' }),
         this.themeSlot.of(this.themeExtension()),
         this.langSlot.of([]),
@@ -1061,8 +1250,21 @@ export class EditorStore {
       const name = untitledTitle(state.doc, tab.untitledNo ?? 1);
       if (name !== tab.name) patch.name = name;
       this.scheduleBackup(id);
+      if (!tab.languageOverride) this.scheduleGuess(id);
     }
     if (Object.keys(patch).length) this.patchTab(id, patch);
+  }
+
+  private guessTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+  /** Re-guesses an untitled tab's language after a pause in typing. */
+  private scheduleGuess(id: string) {
+    const prev = this.guessTimers.get(id);
+    if (prev) clearTimeout(prev);
+    this.guessTimers.set(id, setTimeout(() => {
+      this.guessTimers.delete(id);
+      void this.applyLanguage(id);
+    }, 500));
   }
 
   private updateCursor(state: EditorState) {

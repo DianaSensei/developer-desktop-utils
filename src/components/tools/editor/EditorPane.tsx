@@ -107,6 +107,7 @@ function Welcome({ store, snap }: Props) {
     [<Keycap mod>⇧T</Keycap>, m('shortcutReopen')],
     [<Keycap mod>S</Keycap>, m('shortcutSave')],
     [<Keycap mod>⇧S</Keycap>, m('shortcutSaveAs')],
+    [<Keycap>{IS_MAC ? '⇧⌥F' : 'Shift+Alt+F'}</Keycap>, m('shortcutFormat')],
     [<Keycap mod>{`${alt}S`}</Keycap>, m('shortcutSaveAll')],
     [<Keycap mod>W</Keycap>, m('shortcutClose')],
     [<Keycap mod>F</Keycap>, m('shortcutFind')],

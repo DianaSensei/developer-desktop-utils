@@ -20,6 +20,7 @@ import { EditorTabs } from './EditorTabs';
 import { EditorPane } from './EditorPane';
 import { StatusBar } from './StatusBar';
 import { QuickOpen } from './QuickOpen';
+import { LanguagePicker } from './LanguagePicker';
 import { getEditorStore } from './session';
 import { toFsError } from './fs';
 import { basename, isUnder, relativeTo } from './paths';
@@ -43,6 +44,7 @@ export function WorkspaceEditor() {
   const [sidebarPct, setSidebarPct] = usePluginState(sdk, 'sidebarPct', 22);
   const [pending, setPending] = useState<PendingEdit | null>(null);
   const [quickOpen, setQuickOpen] = useState(false);
+  const [languagePicker, setLanguagePicker] = useState(false);
   const [deletePath, setDeletePath] = useState<string | null>(null);
   const [prompt, setPrompt] = useState<ChoicePrompt | null>(null);
 
@@ -148,8 +150,14 @@ export function WorkspaceEditor() {
 
   const saveAs = useCallback(async (id: string) => { await store.saveAs(id); }, [store]);
 
-  const handlers = useRef({ save, saveAs, requestClose, setQuickOpen, newUntitled });
-  handlers.current = { save, saveAs, requestClose, setQuickOpen, newUntitled };
+  const format = useCallback(async (id: string | null) => {
+    if (!id) return;
+    await store.format(id);
+    store.focusEditor();
+  }, [store]);
+
+  const handlers = useRef({ save, saveAs, requestClose, setQuickOpen, newUntitled, format });
+  handlers.current = { save, saveAs, requestClose, setQuickOpen, newUntitled, format };
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -186,6 +194,10 @@ export function WorkspaceEditor() {
       } else if (e.ctrlKey && e.key === 'Tab') {
         e.preventDefault();
         store.activateRelative(e.shiftKey ? -1 : 1);
+      } else if (e.altKey && e.shiftKey && !mod && e.code === 'KeyF') {
+        // Format Document — VS Code's ⇧⌥F (Shift+Alt+F on Windows/Linux).
+        e.preventDefault();
+        void h.format(active);
       } else if (e.altKey && !mod && !e.shiftKey && e.code === 'KeyZ') {
         e.preventDefault();
         store.toggleWrap();
@@ -197,6 +209,10 @@ export function WorkspaceEditor() {
 
   const noticeText = snap.notice?.code === 'closedUntitled'
     ? m('closedUntitledNotice', { name: snap.notice.text })
+    : snap.notice?.code === 'noFormatter'
+    ? m('noFormatter', { lang: snap.notice.text || m('plainTextLower') })
+    : snap.notice?.code === 'formatFailed'
+    ? m('formatFailed', { msg: snap.notice.text })
     : snap.notice
     ? (snap.notice.code && MESSAGES[`err.${snap.notice.code}` as keyof typeof MESSAGES]
       ? m(`err.${snap.notice.code}` as keyof typeof MESSAGES)
@@ -238,6 +254,7 @@ export function WorkspaceEditor() {
               onRequestClose={(ids) => void requestClose(ids)}
               onCopyPath={(p, rel) => void copyPath(p, rel)}
               onSaveAs={(id) => void saveAs(id)}
+              onFormat={(id) => void format(id)}
               onNewUntitled={newUntitled}
             />
             {noticeText && (
@@ -260,10 +277,19 @@ export function WorkspaceEditor() {
               </Callout>
             )}
             <EditorPane store={store} snap={snap} />
-            <StatusBar store={store} tab={activeTab} wrap={snap.wrap} />
+            <StatusBar
+              store={store}
+              tab={activeTab}
+              wrap={snap.wrap}
+              formatOnSave={snap.formatOnSave}
+              onFormat={() => void format(activeTab?.id ?? null)}
+              onChangeLanguage={() => setLanguagePicker(true)}
+            />
           </div>
         )}
       />
+
+      <LanguagePicker open={languagePicker} onOpenChange={setLanguagePicker} store={store} tab={activeTab} />
 
       <QuickOpen
         open={quickOpen}
