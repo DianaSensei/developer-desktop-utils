@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
+import { storageRemove, storageSet } from '@/lib/persistentStore';
 import { CommandPalette } from '@/components/CommandPalette';
 import { FeatureProvider } from '@/contexts/FeatureContext';
 import { LocaleProvider } from '@/contexts/LocaleContext';
@@ -175,3 +176,46 @@ describe('CommandPalette — workspace', () => {
     await waitFor(() => expect(screen.getByRole('dialog', { name: /New workspace|Workspace mới/ })).toBeTruthy());
   });
 });
+
+describe('CommandPalette — tool gần đây', () => {
+  beforeEach(() => storageRemove('devtool-recent-tools'));
+
+  it('mở với ô trống: tool vừa dùng đứng đầu dưới mục Recent, Enter quay lại nó', async () => {
+    storageSet('devtool-recent-tools', JSON.stringify(['unix-time', 'json']));
+    render(
+      <MemoryRouter initialEntries={['/json']}>
+        <LocaleProvider>
+          <FeatureProvider>
+            <WorkspaceProvider>
+              <CommandPalette />
+              <Where />
+            </WorkspaceProvider>
+          </FeatureProvider>
+        </LocaleProvider>
+      </MemoryRouter>,
+    );
+    fireEvent.keyDown(window, { key: 'k', ctrlKey: true });
+    const input = await screen.findByPlaceholderText(/tool|command/i);
+    expect(screen.getByText('Recent')).toBeTruthy();
+    expect(screen.getByText('All tools')).toBeTruthy();
+    // The current tool (JSON) is not offered as "recent".
+    const options = screen.getAllByRole('button').map((b) => b.textContent);
+    expect(options.indexOf('Date / Time')).toBeLessThan(options.indexOf('JSON Formatter'));
+    fireEvent.keyDown(input, { key: 'Enter' });
+    await waitFor(() => expect(screen.getByTestId('path').textContent).toBe('/unix-time'));
+  });
+
+  it('khi gõ: tool có tên bắt đầu bằng từ khoá đứng trước', async () => {
+    renderPalette();
+    fireEvent.keyDown(window, { key: 'k', ctrlKey: true });
+    const input = await screen.findByPlaceholderText(/tool|command/i);
+    fireEvent.change(input, { target: { value: 'json' } });
+    await waitFor(() => expect(screen.queryByText('Recent')).toBeNull());
+    const first = screen.getAllByRole('button').find((b) => /JSON|Data|Converter/.test(b.textContent ?? ''));
+    expect(first?.textContent).toBe('JSON Formatter');
+  });
+});
+
+function Where() {
+  return <span data-testid="path">{useLocation().pathname}</span>;
+}

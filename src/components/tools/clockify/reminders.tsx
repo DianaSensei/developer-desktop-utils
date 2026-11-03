@@ -15,6 +15,7 @@ import { getPlugin, getPluginSdk, type PluginSdk } from '@/platform';
 import { useFeatures } from '@/contexts/FeatureContext';
 import { useLocale, useMessages } from '@/contexts/LocaleContext';
 import { useMeetings } from '@/lib/meetings';
+import { liveConnections } from '@/lib/liveConnections';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
@@ -95,6 +96,13 @@ function ReminderRuntime() {
     const next = nextReminderAt(input);
     const delay = next == null ? POLL_MS : Math.min(POLL_MS, Math.max(1000, next - now + 50));
     timer.current = window.setTimeout(evaluate, delay);
+  }, [sdk]);
+
+  // A timer left running last session: show the "running" dot right away,
+  // before the Time Tracker is opened (its provider keeps it up to date).
+  useEffect(() => {
+    const entries = readJson<Array<{ end: number | null }>>(sdk.storage.get('clockify:entries'), []);
+    if (Array.isArray(entries) && entries.some((e) => e.end === null)) liveConnections.set(PLUGIN_ID, true);
   }, [sdk]);
 
   useEffect(() => {

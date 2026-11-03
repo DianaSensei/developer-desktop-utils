@@ -757,3 +757,18 @@
   xanh, sẽ hỏng trên app thật; sửa trước khi commit nhờ đọc log này.
 - Bài học chung: state bền mà hai nơi cùng giữ (một tool + một runtime nền) phải có đúng MỘT
   người ghi; nơi còn lại chỉ đọc và nhờ người ghi qua một kênh nhỏ.
+
+## [2026-11-03] Shell — thanh tab workspace không cuộn, tab đang mở + nút "+" bị đẩy ra ngoài màn hình
+- Nguyên nhân: header web (`App.tsx`, nhánh `!showMergedTitlebar`) bọc `WorkspaceBar` trong
+  `div.flex.items-center` KHÔNG có `min-w-0`. Flex item mặc định `min-width: auto` nên không co
+  nhỏ hơn nội dung: danh sách tab (`overflow-x-auto`) rộng bằng toàn bộ tab (1442px trong cửa
+  sổ 1400px), không bao giờ cuộn, logic "cuộn tab đang mở vào tầm nhìn", fade hai mép và menu
+  "tất cả tab" không bao giờ kích hoạt; tổ tiên `overflow-hidden` cắt mất tab cuối, nút "+" và
+  nút trợ giúp. jsdom không layout nên test không thể bắt.
+- Cách fix: nhóm trái `min-w-0 flex-1`, nhóm phải `shrink-0`. Kiểm bằng Playwright: mở 11 tool,
+  đo `clientWidth` của tablist và từng tổ tiên.
+- Bài học chung: một `overflow-x-auto` chỉ cuộn khi MỌI tổ tiên flex giữa nó và phần tử có độ rộng
+  xác định đều có `min-w-0` (hoặc `overflow` khác `visible`). Khi thanh cuộn ngang "không chạy",
+  đi ngược cây đo `clientWidth` để tìm mắt xích đầu tiên rộng hơn cha.
+- Cùng đợt: tab workspace vẫn kéo-thả bằng HTML5 `draggable` (không chạy trong Tauri, xem
+  2026-09-13) → chuyển sang pointer events như Explorer/board Tasks.

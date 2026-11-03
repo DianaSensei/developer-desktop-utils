@@ -6,7 +6,7 @@
 // color (`--card`); the accent is reserved for mode selection (group tabs,
 // Segmented).
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { Check, ChevronDown, ChevronsUpDown, Layers, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { MOD_KEY, IS_MAC } from '@/lib/platform';
@@ -57,6 +57,7 @@ export function WorkspaceBar({ size = 'header', fallback = null }: WorkspaceBarP
   const visible = useWorkspaceBarVisible();
   const listRef = useRef<HTMLDivElement>(null);
   const [dragId, setDragId] = useState<string | null>(null);
+  const [dropId, setDropId] = useState<string | null>(null);
 
   // Keep the active tab in view when the tabs overflow. Scrolls only the
   // tab list: `scrollIntoView` would also scroll every overflow:hidden
@@ -90,6 +91,52 @@ export function WorkspaceBar({ size = 'header', fallback = null }: WorkspaceBarP
     ro?.observe(el);
     return () => { el.removeEventListener('scroll', measure); ro?.disconnect(); };
   }, [measure, tabs.length, visible]);
+
+  // Pointer-driven reorder: Tauri intercepts native drag gestures for OS file
+  // drops, so HTML5 drag events never reach the webview (see the experience
+  // log, 2026-09-13). Dropping on a tab moves the dragged one to its place.
+  const startDrag = (e: ReactPointerEvent, id: string) => {
+    if (e.button !== 0) return;
+    const startX = e.clientX;
+    const startY = e.clientY;
+    let dragging = false;
+    let target: string | null = null;
+    const onPointerMove = (ev: PointerEvent) => {
+      if (!dragging) {
+        if (Math.abs(ev.clientX - startX) < 4 && Math.abs(ev.clientY - startY) < 4) return;
+        dragging = true;
+        setDragId(id);
+        document.body.style.setProperty('cursor', 'grabbing');
+        document.body.style.setProperty('user-select', 'none');
+      }
+      const over = document.elementFromPoint(ev.clientX, ev.clientY)?.closest<HTMLElement>('[data-tab-id]');
+      target = over?.dataset.tabId && over.dataset.tabId !== id ? over.dataset.tabId : null;
+      setDropId(target);
+    };
+    const cleanup = () => {
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+      window.removeEventListener('pointercancel', cleanup);
+      document.body.style.removeProperty('cursor');
+      document.body.style.removeProperty('user-select');
+      setDragId(null);
+      setDropId(null);
+    };
+    const onPointerUp = () => {
+      cleanup();
+      if (!dragging) return;
+      // The release also clicks the tab under the pointer; swallow that click.
+      const swallow = (ev: MouseEvent) => { ev.stopPropagation(); ev.preventDefault(); };
+      window.addEventListener('click', swallow, { capture: true, once: true });
+      setTimeout(() => window.removeEventListener('click', swallow, { capture: true }), 0);
+      // Index in the workspace's full list, which includes hidden (disabled)
+      // tools, not in the visible tabs.
+      if (target) moveTool(id, active.toolIds.indexOf(target));
+    };
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+    window.addEventListener('pointercancel', cleanup);
+  };
 
   if (!visible) return <>{fallback}</>;
 
@@ -143,22 +190,8 @@ export function WorkspaceBar({ size = 'header', fallback = null }: WorkspaceBarP
               tabIndex={focusable ? 0 : -1}
               aria-selected={on}
               title={`${tool.label}${hint}`}
-              draggable
-              onDragStart={(e) => {
-                setDragId(tool.featureId);
-                e.dataTransfer.effectAllowed = 'move';
-              }}
-              onDragOver={(e) => {
-                if (dragId && dragId !== tool.featureId) e.preventDefault();
-              }}
-              onDrop={(e) => {
-                e.preventDefault();
-                // Index in the workspace's full list, which includes hidden
-                // (disabled) tools, not in the visible tabs.
-                if (dragId) moveTool(dragId, active.toolIds.indexOf(tool.featureId));
-                setDragId(null);
-              }}
-              onDragEnd={() => setDragId(null)}
+              data-tab-id={tool.featureId}
+              onPointerDown={(e) => startDrag(e, tool.featureId)}
               onClick={() => openTool(tool.featureId)}
               // Middle click closes the tab, as in browsers.
               onAuxClick={(e) => {
@@ -183,6 +216,7 @@ export function WorkspaceBar({ size = 'header', fallback = null }: WorkspaceBarP
                   ? 'border-line bg-card font-medium text-fg'
                   : 'border-transparent text-fg-mute hover:bg-card/60 hover:text-fg',
                 dragId === tool.featureId && 'opacity-50',
+                dropId === tool.featureId && 'border-acc-edge',
               )}
             >
               {live && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-ok" title={t('shell.titlebar.running')} />}

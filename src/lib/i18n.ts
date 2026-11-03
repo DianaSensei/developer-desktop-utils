@@ -115,6 +115,7 @@ export const DICTIONARY = {
   'shell.sidebar.turnOnHint': { vi: 'Bật thêm tool từ trang Cài đặt.', en: 'Turn on more tools from the Settings page.' },
   'shell.sidebar.closeMenu': { vi: 'Đóng menu', en: 'Close menu' },
   'shell.sidebar.searchToolsTitle': { vi: 'Tìm tool', en: 'Search tools' },
+  'shell.sidebar.paletteHint': { vi: 'Mở bảng lệnh: tìm và mở tool, workspace từ bất kỳ đâu', en: 'Open the command palette: find and open tools and workspaces from anywhere' },
   'shell.sidebar.clearSearch': { vi: 'Xóa tìm kiếm', en: 'Clear search' },
   'shell.sidebar.expand': { vi: 'Mở rộng sidebar', en: 'Expand sidebar' },
   'shell.sidebar.collapse': { vi: 'Thu gọn sidebar', en: 'Collapse sidebar' },
@@ -137,7 +138,7 @@ export const DICTIONARY = {
   // ── Theme options (sidebar and mobile toggle) ──────────────────────────
   'shell.theme.light': { vi: 'Chế độ sáng', en: 'Light mode' },
   'shell.theme.dark': { vi: 'Chế độ tối', en: 'Dark mode' },
-  'shell.theme.system': { vi: 'Theo hệ thống', en: 'Match system' },
+  'shell.theme.system': { vi: 'Giao diện theo hệ thống', en: 'System theme' },
 
   // ── Custom titlebar (macOS overlay, Windows/Linux chrome) ──────────────
   'shell.titlebar.openMenu': { vi: 'Mở menu', en: 'Open menu' },
@@ -173,6 +174,8 @@ export const DICTIONARY = {
   'shell.workspace.save': { vi: 'Lưu', en: 'Save' },
   'shell.workspace.cancel': { vi: 'Huỷ', en: 'Cancel' },
   'palette.section.workspaces': { vi: 'Workspace', en: 'Workspaces' },
+  'palette.section.recent': { vi: 'Gần đây', en: 'Recent' },
+  'palette.section.allTools': { vi: 'Tất cả tool', en: 'All tools' },
   'palette.workspace.switch': { vi: 'Chuyển sang', en: 'Switch to' },
   'palette.workspace.empty': { vi: 'Chưa có tab nào', en: 'No tabs yet' },
 

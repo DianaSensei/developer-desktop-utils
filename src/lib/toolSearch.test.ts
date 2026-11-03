@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { toolMatchesQuery } from '@/lib/toolSearch';
+import { searchTools, toolMatchRank, toolMatchesQuery } from '@/lib/toolSearch';
 
 const CRON = { label: 'Cron Generator', description: 'Build and validate cron expressions.', keywords: ['crontab', 'schedule', 'quartz'] };
 const DATETIME = { label: 'Date / Time', description: 'Convert timestamps.', keywords: ['epoch', 'unix time'] };
@@ -26,5 +26,24 @@ describe('toolMatchesQuery', () => {
 
   it('không khớp khi thiếu một từ', () => {
     expect(toolMatchesQuery(DATETIME, 'epoch guid')).toBe(false);
+  });
+});
+
+describe('searchTools ranking', () => {
+  const tools = [
+    { label: 'Data Converter', description: 'JSON, YAML, CSV', keywords: ['json to yaml'] },
+    { label: 'Regex Tester', description: 'test patterns', keywords: [] },
+    { label: 'JSON Formatter', description: 'format', keywords: [] },
+    { label: 'Cron Generator', description: 'schedule', keywords: ['crontab'] },
+  ];
+  it('puts label matches before keyword/description matches, keeping order on ties', () => {
+    expect(searchTools(tools, 'json').map((t) => t.label)).toEqual(['JSON Formatter', 'Data Converter']);
+    expect(searchTools(tools, 'gen').map((t) => t.label)).toEqual(['Cron Generator']);
+    expect(searchTools(tools, '').map((t) => t.label)).toEqual(tools.map((t) => t.label));
+  });
+  it('ranks a word-start in the label above a mid-word hit', () => {
+    expect(toolMatchRank({ label: 'Cron Generator', description: '' }, 'gen')).toBe(1);
+    expect(toolMatchRank({ label: 'Cron Generator', description: '' }, 'cron')).toBe(0);
+    expect(toolMatchRank({ label: 'Cron Generator', description: '' }, 'erat')).toBe(2);
   });
 });

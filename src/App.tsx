@@ -28,10 +28,10 @@ import { useThemeSync, triggerThemeTransition } from '@/hooks/useThemeSync';
 import { TOOL_DEF_MAP, DEFAULT_TOOL_ORDER } from '@/lib/toolDefs';
 import { allTools, toolPath } from '@/lib/toolRegistry';
 import { buildNavEntries, countFavoriteEntries, type NavEntry } from '@/lib/toolGroups';
-import { toolMatchesQuery } from '@/lib/toolSearch';
+import { searchTools, toolMatchesQuery } from '@/lib/toolSearch';
 import { useLiveConnections } from '@/lib/liveConnections';
 import { initDeepLinkHandling } from '@/lib/deepLink';
-import { CommandPalette } from '@/components/CommandPalette';
+import { CommandPalette, requestCommandPalette } from '@/components/CommandPalette';
 import { WorkspaceBar, useWorkspaceBarVisible } from '@/components/WorkspaceBar';
 import { ToolIdentity, GroupTabs, useActiveGroupTabs } from '@/components/ToolIdentity';
 import { WorkspaceProvider } from '@/contexts/WorkspaceContext';
@@ -46,6 +46,7 @@ import { ExperimentalGate } from '@/components/ExperimentalGate';
 import { ExperimentalDot, ExperimentalMark } from '@/components/ExperimentalBadge';
 import { Button } from '@/components/ui/button';
 import { Tooltip } from '@/components/ui/tooltip';
+import { Keycap } from '@/components/ui/keycap';
 import { FeatureProvider, useFeatures } from '@/contexts/FeatureContext';
 import { LocaleProvider, useLocale } from '@/contexts/LocaleContext';
 import type { TranslationKey } from '@/lib/i18n';
@@ -381,7 +382,7 @@ function NavScrollArea({
               to={settingsTool.path}
               onClick={onClose}
               className={cn(
-                'mt-1.5 flex w-full items-center justify-center gap-1 text-fg-mute/50 hover:text-fg-mute transition-colors',
+                'mt-1.5 flex w-full items-center justify-center gap-1 text-fg-mute hover:text-fg transition-colors',
                 isCollapsed ? 'py-1.5' : 'px-2.5 py-1.5 text-[11px]'
               )}
             >
@@ -490,8 +491,7 @@ function Sidebar({
   // has to guess into. So a query produces one entry per matching tool, and the
   // renderer below stays single-path: everything is a NavEntry either way.
   const navEntries: NavEntry[] = query.trim()
-    ? allNavTools
-        .filter((t) => toolMatchesQuery(t, query))
+    ? searchTools(allNavTools, query)
         .map((t) => {
           const def = TOOL_DEF_MAP.get(t.featureId)!;
           return { key: def.id, label: def.label, icon: def.icon, isGroup: false, tools: [def] };
@@ -578,9 +578,38 @@ function Sidebar({
                 ref={searchRef}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  // Enter opens the top result; Esc clears, then leaves the box.
+                  if (e.key === 'Enter' && query.trim()) {
+                    e.preventDefault();
+                    const first = navEntries[0]?.tools[0];
+                    if (first) {
+                      navigate(toolPath(first.id));
+                      setQuery('');
+                      onClose();
+                    } else if (disabledMatches[0]) {
+                      handleEnableTool(disabledMatches[0]);
+                    }
+                  } else if (e.key === 'Escape') {
+                    if (query) setQuery('');
+                    else e.currentTarget.blur();
+                  }
+                }}
                 placeholder={t('shell.search.placeholder')}
-                className="h-ctl pl-7 pr-7 text-xs"
+                aria-label={t('shell.sidebar.searchToolsTitle')}
+                className={cn('h-ctl pl-7 text-xs', query ? 'pr-7' : 'pr-16')}
               />
+              {!query && (
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  onClick={() => requestCommandPalette()}
+                  title={t('shell.sidebar.paletteHint')}
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-xs focus-visible:outline-hidden"
+                >
+                  <Keycap mod>K</Keycap>
+                </button>
+              )}
               {query && (
                 <button
                   onClick={() => setQuery('')}
@@ -960,8 +989,10 @@ function AppContent() {
         {!showMergedTitlebar && (
         <div className="z-30 header-chrome shrink-0">
           {/* py-2 gives a 50px row that lines up with the sidebar header. */}
-          <div className="flex items-center justify-between px-4 py-2 sm:px-5">
-            <div className="flex items-center gap-2.5">
+          <div className="flex items-center justify-between gap-2 px-4 py-2 sm:px-5">
+            {/* min-w-0 + flex-1: lets the tab strip shrink and scroll instead
+                of pushing the active tab, "+" and the help button off-screen. */}
+            <div className="flex min-w-0 flex-1 items-center gap-2.5">
               <Button variant="ghost" size="icon" className="md:hidden h-ctl w-ctl" onClick={() => setSidebarOpen(true)} title={t('shell.titlebar.openMenu')} aria-label={t('shell.titlebar.openMenu')}>
                 <Menu className="h-4 w-4" />
               </Button>
@@ -973,7 +1004,7 @@ function AppContent() {
                 fallback={<ToolIdentity size="header" />}
               />
             </div>
-            <div className="flex min-w-0 items-center gap-1">
+            <div className="flex shrink-0 items-center gap-1">
               {/* Slot for tool-specific header actions (filled via ToolHeaderActions portal) */}
               <div id="tool-header-actions" className="flex items-center gap-1" />
               <Button

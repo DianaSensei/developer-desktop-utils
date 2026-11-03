@@ -157,3 +157,25 @@ describe('tabShortcutDigit', () => {
     expect(tabShortcutDigit(8, 9)).toBe(9);
   });
 });
+
+describe('WorkspaceBar — reorder by dragging', () => {
+  it('moves a tab onto another with the pointer (no HTML5 drag: Tauri swallows it)', () => {
+    render(<Harness />);
+    fireEvent.click(screen.getByText('To Date'));
+    const tablist = screen.getAllByRole('tablist').find((l) => l.getAttribute('aria-label'))!;
+    const names = () => within(tablist).getAllByRole('tab').map((t) => t.textContent?.trim());
+    expect(names()[0]).toMatch(/JSON/);
+    const [jsonTab, dateTab] = within(tablist).getAllByRole('tab');
+    const original = document.elementFromPoint;
+    document.elementFromPoint = () => jsonTab;
+    try {
+      fireEvent.pointerDown(dateTab, { button: 0, clientX: 100, clientY: 5 });
+      fireEvent.pointerMove(window, { clientX: 20, clientY: 5 });
+      fireEvent.pointerUp(window, { clientX: 20, clientY: 5 });
+    } finally {
+      document.elementFromPoint = original;
+    }
+    expect(names()[0]).toMatch(/Date/);
+    expect(screen.getByTestId('path').textContent).toBe('/unix-time');
+  });
+});

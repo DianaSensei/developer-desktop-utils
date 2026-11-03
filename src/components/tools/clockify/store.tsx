@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from 'react';
 import { storageGet, storageRemove, storageSet } from '@/lib/persistentStore';
+import { liveConnections } from '@/lib/liveConnections';
 import { dayStart, splitRunningAcrossDays, uid } from './time';
 import { statusPatch, type TaskPriority, type TaskStatus } from './todo';
 import { emitTasksChanged, registerTaskHandlers } from './taskBus';
@@ -290,6 +291,13 @@ export function ClockifyProvider({ children }: { children: ReactNode }) {
     if (!isRunning) return;
     const id = window.setInterval(() => setTick((t) => t + 1), 1000);
     return () => window.clearInterval(id);
+  }, [isRunning]);
+
+  // Sidebar/tab "running" dot, on every page. Not cleared on unmount: the
+  // timer keeps running when the user leaves the tool (reminders.tsx sets it
+  // at startup from storage).
+  useEffect(() => {
+    liveConnections.set('task-tracker', isRunning);
   }, [isRunning]);
 
   // auto-split a running entry across midnights
