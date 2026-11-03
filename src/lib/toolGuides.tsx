@@ -336,6 +336,32 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
     caveat: ['No editor syntax highlighting; no tables/footnotes/strikethrough (basic CommonMark); panes don’t sync-scroll.'],
   }),
 
+  'text-editor': makeGuide({
+    use: [
+      <><strong className="text-fg">Open Folder…</strong> picks a folder in the system dialog; it shows in the Explorer as a tree. Add more folders the same way — a closed one stays under <strong className="text-fg">Recent</strong>.</>,
+      'Click a file to open it in a tab. Right-click any row for New File / New Folder, Rename, Cut / Paste, Copy Path and Delete; drag a row onto a folder to move it.',
+      <>New File accepts a path — <Tok>src/util/x.ts</Tok> creates the missing folders too. <Key>F2</Key> renames, <Key>Delete</Key> (or <Key>{mod}</Key>+<Key>⌫</Key>) deletes, arrow keys walk the tree.</>,
+      <><Key>{mod}</Key>+<Key>N</Key> opens a new untitled tab — type anything, no folder or file name needed. Its text is kept automatically (also across restarts); <Key>{mod}</Key>+<Key>S</Key> on it asks where to save it as a file.</>,
+      <>Closing an untitled tab never loses it: it goes to <strong className="text-fg">Recently Closed</strong> (the clock icon at the end of the tab strip, or the welcome screen). <Key>{mod}</Key>+<Key>⇧</Key>+<Key>T</Key> reopens the last closed tab.</>,
+      <><Key>{mod}</Key>+<Key>S</Key> saves, <Key>{mod}</Key>+<Key>⇧</Key>+<Key>S</Key> saves as, <Key>{mod}</Key>+<Key>P</Key> jumps to any file by name, <Key>{mod}</Key>+<Key>W</Key> closes the tab, <Key>Ctrl</Key>+<Key>Tab</Key> cycles tabs, <Key>{mod}</Key>+<Key>F</Key> finds/replaces in the file, <Key>Alt</Key>+<Key>Z</Key> toggles word wrap.</>,
+    ],
+    know: [
+      'Highlighting uses VS Code’s Light+ / Dark+ colors, with bracket pairs colored by depth and indentation guides. The language comes from the file name (~150 languages) or, for an untitled tab, from what you type; click the language in the status bar to change it.',
+      <><strong className="text-fg">Format Document</strong> — <Key>⇧</Key>+<Key>Alt</Key>+<Key>F</Key>, the formatter name in the status bar, or right-click a tab: Prettier for JS/TS/JSX, JSON, CSS/SCSS/LESS, HTML, Vue, Markdown, YAML and XML (your project’s <Tok>.prettierrc</Tok> or <Tok>package.json</Tok> “prettier” is used), sql-formatter for SQL dialects, and re-indenting by the grammar for every other language. Turn on <strong className="text-fg">Format on Save</strong> from the same status-bar menu.</>,
+      <><strong className="text-fg">Local History</strong> — the switch in the <strong className="text-fg">Timeline</strong> at the bottom of the Explorer. While on, every save keeps a snapshot of the file (the first save also keeps the version from before it). Click a snapshot to compare it with the current text; restore it into the editor or delete it from there or from the row’s buttons.</>,
+      'Indentation (spaces or tabs, and the size) is detected per file, as VS Code does; change it from “Spaces: N” in the status bar. Line endings (LF/CRLF) and a UTF-8 BOM are kept when you save.',
+      'Unsaved edits survive switching to another tool, and each tab keeps its own undo history. Open folders and tabs come back after a restart.',
+      'When you return to the window, open folders are re-listed and open files are compared with disk: an unchanged tab reloads on its own; one with unsaved edits asks first. Saving over a file another program changed asks before overwriting.',
+      'The app can only reach folders you opened through the dialog, plus single files you picked in Open File… / Save As. Remove a folder from Recent to revoke that access.',
+      'Recently Closed keeps the last 30 closed tabs; Discard (×) or the bin icon removes their text for good.',
+      'Local History keeps the last 50 snapshots per file, follows a file when it is renamed or moved, and stays after the file is deleted — reopen the path to get it back. Turning the switch off stops recording; existing snapshots stay until you delete them.',
+    ],
+    caveat: [
+      'Delete is permanent — files do not go to the Trash.',
+      'Binary files and files over 10 MB are not opened. Symlinks that point outside the opened folder are listed but cannot be opened.',
+    ],
+  }),
+
   deduplicate: makeGuide({
     use: [
       'Paste one item per line on the left; unique items appear on the right.',
@@ -456,4 +482,6 @@ export const TOOL_GUIDE_VERSIONS: Record<string, number> = {
   'cron-generator': 2,
   // 2 — match count + jump, keyboard tree navigation.
   json: 2,
+  // 4 — Local History (Timeline): snapshots on save, compare, restore, delete.
+  'text-editor': 4,
 };

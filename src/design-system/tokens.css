@@ -29,6 +29,32 @@
     --sql-type: hsl(270 55% 45%);
     --js-property: hsl(32 90% 33%);
     --js-method: hsl(270 60% 52%);
+    /* Text Editor syntax palette: VS Code's Light+ / Dark+ themes, so files
+       look the way they do in VS Code. Used only by the Text Editor tool
+       (code-theme.ts `vscodeHighlight`); the small editors keep --sql-*. */
+    --vsc-comment: #008000;
+    --vsc-keyword: #0000ff;
+    --vsc-control: #af00db;
+    --vsc-string: #a31515;
+    --vsc-regexp: #811f3f;
+    --vsc-escape: #ee0000;
+    --vsc-number: #098658;
+    --vsc-function: #795e26;
+    --vsc-type: #267f99;
+    --vsc-variable: #001080;
+    --vsc-constant: #0070c1;
+    --vsc-tag: #800000;
+    --vsc-attribute: #e50000;
+    --vsc-punct-mute: #800000;
+    --vsc-heading: #800000;
+    --vsc-link: #0451a5;
+    --vsc-invalid: #cd3131;
+    --vsc-inserted: #098658;
+    --vsc-deleted: #a31515;
+    /* Bracket pair colorization (editorBracketHighlight.foreground1–3). */
+    --vsc-bracket-1: #0431fa;
+    --vsc-bracket-2: #319331;
+    --vsc-bracket-3: #7b3814;
     /* JSON tree view (JsonFormatter): strings, numbers and booleans reuse the
        SQL hues; only keys and null get their own. */
     --json-key: hsl(202 88% 35%);
@@ -69,6 +95,28 @@
     --sql-type: hsl(270 60% 72%);
     --js-property: hsl(32 90% 66%);
     --js-method: hsl(270 65% 75%);
+    --vsc-comment: #6a9955;
+    --vsc-keyword: #569cd6;
+    --vsc-control: #c586c0;
+    --vsc-string: #ce9178;
+    --vsc-regexp: #d16969;
+    --vsc-escape: #d7ba7d;
+    --vsc-number: #b5cea8;
+    --vsc-function: #dcdcaa;
+    --vsc-type: #4ec9b0;
+    --vsc-variable: #9cdcfe;
+    --vsc-constant: #4fc1ff;
+    --vsc-tag: #569cd6;
+    --vsc-attribute: #9cdcfe;
+    --vsc-punct-mute: #808080;
+    --vsc-heading: #569cd6;
+    --vsc-link: #4ec9b0;
+    --vsc-invalid: #f44747;
+    --vsc-inserted: #b5cea8;
+    --vsc-deleted: #ce9178;
+    --vsc-bracket-1: #ffd700;
+    --vsc-bracket-2: #da70d6;
+    --vsc-bracket-3: #179fff;
     --json-key: hsl(202 85% 68%);
     --json-null: hsl(350 75% 72%);
 

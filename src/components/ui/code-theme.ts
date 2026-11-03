@@ -11,7 +11,7 @@
 import { EditorView } from '@codemirror/view';
 import { Compartment, Prec, type Extension } from '@codemirror/state';
 import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
-import { tags } from '@lezer/highlight';
+import { tags, tags as t } from '@lezer/highlight';
 import { useEffect, useRef } from 'react';
 import { useIsDark } from '@/hooks/useIsDark';
 
@@ -241,6 +241,49 @@ export function codeTheme(dark: boolean, opts: CodeThemeOptions = {}): Extension
     },
     { dark },
   );
+}
+
+/**
+ * VS Code Light+ / Dark+ token colors for the Text Editor tool, where files
+ * should look the way they do in VS Code. Covers every tag the bundled
+ * grammars (@codemirror/language-data) emit — declarations vs control flow,
+ * types, functions, properties, constants, markup, tags/attributes, diff.
+ * Colors come from the `--vsc-*` tokens (tokens.css), so light/dark switch in
+ * CSS. Unstyled tags (operators, punctuation) inherit the editor foreground,
+ * as in VS Code.
+ */
+export const vscodeHighlight = HighlightStyle.define([
+  { tag: [t.comment, t.lineComment, t.blockComment, t.docComment, t.quote], color: 'var(--vsc-comment)' },
+  { tag: [t.keyword, t.definitionKeyword, t.modifier, t.operatorKeyword, t.self, t.bool, t.null, t.atom], color: 'var(--vsc-keyword)' },
+  { tag: [t.controlKeyword, t.moduleKeyword], color: 'var(--vsc-control)' },
+  { tag: [t.string, t.special(t.string), t.character, t.docString, t.attributeValue, t.monospace], color: 'var(--vsc-string)' },
+  { tag: t.regexp, color: 'var(--vsc-regexp)' },
+  { tag: t.escape, color: 'var(--vsc-escape)' },
+  { tag: [t.number, t.integer, t.float, t.unit], color: 'var(--vsc-number)' },
+  { tag: [t.function(t.variableName), t.function(t.propertyName), t.function(t.definition(t.variableName)), t.macroName], color: 'var(--vsc-function)' },
+  { tag: [t.typeName, t.className, t.namespace, t.definition(t.typeName), t.definition(t.className), t.standard(t.typeName)], color: 'var(--vsc-type)' },
+  { tag: [t.variableName, t.definition(t.variableName), t.propertyName, t.definition(t.propertyName), t.labelName, t.special(t.variableName)], color: 'var(--vsc-variable)' },
+  { tag: [t.constant(t.variableName), t.constant(t.propertyName), t.standard(t.variableName), t.color], color: 'var(--vsc-constant)' },
+  { tag: t.tagName, color: 'var(--vsc-tag)' },
+  { tag: t.angleBracket, color: 'var(--vsc-punct-mute)' },
+  { tag: t.attributeName, color: 'var(--vsc-attribute)' },
+  { tag: [t.meta, t.processingInstruction, t.documentMeta, t.annotation], color: 'var(--vsc-keyword)' },
+  { tag: [t.heading, t.heading1, t.heading2, t.heading3, t.heading4, t.heading5, t.heading6], color: 'var(--vsc-heading)', fontWeight: '700' },
+  { tag: t.list, color: 'var(--vsc-keyword)' },
+  { tag: t.contentSeparator, color: 'var(--vsc-punct-mute)' },
+  { tag: [t.link, t.url], color: 'var(--vsc-link)', textDecoration: 'underline' },
+  { tag: t.emphasis, fontStyle: 'italic' },
+  { tag: t.strong, fontWeight: '700' },
+  { tag: t.strikethrough, textDecoration: 'line-through' },
+  { tag: t.inserted, color: 'var(--vsc-inserted)' },
+  { tag: t.deleted, color: 'var(--vsc-deleted)' },
+  { tag: t.changed, color: 'var(--vsc-constant)' },
+  { tag: t.invalid, color: 'var(--vsc-invalid)' },
+]);
+
+/** The editor chrome plus the VS Code palette — the Text Editor's pair. */
+export function codeThemeWithVscodeHighlight(dark: boolean, opts?: CodeThemeOptions): Extension {
+  return [codeTheme(dark, opts), syntaxHighlighting(vscodeHighlight)];
 }
 
 /** `codeTheme` + the shared highlight style — the usual pair. */

@@ -100,6 +100,7 @@ export { InlineCodeField, type InlineCodeFieldProps, type InlineCodeFieldHandle 
 // SQL/Mongo switch); prefer the components above.
 export {
   codeTheme, codeThemeWithHighlight, codeHighlight, useCodeTheme, smartBracketSkip, CODE_FONT,
+  vscodeHighlight, codeThemeWithVscodeHighlight,
   type CodeThemeOptions,
 } from '@/components/ui/code-theme';
 export { syntaxErrorLinter } from '@/components/ui/syntax-lint';

@@ -30,6 +30,7 @@ const PINNED_ORDER = [
   "cron-generator",
   "qrcode",
   "color-picker",
+  "text-editor",
   "markdown",
   "lucky-wheel",
   "network",
@@ -57,7 +58,8 @@ const PINNED_ROUTES: Record<string, string> = {
   "lucky-wheel": "/lucky-wheel",
   "api-client": "/api-client",
   "mock-server": "/mock-server",
-  "2fa": "/2fa"
+  "2fa": "/2fa",
+  "text-editor": "/text-editor"
 };
 
 const PINNED_LABELS: Record<string, string> = {
@@ -81,7 +83,8 @@ const PINNED_LABELS: Record<string, string> = {
   "lucky-wheel": "Lucky Wheel",
   "api-client": "API Client",
   "mock-server": "Mock Server",
-  "2fa": "2FA Authenticator"
+  "2fa": "2FA Authenticator",
+  "text-editor": "Text Editor"
 };
 
 const PINNED_DEFAULT_ENABLED: Record<string, boolean> = {
@@ -105,7 +108,8 @@ const PINNED_DEFAULT_ENABLED: Record<string, boolean> = {
   "sql-formatter": false,
   "network": false,
   "lucky-wheel": false,
-  "2fa": true
+  "2fa": true,
+  "text-editor": true
 };
 
 describe('registry — tính toàn vẹn', () => {
