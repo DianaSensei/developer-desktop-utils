@@ -53,6 +53,9 @@ export interface JiraConfig {
   lastSync?: number | null;
   /** Keys deleted locally: a sync does not bring them back. */
   hiddenKeys?: string[];
+  /** When set, timer entries on linked tasks that finish after this moment
+   *  are sent as worklogs automatically. Null/absent = off. */
+  autoLogSince?: number | null;
 }
 
 export const DEFAULT_JQL = 'assignee = currentUser() AND statusCategory != Done ORDER BY updated DESC';
@@ -275,9 +278,10 @@ export function mergeIssues(
   issues: JiraIssue[],
   site: string,
   now: number,
-  opts: { hiddenKeys?: string[]; keepStatusFor?: Set<string> } = {},
+  opts: { hiddenKeys?: string[]; keepStatusFor?: Set<string>; forceKeys?: Set<string> } = {},
 ): { tasks: Task[]; added: number; updated: number } {
   const hidden = new Set(opts.hiddenKeys ?? []);
+  const force = opts.forceKeys ?? new Set<string>();
   const keepStatus = opts.keepStatusFor ?? new Set<string>();
   const byKey = new Map(issues.map((i) => [i.key, i]));
   let updated = 0;
@@ -308,15 +312,19 @@ export function mergeIssues(
   });
   let added = 0;
   for (const issue of issues) {
-    if (seen.has(issue.key) || hidden.has(issue.key) || issue.statusCategory === 'done') continue;
+    if (seen.has(issue.key)) continue;
+    // Asked for by key (quick add): added even when done or hidden.
+    if (!force.has(issue.key) && (hidden.has(issue.key) || issue.statusCategory === 'done')) continue;
     const status = statusForCategory(issue.statusCategory);
+    const done = issue.statusCategory === 'done';
     next.push({
       id: uid(),
       name: issue.summary,
       projectId: null,
       parentId: null,
       linkedIds: [],
-      completed: false,
+      completed: done,
+      completedAt: done ? now : null,
       createdAt: now,
       status,
       priority: priorityFromJira(issue.priority),
@@ -363,4 +371,48 @@ export function pendingWorklogs(entries: TimeEntry[], taskId: string): TimeEntry
 /** Jira shows worklogs in minutes; round each entry to the nearest one. */
 export function worklogSeconds(e: Pick<TimeEntry, 'start' | 'end'>): number {
   return Math.max(60, Math.round(((e.end ?? e.start) - e.start) / 60_000) * 60);
+}
+
+/** `PAY-123`, or an issue URL on `site` (`/browse/PAY-123`, a board link with
+ *  `selectedIssue=PAY-123`) → the key. Null for anything else, including
+ *  URLs on another site. */
+export function parseIssueRef(input: string, site: string): string | null {
+  const s = input.trim();
+  if (/^[A-Z][A-Z0-9_]*-\d+$/.test(s)) return s;
+  if (!/^https?:\/\//i.test(s)) return null;
+  try {
+    const u = new URL(s);
+    if (`https://${u.hostname.toLowerCase()}` !== site) return null;
+    const key = /\/browse\/([A-Z][A-Z0-9_]*-\d+)/i.exec(u.pathname)?.[1] ?? u.searchParams.get('selectedIssue');
+    return key && /^[A-Z][A-Z0-9_]*-\d+$/i.test(key) ? key.toUpperCase() : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Entries to send automatically: finished after `since`, on a task linked
+ *  to `site`, not sent yet, at least a minute long. */
+export function autoLogCandidates(entries: TimeEntry[], tasks: Task[], site: string, since: number): Array<{ entry: TimeEntry; task: Task }> {
+  const linked = new Map(tasks.filter((t) => t.jira?.site === site).map((t) => [t.id, t]));
+  const out: Array<{ entry: TimeEntry; task: Task }> = [];
+  for (const e of entries) {
+    const task = e.taskId ? linked.get(e.taskId) : undefined;
+    if (!task || e.end === null || e.end < since || e.jiraWorklogId || e.end - e.start < 60_000) continue;
+    out.push({ entry: e, task });
+  }
+  return out;
+}
+
+/** Unlogged time across every linked task, for the "Log all" action. */
+export function pendingAcrossTasks(entries: TimeEntry[], tasks: Task[], site: string): { tasks: number; seconds: number } {
+  let count = 0;
+  let seconds = 0;
+  for (const t of tasks) {
+    if (t.jira?.site !== site) continue;
+    const pending = pendingWorklogs(entries, t.id);
+    if (pending.length === 0) continue;
+    count++;
+    seconds += pending.reduce((sum, e) => sum + worklogSeconds(e), 0);
+  }
+  return { tasks: count, seconds };
 }

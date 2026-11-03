@@ -450,7 +450,7 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
     use: [
       <>Add a task (with a project), then Start/Stop the timer (<Key>{mod}</Key>+<Key>↵</Key> toggles); edit entry times inline.</>,
       <><strong className="text-fg">Tasks</strong> tab: type a to-do and press <Key>↵</Key>; click it to set status, priority, project, due date/time, a reminder and notes. List groups by due date; Board lets you drag cards between To do / In progress / Done; ▶ tracks time on the task.</>,
-      <><strong className="text-fg">Connect Jira</strong> (Tasks tab): enter your Jira Cloud site, email and an API token; your open issues come in as tasks. Changing a task's status moves the issue in Jira, and <strong className="text-fg">Log … to Jira</strong> in the task editor sends the time you tracked as worklogs.</>,
+      <><strong className="text-fg">Connect Jira</strong> (Tasks tab): enter your Jira Cloud site, email and an API token; your open issues come in as tasks. Changing a task's status moves the issue in Jira, and <strong className="text-fg">Log … to Jira</strong> (task editor, or the toolbar for all tasks) sends the time you tracked as worklogs. Paste <code>PAY-123</code> or an issue link into Add a task to bring in one issue.</>,
       'Switch tabs: Timesheet grid (dates × projects), Calendar, and Meeting Notes; manage projects/colors and settings in the side panels.',
       <>In <strong className="text-fg">Meeting Notes</strong>, create a note and fill title, participants, agenda, decisions, and action items; a note with a start time also appears on the Calendar. Use the Markdown tab to copy exportable minutes.</>,
       'Export time entries as JSON or CSV.',

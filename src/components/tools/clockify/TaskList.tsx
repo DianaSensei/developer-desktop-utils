@@ -24,7 +24,8 @@ import { cn } from '@/lib/utils';
 import { combineDateTime, toDateISO, toHM } from '@/lib/meetings';
 import MESSAGES from './TimeTracker.messages';
 import JIRA_MESSAGES from './jira.messages';
-import { JiraErrorBanner, JiraKeyChip, JiraTaskSection, JiraToolbar } from './JiraPanel';
+import { JiraErrorBanner, JiraKeyChip, JiraTaskSection, JiraToolbar, jiraErrorText } from './JiraPanel';
+import { JiraError, parseIssueRef } from './jira';
 import { useJira } from './jiraContext';
 import { useClockify, type Task } from './store';
 import { ColorDot, ConfirmButton, Modal } from './ui';
@@ -62,6 +63,8 @@ export function TaskList({ focusId, onFocused }: { focusId?: string | null; onFo
   const tr = useMessages(MESSAGES);
   const sdk = usePluginSdkFor('task-tracker');
   const { tasks, addTask, updateTask, now } = useClockify();
+  const jira = useJira();
+  const jm = useMessages(JIRA_MESSAGES);
   const [view, setView] = usePluginState<View>(sdk, 'tasks:view', 'list');
   const [filter, setFilter] = usePluginState<Filter>(sdk, 'tasks:filter', 'open');
   const [draft, setDraft] = useState('');
@@ -84,9 +87,28 @@ export function TaskList({ focusId, onFocused }: { focusId?: string | null; onFo
     [tasks, filter, now]
   );
 
+  // A Jira key or issue URL in the box links that issue instead.
+  const jiraRef = jira.connected && jira.config ? parseIssueRef(draft, jira.config.site) : null;
+  const [addNote, setAddNote] = useState<{ tone: 'ok' | 'bad'; text: string } | null>(null);
+  const addFromJira = (key: string) => {
+    setAddNote(null);
+    jira.addIssue(key)
+      .then(({ taskId, existed }) => {
+        setDraft('');
+        setFilter('all');
+        setHighlight(taskId);
+        setAddNote({ tone: 'ok', text: existed ? jm('alreadyHere', { key }) : jm('addedIssue', { key }) });
+      })
+      .catch((e: unknown) => {
+        const text = e instanceof JiraError && e.kind === 'notFound' ? jm('issueNotFound', { key }) : jiraErrorText(e, jm);
+        setAddNote({ tone: 'bad', text });
+      });
+  };
+
   const add = () => {
     const name = draft.trim();
     if (!name) return;
+    if (jiraRef) { addFromJira(jiraRef); return; }
     const extra: Partial<Task> = { status: 'todo', priority: 'none' };
     // Adding from Today means "due today" — otherwise it vanishes from view.
     if (filter === 'today') Object.assign(extra, { dueAt: dayStart(Date.now()), dueHasTime: false });
@@ -103,12 +125,17 @@ export function TaskList({ focusId, onFocused }: { focusId?: string | null; onFo
           <Plus className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-mute" />
           <Input
             value={draft}
-            onChange={(e) => setDraft(e.target.value)}
+            onChange={(e) => { setDraft(e.target.value); setAddNote(null); }}
             onKeyDown={(e) => { if (e.key === 'Enter') add(); }}
-            placeholder={tr('todo.addPlaceholder')}
+            placeholder={jira.connected ? jm('addPlaceholderJira') : tr('todo.addPlaceholder')}
             aria-label={tr('todo.addAria')}
-            className="h-ctl pl-8"
+            className={cn('h-ctl pl-8', jiraRef && 'pr-40')}
           />
+          {jiraRef && (
+            <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] text-info">
+              {jm('addByKey', { key: jiraRef })}
+            </span>
+          )}
         </div>
         <Segmented<Filter>
           size="sm"
@@ -130,6 +157,11 @@ export function TaskList({ focusId, onFocused }: { focusId?: string | null; onFo
         <JiraToolbar />
       </div>
       <JiraErrorBanner />
+      {addNote && (
+        <p role={addNote.tone === 'bad' ? 'alert' : 'status'} className={cn('border-b border-line px-3 py-1.5 text-xs', addNote.tone === 'bad' ? 'text-bad' : 'text-fg-mute')}>
+          {addNote.text}
+        </p>
+      )}
 
       <div className="min-h-0 flex-1 overflow-auto">
         {tasks.length === 0 && (
