@@ -15,6 +15,8 @@ import { useWorkspaces, workspaceLabel } from '@/contexts/WorkspaceContext';
 import type { Workspace } from '@/lib/workspaces';
 import { StatusChip } from '@/components/ui/status-chip';
 import { Keycap } from '@/components/ui/keycap';
+import { useToolShortcuts } from '@/components/GlobalToolShortcuts';
+import { formatCombo } from '@/lib/toolShortcuts';
 
 type Tool = (typeof allTools)[number];
 
@@ -312,6 +314,8 @@ function ToolRow({
   refCb: (el: HTMLButtonElement | null) => void;
 }) {
   const Icon = tool.icon;
+  const [shortcuts] = useToolShortcuts();
+  const combo = shortcuts[tool.featureId];
   return (
     <button
       ref={refCb}
@@ -326,6 +330,7 @@ function ToolRow({
     >
       <Icon className={cn('h-4 w-4 shrink-0', active ? 'text-acc-ink' : 'text-fg-mute')} />
       <span className="min-w-0 flex-1 truncate">{tool.label}</span>
+      {combo && <Keycap className="shrink-0">{formatCombo(combo)}</Keycap>}
       {!enabled && (
         <span className="shrink-0 h-1.5 w-1.5 rounded-full bg-fg-mute/40" aria-hidden />
       )}

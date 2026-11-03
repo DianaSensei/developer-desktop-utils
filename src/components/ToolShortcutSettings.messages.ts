@@ -1,0 +1,37 @@
+import { defineMessages } from '@/lib/i18n';
+
+/** Settings → Keyboard Shortcuts → "Open a tool" (ToolShortcutSettings.tsx). */
+export default defineMessages({
+  title: { vi: 'Mở nhanh tool', en: 'Open a tool' },
+  description: {
+    vi: 'Gán tổ hợp phím để mở một tool từ bất kỳ đâu trong app, kể cả khi đang gõ. Tối đa 3 phím, phải có ⌘/Ctrl hoặc ⌥/Alt (F1–F24 dùng riêng được). Tool đang tắt sẽ được bật khi mở.',
+    en: 'Give a tool a key combo to open it from anywhere in the app, even while typing. Up to 3 keys, including ⌘/Ctrl or ⌥/Alt (F1–F24 work on their own). A tool that is turned off is turned on when opened.',
+  },
+  search: { vi: 'Tìm tool…', en: 'Search tools…' },
+  set: { vi: 'Gán phím', en: 'Set' },
+  change: { vi: 'Đổi', en: 'Change' },
+  clear: { vi: 'Bỏ phím tắt', en: 'Remove shortcut' },
+  clearAll: { vi: 'Bỏ tất cả', en: 'Remove all' },
+  clearAllTitle: { vi: 'Bỏ mọi phím tắt mở tool?', en: 'Remove every tool shortcut?' },
+  clearAllBody: { vi: 'Các tổ hợp đã gán sẽ bị xoá. Có thể gán lại bất cứ lúc nào.', en: 'All assigned combos are removed. You can assign them again any time.' },
+  recording: { vi: 'Nhấn tổ hợp phím…', en: 'Press a key combo…' },
+  recordingHint: { vi: 'Esc để huỷ', en: 'Esc to cancel' },
+  recordAria: { vi: 'Gán phím tắt mở {{tool}}', en: 'Set the shortcut that opens {{tool}}' },
+  off: { vi: 'Đang tắt', en: 'Off' },
+  none: { vi: 'Không có tool nào khớp.', en: 'No tools match.' },
+  assigned: { vi: '{{n}} tool có phím tắt', en: '{{n}} with a shortcut' },
+  'err.noModifier': { vi: 'Cần thêm ⌘/Ctrl hoặc ⌥/Alt, nếu không sẽ chặn việc gõ chữ.', en: 'Add ⌘/Ctrl or ⌥/Alt — on its own this key would block typing.' },
+  'err.shiftOnly': { vi: 'Shift + phím vẫn là gõ chữ. Thêm ⌘/Ctrl hoặc ⌥/Alt.', en: 'Shift + a key is still typing. Add ⌘/Ctrl or ⌥/Alt.' },
+  'err.tooMany': { vi: 'Tối đa 3 phím (2 phím bổ trợ + 1 phím).', en: 'At most 3 keys (2 modifiers + 1 key).' },
+  'err.key': { vi: 'Dùng chữ cái, số, dấu câu hoặc F1–F24. Mũi tên, Enter, Space, Tab… để dành cho soạn thảo.', en: 'Use a letter, digit, punctuation or F1–F24. Arrows, Enter, Space, Tab… are kept for text editing.' },
+  'err.reserved.editing': { vi: 'Tổ hợp này dùng để sửa văn bản (copy, paste, undo…).', en: 'This combo is used for editing (copy, paste, undo…).' },
+  'err.reserved.palette': { vi: 'Tổ hợp này mở bảng lệnh.', en: 'This combo opens the command palette.' },
+  'err.reserved.tabs': { vi: 'Tổ hợp này chuyển tab trong workspace.', en: 'This combo switches tabs in the workspace.' },
+  'err.reserved.workspaces': { vi: 'Tổ hợp này chuyển workspace.', en: 'This combo switches workspaces.' },
+  'err.reserved.window': { vi: 'Tổ hợp này thuộc về cửa sổ hoặc hệ điều hành.', en: 'This combo belongs to the window or the OS.' },
+  'err.reserved.find': { vi: 'Tổ hợp này dùng để tìm kiếm trong tool.', en: 'This combo is used for find.' },
+  'err.reserved.quickOpen': { vi: 'Tổ hợp này mở Quick Open của tool.', en: "This combo opens a tool's Quick Open." },
+  'err.reserved.history': { vi: 'Tổ hợp này dùng để quay lại / tiến tới.', en: 'This combo goes back / forward.' },
+  displaced: { vi: 'Đã chuyển từ {{tool}} sang đây.', en: 'Moved here from {{tool}}.' },
+  overlap: { vi: 'Trùng phím tắt “{{action}}” của {{tool}}; khi đang ở {{tool}}, phím này sẽ mở tool thay vì “{{action}}”.', en: 'Same as {{tool}}’s “{{action}}”; inside {{tool}} this key opens the tool instead of “{{action}}”.' },
+});
