@@ -880,7 +880,7 @@ git push origin main --tags
 
 | Tool ID | Label | Default On | Notes |
 |---|---|---|---|
-| `task-tracker` | Time Tracker | ✅ | Tasks/to-do (list + board, due dates, reminders), timesheet, calendar, pomodoro, meeting notes |
+| `task-tracker` | Time Tracker | ✅ | Tasks/to-do (list + board, due dates, reminders, Jira Cloud sync: `clockify/jira.ts` + `jiraContext.tsx`), timesheet, calendar, pomodoro, meeting notes |
 | `api-client` | API Client | ✅ | Collections, environments, collection/folder variables + headers + pre/post scripts (Bruno-style inheritance), Postman import/export, OpenAPI 3 / Swagger 2 import (`openapi.ts`) |
 | `mock-server` | Mock Server | ✅ | Local HTTP mock: Rhai scripts, live request log |
 | `cron-generator` | Cron Generator | ✅ | Visual editor, Quartz/Spring support |

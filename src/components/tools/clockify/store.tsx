@@ -13,6 +13,7 @@ import { storageGet, storageRemove, storageSet } from '@/lib/persistentStore';
 import { dayStart, splitRunningAcrossDays, uid } from './time';
 import { statusPatch, type TaskPriority, type TaskStatus } from './todo';
 import { emitTasksChanged, registerTaskHandlers } from './taskBus';
+import type { JiraLink } from './jira';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -45,6 +46,8 @@ export interface Task {
   remindAt?: number | null;
   notes?: string;
   completedAt?: number | null;
+  /** Linked Jira issue (jira.ts); absent for local-only tasks. */
+  jira?: JiraLink;
 }
 
 export interface Tag {
@@ -65,6 +68,8 @@ export interface TimeEntry {
   source: EntrySource;
   /** Subtask name within the task, or null/undefined when tracked on the task directly. */
   subtask?: string | null;
+  /** Id of the Jira worklog this entry was sent as (jira.ts). */
+  jiraWorklogId?: string;
 }
 
 /** A named subtask under a task. Persisted so a task can list subtasks with zero time yet. */
@@ -153,6 +158,8 @@ interface ClockifyContextValue {
   addTask: (name: string, projectId: string | null, parentId?: string | null, extra?: Partial<Task>) => Task;
   updateTask: (id: string, patch: Partial<Task>) => void;
   deleteTask: (id: string) => void;
+  /** Rewrites the whole list at once (Jira sync). */
+  applyTasks: (fn: (prev: Task[]) => Task[]) => void;
 
   // tags
   addTag: (name: string) => Tag;
@@ -555,7 +562,7 @@ export function ClockifyProvider({ children }: { children: ReactNode }) {
     projectById, taskById, tagById,
     updateSettings,
     addProject, updateProject, deleteProject,
-    addTask, updateTask, deleteTask,
+    addTask, updateTask, deleteTask, applyTasks: setTasks,
     addTag,
     startEntry, stopRunning, addEntry, updateEntry, deleteEntry, setDayTotal,
     renameTask, addSubtask, deleteSubtask,
