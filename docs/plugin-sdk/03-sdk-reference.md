@@ -11,7 +11,7 @@ import { usePluginSdkFor } from '@/platform';
 export function MyToolView() {
   const sdk = usePluginSdkFor('my-tool');
   // sdk.storage, sdk.secrets, sdk.clipboard, sdk.files, sdk.http,
-  // sdk.native, sdk.service, sdk.openExternal, sdk.env, sdk.log
+  // sdk.native, sdk.service, sdk.openExternal, sdk.notify, sdk.env, sdk.log
 }
 ```
 
@@ -216,6 +216,20 @@ await sdk.openExternal('https://example.com');
 
 Mở bằng trình duyệt mặc định của hệ điều hành, không mở trong webview của
 app.
+
+## `sdk.notify` — quyền `notifications` (SDK ≥ 1.2.0)
+
+```ts
+const shown = await sdk.notify({ title: 'Sprint review', body: 'Họp sau 10 phút' });
+if (!shown) showInAppBanner(); // OS chặn, hoặc môi trường không có thông báo
+```
+
+Thông báo hệ thống (Notification Center / Action Center / libnotify) qua
+`tauri-plugin-notification`; bản web dùng Web Notification API. Lần đầu hệ điều
+hành hỏi người dùng; bị từ chối thì mọi lần gọi trả `false` chứ không ném lỗi —
+luôn có đường lui hiển thị trong app. Audit chỉ ghi độ dài tiêu đề, không ghi
+nội dung (tên task có thể nhạy cảm). Không có callback khi bấm vào thông báo
+trên desktop: đừng thiết kế luồng phụ thuộc vào nó.
 
 ## `sdk.log`
 

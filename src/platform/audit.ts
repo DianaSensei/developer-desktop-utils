@@ -18,6 +18,7 @@ export type AuditChannel =
   | 'http'
   | 'native'
   | 'service'
+  | 'notify'
   | 'lifecycle';
 
 export interface AuditEntry {

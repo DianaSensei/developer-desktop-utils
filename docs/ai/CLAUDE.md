@@ -781,7 +781,8 @@ Currently registered feature IDs: `'rabbit-client'` (seeded from `devtool:rabbit
 - **Plugin imports**: `@tauri-apps/plugin-*` packages (not `@tauri-apps/api/*` subpaths for plugins)
 - **Tauri detection**: `'__TAURI_INTERNALS__' in window` (not `__TAURI_IPC__`)
 - **Config keys**: `build.devUrl` (not `devPath`), `build.frontendDist` (not `distDir`), `plugins.updater` (not `tauri.updater`)
-- **Adding a capability**: add permission string to `capabilities/default.json` AND document it in the `APP_PERMISSIONS` array in `Settings.tsx`
+- **Adding a capability**: add permission string to `capabilities/default.json` AND describe it in `PERMISSION_DESCRIPTIONS` (plus `NAMESPACE_NAMES` for a new namespace) in `src/lib/appPermissions.ts` — Settings → App Permissions renders from there
+- **Background work for a tool** (runs whichever tool is open): mount a small component in `App.tsx` next to the MCP bridges, like `TaskReminders` (`src/components/tools/clockify/reminders.tsx`). It may read the tool's storage, but must not write state a mounted tool also holds in `usePersistentState` (no cross-instance sync) — route writes through the mounted tool instead (`taskBus.ts`)
 - **macOS Edit menu**: `src-tauri/src/main.rs` registers a native Edit menu (`Undo`, `Redo`, `Cut`, `Copy`, `Paste`, `Select All`) via `tauri::menu::PredefinedMenuItem`. This is required on macOS to route Cmd+Z/X/C/V/A into the WebView; Windows/Linux work without it.
 
 Common capability strings:
@@ -878,7 +879,7 @@ git push origin main --tags
 
 | Tool ID | Label | Default On | Notes |
 |---|---|---|---|
-| `task-tracker` | Time Tracker | ✅ | Timesheet, calendar, pomodoro, meeting notes |
+| `task-tracker` | Time Tracker | ✅ | Tasks/to-do (list + board, due dates, reminders), timesheet, calendar, pomodoro, meeting notes |
 | `api-client` | API Client | ✅ | Collections, environments, collection/folder variables + headers + pre/post scripts (Bruno-style inheritance), Postman import/export, OpenAPI 3 / Swagger 2 import (`openapi.ts`) |
 | `mock-server` | Mock Server | ✅ | Local HTTP mock: Rhai scripts, live request log |
 | `cron-generator` | Cron Generator | ✅ | Visual editor, Quartz/Spring support |

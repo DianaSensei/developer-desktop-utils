@@ -125,6 +125,7 @@ fn main() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_store::Builder::new().build())
+        .plugin(tauri_plugin_notification::init())
         // Do not restore `DECORATIONS`: older installs saved `decorated: true`
         // in `.window-state.json`, which would override `decorations: false`
         // from tauri.windows.conf.json / tauri.linux.conf.json. Nor `VISIBLE`:

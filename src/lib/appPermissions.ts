@@ -38,6 +38,7 @@ const NAMESPACE_NAMES: Record<string, string> = {
   store: 'Store',
   'window-state': 'Window State',
   'deep-link': 'Deep Link',
+  notification: 'Notifications',
 };
 
 /** Lookup table: permission identifier -> human-readable description. Permissions missing here render with the identifier only. */
@@ -58,6 +59,7 @@ const PERMISSION_DESCRIPTIONS: Record<string, string> = {
   'updater:allow-check': 'Check GitHub for new app versions',
   'updater:allow-download-and-install': 'Download and install app updates',
   'store:default': 'Save app settings and preferences to local storage',
+  'notification:default': 'Show system notifications for task and meeting reminders (asks the OS for permission first)',
   'window-state:default': 'Remember window size and position between launches',
   // This grant includes `http://**` and `https://**`, i.e. any host.
   // Tauri capabilities apply per webview, and all tools share one, so it

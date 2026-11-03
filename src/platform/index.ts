@@ -55,6 +55,7 @@ export type {
   PluginFetchInit,
   FileDropEvent,
 } from './sdk';
+export type { NotifyOptions } from './notify';
 export {
   clearSecrets,
   flushSecrets,

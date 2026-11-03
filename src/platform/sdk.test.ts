@@ -149,6 +149,35 @@ describe('openExternal', () => {
   });
 });
 
+describe('notify', () => {
+  it('cần quyền "notifications", chỉ ghi độ dài tiêu đề vào audit', async () => {
+    await expect(createPluginSdk(plugin(['storage'])).notify({ title: 'x' })).rejects.toThrow(PluginPermissionError);
+
+    const shown: Array<{ title: string; body?: string }> = [];
+    class FakeNotification {
+      static permission: NotificationPermission = 'granted';
+      static requestPermission = vi.fn(async () => 'granted' as NotificationPermission);
+      onclick: (() => void) | null = null;
+      constructor(title: string, opts?: { body?: string }) { shown.push({ title, body: opts?.body }); }
+    }
+    vi.stubGlobal('Notification', FakeNotification);
+    try {
+      const sdk = createPluginSdk(plugin(['notifications']));
+      await expect(sdk.notify({ title: 'Họp sprint', body: 'Sau 10 phút' })).resolves.toBe(true);
+      expect(shown).toEqual([{ title: 'Họp sprint', body: 'Sau 10 phút' }]);
+      const entry = audit.recent().find((e) => e.channel === 'notify')!;
+      expect(entry.allowed).toBe(true);
+      expect(JSON.stringify(entry)).not.toContain('Họp sprint');
+
+      FakeNotification.permission = 'denied';
+      await expect(sdk.notify({ title: 'y' })).resolves.toBe(false);
+      expect(shown).toHaveLength(1);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});
+
 describe('clipboard / http', () => {
   it('đọc và ghi clipboard cần đúng quyền tương ứng, không phải một quyền chung', async () => {
     const readOnly = createPluginSdk(plugin(['clipboard:read']));
