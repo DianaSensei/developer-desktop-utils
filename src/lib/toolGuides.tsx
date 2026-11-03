@@ -465,6 +465,7 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
     use: [
       <><strong className="text-fg">Tools</strong> section: search, enable/disable individual tools, drag rows to reorder the sidebar, and star a tool to pin it near the top.</>,
       <><strong className="text-fg">Configuration</strong> section: tunable numbers (editor limits, generator defaults, Kafka/update timings) — changes save and apply immediately, no restart needed.</>,
+      <><strong className="text-fg">Keyboard Shortcuts</strong> section: give any tool a combo (up to 3 keys, e.g. <Key>{mod}</Key>+<Key>⇧</Key>+<Key>J</Key>) that opens it from anywhere in the app; click Set and press the keys. Reserved combos are refused, and overlaps with a tool's own shortcut are flagged.</>,
       <><strong className="text-fg">Data & Storage</strong> section: see where your local data lives on disk and reveal it in Finder/Explorer.</>,
       <><strong className="text-fg">About</strong> section: current version, auto-update toggle/schedule, and the “Xem lại” button to reopen the welcome tour.</>,
     ],
@@ -478,7 +479,8 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
 // again once, the next time they open that tool. Tools not listed default to
 // version 1 (their guide's initial version).
 export const TOOL_GUIDE_VERSIONS: Record<string, number> = {
-  settings: 1,
+  // 2 — assignable "open a tool" shortcuts.
+  settings: 2,
   // 5 — script review when importing a collection.
   'api-client': 5,
   // 2 — case modes work per line; PascalCase/CONSTANT/kebab/Title + "All cases" view.

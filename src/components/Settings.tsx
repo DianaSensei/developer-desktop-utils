@@ -33,6 +33,7 @@ import { getAppPermissionGroups } from '@/lib/appPermissions';
 import { SettingsPlugins } from '@/components/SettingsPlugins';
 import { SettingsExtensions } from '@/components/SettingsExtensions';
 import { getShortcutGroups } from '@/lib/shortcuts';
+import { ToolShortcutSettings } from '@/components/ToolShortcutSettings';
 import { Spinner } from '@/components/ui/spinner';
 import { Input } from '@/components/ui/input';
 import {
@@ -797,7 +798,8 @@ export function Settings() {
 
           {activeSection === 'shortcuts' && (
             <section className="space-y-3">
-        <p className="text-[11px] text-fg-mute -mt-1">
+        <ToolShortcutSettings />
+        <p className="text-[11px] text-fg-mute pt-2">
           {t('settings.shortcuts.description')}
         </p>
         <div className="rounded-lg border divide-y">

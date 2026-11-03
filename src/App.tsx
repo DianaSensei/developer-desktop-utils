@@ -41,6 +41,7 @@ import { McpUtilityBridge } from '@/components/McpUtilityBridge';
 import { ApiClientRuntimeProvider } from '@/components/tools/apiclient/mcpRuntimeContext';
 import { MockServerRuntimeProvider } from '@/components/tools/mockserver/mcpRuntimeContext';
 import { TaskReminders } from '@/components/tools/clockify/reminders';
+import { GlobalToolShortcuts } from '@/components/GlobalToolShortcuts';
 import { ExperimentalGate } from '@/components/ExperimentalGate';
 import { ExperimentalDot, ExperimentalMark } from '@/components/ExperimentalBadge';
 import { Button } from '@/components/ui/button';
@@ -1060,6 +1061,7 @@ function App() {
                           <McpManageBridge />
                           <McpUtilityBridge />
                           <TaskReminders />
+                          <GlobalToolShortcuts />
                         </WorkspaceProvider>
                       </Router>
                     </MockServerRuntimeProvider>
