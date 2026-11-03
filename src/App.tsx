@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { useState, useEffect, useRef, useCallback, useLayoutEffect, Suspense } from 'react';
+import { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { storageGet, storageSet, getThemePreference, setThemePreference, type ThemePreference } from '@/lib/persistentStore';
 import {
@@ -14,8 +14,8 @@ import {
   ChevronDown,
   Search,
   Plus,
-  Loader2,
   HelpCircle,
+  Sparkles,
   Star,
   Minus,
   Square,
@@ -43,7 +43,8 @@ import { ApiClientRuntimeProvider } from '@/components/tools/apiclient/mcpRuntim
 import { MockServerRuntimeProvider } from '@/components/tools/mockserver/mcpRuntimeContext';
 import { TaskReminders } from '@/components/tools/clockify/reminders';
 import { GlobalToolShortcuts } from '@/components/GlobalToolShortcuts';
-import { ExperimentalGate } from '@/components/ExperimentalGate';
+import { SplitToggle, ToolHost, type HostedTool } from '@/components/ToolHost';
+import { SplitViewProvider } from '@/contexts/SplitViewContext';
 import { ExperimentalDot, ExperimentalMark } from '@/components/ExperimentalBadge';
 import { Button } from '@/components/ui/button';
 import { Tooltip } from '@/components/ui/tooltip';
@@ -60,7 +61,6 @@ import { ToolGuideModal } from '@/components/ToolGuideModal';
 import { OnboardingProvider, useOnboarding } from '@/contexts/OnboardingContext';
 import { OnboardingFlow } from '@/components/onboarding/OnboardingFlow';
 import { useToolGuideTracking } from '@/hooks/useToolGuideTracking';
-import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { AppLogo } from '@/components/AppLogo';
 import { isTauri, IS_MAC } from '@/lib/platform';
 
@@ -146,14 +146,6 @@ function applySavedOrder<T extends { featureId: string }>(tools: T[], savedOrder
 
 // Shown briefly while a tool's code-split chunk loads. Fills the content area so
 // the header/sidebar stay put — no layout shift.
-function ToolLoading() {
-  return (
-    <div className="flex h-full w-full items-center justify-center">
-      <Loader2 className="h-5 w-5 animate-spin text-fg-mute/60" />
-    </div>
-  );
-}
-
 // Scrollable nav list with an overflow fade indicator. Extracted into its own
 // component so hooks (useRef, useState, useLayoutEffect) follow React rules —
 // calling hooks inside an IIFE inside another component's render is invalid.
@@ -811,34 +803,30 @@ function AppContent() {
   };
 
   const enabledTools = allTools.filter((tool) => isFeatureEnabled(tool.featureId));
-  const SettingsComponent = allTools.find((t) => t.featureId === 'settings')!.component;
   // Where unmatched URLs go (see <Route path="*">): the first enabled tool
   // in the user's sidebar order.
   const fallbackPath =
     applySavedOrder(enabledTools, toolOrder).find((t) => t.featureId !== 'settings')?.path
     ?? '/settings';
   const activeTool = allTools.find((tool) => tool.path === location.pathname) ?? allTools[0];
-  const isFullHeight = !!(activeTool as typeof allTools[0] & { fullHeight?: boolean }).fullHeight;
   const [guideOpen, setGuideOpen] = useState(false);
   const [guideIsWhatsNew, setGuideIsWhatsNew] = useState(false);
   const { shouldAutoShow, markSeen } = useToolGuideTracking();
   const { show: onboardingShowing } = useOnboarding();
 
-  // Auto-open the guide once per tool version bump (or on a brand-new
-  // install, once per tool's first-ever visit) — see useToolGuideTracking.
-  // Deferred while the global onboarding dialog is up so the two don't stack.
+  // A tool whose guide changed since the user last read it gets a "What's
+  // new" pill on its (?) button instead of a modal that pops up in the middle
+  // of work. Opening the guide (pill or ?) marks it read.
+  const [newsFor, setNewsFor] = useState<string | null>(null);
   useEffect(() => {
-    if (onboardingShowing) return;
-    if (shouldAutoShow(activeTool.featureId)) {
-      setGuideIsWhatsNew(true);
-      setGuideOpen(true);
-    }
-    // Re-run only when the active tool or the onboarding dialog's visibility changes.
+    if (onboardingShowing || guideOpen) return;
+    setNewsFor(shouldAutoShow(activeTool.featureId) ? activeTool.featureId : null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTool.featureId, onboardingShowing]);
+  }, [activeTool.featureId, onboardingShowing, guideOpen]);
+  const hasNews = newsFor === activeTool.featureId;
 
   const openGuideManually = () => {
-    setGuideIsWhatsNew(false);
+    setGuideIsWhatsNew(hasNews);
     setGuideOpen(true);
   };
 
@@ -850,32 +838,23 @@ function AppContent() {
     }
   };
 
-  const routes = (
-    <ErrorBoundary resetKey={location.pathname} toolId={activeTool.featureId} toolLabel={activeTool.label}>
-      <Suspense fallback={<ToolLoading />}>
-        <Routes>
-          {enabledTools.map((tool) => (
-            <Route
-              key={tool.path}
-              path={tool.path}
-              element={tool.experimental ? (
-                <ExperimentalGate label={tool.label}><tool.component /></ExperimentalGate>
-              ) : (
-                <tool.component />
-              )}
-            />
-          ))}
-          <Route path="/settings" element={<SettingsComponent />} />
-          {/* JWT Debugger is now a tab of Encode·Hash·Encrypt; keep old links working. */}
-          <Route path="/jwt" element={<Navigate to="/base64?tab=jwt" replace />} />
-          {/* No match: go to the first enabled tool instead of a blank page
-              (e.g. '/' belongs to a tool the user disabled). `replace` keeps
-              the bad URL out of history. */}
-          <Route path="*" element={<Navigate to={fallbackPath} replace />} />
-        </Routes>
-      </Suspense>
-    </ErrorBoundary>
+  // Tools (kept alive across tab switches, one or two on screen) are
+  // rendered by ToolHost; the router only handles the redirects.
+  const hostedTools = [
+    ...enabledTools.filter((tool) => tool.featureId !== 'settings'),
+    allTools.find((tl) => tl.featureId === 'settings')!,
+  ] as HostedTool[];
+  const redirects = (
+    <Routes>
+      {/* JWT Debugger is now a tab of Encode·Hash·Encrypt; keep old links working. */}
+      <Route path="/jwt" element={<Navigate to="/base64?tab=jwt" replace />} />
+      {/* No match: go to the first enabled tool instead of a blank page
+          (e.g. '/' belongs to a tool the user disabled). `replace` keeps
+          the bad URL out of history. */}
+      <Route path="*" element={<Navigate to={fallbackPath} replace />} />
+    </Routes>
   );
+  const routes = <ToolHost tools={hostedTools} fallback={redirects} />;
 
   // Logo plus the active tool's identity/tabs, shared by both custom
   // titlebars (macOS overlay and Windows/Linux).
@@ -898,17 +877,35 @@ function AppContent() {
     </div>
   );
 
-  const titlebarHelpAction = (
-    <Button
-      variant="ghost"
-      size="icon"
-      className="h-6 w-6 text-fg-mute/70 hover:text-fg"
+  const newsPill = (compact: boolean) => hasNews && (
+    <button
+      type="button"
       onClick={openGuideManually}
-      title={t('shell.titlebar.howToUse', { label: activeTool.label })}
-      aria-label={t('shell.titlebar.howToUse', { label: activeTool.label })}
+      title={t('shell.titlebar.whatsNewTitle', { label: activeTool.label })}
+      className={cn(
+        'inline-flex shrink-0 items-center gap-1 rounded-full bg-acc-tint px-2 font-medium text-acc-ink transition-colors hover:bg-acc-tint-2 focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus',
+        compact ? 'h-5 text-[11px]' : 'h-6 text-xs',
+      )}
     >
-      <HelpCircle className="h-3.5 w-3.5" />
-    </Button>
+      <Sparkles className={compact ? 'h-3 w-3' : 'h-3.5 w-3.5'} />
+      {t('shell.titlebar.whatsNew')}
+    </button>
+  );
+
+  const titlebarHelpAction = (
+    <>
+      {newsPill(true)}
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-6 w-6 text-fg-mute/70 hover:text-fg"
+        onClick={openGuideManually}
+        title={t('shell.titlebar.howToUse', { label: activeTool.label })}
+        aria-label={t('shell.titlebar.howToUse', { label: activeTool.label })}
+      >
+        <HelpCircle className="h-3.5 w-3.5" />
+      </Button>
+    </>
   );
 
   return (
@@ -940,6 +937,7 @@ function AppContent() {
           <div className="flex shrink-0 items-center gap-1">
             {/* Slot for tool-specific header actions (filled via ToolHeaderActions portal) */}
             <div id="tool-header-actions" className="flex items-center gap-0.5" />
+            <SplitToggle compact />
             {titlebarHelpAction}
           </div>
         </div>
@@ -956,6 +954,7 @@ function AppContent() {
           {/* No right padding: Close must touch the window edge, as on Windows. */}
           <div className="flex h-full shrink-0 items-center gap-0.5">
             <div id="tool-header-actions" className="flex items-center gap-0.5" />
+            <SplitToggle compact />
             {titlebarHelpAction}
             <span className="mx-1 h-4 w-px shrink-0 bg-line" />
             {/* Window buttons deliberately ignore app tokens and <Button>
@@ -1028,6 +1027,8 @@ function AppContent() {
             <div className="flex shrink-0 items-center gap-1">
               {/* Slot for tool-specific header actions (filled via ToolHeaderActions portal) */}
               <div id="tool-header-actions" className="flex items-center gap-1" />
+              <SplitToggle />
+              {newsPill(false)}
               <Button
                 variant="ghost"
                 size="icon"
@@ -1060,23 +1061,7 @@ function AppContent() {
         </div>
         )}
         <GroupTabsStrip />
-        {isFullHeight ? (
-          <div className="flex-1 min-h-0 overflow-hidden">
-            {/* key on pathname re-triggers the entrance animation on each tool switch */}
-            <div key={location.pathname} className="h-full motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-base motion-safe:ease-out-soft">
-              {routes}
-            </div>
-          </div>
-        ) : (
-          <div className="flex-1 min-h-0 overflow-y-auto">
-            <div
-              key={location.pathname}
-              className="mx-auto w-full max-w-6xl p-3 sm:p-4 lg:p-5 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-bottom-2 motion-safe:duration-slow motion-safe:ease-out-soft"
-            >
-              {routes}
-            </div>
-          </div>
-        )}
+        <div className="flex-1 min-h-0 overflow-hidden">{routes}</div>
       </main>
       </div>
 
@@ -1105,6 +1090,7 @@ function App() {
                     <MockServerRuntimeProvider>
                       <Router>
                         <WorkspaceProvider>
+                         <SplitViewProvider>
                           <AppContent />
                           <UpdateDialog />
                           <OnboardingFlow />
@@ -1114,6 +1100,7 @@ function App() {
                           <McpUtilityBridge />
                           <TaskReminders />
                           <GlobalToolShortcuts />
+                         </SplitViewProvider>
                         </WorkspaceProvider>
                       </Router>
                     </MockServerRuntimeProvider>

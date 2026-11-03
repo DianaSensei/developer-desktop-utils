@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useAppConfig } from '@/contexts/AppConfigContext';
+import { useToolActiveRef } from '@/contexts/ToolActivityContext';
 
 /**
  * True when the undo shortcut belongs to whatever currently has focus, rather
@@ -44,6 +45,7 @@ function shortcutBelongsToFocusedField(): boolean {
  * see `shortcutBelongsToFocusedField`.
  */
 export function useInputHistory(value: string, applyValue: (next: string) => void, enabled = true) {
+  const activeRef = useToolActiveRef();
   const { config } = useAppConfig();
   const history = useRef<string[]>([value]);
   const index = useRef(0);
@@ -77,7 +79,7 @@ export function useInputHistory(value: string, applyValue: (next: string) => voi
     if (!enabled) return;
 
     const onKeyDown = (event: KeyboardEvent) => {
-      if (!(event.metaKey || event.ctrlKey)) return;
+      if (!(event.metaKey || event.ctrlKey) || !activeRef.current) return;
       const key = event.key.toLowerCase();
       const isUndo = key === 'z' && !event.shiftKey;
       const isRedo = (key === 'z' && event.shiftKey) || key === 'y';

@@ -87,3 +87,7 @@ export { PluginProvider, usePluginSdk, usePluginSdkOptional, withPluginSdk } fro
 export type { Channel } from '@tauri-apps/api/core';
 export * as pluginAudit from './audit';
 export type { AuditChannel, AuditEntry } from './audit';
+
+// Open tools stay mounted in background tabs / the other split pane: window
+// listeners check this before acting (see ToolHost.tsx).
+export { useToolActivity, useToolActiveRef } from '@/contexts/ToolActivityContext';

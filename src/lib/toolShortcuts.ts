@@ -107,6 +107,7 @@ const RESERVED: Record<string, string> = Object.fromEntries([
   ...['KeyC', 'KeyV', 'KeyX', 'KeyA', 'KeyZ'].map((k) => [`Mod+${k}`, 'editing'] as const),
   ['Mod+Shift+KeyZ', 'editing'],
   ['Mod+KeyK', 'palette'],
+  ['Mod+Backslash', 'tabs'],
   ...digits('Mod+').map((k) => [k, 'tabs'] as const),
   ...digits('Mod+Alt+').map((k) => [k, 'workspaces'] as const),
   ['Mod+Shift+BracketLeft', 'tabs'],

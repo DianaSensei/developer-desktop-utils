@@ -34,6 +34,7 @@ import {
 import { useMessages } from '@/contexts/LocaleContext';
 import { Tooltip } from '@/components/ui/tooltip';
 import MESSAGES from '@/components/tools/NetworkTools.messages';
+import { useToolActiveRef } from '@/contexts/ToolActivityContext';
 
 type View = 'dns' | 'propagation' | 'dnssec' | 'myip' | 'iplookup' | 'local' | 'ports';
 type Category = 'dns' | 'ip' | 'machine';
@@ -1311,9 +1312,10 @@ export function NetworkTools() {
   // Keyboard navigation: ←/→ (or ↑/↓) cycle through views, number keys 1–7 jump
   // straight to one. Ignored while typing in a field so domain/IP entry — and
   // each view's own Enter-to-run — keep working untouched.
+  const activeRef = useToolActiveRef();
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.metaKey || e.ctrlKey || e.altKey || !activeRef.current) return;
       const t = e.target as HTMLElement | null;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
       const i = VIEW_ORDER.indexOf(view);

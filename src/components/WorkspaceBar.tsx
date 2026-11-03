@@ -7,12 +7,13 @@
 // Segmented).
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
-import { Check, ChevronDown, ChevronsUpDown, Layers, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { Check, ChevronDown, ChevronsUpDown, Columns2, Layers, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { MOD_KEY, IS_MAC } from '@/lib/platform';
 import { useLocale } from '@/contexts/LocaleContext';
 import { useWorkspaces, workspaceLabel } from '@/contexts/WorkspaceContext';
 import { useLiveConnections } from '@/lib/liveConnections';
+import { useSplitView } from '@/contexts/SplitViewContext';
 import { MAX_WORKSPACES } from '@/lib/workspaces';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
@@ -53,6 +54,7 @@ export function WorkspaceBar({ size = 'header', fallback = null }: WorkspaceBarP
   } = useWorkspaces();
   const { t } = useLocale();
   const liveIds = useLiveConnections();
+  const split = useSplitView();
   const menu = useContextMenu();
   const visible = useWorkspaceBarVisible();
   const listRef = useRef<HTMLDivElement>(null);
@@ -204,6 +206,7 @@ export function WorkspaceBar({ size = 'header', fallback = null }: WorkspaceBarP
                 menu.open(e, [
                   { icon: <X className="h-3.5 w-3.5" />, label: t('shell.workspace.closeTab', { label: tool.label }), onClick: () => closeTool(tool.featureId) },
                   { label: t('shell.workspace.closeOthers'), onClick: () => closeOtherTools(tool.featureId), disabled: tabs.length < 2 },
+                  ...(split ? [{ sep: true as const, icon: <Columns2 className="h-3.5 w-3.5" />, label: t('shell.split.openToSide'), onClick: () => split.openToSide(tool.featureId), disabled: tabs.length < 2 || split.rightId === tool.featureId }] : []),
                 ])
               }
               onKeyDown={(e) => onTabKeyDown(e, i)}

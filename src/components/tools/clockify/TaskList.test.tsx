@@ -102,12 +102,12 @@ describe('Tasks tab', () => {
     renderSuite();
     openTasksTab();
     fireEvent.click(screen.getByRole('button', { name: /Plan sprint/ }));
-    const dialog = screen.getByRole('dialog');
+    const dialog = screen.getByRole('complementary', { name: 'Edit task' });
     fireEvent.click(within(dialog).getByRole('tab', { name: 'High' }));
     fireEvent.change(within(dialog).getByLabelText('Notes'), { target: { value: 'Capacity 30 pts' } });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
     expect(saved()[0]).toMatchObject({ priority: 'high', notes: 'Capacity 30 pts' });
-    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.queryByRole('complementary', { name: 'Edit task' })).toBeNull();
   });
 
   it('board view moves a task to another column on drop', () => {
@@ -138,6 +138,6 @@ describe('Tasks tab', () => {
     seed([{ name: 'Call vendor', status: 'done', completed: true }]);
     renderSuite();
     act(() => requestOpen({ tab: 'tasks', id: 't0' }));
-    expect(within(screen.getByRole('dialog')).getByDisplayValue('Call vendor')).toBeTruthy();
+    expect(within(screen.getByRole('complementary', { name: 'Edit task' })).getByDisplayValue('Call vendor')).toBeTruthy();
   });
 });

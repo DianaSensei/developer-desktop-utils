@@ -28,6 +28,7 @@ import { getEditorStore } from './session';
 import type { Notice } from './store';
 import { toFsError } from './fs';
 import { basename, isUnder, relativeTo } from './paths';
+import { useToolActiveRef } from '@/contexts/ToolActivityContext';
 
 type Choice = 'primary' | 'secondary' | 'cancel';
 
@@ -183,10 +184,12 @@ export function WorkspaceEditor() {
   const handlers = useRef({ save, saveAs, requestClose, setQuickOpen, newUntitled, format });
   handlers.current = { save, saveAs, requestClose, setQuickOpen, newUntitled, format };
 
+  const activeRef = useToolActiveRef();
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      // A modal owns the keyboard while open.
-      if (document.querySelector('[role="dialog"]')) return;
+      // A background tab / unfocused split pane doesn't own the keyboard,
+      // and a modal owns it while open.
+      if (!activeRef.current || document.querySelector('[role="dialog"]')) return;
       const mod = e.metaKey || e.ctrlKey;
       const h = handlers.current;
       const snapNow = store.getSnapshot();

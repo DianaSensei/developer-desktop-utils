@@ -34,6 +34,7 @@ import { isScriptSandboxDegraded, stopScriptSandbox, subscribeSandboxStatus } fr
 import type { ApiRequest, ApiResponse, LogEntry, TestResult, VarMap } from './types';
 import { buildResolvedVars } from './vars';
 import { t } from './i18n';
+import { useToolActiveRef } from '@/contexts/ToolActivityContext';
 
 export type SplitDirection = 'horizontal' | 'vertical';
 
@@ -305,9 +306,11 @@ export function ApiClient() {
   // ⌘K is the app-wide tool palette (CommandPalette.tsx) and stays untouched.
   // Every one is a no-op while a dialog is open — sending the request behind
   // the Environments dialog because ⌘Enter fell through was a real footgun.
+  const activeRef = useToolActiveRef();
   useEffect(() => {
     const dialogOpen = () => !!document.querySelector('[role="dialog"]');
     const onKey = (e: KeyboardEvent) => {
+      if (!activeRef.current) return;
       const s = storeRef.current;
       const req = activeRequestRef.current;
       const key = e.key.toLowerCase();
@@ -443,7 +446,7 @@ export function ApiClient() {
     // tells the app's workspace shortcuts (WorkspaceContext) to stand aside.
     <div
       className="flex h-full min-h-0 flex-col overflow-hidden"
-      data-claims-shortcuts={store.openRequests.length > 0 ? 'mod-digit' : undefined}
+      data-claims-shortcuts={activeRef.current && store.openRequests.length > 0 ? 'mod-digit' : undefined}
     >
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <div className="shrink-0 overflow-hidden" style={{ width: sidebarWidth }}>

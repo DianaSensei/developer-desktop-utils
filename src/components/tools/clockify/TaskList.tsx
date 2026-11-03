@@ -6,7 +6,7 @@
 
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import {
-  Bell, CalendarDays, Check, Flag, LayoutList, Columns3, Pencil, Play, Plus, Square, Trash2,
+  Bell, CalendarDays, Check, Flag, LayoutList, Columns3, Pencil, Play, Plus, Square, Trash2, X,
 } from 'lucide-react';
 import { usePluginSdkFor, usePluginState } from '@/platform';
 import { useLocale, useMessages } from '@/contexts/LocaleContext';
@@ -28,7 +28,7 @@ import { JiraErrorBanner, JiraKeyChip, JiraTaskSection, JiraToolbar, jiraErrorTe
 import { JiraError, parseIssueRef } from './jira';
 import { useJira } from './jiraContext';
 import { useClockify, type Task } from './store';
-import { ColorDot, ConfirmButton, Modal } from './ui';
+import { ColorDot, ConfirmButton } from './ui';
 import { dayStart, fmtTotal } from './time';
 import {
   PRIORITIES, REMIND_OFFSETS, STATUSES, compareTasks, dueBucket, priorityOf, remindAtFor, statusOf, statusPatch,
@@ -163,7 +163,8 @@ export function TaskList({ focusId, onFocused }: { focusId?: string | null; onFo
         </p>
       )}
 
-      <div className="min-h-0 flex-1 overflow-auto">
+      <div className="relative flex min-h-0 flex-1">
+      <div className="min-h-0 min-w-0 flex-1 overflow-auto">
         {tasks.length === 0 && (
           <EmptyState icon={Check} title={tr('todo.empty.title')} description={tr('todo.empty.body')} className="mt-10" />
         )}
@@ -182,7 +183,10 @@ export function TaskList({ focusId, onFocused }: { focusId?: string | null; onFo
         )}
       </div>
 
+      {/* A side panel, not a modal: the list stays usable (tick, start a
+          timer, pick another task) while one is open. */}
       {editingTask && <TaskEditor key={editingTask.id} task={editingTask} onClose={() => setEditing(null)} />}
+      </div>
     </div>
   );
 }
@@ -583,9 +587,23 @@ function TaskEditor({ task, onClose }: { task: Task; onClose: () => void }) {
   const activeProjects = projects.filter((p) => !p.archived || p.id === task.projectId);
 
   return (
-    <Modal open onClose={onClose} title={tr('todo.edit')} width="max-w-lg">
+    <aside
+      aria-label={tr('todo.edit')}
+      onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); onClose(); } }}
+      className={cn(
+        'flex w-[400px] max-w-full shrink-0 flex-col border-l border-line bg-card',
+        // Narrow windows: overlay the list instead of squeezing it.
+        'max-lg:absolute max-lg:inset-y-0 max-lg:right-0 max-lg:z-20 max-lg:shadow-lift',
+      )}
+    >
+      <div className="flex h-ctl shrink-0 items-center gap-2 border-b border-line px-3">
+        <h3 className="min-w-0 flex-1 truncate text-sm font-semibold">{tr('todo.edit')}</h3>
+        <Button variant="ghost" size="icon" className="text-fg-mute" onClick={onClose} title={tr('cancel')} aria-label={tr('cancel')}>
+          <X className="h-4 w-4" />
+        </Button>
+      </div>
       <form
-        className="space-y-3.5"
+        className="min-h-0 flex-1 space-y-3.5 overflow-y-auto p-3"
         onSubmit={(e) => { e.preventDefault(); save(); }}
       >
         <Field label={tr('todo.name')}>
@@ -707,7 +725,7 @@ function TaskEditor({ task, onClose }: { task: Task; onClose: () => void }) {
           <Button type="submit" size="sm">{tr('todo.save')}</Button>
         </div>
       </form>
-    </Modal>
+    </aside>
   );
 }
 

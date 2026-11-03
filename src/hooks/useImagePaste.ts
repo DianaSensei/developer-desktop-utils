@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { readImageFromClipboard } from '@/lib/clipboard';
+import { useToolActiveRef } from '@/contexts/ToolActivityContext';
 
 /**
  * True when focus is in a field where the user is actively typing/editing.
@@ -24,6 +25,7 @@ function fileToDataUrl(file: File, onImage: (dataUrl: string) => void) {
  * plugin in the desktop app and the async Clipboard API on the web.
  */
 export function useImagePaste(onImage: (dataUrl: string) => void, enabled = true) {
+  const activeRef = useToolActiveRef();
   const handlerRef = useRef(onImage);
   handlerRef.current = onImage;
 
@@ -43,7 +45,7 @@ export function useImagePaste(onImage: (dataUrl: string) => void, enabled = true
     const onKeyDown = async (event: KeyboardEvent) => {
       const isPasteCombo =
         (event.metaKey || event.ctrlKey) && !event.altKey && event.key.toLowerCase() === 'v';
-      if (!isPasteCombo) return;
+      if (!isPasteCombo || !activeRef.current) return;
       if (isEditableTarget(event.target) || isEditableTarget(document.activeElement)) return;
 
       const dataUrl = await readImageFromClipboard();
@@ -56,6 +58,7 @@ export function useImagePaste(onImage: (dataUrl: string) => void, enabled = true
     // Native paste event — fires with image File items in browsers/WebViews
     // that expose them, avoiding a clipboard-read permission prompt on the web.
     const onPaste = (event: ClipboardEvent) => {
+      if (!activeRef.current) return;
       const items = event.clipboardData?.items;
       if (!items) return;
       for (const item of items) {

@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { isTauri } from '@/lib/platform';
 import { useMessages } from '@/contexts/LocaleContext';
 import MESSAGES from '@/components/tools/EncodeHashEncrypt.messages';
+import { useToolActiveRef } from '@/contexts/ToolActivityContext';
 
 const ALGORITHMS = [
   { label: 'MD5',     id: 'md5'    },
@@ -52,12 +53,16 @@ export function ChecksumTool() {
   useEffect(() => () => { workerRef.current?.terminate(); }, []);
 
   // ─── Tauri: listen for window-level file drop events ────────────────────────
+  const activeRef = useToolActiveRef();
   useEffect(() => {
     if (!isTauri) return;
     let unlisten: (() => void) | undefined;
 
     (async () => {
       unlisten = await sdk.native.onFileDrop((event) => {
+        // Only the tool in front takes a drop (others may be kept alive in
+        // background tabs or the other split pane).
+        if (!activeRef.current) return;
         if (event.type === 'enter' || event.type === 'over') {
           setDragging(true);
         } else if (event.type === 'drop') {
