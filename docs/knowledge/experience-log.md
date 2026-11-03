@@ -741,3 +741,19 @@
   của CodeQL trên PR là dấu hiệu sẽ bị chặn merge, không phải "bỏ qua được". (Còn để ý: PR chỉ
   sửa tài liệu không kích hoạt workflow vì `paths-ignore`; nếu một PR như vậy cũng bị chặn thì
   cần chạy CodeQL cả khi chỉ đổi docs.)
+
+## [2026-11-03] Time Tracker — nhắc việc chạy toàn app nhưng không được ghi task sau lưng tab đang mở
+- Nguyên nhân (thiết kế, bắt trước khi thành bug): `TaskReminders` mount ở `App.tsx` để nhắc
+  việc kêu dù đang ở tool nào, nên đọc task thẳng từ storage. Nút "Xong" trên thẻ nhắc nếu ghi
+  storage trực tiếp sẽ bị `ClockifyProvider` (nếu đang mount) ghi đè ở lần sửa kế tiếp:
+  `usePersistentState` giữ bản trong bộ nhớ và không đồng bộ giữa các instance.
+- Cách làm: `clockify/taskBus.ts` — provider đăng ký handler khi mount; runtime gọi
+  `completeTaskInSuite(id)`, chỉ tự ghi storage khi không có suite nào mount. Provider phát
+  `emitTasksChanged()` sau mỗi lần ghi để runtime đọc lại ngay (không chờ poll 30s). "Mở" từ
+  thẻ nhắc đi qua `requestOpen()` + `peekPendingOpen()` (đọc trong render không tiêu thụ, effect
+  mới `take`) vì StrictMode gọi initializer của `useState` hai lần.
+- Đồng thời: board Tasks dùng pointer events chứ không HTML5 drag (xem mục 2026-09-13 —
+  Tauri nuốt mọi drag HTML5 trong webview). Bản đầu viết bằng `draggable`/`onDrop`, test jsdom
+  xanh, sẽ hỏng trên app thật; sửa trước khi commit nhờ đọc log này.
+- Bài học chung: state bền mà hai nơi cùng giữ (một tool + một runtime nền) phải có đúng MỘT
+  người ghi; nơi còn lại chỉ đọc và nhờ người ghi qua một kênh nhỏ.

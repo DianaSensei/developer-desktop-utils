@@ -11,6 +11,8 @@ import {
 } from 'react';
 import { storageGet, storageRemove, storageSet } from '@/lib/persistentStore';
 import { dayStart, splitRunningAcrossDays, uid } from './time';
+import { statusPatch, type TaskPriority, type TaskStatus } from './todo';
+import { emitTasksChanged, registerTaskHandlers } from './taskBus';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -32,6 +34,17 @@ export interface Task {
   linkedIds: string[];
   completed: boolean;
   createdAt: number;
+  // To-do fields (Tasks tab). Optional: tasks saved before it lack them.
+  /** Absent on old tasks: derived from `completed` (see todo.ts statusOf). */
+  status?: TaskStatus;
+  priority?: TaskPriority;
+  /** ms; for a date-only due (`dueHasTime` false) the local midnight of that day. */
+  dueAt?: number | null;
+  dueHasTime?: boolean;
+  /** Absolute reminder time, ms. */
+  remindAt?: number | null;
+  notes?: string;
+  completedAt?: number | null;
 }
 
 export interface Tag {
@@ -75,6 +88,10 @@ export interface Settings {
   lunchStart: string;
   lunchEnd: string;
   workEnd: string;
+  /** Also show task/meeting reminders as system notifications. */
+  systemNotifications: boolean;
+  /** Remind this many minutes before a meeting starts; 0 = off. */
+  meetingReminderMinutes: number;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -88,6 +105,8 @@ export const DEFAULT_SETTINGS: Settings = {
   lunchStart: '12:00',
   lunchEnd: '13:00',
   workEnd: '18:00',
+  systemNotifications: true,
+  meetingReminderMinutes: 10,
 };
 
 export const PROJECT_COLORS = [
@@ -131,7 +150,7 @@ interface ClockifyContextValue {
   deleteProject: (id: string) => void;
 
   // tasks
-  addTask: (name: string, projectId: string | null, parentId?: string | null) => Task;
+  addTask: (name: string, projectId: string | null, parentId?: string | null, extra?: Partial<Task>) => Task;
   updateTask: (id: string, patch: Partial<Task>) => void;
   deleteTask: (id: string) => void;
 
@@ -320,8 +339,9 @@ export function ClockifyProvider({ children }: { children: ReactNode }) {
 
   // --- tasks ---
   const addTask = useCallback(
-    (name: string, projectId: string | null, parentId: string | null = null) => {
+    (name: string, projectId: string | null, parentId: string | null = null, extra: Partial<Task> = {}) => {
       const t: Task = {
+        ...extra,
         id: uid(),
         name: name.trim() || 'Untitled',
         projectId,
@@ -355,6 +375,16 @@ export function ClockifyProvider({ children }: { children: ReactNode }) {
     },
     [setTasks, setEntries]
   );
+
+  // The reminder runtime completes tasks through the mounted suite (taskBus.ts)
+  // and re-reads tasks as soon as they change instead of on its next poll.
+  useEffect(
+    () => registerTaskHandlers({ complete: (id) => updateTask(id, statusPatch('done', Date.now())) }),
+    [updateTask]
+  );
+  useEffect(() => {
+    emitTasksChanged();
+  }, [tasks]);
 
   // --- tags ---
   const addTag = useCallback(

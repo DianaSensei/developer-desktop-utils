@@ -46,6 +46,7 @@ const VALID_PERMISSIONS: PluginPermission[] = [
   'open-url',
   'http',
   'native',
+  'notifications',
   'service',
 ];
 

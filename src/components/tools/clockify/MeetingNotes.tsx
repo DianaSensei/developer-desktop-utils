@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { usePluginSdkFor, usePluginState } from '@/platform';
 import { MarkdownView } from '@/components/ui/markdown-view';
 import { Segmented } from '@/components/ui/segmented';
@@ -31,11 +31,17 @@ function whenLabel(m: Meeting): string {
   return `${d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} · ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
 }
 
-export function MeetingNotes() {
+export function MeetingNotes({ focusId, onFocused }: { focusId?: string | null; onFocused?: () => void }) {
   const tr = useMessages(MESSAGES);
   const sdk = usePluginSdkFor('task-tracker');
   const { meetings, addMeeting, updateMeeting, deleteMeeting, getMeeting } = useMeetings();
   const [selectedId, setSelectedId] = usePluginState<string | null>(sdk, 'meeting:selected', null, { legacyKey: 'devtool:meeting:selected' });
+  // A meeting reminder's "Open" lands here.
+  useEffect(() => {
+    if (!focusId) return;
+    if (getMeeting(focusId)) setSelectedId(focusId);
+    onFocused?.();
+  }, [focusId, getMeeting, setSelectedId, onFocused]);
   const [query, setQuery] = useState('');
   const [mode, setMode] = usePluginState<ViewMode>(sdk, 'meeting:mode', 'edit', { legacyKey: 'devtool:meeting:mode' });
 

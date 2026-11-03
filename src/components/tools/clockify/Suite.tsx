@@ -1,4 +1,4 @@
-import { useState, type JSX } from 'react';
+import { useCallback, useEffect, useState, type JSX } from 'react';
 import {
   Clock,
   CalendarDays,
@@ -9,6 +9,7 @@ import {
   Plus,
   Trash2,
   Square,
+  ListTodo,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,22 +22,52 @@ import { TimeTracker } from './TimeTracker';
 import { Timesheet } from './Timesheet';
 import { CalendarView } from './CalendarView';
 import { MeetingNotes } from './MeetingNotes';
+import { TaskList } from './TaskList';
+import { onOpenRequest, peekPendingOpen, takePendingOpen, type OpenTarget } from './taskBus';
+import { usePluginSdkFor } from '@/platform';
 import { useMessages } from '@/contexts/LocaleContext';
 import MESSAGES from '@/components/tools/clockify/TimeTracker.messages';
 
-type TabId = 'tracker' | 'timesheet' | 'calendar' | 'notes';
+type TabId = 'tracker' | 'tasks' | 'timesheet' | 'calendar' | 'notes';
 
-const TABS: { id: TabId; label: string; icon: typeof Clock; render: () => JSX.Element }[] = [
+/** What a reminder's "Open" asked to show (taskBus.ts). */
+interface Focus {
+  target: OpenTarget | null;
+  clear: () => void;
+}
+
+const TABS: { id: TabId; label: string; icon: typeof Clock; render: (focus: Focus) => JSX.Element }[] = [
   { id: 'tracker', label: 'Time Tracker', icon: Clock, render: () => <TimeTracker /> },
+  {
+    id: 'tasks', label: 'Tasks', icon: ListTodo,
+    render: ({ target, clear }) => <TaskList focusId={target?.tab === 'tasks' ? target.id : null} onFocused={clear} />,
+  },
   { id: 'timesheet', label: 'Timesheet', icon: LayoutGrid, render: () => <Timesheet /> },
   { id: 'calendar', label: 'Calendar', icon: CalendarDays, render: () => <CalendarView /> },
-  { id: 'notes', label: 'Meeting Notes', icon: NotebookPen, render: () => <MeetingNotes /> },
+  {
+    id: 'notes', label: 'Meeting Notes', icon: NotebookPen,
+    render: ({ target, clear }) => <MeetingNotes focusId={target?.tab === 'notes' ? target.id : null} onFocused={clear} />,
+  },
 ];
 
 function SuiteInner() {
   const tr = useMessages(MESSAGES);
   const { running, now, stopRunning, projectById } = useClockify();
-  const [tab, setTab] = useState<TabId>('tracker');
+  const [focus, setFocus] = useState<OpenTarget | null>(peekPendingOpen);
+  const [tab, setTab] = useState<TabId>(() => peekPendingOpen()?.tab ?? 'tracker');
+  // A reminder's "Open": pending from before this mount, or sent while the
+  // suite is already on screen.
+  useEffect(() => {
+    const take = () => {
+      const target = takePendingOpen();
+      if (!target) return;
+      setFocus(target);
+      setTab(target.tab);
+    };
+    take();
+    return onOpenRequest(take);
+  }, []);
+  const clearFocus = useCallback(() => setFocus(null), []);
   const [showProjects, setShowProjects] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const active = TABS.find((t) => t.id === tab)!;
@@ -90,7 +121,7 @@ function SuiteInner() {
       </div>
 
       {/* Active tab */}
-      <div className="min-h-0 flex-1">{active.render()}</div>
+      <div className="min-h-0 flex-1">{active.render({ target: focus, clear: clearFocus })}</div>
 
       {showProjects && <ProjectManager onClose={() => setShowProjects(false)} />}
       {showSettings && <SettingsPanel onClose={() => setShowSettings(false)} />}
@@ -228,11 +259,51 @@ function SettingsPanel({ onClose }: { onClose: () => void }) {
           <Toggle label={tr('phaseChime')} checked={settings.sound} onChange={(v) => updateSettings({ sound: v })} />
         </section>
 
+        <ReminderSettings />
+
         <div className="flex justify-end border-t border-line pt-3">
           <Button size="sm" onClick={onClose}>{tr('done')}</Button>
         </div>
       </div>
     </Modal>
+  );
+}
+
+function ReminderSettings() {
+  const tr = useMessages(MESSAGES);
+  const sdk = usePluginSdkFor('task-tracker');
+  const { settings, updateSettings } = useClockify();
+  const [test, setTest] = useState<'idle' | 'ok' | 'blocked'>('idle');
+  const sendTest = async () => {
+    const shown = await sdk.notify({ title: tr('testNotificationTitle'), body: tr('testNotificationBody') });
+    setTest(shown ? 'ok' : 'blocked');
+  };
+  return (
+    <section className="space-y-2.5 border-t border-line pt-3">
+      <h4 className="text-xs font-semibold uppercase tracking-wide text-fg-mute">{tr('reminders')}</h4>
+      <Toggle
+        label={tr('systemNotifications')}
+        checked={settings.systemNotifications}
+        onChange={(v) => updateSettings({ systemNotifications: v })}
+      />
+      <label className="flex items-center justify-between gap-3 text-xs">
+        <span className="text-fg-mute">{tr('meetingReminder')}</span>
+        <NumberStepper
+          value={settings.meetingReminderMinutes}
+          min={0}
+          max={120}
+          onChange={(v) => updateSettings({ meetingReminderMinutes: v })}
+        />
+      </label>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button type="button" variant="outline" size="sm" className="text-xs" onClick={() => { void sendTest(); }}>
+          {tr('testNotification')}
+        </Button>
+        {test === 'ok' && <span className="text-[11px] text-ok">{tr('notificationsOk')}</span>}
+      </div>
+      {test === 'blocked' && <p className="text-[11px] text-warn">{tr('notificationsBlocked')}</p>}
+      <p className="text-[11px] text-fg-mute">{tr('remindersHint')}</p>
+    </section>
   );
 }
 

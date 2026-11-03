@@ -72,6 +72,7 @@ export default definePlugin({
 | `files:read` | `sdk.files.pickOpen/readText/readBytes`, `sdk.native.onFileDrop` | Không |
 | `files:write` | `sdk.files.pickSave/writeText/writeBytes` | Không |
 | `open-url` | `sdk.openExternal` | Không |
+| `notifications` | `sdk.notify` (SDK ≥ 1.2.0) | Không |
 | `http` | `sdk.http.fetch` | **Có** — `hosts` |
 | `native` | `sdk.native.invoke/listen/channel` | **Có** — `commands` |
 | `service` | `sdk.service.call/stream` | **Có** — `service` descriptor |

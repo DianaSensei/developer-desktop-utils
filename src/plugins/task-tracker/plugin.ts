@@ -6,12 +6,12 @@ export default definePlugin({
   label: "Time Tracker",
   icon: Timer,
   description:
-    "Time tracker with timesheet, calendar, and meeting-notes views, projects, tags, and pomodoro.",
-  keywords: ["time tracker", "timer", "timesheet", "pomodoro", "calendar", "clockify", "meeting notes", "project", "task", "stopwatch"],
+    "Time tracker and to-do list with reminders, timesheet, calendar, and meeting-notes views, projects, tags, and pomodoro.",
+  keywords: ["time tracker", "timer", "timesheet", "pomodoro", "calendar", "clockify", "meeting notes", "project", "task", "stopwatch", "todo", "to-do", "reminder", "deadline"],
   route: '/task-tracker',
   order: 10,
   defaultEnabled: true,
-  permissions: ['storage', 'files:write', 'clipboard:read', 'clipboard:write', 'open-url'],
+  permissions: ['storage', 'files:write', 'clipboard:read', 'clipboard:write', 'open-url', 'notifications'],
   sdk: '^1.0.0',
   load: () => import('@/components/tools/clockify/Suite').then((m) => m.ClockifySuite),
 });

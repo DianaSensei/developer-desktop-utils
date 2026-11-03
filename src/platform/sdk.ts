@@ -23,6 +23,7 @@ import { SDK_VERSION, type PluginManifest, type PluginPermission } from './types
 import { secretDelete, secretGet, secretKeys, secretSet } from './secrets';
 import { createPluginService, type PluginService } from './service';
 import { hostAllowed } from './manifest';
+import { showSystemNotification, type NotifyOptions } from './notify';
 import type { Channel } from '@tauri-apps/api/core';
 import type { DangerousSettings } from '@tauri-apps/plugin-http';
 
@@ -175,6 +176,12 @@ export interface PluginSdk {
   };
   /** Tier B: calls the plugin's sidecar. See service.ts. */
   service: PluginService;
+  /**
+   * Shows a system notification (quyền `notifications`). The OS asks the user
+   * the first time; resolves `false` when notifications are refused or
+   * unavailable, so show an in-app notice instead.
+   */
+  notify(options: NotifyOptions): Promise<boolean>;
   log(message: string, detail?: string): void;
 }
 
@@ -393,6 +400,12 @@ export function createPluginSdk(manifest: PluginManifest): PluginSdk {
     },
 
     service: createPluginService(manifest),
+
+    async notify(options) {
+      // Title length only: notification text can carry task names.
+      ensure(manifest, 'notifications', 'notify', 'notify', `${options.title.length} ký tự`);
+      return showSystemNotification(options);
+    },
 
     log(message, detail) {
       audit.record({ pluginId: id, channel: 'lifecycle', action: message, allowed: true, detail });

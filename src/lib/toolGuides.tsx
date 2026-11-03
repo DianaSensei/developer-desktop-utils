@@ -449,12 +449,16 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
   'task-tracker': makeGuide({
     use: [
       <>Add a task (with a project), then Start/Stop the timer (<Key>{mod}</Key>+<Key>↵</Key> toggles); edit entry times inline.</>,
+      <><strong className="text-fg">Tasks</strong> tab: type a to-do and press <Key>↵</Key>; click it to set status, priority, project, due date/time, a reminder and notes. List groups by due date; Board lets you drag cards between To do / In progress / Done; ▶ tracks time on the task.</>,
       'Switch tabs: Timesheet grid (dates × projects), Calendar, and Meeting Notes; manage projects/colors and settings in the side panels.',
       <>In <strong className="text-fg">Meeting Notes</strong>, create a note and fill title, participants, agenda, decisions, and action items; a note with a start time also appears on the Calendar. Use the Markdown tab to copy exportable minutes.</>,
       'Export time entries as JSON or CSV.',
     ],
-    know: ['The timer and all data persist locally; Pomodoro pauses and beeps after the configured interval; meeting notes and time entries share the same calendar.'],
-    caveat: ['Local only (no cloud sync); desktop notifications need permission. Meeting-note Markdown is generated one-way from the form (no markdown-to-form editing).'],
+    know: [
+      'The timer and all data persist locally; Pomodoro pauses and beeps after the configured interval; meeting notes and time entries share the same calendar.',
+      'Task and meeting reminders ring from any tool while the app is open: a card with Done / Snooze / Open, plus a system notification when the window is in the background. Settings → Reminders sets the meeting lead time and sends a test notification.',
+    ],
+    caveat: ['Local only (no cloud sync); reminders need the app running (minimised is fine), and system notifications need OS permission — without it they stay in-app. Meeting-note Markdown is generated one-way from the form (no markdown-to-form editing).'],
   }),
 
   settings: makeGuide({
@@ -485,4 +489,6 @@ export const TOOL_GUIDE_VERSIONS: Record<string, number> = {
   json: 2,
   // 5 — large files: 200 MB editable, read-only viewer with search and tail -f.
   'text-editor': 5,
+  // 2 — Tasks tab (to-do list, board) with app-wide reminders and system notifications.
+  'task-tracker': 2,
 };

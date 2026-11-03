@@ -23,7 +23,7 @@ This document describes every tool in the app: what computation it performs, wha
 | Lucky Wheel | — | — | — | — | Choices + options (localStorage) |
 | Array Deduplicator | ✓ | — | — | — | Input (localStorage) |
 | Generator | ✓ | — | ✓ | — | Random + Test Data schema/options (localStorage) |
-| Time Tracker | ✓ | — | — | — | Time entries, projects, tags (localStorage) |
+| Time Tracker | ✓ | — | — | — | Time entries, projects, tags, tasks & reminder state (localStorage); **system notifications** for reminders (asks the OS first) |
 | QR Code | ✓ (image) | ✓ | ✓ | — | Mode (localStorage) |
 | Text Editor | ✓ (path) | **✓ folders / files you open** | **✓ folders you open (create/rename/move/delete), files you Save As** | — | Open folders, tab paths, layout (localStorage); authorised folder/file list, **untitled-tab backups** and **Local History snapshots** when turned on (app data) |
 | Kafka Explorer | ✓ | — | — | **✓ TCP** | Broker configs (app data); produce draft in-memory |
@@ -222,11 +222,13 @@ Two tabs behind one tool: **Random** and **Test Data**.
 
 ### Time Tracker
 
-A time-management suite with four views: time tracker, timesheet, calendar, and meeting notes. All entries, projects, and tags are computed and stored **locally in `localStorage`** — there is no account, sync, or server. Closing and reopening the app preserves your data; clearing browser storage erases it.
+A time-management suite with five views: time tracker, tasks, timesheet, calendar, and meeting notes. All entries, projects, and tags are computed and stored **locally in `localStorage`** — there is no account, sync, or server. Closing and reopening the app preserves your data; clearing browser storage erases it.
 
 The **Meeting Notes** view manages meeting minutes: create, search, edit, and delete notes from a sidebar list. Each note has a title, date, start/end time (with derived duration), participants, agenda/discussion, decisions, and action items, assembled into clean Markdown in real time (action items become task checkboxes); the preview renders with `react-markdown` and copy writes the Markdown to your clipboard. Notes live in a shared `devtool:meetings` record, so a meeting with a time range also shows on the **Calendar** — edits sync both ways. Markdown is generated one-way from the form (no markdown-to-form editing).
 
-**OS / system impact:** clipboard write only. No network, no file access — everything persists in `localStorage` (`devtool:meetings` for notes).
+The **Tasks** view is a local to-do list: tasks have a status (To do / In progress / Done), priority, project, due date (optionally with a time), notes and a reminder (at the due time, 10/30/60 minutes or a day before, or any moment you pick). It has a list grouped by due date (Overdue, Today, Tomorrow, Next 7 days, Later, No date) and a board you drag cards across; ▶ on a task starts the timer against it. Reminders — and a heads-up a configurable number of minutes before each meeting — ring **from any tool while the app is open** (also when minimised): an in-app card with Done / Snooze / Open / Dismiss, the Time Tracker chime, and, when the window is in the background, a **system notification**. A reminder missed while the app was closed still shows on the next start if it is less than 12 hours old.
+
+**OS / system impact:** clipboard write; **system notifications** (`notification:default`, through `sdk.notify`, permission `notifications`) — the OS asks once, and refusing just keeps reminders in-app (Settings → Reminders has a test button and an off switch). No network, no file access — everything persists in `localStorage` (`devtool:meetings` for notes, `devtool:task-tracker:tasks:items` for tasks, `devtool:task-tracker:reminders:state` for shown/snoozed reminders).
 
 ---
 

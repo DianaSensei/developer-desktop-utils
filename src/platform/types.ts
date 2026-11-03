@@ -11,7 +11,7 @@ import type { ServiceDescriptor } from './service';
  */
 
 /** Platform SDK version. Plugins declare a range such as `sdk: '^1.0.0'`. */
-export const SDK_VERSION = '1.1.0';
+export const SDK_VERSION = '1.2.0';
 
 /**
  * Permissions a plugin must declare before using the matching SDK channel.
@@ -32,6 +32,7 @@ export type PluginPermission =
   | 'open-url'
   | 'http'
   | 'native'
+  | 'notifications'
   | 'service';
 
 export interface PluginManifest {
