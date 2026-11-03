@@ -12,6 +12,9 @@ import { storageKeys, storageRemove } from '@/lib/persistentStore';
 // jsdom doesn't implement scrollIntoView; the tree and tab strip call it to
 // keep the active row/tab in view.
 Element.prototype.scrollIntoView = vi.fn();
+// …nor Range geometry, which the snapshot diff view measures.
+Range.prototype.getClientRects = () => ({ length: 0, item: () => null, [Symbol.iterator]: [][Symbol.iterator] }) as unknown as DOMRectList;
+Range.prototype.getBoundingClientRect = () => new DOMRect();
 
 function renderEditor() {
   return render(
@@ -85,5 +88,30 @@ describe('WorkspaceEditor (browser demo workspace)', () => {
 
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Restore' })); });
     expect(await screen.findByRole('tab', { name: /meeting notes/ })).toBeTruthy();
+  });
+
+  it('Local History: turn on, save, compare a snapshot, delete it', async () => {
+    renderEditor();
+    fireEvent.click(await screen.findByTitle('/demo-workspace'));
+    await act(async () => { fireEvent.click(await screen.findByText('README.md')); });
+    await screen.findByRole('tab', { name: /README\.md/ });
+    expect(await screen.findByText(/Turn on to keep a snapshot/)).toBeTruthy();
+
+    await act(async () => { fireEvent.click(screen.getByRole('switch', { name: 'Local History' })); });
+    const store = getEditorStore(getPluginSdk('text-editor'));
+    act(() => { store.newUntitled(); store.closeTab(store.getSnapshot().activeId!); });
+    const id = store.getSnapshot().tabs[0].id;
+    const view = (store as unknown as { view: { dispatch: (s: unknown) => void; state: { doc: { length: number } } } }).view;
+    act(() => { view.dispatch({ changes: { from: view.state.doc.length, insert: 'more' } }); });
+    await act(async () => { await store.save(id); });
+
+    const row = await screen.findByText('Before save');
+    await act(async () => { fireEvent.click(row); });
+    expect(await screen.findByText(/Left: snapshot/)).toBeTruthy();
+    await act(async () => { fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /Delete Snapshot/ })); });
+    expect(await screen.findByText(/Delete the snapshot from/)).toBeTruthy();
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Delete' })); });
+    await waitFor(() => expect(screen.queryByText('Before save')).toBeNull());
+    expect(screen.getByText('Saved')).toBeTruthy();
   });
 });

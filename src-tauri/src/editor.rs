@@ -11,6 +11,7 @@
 // for single files chosen in the Save As / Open File dialogs.
 
 use crate::editor_backup;
+use crate::editor_history;
 use crate::editor_fs::{DirListing, FileContent, FileList, FileStat, FsError, FsResult, Roots};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
@@ -155,6 +156,61 @@ pub fn editor_authorised_files(app: AppHandle) -> Vec<String> {
     snapshot(&app).list_authorised_files()
 }
 
+fn history_dir(app: &AppHandle) -> FsResult<PathBuf> {
+    app.path()
+        .app_data_dir()
+        .map(|d| d.join(editor_history::HISTORY_DIR))
+        .map_err(|e| FsError { code: "io", message: e.to_string() })
+}
+
+fn now_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
+}
+
+/// Local History: records a snapshot of `path` (see editor_history.rs).
+/// `None` when it matched the newest snapshot and was skipped.
+#[tauri::command]
+pub async fn editor_history_add(
+    app: AppHandle,
+    path: String,
+    content: String,
+    source: Option<String>,
+) -> FsResult<Option<editor_history::HistoryEntry>> {
+    let (roots, dir) = (snapshot(&app), history_dir(&app)?);
+    blocking(move || {
+        let key = roots.history_path(&path)?;
+        editor_history::add(&dir, &key, &content, source.as_deref().unwrap_or("save"), now_ms())
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn editor_history_list(app: AppHandle, path: String) -> FsResult<Vec<editor_history::HistoryEntry>> {
+    let (roots, dir) = (snapshot(&app), history_dir(&app)?);
+    blocking(move || Ok(editor_history::list(&dir, &roots.history_path(&path)?))).await
+}
+
+#[tauri::command]
+pub async fn editor_history_read(app: AppHandle, path: String, id: String) -> FsResult<String> {
+    let (roots, dir) = (snapshot(&app), history_dir(&app)?);
+    blocking(move || editor_history::read(&dir, &roots.history_path(&path)?, &id)).await
+}
+
+#[tauri::command]
+pub async fn editor_history_delete(app: AppHandle, path: String, id: String) -> FsResult<()> {
+    let (roots, dir) = (snapshot(&app), history_dir(&app)?);
+    blocking(move || editor_history::delete(&dir, &roots.history_path(&path)?, &id)).await
+}
+
+#[tauri::command]
+pub async fn editor_history_clear(app: AppHandle, path: String) -> FsResult<()> {
+    let (roots, dir) = (snapshot(&app), history_dir(&app)?);
+    blocking(move || editor_history::clear(&dir, &roots.history_path(&path)?)).await
+}
+
 fn backup_dir(app: &AppHandle) -> FsResult<PathBuf> {
     app.path()
         .app_data_dir()
@@ -249,14 +305,27 @@ pub async fn editor_create_dir(app: AppHandle, dir: String, name: String) -> FsR
 
 #[tauri::command]
 pub async fn editor_rename(app: AppHandle, path: String, new_name: String) -> FsResult<String> {
-    let roots = snapshot(&app);
-    blocking(move || roots.rename(&path, &new_name)).await
+    let (roots, dir) = (snapshot(&app), history_dir(&app)?);
+    blocking(move || {
+        let from = roots.resolve_entry(&path)?;
+        let to = roots.rename(&path, &new_name)?;
+        // Best-effort: a failure here must not report the rename as failed.
+        let _ = editor_history::relocate(&dir, &from.to_string_lossy(), &to);
+        Ok(to)
+    })
+    .await
 }
 
 #[tauri::command]
 pub async fn editor_move(app: AppHandle, path: String, target_dir: String) -> FsResult<String> {
-    let roots = snapshot(&app);
-    blocking(move || roots.move_into(&path, &target_dir)).await
+    let (roots, dir) = (snapshot(&app), history_dir(&app)?);
+    blocking(move || {
+        let from = roots.resolve_entry(&path)?;
+        let to = roots.move_into(&path, &target_dir)?;
+        let _ = editor_history::relocate(&dir, &from.to_string_lossy(), &to);
+        Ok(to)
+    })
+    .await
 }
 
 #[tauri::command]

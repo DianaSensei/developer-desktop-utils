@@ -423,3 +423,82 @@ describe('minimalChange', () => {
     expect(minimalChange('same', 'same')).toEqual({ from: 4, to: 4, insert: '' });
   });
 });
+
+describe('EditorStore — Local History', () => {
+  beforeEach(async () => { await store.openFolder(); });
+  const path = `${R}/a.txt`;
+
+  it('records nothing while off', async () => {
+    await store.openFile(path);
+    type('x');
+    await store.save(activeTab().id);
+    expect(await store.listHistory(path)).toEqual([]);
+  });
+
+  it('when on, the first save keeps the version before it, then every changed save', async () => {
+    store.setHistoryEnabled(true);
+    await store.openFile(path);
+    type('1');
+    await store.save(activeTab().id);
+    let list = await store.listHistory(path);
+    expect(list.map((e) => e.source)).toEqual(['save', 'previous']);
+    expect(await store.readSnapshot(path, list[1].id)).toBe('alpha\n');
+    expect(await store.readSnapshot(path, list[0].id)).toBe('alpha\n1');
+
+    type('2');
+    await store.save(activeTab().id);
+    // Saving again without changes adds nothing.
+    await store.save(activeTab().id);
+    list = await store.listHistory(path);
+    expect(list.map((e) => e.source)).toEqual(['save', 'save', 'previous']);
+    expect(snap().historyVersion).toBeGreaterThan(0);
+  });
+
+  it('keeps CRLF in snapshots', async () => {
+    store.setHistoryEnabled(true);
+    await store.openFile(`${R}/win.txt`);
+    type('three');
+    await store.save(activeTab().id);
+    const [saved, previous] = await store.listHistory(`${R}/win.txt`);
+    expect(await store.readSnapshot(`${R}/win.txt`, previous.id)).toBe('one\r\ntwo\r\n');
+    expect(await store.readSnapshot(`${R}/win.txt`, saved.id)).toBe('one\r\ntwo\r\nthree');
+  });
+
+  it('restoring puts the snapshot in the editor as one undoable change, unsaved', async () => {
+    store.setHistoryEnabled(true);
+    await store.openFile(path);
+    type(' v2');
+    await store.save(activeTab().id);
+    const previous = (await store.listHistory(path))[1];
+    expect(await store.restoreSnapshot(activeTab().id, previous.id)).toBe(true);
+    expect(view.state.doc.toString()).toBe('alpha\n');
+    expect(activeTab().dirty).toBe(true);
+    expect((await fs.readFile(path)).content).toBe('alpha\n v2');
+  });
+
+  it('deletes one snapshot or the whole file history', async () => {
+    store.setHistoryEnabled(true);
+    await store.openFile(path);
+    type('1');
+    await store.save(activeTab().id);
+    const [newest] = await store.listHistory(path);
+    await store.deleteSnapshot(path, newest.id);
+    expect((await store.listHistory(path)).map((e) => e.source)).toEqual(['previous']);
+    await store.clearHistory(path);
+    expect(await store.listHistory(path)).toEqual([]);
+  });
+
+  it('history outlives the file, and the setting survives a restart', async () => {
+    store.setHistoryEnabled(true);
+    await store.openFile(path);
+    type('!');
+    await store.save(activeTab().id);
+    await store.remove(path);
+    expect((await store.listHistory(path)).length).toBe(2);
+
+    store.flushPersist();
+    const again = makeStore();
+    await again.hydrate();
+    expect(again.getSnapshot().historyEnabled).toBe(true);
+  });
+});

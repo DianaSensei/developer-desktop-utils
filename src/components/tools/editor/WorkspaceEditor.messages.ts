@@ -74,6 +74,35 @@ export default defineMessages({
   indentSize: { vi: 'Độ rộng {{n}}', en: 'Size {{n}}' },
   shortcutFormat: { vi: 'Định dạng tài liệu', en: 'Format Document' },
 
+  // Local History (Timeline)
+  timeline: { vi: 'Lịch sử', en: 'Timeline' },
+  localHistory: { vi: 'Lưu lịch sử thay đổi', en: 'Local History' },
+  historyOnHint: { vi: 'Mỗi lần lưu file sẽ giữ lại một snapshot', en: 'Every save keeps a snapshot of the file' },
+  historyOffHint: {
+    vi: 'Bật để giữ lại một snapshot mỗi khi lưu file — xem lại, so sánh, khôi phục hoặc xoá sau.',
+    en: 'Turn on to keep a snapshot every time a file is saved — view, compare, restore or delete them later.',
+  },
+  historyEmpty: { vi: 'Chưa có snapshot — lưu file để tạo.', en: 'No snapshots yet — save the file to create one.' },
+  historyNoFile: { vi: 'Mở một file để xem lịch sử của nó.', en: 'Open a file to see its history.' },
+  historyUntitled: { vi: 'Tab chưa lưu thành file không có lịch sử.', en: 'An untitled tab has no history until it is saved.' },
+  historyPaused: { vi: 'Đang tắt — snapshot cũ vẫn xem được', en: 'Off — existing snapshots stay available' },
+  sourceSave: { vi: 'Đã lưu', en: 'Saved' },
+  sourcePrevious: { vi: 'Bản trước khi lưu', en: 'Before save' },
+  sourceRestore: { vi: 'Khôi phục', en: 'Restored' },
+  viewSnapshot: { vi: 'So sánh với hiện tại', en: 'Compare with Current' },
+  restoreSnapshot: { vi: 'Khôi phục nội dung này', en: 'Restore Contents' },
+  deleteSnapshot: { vi: 'Xoá snapshot', en: 'Delete Snapshot' },
+  clearHistory: { vi: 'Xoá toàn bộ lịch sử của file', en: 'Clear History of This File' },
+  deleteSnapshotTitle: { vi: 'Xoá snapshot lúc {{time}}?', en: 'Delete the snapshot from {{time}}?' },
+  deleteSnapshotDesc: { vi: 'Snapshot này sẽ bị xoá vĩnh viễn. File hiện tại không bị ảnh hưởng.', en: 'This snapshot is deleted for good. The file itself is not touched.' },
+  clearHistoryTitle: { vi: 'Xoá {{n}} snapshot của "{{name}}"?', en: 'Delete all {{n}} snapshots of "{{name}}"?' },
+  clearHistoryDesc: { vi: 'Toàn bộ lịch sử của file này sẽ bị xoá vĩnh viễn. File hiện tại không bị ảnh hưởng.', en: 'This file’s whole history is deleted for good. The file itself is not touched.' },
+  snapshotVsCurrent: { vi: 'Trái: snapshot · Phải: nội dung hiện tại trong editor', en: 'Left: snapshot · Right: current editor content' },
+  noDifferences: { vi: 'Giống hệt nội dung hiện tại', en: 'Identical to the current content' },
+  changedRegions: { vi: '{{n}} vùng khác nhau', en: '{{n}} changed regions' },
+  restoredNotice: { vi: 'Đã khôi phục — lưu để ghi ra file, hoặc ⌘Z để hoàn tác.', en: 'Restored — save to write it to the file, or undo to go back.' },
+  justNow: { vi: 'vừa xong', en: 'just now' },
+
   // Delete confirmation
   deleteTitle: { vi: 'Xoá "{{name}}"?', en: 'Delete "{{name}}"?' },
   deleteFileDesc: {

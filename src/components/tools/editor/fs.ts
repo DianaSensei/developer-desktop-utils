@@ -104,6 +104,29 @@ export interface EditorFs {
   delete(path: string): Promise<void>;
   /** Content of untitled tabs, one entry per key, outside the settings store. */
   readonly backups: BackupStore;
+  /** Local History: snapshots of a file taken on save (editor_history.rs). */
+  readonly history: HistoryStore;
+}
+
+export type SnapshotSource = 'save' | 'previous' | 'restore';
+
+export interface HistoryEntry {
+  id: string;
+  /** ms since the Unix epoch. */
+  ts: number;
+  size: number;
+  hash: string;
+  source: SnapshotSource;
+}
+
+export interface HistoryStore {
+  /** Null when identical to the newest snapshot (nothing recorded). */
+  add(path: string, content: string, source: SnapshotSource): Promise<HistoryEntry | null>;
+  /** Newest first. */
+  list(path: string): Promise<HistoryEntry[]>;
+  read(path: string, id: string): Promise<string>;
+  delete(path: string, id: string): Promise<void>;
+  clear(path: string): Promise<void>;
 }
 
 export interface BackupStore {
@@ -142,6 +165,13 @@ export function createNativeFs(sdk: PluginSdk): EditorFs {
     rename: (path, newName) => call<string>('editor_rename', { path, newName }),
     move: (path, targetDir) => call<string>('editor_move', { path, targetDir }),
     delete: (path) => call<void>('editor_delete', { path }),
+    history: {
+      add: (path, content, source) => call<HistoryEntry | null>('editor_history_add', { path, content, source }),
+      list: (path) => call<HistoryEntry[]>('editor_history_list', { path }),
+      read: (path, id) => call<string>('editor_history_read', { path, id }),
+      delete: (path, id) => call<void>('editor_history_delete', { path, id }),
+      clear: (path) => call<void>('editor_history_clear', { path }),
+    },
     backups: {
       list: () => call<string[]>('editor_backup_list'),
       read: (key) => call<string | null>('editor_backup_read', { key }),

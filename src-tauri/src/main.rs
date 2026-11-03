@@ -5,6 +5,7 @@ mod checksum;
 mod dropped;
 mod editor;
 mod editor_backup;
+mod editor_history;
 mod editor_fs;
 mod netinfo;
 mod files;
@@ -172,6 +173,11 @@ fn main() {
             editor::editor_save_as,
             editor::editor_authorised_files,
             editor::editor_backup_write,
+            editor::editor_history_add,
+            editor::editor_history_list,
+            editor::editor_history_read,
+            editor::editor_history_delete,
+            editor::editor_history_clear,
             editor::editor_backup_read,
             editor::editor_backup_delete,
             editor::editor_backup_list,

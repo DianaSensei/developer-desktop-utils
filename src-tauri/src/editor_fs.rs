@@ -307,6 +307,29 @@ impl Roots {
         }
     }
 
+    /// The path Local History files a file under: its canonical form when it
+    /// exists (or is an authorised single file), else — for a file deleted
+    /// since — its canonical parent (which must be inside a root) + name, so
+    /// the history of a deleted file can still bring it back.
+    pub fn history_path(&self, p: &str) -> FsResult<String> {
+        match self.resolve_file(p) {
+            Ok(c) => Ok(to_string(&c)),
+            Err(e) if e.code == "not_found" => {
+                let path = Path::new(p);
+                let name = match path.components().next_back() {
+                    Some(Component::Normal(n)) => n.to_owned(),
+                    _ => return Err(FsError::denied()),
+                };
+                let parent = canon(path.parent().ok_or_else(FsError::denied)?).map_err(|_| FsError::denied())?;
+                if !self.within(&parent) {
+                    return Err(FsError::denied());
+                }
+                Ok(to_string(&parent.join(name)))
+            }
+            Err(e) => Err(e),
+        }
+    }
+
     /// The entry itself (not what a symlink points to): canonical parent +
     /// file name. The parent must be inside a root and the entry must not be
     /// a root, so a workspace folder cannot be deleted/renamed from the tree.
@@ -884,6 +907,19 @@ mod tests {
         fs::write(root.join("a.txt"), "").unwrap();
         roots.add_file(&root.join("a.txt")).unwrap();
         assert!(roots.list_authorised_files().is_empty());
+    }
+
+    #[test]
+    fn history_path_covers_deleted_files_but_not_outsiders() {
+        let (t, root, roots) = workspace("histpath");
+        fs::write(root.join("a.txt"), "x").unwrap();
+        let live = roots.history_path(&s(&root.join("a.txt"))).unwrap();
+        fs::remove_file(root.join("a.txt")).unwrap();
+        assert_eq!(roots.history_path(&s(&root.join("a.txt"))).unwrap(), live, "same key after deletion");
+        let outside = t.0.join("secret.txt");
+        fs::write(&outside, "s").unwrap();
+        assert_eq!(roots.history_path(&s(&outside)).unwrap_err().code, "denied");
+        assert_eq!(roots.history_path(&s(&t.0.join("gone.txt"))).unwrap_err().code, "denied");
     }
 
     #[test]

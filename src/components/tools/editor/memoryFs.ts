@@ -4,7 +4,7 @@
 // renamed or deleted from inside, and a stale save is a `conflict`.
 
 import {
-  EditorFsError, type BackupStore, type DirEntry, type EditorFs, type FileContent, type FileList, type FileStat,
+  EditorFsError, type BackupStore, type DirEntry, type HistoryEntry, type HistoryStore, type EditorFs, type FileContent, type FileList, type FileStat,
 } from './fs';
 import { basename, dirname, isUnder, join, relativeTo } from './paths';
 
@@ -149,9 +149,44 @@ export function createMemoryFs(opts: MemoryFsOptions = {}): MemoryFs {
     },
   };
 
+  // Local History, kept in memory (the browser demo has no app data folder).
+  const historyMap = new Map<string, { entry: HistoryEntry; content: string }[]>();
+  let historySeq = 0;
+  const historyKey = (p: string) => {
+    if (nodes.has(p)) { resolve(p); return p; }
+    if (!within(dirname(p))) throw new EditorFsError('denied', 'That path is outside the folders opened in the editor.');
+    return p; // deleted since: history stays reachable
+  };
+  const history: HistoryStore = {
+    async add(path, content, source) {
+      const key = historyKey(path);
+      const list = historyMap.get(key) ?? [];
+      const last = list[list.length - 1];
+      if (last && last.content === content) return null;
+      const ts = now();
+      const entry: HistoryEntry = { id: `${ts}-${historySeq++}`, ts, size: content.length, hash: String(content.length), source };
+      list.push({ entry, content });
+      while (list.length > 50) list.shift();
+      historyMap.set(key, list);
+      return entry;
+    },
+    async list(path) { return [...(historyMap.get(historyKey(path)) ?? [])].reverse().map((x) => x.entry); },
+    async read(path, id) {
+      const hit = historyMap.get(historyKey(path))?.find((x) => x.entry.id === id);
+      if (!hit) throw new EditorFsError('not_found', 'No such snapshot.');
+      return hit.content;
+    },
+    async delete(path, id) {
+      const key = historyKey(path);
+      historyMap.set(key, (historyMap.get(key) ?? []).filter((x) => x.entry.id !== id));
+    },
+    async clear(path) { historyMap.delete(historyKey(path)); },
+  };
+
   return {
     kind: 'memory',
     backups,
+    history,
     async pickFolder() {
       const picked = opts.pickResult === undefined ? DEMO_ROOT : opts.pickResult;
       if (!picked) return null;

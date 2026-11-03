@@ -348,11 +348,13 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
     know: [
       'Highlighting uses VS Code’s Light+ / Dark+ colors, with bracket pairs colored by depth and indentation guides. The language comes from the file name (~150 languages) or, for an untitled tab, from what you type; click the language in the status bar to change it.',
       <><strong className="text-fg">Format Document</strong> — <Key>⇧</Key>+<Key>Alt</Key>+<Key>F</Key>, the formatter name in the status bar, or right-click a tab: Prettier for JS/TS/JSX, JSON, CSS/SCSS/LESS, HTML, Vue, Markdown, YAML and XML (your project’s <Tok>.prettierrc</Tok> or <Tok>package.json</Tok> “prettier” is used), sql-formatter for SQL dialects, and re-indenting by the grammar for every other language. Turn on <strong className="text-fg">Format on Save</strong> from the same status-bar menu.</>,
+      <><strong className="text-fg">Local History</strong> — the switch in the <strong className="text-fg">Timeline</strong> at the bottom of the Explorer. While on, every save keeps a snapshot of the file (the first save also keeps the version from before it). Click a snapshot to compare it with the current text; restore it into the editor or delete it from there or from the row’s buttons.</>,
       'Indentation (spaces or tabs, and the size) is detected per file, as VS Code does; change it from “Spaces: N” in the status bar. Line endings (LF/CRLF) and a UTF-8 BOM are kept when you save.',
       'Unsaved edits survive switching to another tool, and each tab keeps its own undo history. Open folders and tabs come back after a restart.',
       'When you return to the window, open folders are re-listed and open files are compared with disk: an unchanged tab reloads on its own; one with unsaved edits asks first. Saving over a file another program changed asks before overwriting.',
       'The app can only reach folders you opened through the dialog, plus single files you picked in Open File… / Save As. Remove a folder from Recent to revoke that access.',
       'Recently Closed keeps the last 30 closed tabs; Discard (×) or the bin icon removes their text for good.',
+      'Local History keeps the last 50 snapshots per file, follows a file when it is renamed or moved, and stays after the file is deleted — reopen the path to get it back. Turning the switch off stops recording; existing snapshots stay until you delete them.',
     ],
     caveat: [
       'Delete is permanent — files do not go to the Trash.',
@@ -480,6 +482,6 @@ export const TOOL_GUIDE_VERSIONS: Record<string, number> = {
   'cron-generator': 2,
   // 2 — match count + jump, keyboard tree navigation.
   json: 2,
-  // 3 — VS Code highlighting, Change Language Mode, Format Document / on Save.
-  'text-editor': 3,
+  // 4 — Local History (Timeline): snapshots on save, compare, restore, delete.
+  'text-editor': 4,
 };

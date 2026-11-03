@@ -23,7 +23,9 @@ import { indentUnit, indentRange } from '@codemirror/language';
 import { codeThemeWithVscodeHighlight, smartBracketSkip } from '@/components/ui/code-theme';
 import { bracketPairColorization, detectIndent, indentGuides, type DetectedIndent } from '@/components/ui/code-vscode';
 import { FormatError, PRETTIER_CONFIG_FILES, formatWithTool, formatterFor, parsePrettierConfig } from './format';
-import { toFsError, type EditorFsError, type DirEntry, type EditorFs, type WalkEntry } from './fs';
+import {
+  toFsError, type EditorFsError, type DirEntry, type EditorFs, type HistoryEntry, type SnapshotSource, type WalkEntry,
+} from './fs';
 import { guessLanguage, loadLanguage, loadLanguageByName } from './languages';
 import { basename, dirname, isUnder, join, rebase } from './paths';
 
@@ -105,6 +107,10 @@ export interface EditorSnapshot {
   closed: ClosedEntry[];
   /** Run Format Document before every save of a file (VS Code's editor.formatOnSave). */
   formatOnSave: boolean;
+  /** Local History: snapshot every saved file (off until the user turns it on). */
+  historyEnabled: boolean;
+  /** Bumped whenever a snapshot is added or removed, so the Timeline re-lists. */
+  historyVersion: number;
 }
 
 export type FormatResult = 'formatted' | 'unchanged' | 'unsupported' | 'failed';
@@ -126,6 +132,7 @@ const KEYS = {
   untitled: 'untitled',
   closed: 'closed',
   formatOnSave: 'formatOnSave',
+  history: 'localHistory',
 } as const;
 
 const DEFAULT_INDENT: DetectedIndent = { useTabs: false, size: 4 };
@@ -159,6 +166,10 @@ function readJson<T>(storage: StorageLike, key: string, fallback: T): T {
   } catch {
     return fallback;
   }
+}
+
+function withEol(text: string, eol: '\n' | '\r\n'): string {
+  return eol === '\r\n' ? text.replace(/\n/g, '\r\n') : text;
 }
 
 function detectEol(text: string): '\n' | '\r\n' {
@@ -195,6 +206,7 @@ export class EditorStore {
   private snap: EditorSnapshot = {
     hydrated: false, folders: [], recent: [], dirs: {}, expanded: {}, selected: null,
     tabs: [], activeId: null, wrap: false, cut: null, notice: null, closed: [], formatOnSave: false,
+    historyEnabled: false, historyVersion: 0,
   };
   private listeners = new Set<() => void>();
   private cursorListeners = new Set<() => void>();
@@ -284,6 +296,7 @@ export class EditorStore {
         .map((t) => ({ key: t.path.slice(UNTITLED_PREFIX.length), no: t.untitledNo, lang: t.languageOverride })),
       [KEYS.closed]: s.closed,
       [KEYS.formatOnSave]: s.formatOnSave,
+      [KEYS.history]: s.historyEnabled,
     };
     for (const [key, value] of Object.entries(values)) {
       const json = JSON.stringify(value);
@@ -347,6 +360,7 @@ export class EditorStore {
     const wrap = readJson<boolean>(this.storage, KEYS.wrap, false);
     const untitledMeta = readJson<{ key: string; no: number | null; lang?: string | null }[]>(this.storage, KEYS.untitled, []);
     const formatOnSave = readJson<boolean>(this.storage, KEYS.formatOnSave, false);
+    const historyEnabled = readJson<boolean>(this.storage, KEYS.history, false);
     const closedSaved = readJson<ClosedEntry[]>(this.storage, KEYS.closed, []);
 
     let authorised: string[] = [];
@@ -406,6 +420,7 @@ export class EditorStore {
       wrap,
       closed,
       formatOnSave,
+      historyEnabled,
     });
     this.syncView(true);
     for (const t of tabs) if (t.kind === 'untitled') void this.applyLanguage(t.id);
@@ -1091,6 +1106,14 @@ export class EditorStore {
     const live = this.currentState(id) ?? state;
     let content = live.doc.toString();
     if (tab.eol === '\r\n') content = content.replace(/\n/g, '\r\n');
+    // Local History: what is on disk now, before it is overwritten. The
+    // backend skips it when it equals the newest snapshot, so in practice
+    // this records the version from before the first save (or an outside
+    // change that was reloaded since).
+    const previous = this.saved.get(id);
+    if (this.snap.historyEnabled && previous) {
+      await this.snapshot(tab.path, withEol(previous.toString(), tab.eol), 'previous');
+    }
     this.patchTab(id, { saving: true });
     try {
       let stat;
@@ -1113,6 +1136,7 @@ export class EditorStore {
         saving: false, modified: stat.modified, size: stat.size, external: null,
         dirty: now ? !now.doc.eq(live.doc) : false,
       });
+      if (this.snap.historyEnabled) await this.snapshot(tab.path, content, 'save');
       return 'saved';
     } catch (e) {
       const err = toFsError(e);
@@ -1171,8 +1195,69 @@ export class EditorStore {
       void this.loadDir(dirname(path));
       this.select(path);
     }
+    if (this.snap.historyEnabled) await this.snapshot(path, content, 'save');
     await this.applyLanguage(id);
     return 'saved';
+  }
+
+  // ── Local History ──────────────────────────────────────────────────────
+
+  private historyWarned = false;
+
+  /** Records one snapshot; a failure is reported once and never blocks a save. */
+  private async snapshot(path: string, content: string, source: SnapshotSource) {
+    try {
+      const entry = await this.fs.history.add(path, content, source);
+      if (entry) this.set({ historyVersion: this.snap.historyVersion + 1 });
+    } catch (e) {
+      if (!this.historyWarned) {
+        this.historyWarned = true;
+        this.fail(e);
+      }
+    }
+  }
+
+  setHistoryEnabled(on: boolean) {
+    this.set({ historyEnabled: on });
+    this.persist();
+  }
+
+  listHistory(path: string): Promise<HistoryEntry[]> {
+    return this.fs.history.list(path);
+  }
+
+  readSnapshot(path: string, snapshotId: string): Promise<string> {
+    return this.fs.history.read(path, snapshotId);
+  }
+
+  /** Puts a snapshot's text into the tab as one undoable change. Not saved:
+   *  the tab turns dirty, as with VS Code's "Restore Contents". */
+  async restoreSnapshot(id: string, snapshotId: string): Promise<boolean> {
+    const tab = this.tab(id);
+    const state = this.currentState(id);
+    if (!tab || !state || tab.status !== 'ready') return false;
+    let text: string;
+    try {
+      text = await this.fs.history.read(tab.path, snapshotId);
+    } catch (e) {
+      this.fail(e);
+      return false;
+    }
+    // The editor works in LF; the tab's EOL is applied again on save.
+    const before = state.doc.toString();
+    const after = text.replace(/\r\n?/g, '\n');
+    if (before !== after) this.dispatchSpec(id, { changes: minimalChange(before, after), userEvent: 'restore' });
+    return true;
+  }
+
+  async deleteSnapshot(path: string, snapshotId: string) {
+    await this.fs.history.delete(path, snapshotId);
+    this.set({ historyVersion: this.snap.historyVersion + 1 });
+  }
+
+  async clearHistory(path: string) {
+    await this.fs.history.clear(path);
+    this.set({ historyVersion: this.snap.historyVersion + 1 });
   }
 
   // ── external changes ───────────────────────────────────────────────────

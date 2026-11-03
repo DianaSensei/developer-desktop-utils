@@ -694,3 +694,17 @@
   thước. (Cùng phiên: `tsc` của `npm run build` kiểm cả file `*.test.ts` — vitest chạy xanh
   không có nghĩa build xanh; plugin XML của Prettier mặc định không re-indent gì vì
   `xmlWhitespaceSensitivity: 'strict'`.)
+
+## [2026-11-03] tests — `@codemirror/merge` trong jsdom ném `textRange(...).getClientRects is not a function`
+- Nguyên nhân: `MergeView` (dùng cho xem diff snapshot của Local History) đo hình học của
+  `Range` ngay khi dựng; jsdom không cài `Range.prototype.getClientRects` /
+  `getBoundingClientRect`. Lỗi bắn từ callback đo của CodeMirror nên hiện thành log lỗi chứ
+  không làm test đỏ ngay — dễ bị bỏ qua cho tới khi nó biến thành "unhandled error".
+- Số lần thử: 1/5
+- Kết quả: Đã fix trong `WorkspaceEditor.test.tsx` bằng stub hai hàm đó (cùng chỗ stub
+  `scrollIntoView`).
+- Bài học chung: component nào dựng editor CodeMirror phức tạp (merge view, tooltip, panel) trong
+  test jsdom thì cần stub geometry của cả `Element` lẫn `Range`; đọc kỹ stderr của vitest kể cả
+  khi số test xanh. (Cùng phiên: `codecMcpBridge.decryptError.test.ts` đỏ một lần khi chạy cả
+  suite rồi xanh 5/5 khi chạy riêng và xanh ở lần chạy suite kế tiếp — test có sẵn, phụ thuộc
+  ciphertext ngẫu nhiên của crypto-js, không liên quan thay đổi editor.)

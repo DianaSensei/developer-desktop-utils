@@ -13,7 +13,7 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
 import { SplitPane } from '@/components/ui/split-pane';
-import { useMessages } from '@/contexts/LocaleContext';
+import { useCurrentLocale, useMessages } from '@/contexts/LocaleContext';
 import MESSAGES from './WorkspaceEditor.messages';
 import { Explorer, type PendingEdit } from './Explorer';
 import { EditorTabs } from './EditorTabs';
@@ -21,6 +21,9 @@ import { EditorPane } from './EditorPane';
 import { StatusBar } from './StatusBar';
 import { QuickOpen } from './QuickOpen';
 import { LanguagePicker } from './LanguagePicker';
+import { Timeline, absoluteTime } from './Timeline';
+import { SnapshotDiff } from './SnapshotDiff';
+import type { HistoryEntry } from './fs';
 import { getEditorStore } from './session';
 import { toFsError } from './fs';
 import { basename, isUnder, relativeTo } from './paths';
@@ -45,6 +48,9 @@ export function WorkspaceEditor() {
   const [pending, setPending] = useState<PendingEdit | null>(null);
   const [quickOpen, setQuickOpen] = useState(false);
   const [languagePicker, setLanguagePicker] = useState(false);
+  const [viewing, setViewing] = useState<HistoryEntry | null>(null);
+  const [snapshotToDelete, setSnapshotToDelete] = useState<{ path: string; entry: HistoryEntry } | null>(null);
+  const locale = useCurrentLocale();
   const [deletePath, setDeletePath] = useState<string | null>(null);
   const [prompt, setPrompt] = useState<ChoicePrompt | null>(null);
 
@@ -244,6 +250,7 @@ export function WorkspaceEditor() {
             onRequestDelete={setDeletePath}
             onRequestCloseFolder={(p) => void requestCloseFolder(p)}
             onCopyPath={(p, rel) => void copyPath(p, rel)}
+            footer={<Timeline store={store} snap={snap} tab={activeTab} onView={setViewing} />}
           />
         )}
         second={(
@@ -287,6 +294,33 @@ export function WorkspaceEditor() {
             />
           </div>
         )}
+      />
+
+      {viewing && activeTab?.kind === 'file' && (
+        <SnapshotDiff
+          store={store}
+          tab={activeTab}
+          entry={viewing}
+          onClose={() => setViewing(null)}
+          onRestore={() => {
+            const entry = viewing;
+            setViewing(null);
+            void store.restoreSnapshot(activeTab.id, entry.id).then((ok) => {
+              if (ok) { store.notify(m('restoredNotice'), 'info'); store.focusEditor(); }
+            });
+          }}
+          onDelete={() => { setSnapshotToDelete({ path: activeTab.path, entry: viewing }); setViewing(null); }}
+        />
+      )}
+      <ConfirmDialog
+        open={snapshotToDelete !== null}
+        onOpenChange={(o) => { if (!o) setSnapshotToDelete(null); }}
+        title={m('deleteSnapshotTitle', { time: snapshotToDelete ? absoluteTime(snapshotToDelete.entry.ts, locale) : '' })}
+        description={m('deleteSnapshotDesc')}
+        confirmLabel={m('delete')}
+        onConfirm={async () => {
+          if (snapshotToDelete) await store.deleteSnapshot(snapshotToDelete.path, snapshotToDelete.entry.id);
+        }}
       />
 
       <LanguagePicker open={languagePicker} onOpenChange={setLanguagePicker} store={store} tab={activeTab} />

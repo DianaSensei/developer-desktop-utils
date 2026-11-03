@@ -123,6 +123,33 @@ Rủi ro: backup là văn bản thuần trên đĩa — ai dán secret vào tab 
   heuristic có thứ tự, chạy lại 500 ms sau khi ngừng gõ nếu người dùng chưa chọn). Lựa chọn của
   tab untitled được lưu cùng metadata của nó.
 
+## Local History (Timeline) — bổ sung 2026-11-03
+
+Yêu cầu: có công tắc; khi bật, mỗi lần lưu file giữ một snapshot; người dùng xem lại hoặc xoá.
+
+- **Một công tắc chung** (`historyEnabled` trong `sdk.storage`, tắt mặc định) ở header của panel
+  Timeline cuối Explorer — đúng chỗ VS Code đặt Timeline. Tắt chỉ ngừng ghi, không xoá gì.
+- **Lưu ở Rust** (`src-tauri/src/editor_history.rs`), không phải `sdk.storage` (cùng lý do với
+  backup tab untitled): `<app_data>/editor-history/<sha256(path canonical)[..32]>/index.json` +
+  `<id>.txt`. Ghi nguyên tử, 0600. Mọi lệnh nhận **đường dẫn file** và kiểm lại với `Roots`
+  (`history_path`) trước — không đọc/ghi được lịch sử của file mà editor không được mở. Với file
+  đã bị xoá, khoá = thư mục cha canonical (phải nằm trong root) + tên, nên lịch sử vẫn mở được để
+  cứu file.
+- **Khi nào ghi**: trong `store.save`, trước khi ghi đè thì ghi snapshot `previous` = nội dung
+  trên đĩa lúc đọc (`saved`, áp lại EOL), sau khi ghi thì `save` = nội dung vừa lưu. Rust bỏ
+  qua snapshot trùng hash với snapshot mới nhất, nên `previous` thực tế chỉ xuất hiện ở lần lưu
+  đầu (hoặc sau khi file bị sửa từ ngoài rồi reload) — đúng thứ người dùng cần để quay về bản
+  trước khi mình sửa. Save As cũng ghi. Lỗi lịch sử báo một lần, **không bao giờ chặn việc lưu**.
+- Tối đa 50 snapshot / file (như `workbench.localHistory.maxFileEntries`), tối đa 10 MB / snapshot.
+- **Đổi tên / di chuyển** (`editor_rename` / `editor_move`) dời thư mục lịch sử theo (cả file
+  trong thư mục được đổi tên); trùng đích thì gộp. Best-effort: lỗi dời lịch sử không làm rename
+  thất bại.
+- **Xem**: `SnapshotDiff.tsx` — `MergeView` read-only (snapshot trái, nội dung hiện tại phải),
+  gập đoạn không đổi, màu VS Code. **Khôi phục** = một thay đổi undo được trong editor, không tự
+  lưu (giống "Restore Contents" của VS Code). **Xoá** một snapshot hoặc cả lịch sử file luôn qua
+  `ConfirmDialog`.
+- Tab untitled không có lịch sử (đã có backup hot exit). Bản web: lịch sử trong bộ nhớ.
+
 ## Đã cân nhắc, chưa làm
 
 - **Xoá vào Thùng rác** (crate `trash`) — UX tốt hơn, nhưng thêm dependency native cho cả ba
@@ -142,5 +169,6 @@ Rủi ro: backup là văn bản thuần trên đĩa — ai dán secret vào tab 
 - `src-tauri/src/editor_fs.rs` — luật filesystem + 18 test (symlink, `..`, prefix, root…)
 - `src-tauri/src/editor.rs` — lệnh Tauri, state, lưu `editor-roots.json`, hộp thoại
 - `src-tauri/src/editor_backup.rs` — backup tab untitled + test
+- `src-tauri/src/editor_history.rs` — Local History + test
 - `src/components/tools/editor/` — `store.ts` (+ test), `fs.ts`, `memoryFs.ts`, `Explorer.tsx`,
   `EditorTabs.tsx`, `EditorPane.tsx`, `StatusBar.tsx`, `QuickOpen.tsx`, `fileRanking.ts`

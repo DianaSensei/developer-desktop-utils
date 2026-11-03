@@ -36,12 +36,14 @@ interface Props {
   onRequestDelete: (path: string) => void;
   onRequestCloseFolder: (path: string) => void;
   onCopyPath: (path: string, relative: boolean) => void;
+  /** Rendered at the bottom of the side bar (the Timeline). */
+  footer?: React.ReactNode;
 }
 
 const ROW = 'flex w-full items-center gap-1.5 rounded-xs pr-2 text-dense leading-6 select-none';
 
 export function Explorer({
-  store, snap, activePath, pending, setPending, onRequestDelete, onRequestCloseFolder, onCopyPath,
+  store, snap, activePath, pending, setPending, onRequestDelete, onRequestCloseFolder, onCopyPath, footer,
 }: Props) {
   const m = useMessages(MESSAGES);
   const menu = useContextMenu();
@@ -270,6 +272,7 @@ export function Explorer({
           )}
         </>
       )}
+      {footer}
       {menu.state && <ContextMenu state={menu.state} onClose={menu.close} width={240} />}
     </div>
   );
