@@ -23,6 +23,7 @@ import { Timesheet } from './Timesheet';
 import { CalendarView } from './CalendarView';
 import { MeetingNotes } from './MeetingNotes';
 import { TaskList } from './TaskList';
+import { JiraProvider } from './jiraContext';
 import { onOpenRequest, peekPendingOpen, takePendingOpen, type OpenTarget } from './taskBus';
 import { usePluginSdkFor } from '@/platform';
 import { useMessages } from '@/contexts/LocaleContext';
@@ -310,7 +311,9 @@ function ReminderSettings() {
 export function ClockifySuite() {
   return (
     <ClockifyProvider>
-      <SuiteInner />
+      <JiraProvider>
+        <SuiteInner />
+      </JiraProvider>
     </ClockifyProvider>
   );
 }

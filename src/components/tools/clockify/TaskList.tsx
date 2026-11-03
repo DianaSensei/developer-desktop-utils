@@ -23,6 +23,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { cn } from '@/lib/utils';
 import { combineDateTime, toDateISO, toHM } from '@/lib/meetings';
 import MESSAGES from './TimeTracker.messages';
+import JIRA_MESSAGES from './jira.messages';
+import { JiraErrorBanner, JiraKeyChip, JiraTaskSection, JiraToolbar } from './JiraPanel';
+import { useJira } from './jiraContext';
 import { useClockify, type Task } from './store';
 import { ColorDot, ConfirmButton, Modal } from './ui';
 import { dayStart, fmtTotal } from './time';
@@ -124,7 +127,9 @@ export function TaskList({ focusId, onFocused }: { focusId?: string | null; onFo
             { value: 'board', icon: Columns3, title: tr('todo.view.board') },
           ]}
         />
+        <JiraToolbar />
       </div>
+      <JiraErrorBanner />
 
       <div className="min-h-0 flex-1 overflow-auto">
         {tasks.length === 0 && (
@@ -215,6 +220,7 @@ function useTaskActions(task: Task) {
 function TaskRow({ task, now, highlighted, onEdit }: { task: Task; now: number; highlighted: boolean; onEdit: () => void }) {
   const tr = useMessages(MESSAGES);
   const { deleteTask } = useClockify();
+  const { hideIssue } = useJira();
   const a = useTaskActions(task);
   const done = a.status === 'done';
   const ref = useRef<HTMLLIElement>(null);
@@ -236,6 +242,7 @@ function TaskRow({ task, now, highlighted, onEdit }: { task: Task; now: number; 
         <span className={cn('block truncate text-sm', done ? 'text-fg-mute line-through' : 'text-fg')}>{task.name}</span>
         <TaskMeta task={task} now={now} project={a.project} tracked={a.tracked} />
       </button>
+      <JiraKeyChip task={task} />
       {a.status === 'doing' && !done && (
         <span className="hidden shrink-0 rounded-sm bg-acc-tint px-1.5 py-0.5 text-[11px] font-medium text-acc-ink sm:inline">
           {tr('todo.status.doing')}
@@ -253,7 +260,7 @@ function TaskRow({ task, now, highlighted, onEdit }: { task: Task; now: number; 
           {a.isRunning ? <Square className="h-3.5 w-3.5 fill-current" /> : <Play className="h-3.5 w-3.5" />}
         </Button>
       )}
-      <ConfirmButton onConfirm={() => deleteTask(task.id)} title={tr('todo.delete')}>
+      <ConfirmButton onConfirm={() => { if (task.jira) hideIssue(task.jira.key); deleteTask(task.id); }} title={tr('todo.delete')}>
         <Trash2 className="h-3.5 w-3.5" />
       </ConfirmButton>
     </li>
@@ -460,6 +467,7 @@ function BoardCard({ task, now, highlighted, dragging, onPointerDown, onEdit, on
         </button>
       </div>
       <div className="mt-1.5 flex items-center justify-end gap-0.5">
+        <span className="mr-auto"><JiraKeyChip task={task} /></span>
         {/* Keyboard alternative to drag and drop. */}
         <Select value={a.status} onValueChange={(v) => onMove(v as TaskStatus)}>
           <SelectTrigger aria-label={tr('todo.moveTo')} className="h-ctl w-auto gap-1 border-transparent bg-transparent px-2 text-[11px] shadow-none">
@@ -503,6 +511,8 @@ function remindChoiceOf(t: Pick<Task, 'dueAt' | 'dueHasTime' | 'remindAt'>): Rem
 function TaskEditor({ task, onClose }: { task: Task; onClose: () => void }) {
   const tr = useMessages(MESSAGES);
   const { projects, updateTask, deleteTask } = useClockify();
+  const { hideIssue } = useJira();
+  const jm = useMessages(JIRA_MESSAGES);
   const [name, setName] = useState(task.name);
   const [status, setStatus] = useState<TaskStatus>(statusOf(task));
   const [priority, setPriority] = useState<TaskPriority>(priorityOf(task));
@@ -547,8 +557,18 @@ function TaskEditor({ task, onClose }: { task: Task; onClose: () => void }) {
         onSubmit={(e) => { e.preventDefault(); save(); }}
       >
         <Field label={tr('todo.name')}>
-          <Input value={name} onChange={(e) => setName(e.target.value)} aria-label={tr('todo.name')} className="h-ctl" autoFocus />
+          <Input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            aria-label={tr('todo.name')}
+            className="h-ctl"
+            autoFocus={!task.jira}
+            readOnly={!!task.jira}
+          />
+          {task.jira && <p className="text-[11px] text-fg-mute">{jm('nameFromJira')}</p>}
         </Field>
+
+        {task.jira && <JiraTaskSection task={task} />}
 
         <div className="flex flex-wrap gap-x-5 gap-y-3">
           <Field label={tr('todo.status')}>
@@ -647,7 +667,7 @@ function TaskEditor({ task, onClose }: { task: Task; onClose: () => void }) {
         </Field>
 
         <div className="flex items-center gap-2 border-t border-line pt-3">
-          <ConfirmButton onConfirm={() => { deleteTask(task.id); onClose(); }} title={tr('todo.delete')}>
+          <ConfirmButton onConfirm={() => { if (task.jira) hideIssue(task.jira.key); deleteTask(task.id); onClose(); }} title={tr('todo.delete')}>
             <Trash2 className="h-3.5 w-3.5" />
           </ConfirmButton>
           <span className="flex-1" />
