@@ -152,10 +152,10 @@ function indentExtension(indent: DetectedIndent): Extension {
 export function minimalChange(a: string, b: string): { from: number; to: number; insert: string } {
   let start = 0;
   const max = Math.min(a.length, b.length);
-  while (start < max && a.charCodeAt(start) === b.charCodeAt(start)) start++;
+  while (start < max && a.codePointAt(start) === b.codePointAt(start)) start++;
   let endA = a.length;
   let endB = b.length;
-  while (endA > start && endB > start && a.charCodeAt(endA - 1) === b.charCodeAt(endB - 1)) { endA--; endB--; }
+  while (endA > start && endB > start && a.codePointAt(endA - 1) === b.codePointAt(endB - 1)) { endA--; endB--; }
   return { from: start, to: endA, insert: b.slice(start, endB) };
 }
 
@@ -179,10 +179,20 @@ function detectEol(text: string): '\n' | '\r\n' {
 
 let nextId = 1;
 
+/** Backup key for an untitled tab. Not a secret, but taken from the CSPRNG
+ *  anyway; `randomUUID` needs a secure context, `getRandomValues` does not. */
 function newKey(): string {
-  const c = globalThis.crypto as Crypto | undefined;
-  if (c?.randomUUID) return c.randomUUID();
-  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  if (typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/** Length of `text` without its trailing spaces and tabs (a plain scan — the
+ *  `/[ \t]+$/` regex backtracks quadratically on long runs of blanks). */
+function trimmedLength(text: string): number {
+  let end = text.length;
+  while (end > 0 && (text[end - 1] === ' ' || text[end - 1] === '\t')) end--;
+  return end;
 }
 
 /** An untitled tab is named after its first line with text, as in VS Code. */
@@ -1039,8 +1049,8 @@ export class EditorStore {
     const trims: { from: number; to: number }[] = [];
     for (let i = 1; i <= trimmed.doc.lines; i++) {
       const line = trimmed.doc.line(i);
-      const m = /[ \t]+$/.exec(line.text);
-      if (m) trims.push({ from: line.from + m.index, to: line.to });
+      const end = trimmedLength(line.text);
+      if (end < line.text.length) trims.push({ from: line.from + end, to: line.to });
     }
     const after = trimmed.update({ changes: trims }).state.doc.toString();
     const before = state.doc.toString();

@@ -4,7 +4,7 @@
 // renames, Delete deletes, drag onto a folder moves — and new/rename happen
 // in an inline field in the tree rather than in a dialog.
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import {
   ChevronRight, ClipboardPaste, Copy, FileInput, FilePlus, FolderInput, FolderPlus, FolderX, History, ListCollapse,
   Pencil, RefreshCw, Scissors, Trash2, X,
@@ -40,7 +40,18 @@ interface Props {
   footer?: React.ReactNode;
 }
 
-const ROW = 'flex w-full items-center gap-1.5 rounded-xs pr-2 text-dense leading-6 select-none';
+const ROW = 'flex w-full items-center gap-1.5 rounded-xs pr-2 text-dense leading-6 select-none outline-hidden';
+
+/** Enter / Space on a row does what a click does. Rows are not in the tab
+ *  order (the tree is, and walks rows with the arrow keys), but a row that
+ *  takes clicks must also take the keyboard. */
+const onActivateKey = (activate: () => void) => (e: React.KeyboardEvent) => {
+  if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault();
+    e.stopPropagation();
+    activate();
+  }
+};
 
 export function Explorer({
   store, snap, activePath, pending, setPending, onRequestDelete, onRequestCloseFolder, onCopyPath, footer,
@@ -296,13 +307,24 @@ function RootNode({ ctx, root }: { ctx: TreeCtx; root: string }) {
   const { store, snap } = ctx;
   const open = !!snap.expanded[root];
   const selected = snap.selected === root;
+  const groupId = useId();
+  const activate = () => { store.select(root); void store.toggleDir(root); ctx.focusTree(); };
+  // The row itself is the treeitem; its children's group is a sibling tied to
+  // it with aria-owns, so the clickable element carries the interactive role.
   return (
-    <div role="treeitem" aria-expanded={open} aria-selected={selected} aria-level={1}>
+    <div role="none">
       <div
+        role="treeitem"
+        aria-expanded={open}
+        aria-selected={selected}
+        aria-level={1}
+        aria-owns={open ? groupId : undefined}
+        tabIndex={-1}
         data-path={root}
         data-drop-dir={root}
         title={root}
-        onClick={() => { store.select(root); void store.toggleDir(root); ctx.focusTree(); }}
+        onClick={activate}
+        onKeyDown={onActivateKey(activate)}
         onContextMenu={(e) => { store.select(root); ctx.menu.open(e, ctx.entriesFor(root, true, true)); }}
         className={cn(
           ROW, 'cursor-pointer pl-1 font-semibold uppercase tracking-wide text-xs text-fg-mute hover:bg-bg-2/60',
@@ -313,19 +335,19 @@ function RootNode({ ctx, root }: { ctx: TreeCtx; root: string }) {
         <ChevronRight className={cn('h-3.5 w-3.5 shrink-0 transition-transform duration-fast', open && 'rotate-90')} />
         <span className="truncate">{basename(root)}</span>
       </div>
-      {open && <DirChildren ctx={ctx} dir={root} depth={1} />}
+      {open && <DirChildren id={groupId} ctx={ctx} dir={root} depth={1} />}
     </div>
   );
 }
 
-function DirChildren({ ctx, dir, depth }: { ctx: TreeCtx; dir: string; depth: number }) {
+function DirChildren({ id, ctx, dir, depth }: { id: string; ctx: TreeCtx; dir: string; depth: number }) {
   const m = useMessages(MESSAGES);
   const state = ctx.snap.dirs[dir];
   const pendingHere = ctx.pending && ctx.pending.kind !== 'rename' && ctx.pending.dir === dir ? ctx.pending : null;
   const pad = { paddingLeft: 6 + depth * 12 };
 
   return (
-    <div role="group">
+    <div id={id} role="group">
       {pendingHere && (
         <NameField
           ctx={ctx}
@@ -366,6 +388,7 @@ function EntryNode({ ctx, path, name, isDir, isSymlink, depth }: {
   const tab = snap.tabs.find((t) => t.path === path);
   const Icon = isDir ? folderIcon(open) : fileIcon(path);
   const rowRef = useRef<HTMLDivElement>(null);
+  const groupId = useId();
 
   // Follow the active editor: its file's row scrolls into view when selected
   // from elsewhere (a tab click, Quick Open).
@@ -385,21 +408,30 @@ function EntryNode({ ctx, path, name, isDir, isSymlink, depth }: {
     );
   }
 
+  const activate = () => {
+    store.select(path);
+    if (isDir) void store.toggleDir(path);
+    else void store.openFile(path);
+    ctx.focusTree();
+  };
+
   return (
-    <div role="treeitem" aria-expanded={isDir ? open : undefined} aria-selected={selected} aria-level={depth + 1}>
+    <div role="none">
       <div
         ref={rowRef}
+        role="treeitem"
+        aria-expanded={isDir ? open : undefined}
+        aria-selected={selected}
+        aria-level={depth + 1}
+        aria-owns={open ? groupId : undefined}
+        tabIndex={-1}
         data-path={path}
         data-drop-dir={isDir ? path : dirname(path)}
         title={isSymlink ? `${path} — ${m('symlink')}` : path}
         style={{ paddingLeft: 6 + depth * 12 }}
         onPointerDown={(e) => ctx.startDrag(e, path)}
-        onClick={() => {
-          store.select(path);
-          if (isDir) void store.toggleDir(path);
-          else void store.openFile(path);
-          ctx.focusTree();
-        }}
+        onClick={activate}
+        onKeyDown={onActivateKey(activate)}
         onContextMenu={(e) => { store.select(path); ctx.menu.open(e, ctx.entriesFor(path, isDir, false)); }}
         className={cn(
           ROW, 'cursor-pointer text-fg/90 transition-colors duration-fast hover:bg-bg-2/60',
@@ -416,7 +448,7 @@ function EntryNode({ ctx, path, name, isDir, isSymlink, depth }: {
         <span className={cn('truncate', isSymlink && 'italic')}>{name}</span>
         {tab?.dirty && <span className="ml-auto h-2 w-2 shrink-0 rounded-full bg-fg-mute" aria-label={m('unsaved')} />}
       </div>
-      {open && <DirChildren ctx={ctx} dir={path} depth={depth + 1} />}
+      {open && <DirChildren id={groupId} ctx={ctx} dir={path} depth={depth + 1} />}
     </div>
   );
 }

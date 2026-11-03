@@ -89,10 +89,12 @@ export function guessLanguage(text: string): string | null {
   }
   if (/^(def\s+\w+\(.*\)\s*(->.*)?:|class\s+\w+(\(.*\))?:|from\s+[\w.]+\s+import\s|import\s+[\w.]+\s*$)/m.test(head)) return 'Python';
   if (/^(package\s+\w+|func\s+\w+\(.*\)\s*\{)/m.test(head) && /\bfunc\b/.test(head)) return 'Go';
-  if (/^\s*(fn\s+\w+|use\s+[\w:]+;|impl\b|pub\s+(fn|struct|enum)\b)/m.test(head)) return 'Rust';
+  if (/^[ \t]*(fn[ \t]+\w|use[ \t]+[\w:]+;|impl\b|pub[ \t]+(fn|struct|enum)\b)/m.test(head)) return 'Rust';
   if (/^(function\s+\w+\s*\(|const\s+\w+\s*=|let\s+\w+\s*=|console\.log\()/m.test(head)) return 'JavaScript';
-  if (/^[.#]?[\w-]+(\s*[,>+~]\s*[.#]?[\w-]+)*\s*\{[^}]*:[^}]*;[^}]*\}/m.test(head)) return 'CSS';
-  if (/^(#{1,6}\s+\S|[-*]\s+\[[ x]\]\s)/m.test(head) || /\[[^\]]+\]\([^)]+\)/.test(head)) return 'Markdown';
+  // A selector line opening a block, and a `property: value;` line. Two
+  // simple patterns rather than one nested one, which backtracks badly.
+  if (/^[.#]?[\w-][^{\n]{0,200}\{/m.test(head) && /^[ \t]*[\w-]+[ \t]*:[^;\n]+;/m.test(head)) return 'CSS';
+  if (/^(#{1,6}[ \t]+\S|[-*][ \t]+\[[ x]\][ \t])/m.test(head) || /\[[^\]\n]{1,200}\]\([^)\n]{1,500}\)/.test(head)) return 'Markdown';
   if (/^---\s*$|^[\w-]+:\s+\S.*\n[\w-]+:\s+\S/m.test(head) && !/[;{}]/.test(head)) return 'YAML';
   return null;
 }

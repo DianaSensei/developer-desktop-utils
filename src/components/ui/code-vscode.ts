@@ -111,7 +111,9 @@ export interface DetectedIndent {
  * anything else rounds to the nearest of those). `fallback` when nothing is
  * indented.
  */
-export function detectIndent(text: string, fallback: DetectedIndent = { useTabs: false, size: 4 }): DetectedIndent {
+const DEFAULT_INDENT: DetectedIndent = { useTabs: false, size: 4 };
+
+export function detectIndent(text: string, fallback: DetectedIndent = DEFAULT_INDENT): DetectedIndent {
   let tabs = 0;
   let spaces = 0;
   const deltas = new Map<number, number>();
@@ -143,6 +145,6 @@ export function detectIndent(text: string, fallback: DetectedIndent = { useTabs:
   let best = 0;
   let bestCount = -1;
   for (const [d, c] of deltas) if (c > bestCount || (c === bestCount && d < best)) { best = d; bestCount = c; }
-  const size = [2, 4, 8].reduce((a, b) => (Math.abs(b - best) < Math.abs(a - best) ? b : a));
+  const size = [4, 8].reduce((a, b) => (Math.abs(b - best) < Math.abs(a - best) ? b : a), 2);
   return { useTabs: false, size };
 }

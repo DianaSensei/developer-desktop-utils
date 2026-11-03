@@ -41,9 +41,42 @@ export function EditorTabs({ store, snap, onRequestClose, onCopyPath, onSaveAs, 
   }, [tabs]);
 
   useEffect(() => {
-    stripRef.current?.querySelector<HTMLElement>('[data-active="true"]')
-      ?.scrollIntoView({ inline: 'nearest', block: 'nearest' });
+    const strip = stripRef.current;
+    const active = strip?.querySelector<HTMLElement>('[data-active="true"]');
+    active?.scrollIntoView({ inline: 'nearest', block: 'nearest' });
+    // Arrow keys move between tabs: keep focus on the tab that became active.
+    if (strip?.contains(document.activeElement) && active && document.activeElement !== active) active.focus();
   }, [activeId]);
+
+  // The usual tablist keys: ←/→ (and Home/End) move, Enter/Space activate,
+  // Delete closes.
+  const onTabKey = (e: React.KeyboardEvent, tab: Tab) => {
+    // Keys on the tab's own × button belong to that button.
+    if (e.target !== e.currentTarget) return;
+    switch (e.key) {
+      case 'Enter':
+      case ' ':
+        e.preventDefault();
+        store.activate(tab.id);
+        break;
+      case 'ArrowRight':
+      case 'ArrowLeft':
+        e.preventDefault();
+        store.activateRelative(e.key === 'ArrowRight' ? 1 : -1);
+        break;
+      case 'Home':
+      case 'End': {
+        e.preventDefault();
+        const target = e.key === 'Home' ? tabs[0] : tabs.at(-1);
+        if (target) store.activate(target.id);
+        break;
+      }
+      case 'Delete':
+        e.preventDefault();
+        onRequestClose([tab.id]);
+        break;
+    }
+  };
 
   if (tabs.length === 0) return null;
 
@@ -78,6 +111,7 @@ export function EditorTabs({ store, snap, onRequestClose, onCopyPath, onSaveAs, 
     <div
       ref={stripRef}
       role="tablist"
+      tabIndex={-1}
       onDoubleClick={(e) => { if (e.target === e.currentTarget) onNewUntitled(); }}
       className="flex min-w-0 flex-1 items-stretch overflow-x-auto no-scrollbar"
     >
@@ -93,6 +127,7 @@ export function EditorTabs({ store, snap, onRequestClose, onCopyPath, onSaveAs, 
             title={tab.kind === 'untitled' ? `${tab.name} — ${m('untitledHint')}` : tab.path}
             tabIndex={active ? 0 : -1}
             onClick={() => store.activate(tab.id)}
+            onKeyDown={(e) => onTabKey(e, tab)}
             onAuxClick={(e) => { if (e.button === 1) { e.preventDefault(); onRequestClose([tab.id]); } }}
             onContextMenu={(e) => menu.open(e, entries(tab))}
             className={cn(

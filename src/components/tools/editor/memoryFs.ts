@@ -49,6 +49,18 @@ export interface MemoryFsOptions {
   now?: () => number;
 }
 
+/** Runs synchronous in-memory work as the async contract the real backend
+ *  has: a value resolves, a throw rejects (never escapes synchronously). */
+function run<T>(work: () => T): Promise<T> {
+  try {
+    return Promise.resolve(work());
+  } catch (e) {
+    return Promise.reject(e instanceof Error ? e : new Error(String(e)));
+  }
+}
+
+const byName = (a: string, b: string) => a.localeCompare(b);
+
 export interface MemoryFs extends EditorFs {
   /** Test hook: change a file behind the editor's back. */
   touch(path: string, content: string): void;
@@ -107,7 +119,7 @@ export function createMemoryFs(opts: MemoryFsOptions = {}): MemoryFs {
     }
   };
 
-  const create = async (dir: string, name: string, folder: boolean) => {
+  const create = (dir: string, name: string, folder: boolean) => run(() => {
     resolveDir(dir);
     const parts = name.split(/[\\/]/).filter(Boolean);
     if (parts.length === 0) throw new EditorFsError('invalid_name', 'A name is required.');
@@ -124,7 +136,7 @@ export function createMemoryFs(opts: MemoryFsOptions = {}): MemoryFs {
     if (nodes.has(target)) throw new EditorFsError('exists', `"${parts.join('/')}" already exists.`);
     nodes.set(target, folder ? { kind: 'dir', modified: now() } : { kind: 'file', content: '', modified: now() });
     return target;
-  };
+  });
 
   const backupMap = new Map<string, string>();
   const bs = opts.backupStorage;
@@ -134,19 +146,19 @@ export function createMemoryFs(opts: MemoryFsOptions = {}): MemoryFs {
     try { return JSON.parse(bs.get(INDEX) ?? '[]') as string[]; } catch { return []; }
   };
   const backups: BackupStore = {
-    async list() { return index().sort(); },
-    async read(key) { return bs ? bs.get(`backup:${key}`) : backupMap.get(key) ?? null; },
-    async write(key, content) {
+    list() { return run(() => index().sort(byName)); },
+    read(key) { return run(() => { return bs ? bs.get(`backup:${key}`) : backupMap.get(key) ?? null; }); },
+    write(key, content) { return run(() => {
       if (!bs) { backupMap.set(key, content); return; }
       bs.set(`backup:${key}`, content);
       const keys = index();
       if (!keys.includes(key)) bs.set(INDEX, JSON.stringify([...keys, key]));
-    },
-    async delete(key) {
+    }); },
+    delete(key) { return run(() => {
       if (!bs) { backupMap.delete(key); return; }
       if (bs.remove) bs.remove(`backup:${key}`); else bs.set(`backup:${key}`, '');
       bs.set(INDEX, JSON.stringify(index().filter((k) => k !== key)));
-    },
+    }); },
   };
 
   // Local History, kept in memory (the browser demo has no app data folder).
@@ -158,7 +170,7 @@ export function createMemoryFs(opts: MemoryFsOptions = {}): MemoryFs {
     return p; // deleted since: history stays reachable
   };
   const history: HistoryStore = {
-    async add(path, content, source) {
+    add(path, content, source) { return run(() => {
       const key = historyKey(path);
       const list = historyMap.get(key) ?? [];
       const last = list[list.length - 1];
@@ -169,25 +181,25 @@ export function createMemoryFs(opts: MemoryFsOptions = {}): MemoryFs {
       while (list.length > 50) list.shift();
       historyMap.set(key, list);
       return entry;
-    },
-    async list(path) { return [...(historyMap.get(historyKey(path)) ?? [])].reverse().map((x) => x.entry); },
-    async read(path, id) {
+    }); },
+    list(path) { return run(() => { return [...(historyMap.get(historyKey(path)) ?? [])].reverse().map((x) => x.entry); }); },
+    read(path, id) { return run(() => {
       const hit = historyMap.get(historyKey(path))?.find((x) => x.entry.id === id);
       if (!hit) throw new EditorFsError('not_found', 'No such snapshot.');
       return hit.content;
-    },
-    async delete(path, id) {
+    }); },
+    delete(path, id) { return run(() => {
       const key = historyKey(path);
       historyMap.set(key, (historyMap.get(key) ?? []).filter((x) => x.entry.id !== id));
-    },
-    async clear(path) { historyMap.delete(historyKey(path)); },
+    }); },
+    clear(path) { return run(() => { historyMap.delete(historyKey(path)); }); },
   };
 
   return {
     kind: 'memory',
     backups,
     history,
-    async pickFolder() {
+    pickFolder() { return run(() => {
       const picked = opts.pickResult === undefined ? DEMO_ROOT : opts.pickResult;
       if (!picked) return null;
       if (nodes.get(picked)?.kind !== 'dir') throw new EditorFsError('not_dir', 'Only folders can be opened.');
@@ -195,11 +207,11 @@ export function createMemoryFs(opts: MemoryFsOptions = {}): MemoryFs {
       if (i >= 0) roots.splice(i, 1);
       roots.push(picked);
       return picked;
-    },
-    async roots() { return roots.filter((r) => nodes.has(r)); },
-    async authorisedFiles() { return files.filter((f) => nodes.has(f)); },
-    async pickFile() { return null; },
-    async saveAs(content, suggestedName) {
+    }); },
+    roots() { return run(() => { return roots.filter((r) => nodes.has(r)); }); },
+    authorisedFiles() { return run(() => { return files.filter((f) => nodes.has(f)); }); },
+    pickFile() { return run(() => { return null; }); },
+    saveAs(content, suggestedName) { return run(() => {
       const dir = opts.saveDir ?? DEMO_ROOT;
       mkdirp(dir);
       const dot = suggestedName.lastIndexOf('.');
@@ -210,12 +222,12 @@ export function createMemoryFs(opts: MemoryFsOptions = {}): MemoryFs {
       nodes.set(path, { kind: 'file', content, modified: now() });
       if (!roots.some((r) => isUnder(path, r))) files.push(path);
       return path;
-    },
-    async forgetRoot(path) {
+    }); },
+    forgetRoot(path) { return run(() => {
       const i = roots.indexOf(path);
       if (i >= 0) roots.splice(i, 1);
-    },
-    async listDir(path) {
+    }); },
+    listDir(path) { return run(() => {
       resolveDir(path);
       const entries: DirEntry[] = children(path).map((p) => {
         const n = nodes.get(p)!;
@@ -225,13 +237,13 @@ export function createMemoryFs(opts: MemoryFsOptions = {}): MemoryFs {
         || a.name.toLowerCase().localeCompare(b.name.toLowerCase())
         || a.name.localeCompare(b.name));
       return { entries, truncated: false };
-    },
-    async listFiles(root, limit = MAX_WALK) {
+    }); },
+    listFiles(root, limit = MAX_WALK) { return run(() => {
       resolveDir(root);
       const cap = Math.min(limit, MAX_WALK);
       const files: FileList['files'] = [];
       let truncated = false;
-      const keys = [...nodes.keys()].filter((k) => k !== root && isUnder(k, root)).sort();
+      const keys = [...nodes.keys()].filter((k) => k !== root && isUnder(k, root)).sort(byName);
       for (const k of keys) {
         const n = nodes.get(k)!;
         if (n.kind !== 'file') continue;
@@ -241,15 +253,15 @@ export function createMemoryFs(opts: MemoryFsOptions = {}): MemoryFs {
         files.push({ path: k, rel });
       }
       return { files, truncated };
-    },
-    async stat(path) { return stat(resolve(path)); },
-    async readFile(path): Promise<FileContent> {
+    }); },
+    stat(path) { return run(() => { return stat(resolve(path)); }); },
+    readFile(path): Promise<FileContent> { return run(() => {
       const n = resolve(path);
       if (n.kind !== 'file') throw new EditorFsError('is_dir', 'That is a folder.');
       const binary = n.content.includes('\0');
       return { content: binary ? '' : n.content, binary, bom: false, size: n.content.length, modified: n.modified };
-    },
-    async writeFile(path, content, wopts = {}) {
+    }); },
+    writeFile(path, content, wopts = {}) { return run(() => {
       const n = resolve(path);
       if (n.kind !== 'file') throw new EditorFsError('is_dir', 'That is a folder.');
       if (wopts.expectedModified && n.modified !== wopts.expectedModified) {
@@ -258,10 +270,10 @@ export function createMemoryFs(opts: MemoryFsOptions = {}): MemoryFs {
       const next: Node = { kind: 'file', content, modified: Math.max(now(), n.modified + 1) };
       nodes.set(path, next);
       return stat(next);
-    },
+    }); },
     createFile: (dir, name) => create(dir, name, false),
     createDir: (dir, name) => create(dir, name, true),
-    async rename(path, newName) {
+    rename(path, newName) { return run(() => {
       checkComponent(newName);
       resolveEntry(path);
       const dst = join(dirname(path), newName);
@@ -269,8 +281,8 @@ export function createMemoryFs(opts: MemoryFsOptions = {}): MemoryFs {
       if (nodes.has(dst)) throw new EditorFsError('exists', `"${newName}" already exists.`);
       moveTree(path, dst);
       return dst;
-    },
-    async move(path, targetDir) {
+    }); },
+    move(path, targetDir) { return run(() => {
       resolveEntry(path);
       resolveDir(targetDir);
       if (isUnder(targetDir, path)) throw new EditorFsError('invalid_move', 'A folder cannot be moved into itself.');
@@ -279,11 +291,11 @@ export function createMemoryFs(opts: MemoryFsOptions = {}): MemoryFs {
       if (nodes.has(dst)) throw new EditorFsError('exists', `"${basename(path)}" already exists in the destination folder.`);
       moveTree(path, dst);
       return dst;
-    },
-    async delete(path) {
+    }); },
+    delete(path) { return run(() => {
       resolveEntry(path);
       for (const key of [...nodes.keys()]) if (isUnder(key, path)) nodes.delete(key);
-    },
+    }); },
     touch(path, content) {
       if (!nodes.has(dirname(path))) mkdirp(dirname(path));
       const prev = nodes.get(path);
