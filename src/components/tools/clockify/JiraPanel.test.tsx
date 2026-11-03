@@ -135,7 +135,7 @@ describe('Jira in the Tasks tab', () => {
     // The token comes back from the vault asynchronously.
     await waitFor(() => screen.getByRole('button', { name: 'Sync' }));
     fireEvent.click(screen.getByRole('button', { name: /Refund rounding/ }));
-    const dialog = screen.getByRole('dialog');
+    const dialog = screen.getByRole('complementary', { name: 'Edit task' });
     expect(within(dialog).getByText('45m not logged in Jira yet')).toBeTruthy();
     await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: 'Log 45m to Jira' })); });
     await waitFor(() => expect(jira.calls.some((c) => c.path.endsWith('/worklog'))).toBe(true));

@@ -29,6 +29,7 @@ import {
 } from './time';
 import { useMessages } from '@/contexts/LocaleContext';
 import MESSAGES from '@/components/tools/clockify/TimeTracker.messages';
+import { useToolActiveRef } from '@/contexts/ToolActivityContext';
 
 type Period = 'day' | 'week' | 'month' | 'all' | 'range';
 const PERIODS: { id: Period; label: string }[] = [
@@ -411,8 +412,10 @@ export function TimeTracker() {
   startRef.current = start;
   const runningRef = useRef(running);
   runningRef.current = running;
+  const activeRef = useToolActiveRef();
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (!activeRef.current) return;
       if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
         e.preventDefault();
         if (runningRef.current) stopRunning();

@@ -1,76 +1,77 @@
-import { Download, Sparkles } from 'lucide-react';
+import { Download, Sparkles, X } from 'lucide-react';
 import { Spinner } from '@/components/ui/spinner';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 import { useUpdate } from '@/contexts/UpdateContext';
 
 /**
- * Popup shown when an automatic update check (on launch / daily at 6am) finds a new version.
+ * Shown when an update check (on launch / daily at 6am, or "Check now")
+ * finds a new version. A card in the bottom-left corner, not a modal: it
+ * doesn't take the keyboard or block the tool you're working in, and stays
+ * until you install or choose Later.
  */
 export function UpdateDialog() {
   const { showUpdateDialog, dismissUpdateDialog, updateInfo, status, downloadProgress, installUpdate, cancelInstall } = useUpdate();
   const isDownloading = status === 'downloading';
+  if (!showUpdateDialog) return null;
 
   return (
-    <Dialog open={showUpdateDialog} onOpenChange={(open) => { if (!open) dismissUpdateDialog(); }}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-ok" />
-            Update available
-          </DialogTitle>
-          <DialogDescription>
+    <section
+      aria-label="Update available"
+      aria-live="polite"
+      className="fixed bottom-4 left-4 z-50 w-80 max-w-[calc(100vw-2rem)] rounded-lg border border-line bg-card p-3 shadow-lift"
+    >
+      <div className="flex items-start gap-2.5">
+        <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-ok/10 text-ok">
+          <Sparkles className="h-3.5 w-3.5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-fg">Update available</p>
+          <p className="text-xs text-fg-mute">
             Version <span className="font-mono font-medium text-fg">{updateInfo?.version}</span> is ready to install.
-          </DialogDescription>
-        </DialogHeader>
+          </p>
+        </div>
+        {!isDownloading && (
+          <button
+            type="button"
+            onClick={dismissUpdateDialog}
+            aria-label="Later"
+            title="Later"
+            className="rounded-xs p-0.5 text-fg-mute transition-colors hover:bg-bg-2 hover:text-fg focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
 
-        {updateInfo?.body && (
-          <div className="max-h-48 overflow-y-auto rounded-md border bg-bg-2/40 p-3 text-xs whitespace-pre-wrap text-fg-mute">
+      {updateInfo?.body && (
+        <details className="mt-2 text-xs">
+          <summary className="cursor-pointer text-fg-mute hover:text-fg">What's new</summary>
+          <div className="mt-1.5 max-h-40 overflow-y-auto whitespace-pre-wrap rounded-md border border-line bg-bg-2/40 p-2 text-fg-mute">
             {updateInfo.body}
           </div>
-        )}
+        </details>
+      )}
 
-        <DialogFooter>
+      <div className="mt-2.5 flex items-center justify-end gap-1.5">
+        {isDownloading ? (
+          <Button variant="ghost" size="sm" className="text-xs" onClick={cancelInstall}>Cancel</Button>
+        ) : (
+          <Button variant="ghost" size="sm" className="text-xs" onClick={dismissUpdateDialog}>Later</Button>
+        )}
+        <Button size="sm" className="gap-1.5 text-xs" onClick={installUpdate} disabled={isDownloading}>
           {isDownloading ? (
-            <button
-              onClick={cancelInstall}
-              className="rounded-md border px-3 py-1.5 text-xs font-medium text-fg-mute transition-colors hover:bg-bg-2 hover:text-fg"
-            >
-              Cancel
-            </button>
+            <>
+              <Spinner size="sm" />
+              {downloadProgress != null ? `Installing… ${downloadProgress}%` : 'Installing…'}
+            </>
           ) : (
-            <button
-              onClick={dismissUpdateDialog}
-              className="rounded-md border px-3 py-1.5 text-xs font-medium text-fg-mute transition-colors hover:bg-bg-2 hover:text-fg"
-            >
-              Later
-            </button>
+            <>
+              <Download className="h-3.5 w-3.5" />
+              Install &amp; restart
+            </>
           )}
-          <button
-            onClick={installUpdate}
-            disabled={isDownloading}
-            className="flex items-center gap-1.5 rounded-md bg-acc px-3 py-1.5 text-xs font-medium text-acc-fg transition-colors hover:bg-acc/90 disabled:opacity-50"
-          >
-            {isDownloading ? (
-              <>
-                <Spinner size="sm" />
-                {downloadProgress != null ? `Installing… ${downloadProgress}%` : 'Installing…'}
-              </>
-            ) : (
-              <>
-                <Download className="h-3.5 w-3.5" />
-                Install &amp; restart
-              </>
-            )}
-          </button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </Button>
+      </div>
+    </section>
   );
 }

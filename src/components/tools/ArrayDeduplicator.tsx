@@ -12,6 +12,7 @@ import { useMessages } from '@/contexts/LocaleContext';
 import COMMON from '@/components/tools/common.messages';
 import MESSAGES from '@/components/tools/ArrayDeduplicator.messages';
 import { PaneHeader } from '@/components/ui/tool-layout';
+import { useToolActiveRef } from '@/contexts/ToolActivityContext';
 
 type DedupeMode = 'preserve' | 'sort';
 
@@ -359,9 +360,10 @@ export function ArrayDeduplicator() {
     if (value) scheduleWorker(value);
   }, [mode, scheduleWorker]);
 
+  const activeRef = useToolActiveRef();
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (!(e.metaKey || e.ctrlKey)) return;
+      if (!(e.metaKey || e.ctrlKey) || !activeRef.current) return;
       const key = e.key.toLowerCase();
       const isUndo = key === 'z' && !e.shiftKey;
       const isRedo = (key === 'z' && e.shiftKey) || key === 'y';

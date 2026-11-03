@@ -3,6 +3,7 @@ import { isTauri, IS_MAC as isMac } from '@/lib/platform';
 
 import { useMessages } from '@/contexts/LocaleContext';
 import COMMON from '@/components/tools/common.messages';
+import { useToolActiveRef } from '@/contexts/ToolActivityContext';
 
 export { isMac };
 /** Fixed English hint for code outside React; components use `useQuickPasteHint()`. */
@@ -40,6 +41,8 @@ function isEditableTarget(el: EventTarget | null): boolean {
 export function useQuickPaste(onPaste: (text: string) => void, enabled = true) {
   const handlerRef = useRef(onPaste);
   handlerRef.current = onPaste;
+  // A tool kept alive in a background tab must not take the paste.
+  const activeRef = useToolActiveRef();
 
   useEffect(() => {
     if (!enabled) return;
@@ -47,7 +50,7 @@ export function useQuickPaste(onPaste: (text: string) => void, enabled = true) {
     const onKeyDown = async (event: KeyboardEvent) => {
       const isPasteCombo =
         (event.metaKey || event.ctrlKey) && !event.altKey && event.key.toLowerCase() === 'v';
-      if (!isPasteCombo) return;
+      if (!isPasteCombo || !activeRef.current) return;
 
       // While editing a field, let the browser handle paste normally
       // (insert at the cursor) instead of replacing the entire input.

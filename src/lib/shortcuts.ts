@@ -41,6 +41,8 @@ export function getShortcutGroups(): ShortcutGroup[] {
         { keys: [MOD_KEY, '⇧', '[ / ]'], description: 'Previous / next tab in the current workspace' },
         ...(IS_MAC ? [] : [{ keys: [MOD_KEY, 'PgUp / PgDn'], description: 'Previous / next tab in the current workspace' }]),
         { keys: [MOD_KEY, IS_MAC ? '⌥' : 'Alt', '1–9'], description: 'Switch to workspace 1–9' },
+        // SplitViewContext.tsx
+        { keys: [MOD_KEY, '\\'], description: 'Split view: show the last used tab next to this one (again to close)' },
       ],
     },
     {

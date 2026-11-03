@@ -256,6 +256,27 @@ trên qua `window.__DEVTOOL_VENDOR__.platform`, và bộ component UI qua
 `window.__DEVTOOL_VENDOR__.ui` (SDK ≥ 1.1.0). Xem
 [05-external-install.md](05-external-install.md#ui-dùng-bộ-component-của-app-chủ--__devtool_vendor__ui-sdk--110).
 
+## `useToolActivity()` / `useToolActiveRef()` — tool đang ở trước hay đang chạy nền
+
+Từ SDK 1.2.0, tool đang mở trong tab nền (hoặc khung còn lại của split view)
+vẫn được **giữ mount** chứ không unmount khi người dùng chuyển tab. Mọi listener
+gắn vào `window`/`document` (phím tắt, paste, file drop) phải tự kiểm:
+
+```ts
+const activeRef = useToolActiveRef();
+useEffect(() => {
+  const onKey = (e: KeyboardEvent) => {
+    if (!activeRef.current) return; // tool khác đang ở trước
+    // ...
+  };
+  window.addEventListener('keydown', onKey);
+  return () => window.removeEventListener('keydown', onKey);
+}, [activeRef]);
+```
+
+`useToolActivity()` trả `{ active, visible }`: `visible` true khi tool đang hiện
+(kể cả khung không focus của split view), `active` khi nó giữ bàn phím.
+
 ## Kiểm quyền không phải kiểm boolean đơn giản
 
 Toàn bộ `ensure()` nội bộ của SDK vừa kiểm quyền vừa GHI AUDIT trong cùng

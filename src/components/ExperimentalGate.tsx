@@ -4,17 +4,18 @@ import { FlaskConical } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useLocale } from '@/contexts/LocaleContext';
 
+/** Tools the user already agreed to open this session. */
+const confirmedThisSession = new Set<string>();
+
 /**
- * Consent screen an experimental tool's route is wrapped in. Deliberately
- * NOT persisted anywhere (no localStorage, no context) — `confirmed` is
- * local `useState`, and every tool in this app already remounts on each
- * sidebar navigation (see the `cachedConnections` module-scope-cache comment
- * in RedisClient.tsx and its siblings), so leaving the tool and coming back
- * naturally re-asks. That's the point: the user consents per visit, not once
- * ever, because an experimental tool's behavior can change between visits.
+ * Consent screen an experimental tool's route is wrapped in. Asked once per
+ * app session per tool — not on every visit: open tools now stay mounted
+ * across tab switches, and re-asking each time a user came back was an
+ * interruption without new information. Not persisted, so a restart (which
+ * may bring a changed experimental tool) asks again.
  */
 export function ExperimentalGate({ label, children }: { label: string; children: React.ReactNode }) {
-  const [confirmed, setConfirmed] = useState(false);
+  const [confirmed, setConfirmed] = useState(() => confirmedThisSession.has(label));
   const { t } = useLocale();
   const navigate = useNavigate();
 
@@ -31,7 +32,7 @@ export function ExperimentalGate({ label, children }: { label: string; children:
       </div>
       <div className="flex gap-2">
         <Button variant="outline" onClick={() => navigate(-1)}>{t('shell.experimental.cancel')}</Button>
-        <Button onClick={() => setConfirmed(true)}>{t('shell.experimental.continue')}</Button>
+        <Button onClick={() => { confirmedThisSession.add(label); setConfirmed(true); }}>{t('shell.experimental.continue')}</Button>
       </div>
     </div>
   );

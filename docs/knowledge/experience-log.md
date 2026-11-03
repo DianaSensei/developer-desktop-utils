@@ -772,3 +772,20 @@
   đi ngược cây đo `clientWidth` để tìm mắt xích đầu tiên rộng hơn cha.
 - Cùng đợt: tab workspace vẫn kéo-thả bằng HTML5 `draggable` (không chạy trong Tauri, xem
   2026-09-13) → chuyển sang pointer events như Explorer/board Tasks.
+
+## [2026-11-03] Shell — giữ tool sống qua tab (ToolHost): bẫy listener toàn cục và URL của tool nền
+- Bối cảnh: trước đây mỗi lần điều hướng là unmount tool (ExperimentalGate và vài tool còn dựa
+  vào điều đó). Chuyển sang giữ mount các tab đang mở (ẩn bằng `hidden`) để làm việc song song.
+- Bẫy 1 — listener `window` của tool nền vẫn chạy: ⌘S của Text Editor đang ẩn sẽ lưu file khi
+  người dùng ở JSON; ⌘V quick-paste của mọi tool ẩn đều nhận paste. Fix: `ToolActivityContext`
+  + `useToolActiveRef()`; hook dùng chung (`useQuickPaste`, `useInputHistory`, `useImagePaste`,
+  `ToolHeaderActions`) tự kiểm; 6 tool có listener riêng thêm guard. `data-claims-shortcuts` của
+  API Client (đánh dấu bằng DOM) cũng chỉ bật khi active, nếu không ⌘1–9 chết ở mọi tool khác.
+- Bẫy 2 — `useSearchParams` của tool nền đọc URL của tool đang ở trước. Fix: mỗi tool render qua
+  `<Routes location={vịTríCuốiCủaNó}>`; về lại tool bằng đường dẫn trơn (sidebar) thì khôi phục
+  query cũ (`/base64` → `/base64?tab=jwt`).
+- Bẫy 3 — React không "dời" được một cây con giữa hai khung split mà không remount. Fix: mọi tool
+  là anh em trong MỘT hàng flex; vào khung trái/phải/ẩn chỉ đổi `order`/`flex-basis`/`hidden`.
+- Bài học chung: khi đổi một giả định vòng đời ("điều hướng = unmount"), grep mọi
+  `window.addEventListener`, `document.querySelector` và `useSearchParams` — đó là nơi code ngầm
+  dựa vào giả định cũ.
