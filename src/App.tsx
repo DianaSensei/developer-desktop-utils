@@ -30,6 +30,7 @@ import { allTools, toolPath } from '@/lib/toolRegistry';
 import { buildNavEntries, countFavoriteEntries, type NavEntry } from '@/lib/toolGroups';
 import { searchTools, toolMatchesQuery } from '@/lib/toolSearch';
 import { useLiveConnections } from '@/lib/liveConnections';
+import { useNavBadges } from '@/lib/navBadges';
 import { initDeepLinkHandling } from '@/lib/deepLink';
 import { CommandPalette, requestCommandPalette } from '@/components/CommandPalette';
 import { WorkspaceBar, useWorkspaceBarVisible } from '@/components/WorkspaceBar';
@@ -196,6 +197,7 @@ function NavScrollArea({
   const navRef = useRef<HTMLElement>(null);
   const [hasMore, setHasMore] = useState(false);
   const liveIds = useLiveConnections();
+  const badges = useNavBadges();
 
   // Section labels ("Favorites" / "All tools") only make sense when favourites
   // are pinned to the top of the full, unfiltered, expanded list.
@@ -233,6 +235,7 @@ function NavScrollArea({
             const path = memberPaths[0];
             const isActive = memberPaths.includes(location.pathname);
             const isLive = entry.tools.some((t) => liveIds.includes(t.id));
+            const badge = entry.tools.map((t) => badges[t.id]).find(Boolean);
             const isExperimental = entry.tools.some((t) => t.experimental);
             const fav = entry.tools.some((t) => isFavorite(t.id));
             // A group's description lists its tools.
@@ -281,6 +284,12 @@ function NavScrollArea({
                       {isExperimental && isCollapsed && (
                         <ExperimentalDot title={t('shell.experimental.badge')} />
                       )}
+                      {badge && isCollapsed && !isLive && (
+                        <span
+                          className={cn('absolute -top-1 -right-1 h-2 w-2 rounded-full ring-2 ring-[hsl(var(--chrome-c))]', badge.tone === 'bad' ? 'bg-bad' : 'bg-info')}
+                          title={badge.label}
+                        />
+                      )}
                     </span>
                     {/* The label stays mounted and fades with the sidebar's 300ms
                         width animation. `min-w-0` lets a long label truncate while the
@@ -300,6 +309,18 @@ function NavScrollArea({
                         </span>
                       )}
                       {isExperimental && !isCollapsed && <ExperimentalMark className="ml-1.5" />}
+                      {badge && !isCollapsed && (
+                        <span
+                          title={badge.label}
+                          aria-label={badge.label}
+                          className={cn(
+                            'ml-1.5 inline-flex h-4 min-w-4 shrink-0 items-center justify-center rounded-full px-1 text-[11px] font-semibold tabular-nums leading-none',
+                            badge.tone === 'bad' ? 'bg-bad/10 text-bad' : 'bg-info/10 text-info',
+                          )}
+                        >
+                          {badge.count}
+                        </span>
+                      )}
                     </span>
                     {/* Favorite toggle, hidden when collapsed. On a group it acts on
                         the whole group: unfavoriting removes every member, favoriting

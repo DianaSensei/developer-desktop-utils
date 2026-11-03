@@ -3,6 +3,8 @@ import { defineMessages } from '@/lib/i18n';
 /** App-wide reminder toasts (reminders.tsx). */
 export default defineMessages({
   region: { vi: 'Nhắc việc', en: 'Reminders' },
+  badgeOverdue: { vi: '{{n}} việc quá hạn', en: '{{n}} overdue' },
+  badgeToday: { vi: '{{n}} việc hạn hôm nay', en: '{{n}} due today' },
   taskReminder: { vi: 'Nhắc task', en: 'Task reminder' },
   meetingSoon: { vi: 'Họp sau {{n}} phút', en: 'Meeting in {{n}} min' },
   meetingNow: { vi: 'Cuộc họp đang bắt đầu', en: 'Meeting starting now' },

@@ -107,7 +107,7 @@ export const DICTIONARY = {
   // ── Sidebar: status, tooltips, buttons ─────────────────────────────────
   'shell.sidebar.navLabel': { vi: 'Danh sách tool', en: 'Tools' },
   'shell.sidebar.connected': { vi: 'Đang kết nối', en: 'Connected' },
-  'shell.sidebar.connectedLabel': { vi: '{{label}} — đang kết nối', en: '{{label}} — connected' },
+  'shell.sidebar.connectedLabel': { vi: '{{label}} — đang hoạt động', en: '{{label}} — active' },
   'shell.sidebar.disabledLabel': { vi: '{{label}} — đã tắt', en: '{{label}} — turned off' },
   'shell.sidebar.enable': { vi: 'Bật', en: 'Enable' },
   'shell.sidebar.moreAvailable': { vi: 'Còn {{count}} tool nữa', en: '{{count}} more tools available' },

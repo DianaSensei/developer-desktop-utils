@@ -13,6 +13,10 @@ export default defineMessages({
     vi: 'Mở một thư mục để duyệt và sửa các file bên trong. Ứng dụng chỉ đụng tới thư mục bạn chọn.',
     en: 'Open a folder to browse and edit the files in it. The app only touches folders you choose.',
   },
+  noEditorNoFolder: {
+    vi: 'Gõ ngay vào một file mới (không cần chọn nơi lưu), mở một file, hoặc mở thư mục ở bên trái.',
+    en: 'Start typing in a new file (no location needed), open a file, or open a folder on the left.',
+  },
   recent: { vi: 'Gần đây', en: 'Recent' },
   forget: { vi: 'Xoá khỏi danh sách gần đây', en: 'Remove from Recent' },
   removeFolder: { vi: 'Đóng thư mục khỏi workspace', en: 'Remove Folder from Workspace' },

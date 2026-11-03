@@ -119,7 +119,7 @@ export function JiraErrorBanner() {
   const [dialog, setDialog] = useState(false);
   if (!jira.error) return null;
   return (
-    <div role="alert" className="flex items-center gap-2 border-b border-line bg-[hsl(var(--warn-c)/0.08)] px-3 py-1.5 text-xs text-warn">
+    <div role="alert" className="flex items-center gap-2 border-b border-line bg-warn/10 px-3 py-1.5 text-xs text-warn">
       <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
       <span className="min-w-0 flex-1">{jiraErrorText(jira.error, m)}</span>
       {jira.error.kind === 'auth' ? (
