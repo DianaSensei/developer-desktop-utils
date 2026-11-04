@@ -14,6 +14,7 @@ import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
 import { tags, tags as t } from '@lezer/highlight';
 import { useEffect, useRef } from 'react';
 import { useIsDark } from '@/hooks/useIsDark';
+import { findWidget } from './code-find';
 
 /** Code surfaces use the kit's `--mono` token, like `font-mono`. */
 export const CODE_FONT = 'var(--mono)';
@@ -113,7 +114,7 @@ export function resolveCodeThemeOptions(opts: CodeThemeOptions = {}) {
 export function codeTheme(dark: boolean, opts: CodeThemeOptions = {}): Extension {
   const { fontSize, paddingY, paddingX, gutter, activeLine, fill, fontFamily } = resolveCodeThemeOptions(opts);
 
-  return EditorView.theme(
+  return [findWidget, EditorView.theme(
     {
       '&': {
         // flex:1 rather than height:100% — percentage heights don't resolve
@@ -195,8 +196,6 @@ export function codeTheme(dark: boolean, opts: CodeThemeOptions = {}): Extension
         backgroundColor: 'hsl(var(--acc-c) / 0.2)',
       },
       '.cm-selectionMatch': { backgroundColor: 'hsl(var(--acc-c) / 0.12)' },
-      '.cm-searchMatch': { backgroundColor: 'hsl(var(--acc-c) / 0.18)' },
-      '.cm-searchMatch.cm-searchMatch-selected': { backgroundColor: 'hsl(var(--acc-c) / 0.32)' },
       '.cm-matchingBracket, &.cm-focused .cm-matchingBracket': {
         backgroundColor: 'hsl(var(--acc-c) / 0.15)',
         outline: '1px solid hsl(var(--acc-c) / 0.35)',
@@ -225,7 +224,7 @@ export function codeTheme(dark: boolean, opts: CodeThemeOptions = {}): Extension
       '.cm-completionLabel': { color: 'inherit' },
       '.cm-completionDetail': { color: 'hsl(var(--fg-mute-c))' },
 
-      // Search / goto-line panel.
+      // Go-to-line and other bottom panels (Find has its own widget: code-find.ts).
       '.cm-panels': { backgroundColor: 'hsl(var(--card-c))', color: 'hsl(var(--fg-c))' },
       '.cm-panels.cm-panels-top': { borderBottom: '1px solid hsl(var(--line-c))' },
       '.cm-panels.cm-panels-bottom': { borderTop: '1px solid hsl(var(--line-c))' },
@@ -243,7 +242,7 @@ export function codeTheme(dark: boolean, opts: CodeThemeOptions = {}): Extension
       },
     },
     { dark },
-  );
+  )];
 }
 
 /**

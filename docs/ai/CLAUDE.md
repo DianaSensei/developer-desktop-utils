@@ -1371,6 +1371,8 @@ const theme = useCodeTheme(viewRef, { fontSize: '12px', gutter: 'flush', activeL
 
 Why the hook rather than a plain constant: CodeMirror chooses between its `&light` and `&dark` base rules from the flag passed to `EditorView.theme(spec, { dark })` — it cannot see the app's `.dark` class. A theme built without the flag pins the editor to CodeMirror's light base rules forever, so unstated surfaces (autocomplete tooltips, text-selection fill) stay light in dark mode. `useCodeTheme` supplies the flag and reconfigures a `Compartment` when the theme flips. Syntax colors live in `codeHighlight`, sourced from the `--sql-*` / `--js-*` tokens — add a tag there, and don't add fallback colors (the tokens are always defined).
 
+**Find widget**: `codeTheme()` returns `[findWidget, theme]` — `code-find.ts` replaces CodeMirror's search panel for every editor (floating card, match count, Replace row, `--find-*` match tokens, ⌘⌥F / Ctrl+H `openReplace`). Never add a second `search({...})` config (merge conflict on `createPanel` throws); tests look for `.cm-find`, not `.cm-search`.
+
 ### CodeMirror `basicSetup` already includes more than it looks like
 
 `codemirror`'s `basicSetup` (used by every editor in this app, editable or bespoke) silently bundles keybindings that are easy to assume are missing and re-add — check before binding a key basicSetup already owns:
