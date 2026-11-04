@@ -204,7 +204,7 @@ export function TextDiff() {
           ]}
           aria-label={m('modeLabel')}
         />
-        <span className="hidden text-xs text-fg-mute lg:block">
+        <span className="hidden text-xs text-fg-mute @4xl:block">
           {mode === 'text'
             ? m('textHint')
             : m('jsonHint')}

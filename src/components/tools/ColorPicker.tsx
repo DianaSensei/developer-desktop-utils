@@ -401,7 +401,7 @@ export function ColorPicker() {
     <div className="h-full overflow-y-auto">
       <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onFile} />
 
-      <div className="grid gap-6 p-4 lg:grid-cols-[minmax(0,1fr)_30rem]">
+      <div className="grid gap-6 p-4 @4xl:grid-cols-[minmax(0,1fr)_30rem]">
 
         {/* ── Left: image ── */}
         <div className="min-w-0 space-y-5">

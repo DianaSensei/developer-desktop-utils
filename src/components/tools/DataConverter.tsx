@@ -252,7 +252,9 @@ export function DataConverter() {
       </ToolToolbar>
 
       {/* Editors — source | result */}
-      <div className="flex flex-1 min-h-0 divide-x divide-line">
+      {/* Side by side when the pane is wide enough (container query: a split
+          view pane counts, not the window); stacked otherwise. */}
+      <div className="flex flex-1 min-h-0 flex-col divide-y divide-line @2xl:flex-row @2xl:divide-x @2xl:divide-y-0">
         {/* Source */}
         <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
           <PaneHeader label={m('source', { format: FORMATS.find((f) => f.value === from)?.label ?? '' })} />

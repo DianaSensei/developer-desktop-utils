@@ -103,7 +103,7 @@ export function MarkdownPreview() {
   useInputHistory(markdownText, setMarkdownText);
 
   return (
-    <div className="grid h-full grid-rows-2 divide-y divide-line overflow-hidden md:grid-cols-2 md:grid-rows-1 md:divide-x md:divide-y-0">
+    <div className="grid h-full grid-rows-2 divide-y divide-line overflow-hidden @2xl:grid-cols-2 @2xl:grid-rows-1 @2xl:divide-x @2xl:divide-y-0">
       {/* Editor */}
       <div className="flex flex-col min-h-0">
         <PaneHeader label={m('markdown')} hint={quickPasteHint} />

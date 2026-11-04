@@ -123,7 +123,7 @@ export function PasswordHash() {
           ]}
           aria-label={m('mode')}
         />
-        <span className="hidden text-xs text-fg-mute sm:block">
+        <span className="hidden text-xs text-fg-mute @lg:block">
           {mode === 'hash' ? m('hashHint') : m('verifyHint')}
         </span>
       </ToolToolbar>

@@ -473,11 +473,15 @@ export function Settings() {
   }, [displayTools, reorderTools]);
 
   return (
-    <div className="flex h-full min-h-0">
+    <div className="flex h-full min-h-0 flex-col @2xl:flex-row">
       {/* Left nav: plain text, no icons, so it does not compete with the
-          main sidebar. One section is shown at a time. */}
-      <nav aria-label={t('shell.sidebar.settings')} className="w-48 shrink-0 overflow-y-auto border-r border-line bg-chrome px-2 py-4">
-        <ul className="space-y-0.5">
+          main sidebar. One section is shown at a time. In a narrow pane it
+          becomes a scrolling strip above the section (container query). */}
+      <nav
+        aria-label={t('shell.sidebar.settings')}
+        className="no-scrollbar shrink-0 overflow-x-auto border-b border-line bg-chrome px-2 py-1.5 @2xl:w-48 @2xl:overflow-x-visible @2xl:overflow-y-auto @2xl:border-b-0 @2xl:border-r @2xl:py-4"
+      >
+        <ul className="flex gap-0.5 @2xl:block @2xl:space-y-0.5">
           {SETTINGS_SECTIONS.map((s) => (
             <li key={s.id}>
               <button
@@ -485,7 +489,7 @@ export function Settings() {
                 onClick={() => setActiveSection(s.id)}
                 aria-current={activeSection === s.id ? 'true' : undefined}
                 className={cn(
-                  'flex w-full items-center justify-between gap-2 rounded-sm border px-2.5 py-2 text-left text-sm transition-colors',
+                  'flex w-full items-center justify-between gap-2 whitespace-nowrap rounded-sm border px-2.5 py-2 text-left text-sm transition-colors',
                   activeSection === s.id
                     ? 'border-line bg-card font-medium text-fg'
                     : 'border-transparent text-fg-mute hover:bg-card/60 hover:text-fg',
@@ -505,7 +509,7 @@ export function Settings() {
           heading tells screen readers which section is open. */}
       <div className="min-w-0 flex-1 overflow-y-auto">
         {/* Fixed max width keeps description lines readable on wide windows. */}
-        <div className="mx-auto max-w-[60rem] space-y-4 px-6 py-6">
+        <div className="mx-auto max-w-[60rem] space-y-4 px-3 py-4 @2xl:px-6 @2xl:py-6">
           <h2 className="sr-only">{t(SETTINGS_SECTIONS.find((s) => s.id === activeSection)!.label)}</h2>
 
           {activeSection === 'appearance' && (

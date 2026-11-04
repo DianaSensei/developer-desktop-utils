@@ -27,6 +27,7 @@ import { McpSetupDialog } from '@/components/McpSetupDialog';
 import { useMessages } from '@/contexts/LocaleContext';
 import MESSAGES from '@/components/tools/mockserver/MockServer.messages';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { useElementWidth } from '@/hooks/useElementWidth';
 
 // Sentinel selection id for the editable "no-match" fallback response.
 const FALLBACK_ID = '__fallback__';
@@ -71,6 +72,8 @@ export function MockServer() {
   // stable regardless of whether the request log is shown — the editor and log
   // share all the remaining space.
   const [sidebarW, setSidebarW] = usePluginState(sdk, 'mockServer:sidebarW', 230, { legacyKey: 'devtool:mockServer:sidebarW' });
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const bodyWidth = useElementWidth(bodyRef);
   const [dragging, setDragging] = useState(false);
   const dragCleanup = useRef<(() => void) | null>(null);
   useEffect(() => () => dragCleanup.current?.(), []);
@@ -137,6 +140,7 @@ export function MockServer() {
   const baseUrl = `http://${shownHost}:${displayPort}`;
 
   // ── Panels ───────────────────────────────────────────────────────────────
+  const narrow = bodyWidth > 0 && bodyWidth < 640;
   const stubListPane = (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex shrink-0 items-center justify-between border-b border-line px-3 py-1.5">
@@ -330,19 +334,26 @@ export function MockServer() {
       </ToolToolbar>
 
       {/* ── Body: [stubs] · editor [· log] ──────────────────────────────── */}
-      <div className="flex min-h-0 flex-1">
-        <div className="flex min-h-0 shrink-0 flex-col overflow-hidden" style={{ width: sidebarW }}>
+      {/* Narrow pane (small window / split view): the stub list stacks on top
+          as a short scrolling list instead of a squeezed column. */}
+      <div ref={bodyRef} className={cn('flex min-h-0 flex-1', narrow && 'flex-col')}>
+        <div
+          className={cn('flex min-h-0 shrink-0 flex-col overflow-hidden', narrow && 'max-h-40 border-b border-line')}
+          style={narrow ? undefined : { width: sidebarW }}
+        >
           {stubListPane}
         </div>
-        <div
-          onPointerDown={startSidebarDrag}
-          className={cn(
-            'group relative w-px shrink-0 cursor-col-resize bg-line transition-colors hover:bg-acc/40',
-            dragging && 'bg-acc/60',
-          )}
-        >
-          <span className="absolute -inset-x-1 inset-y-0" />
-        </div>
+        {!narrow && (
+          <div
+            onPointerDown={startSidebarDrag}
+            className={cn(
+              'group relative w-px shrink-0 cursor-col-resize bg-line transition-colors hover:bg-acc/40',
+              dragging && 'bg-acc/60',
+            )}
+          >
+            <span className="absolute -inset-x-1 inset-y-0" />
+          </div>
+        )}
 
         <div className="flex min-h-0 min-w-0 flex-1">
           {logVisible ? (

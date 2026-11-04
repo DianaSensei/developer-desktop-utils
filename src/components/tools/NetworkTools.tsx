@@ -276,7 +276,7 @@ function DnsView() {
               No {type} records found{status && status !== 'NOERROR' ? ` · ${status}` : ''}.
             </div>
           ) : (
-            <div className="grid gap-1.5 lg:grid-cols-2">
+            <div className="grid gap-1.5 @4xl:grid-cols-2">
               {answers.map((a, i) => (
                 <div key={i} className="flex items-center gap-2.5 rounded-lg border bg-card px-3 py-2">
                   <Pill className="shrink-0 w-12">{a.typeName}</Pill>
@@ -364,7 +364,7 @@ function PropagationView() {
               {consistent ? m('propagated') : m('notPropagated')}
             </Callout>
           )}
-          <div className="grid gap-2 sm:grid-cols-2">
+          <div className="grid gap-2 @lg:grid-cols-2">
             {rows.map((r) => (
               <div key={r.provider.id} className="rounded-lg border bg-card px-3 py-2.5">
                 <div className="flex items-center gap-2">
@@ -467,7 +467,7 @@ function DnssecView() {
           </Callout>
           {hasData ? (
             <div className="space-y-2">
-              <div className="grid gap-2 lg:grid-cols-2">
+              <div className="grid gap-2 @4xl:grid-cols-2">
                 <DnssecSection title={m('dsRecords')} records={result.ds} />
                 <DnssecSection title={m('dnskeyRecords')} records={result.dnskey} />
               </div>
@@ -619,7 +619,7 @@ function LocalNetworkView() {
           {info.interfaces.length > 0 && (
             <>
               <SectionLabel rule className="px-0.5 pt-1" count={info.interfaces.length}>{m('interfaces')}</SectionLabel>
-              <div className="grid gap-1.5 lg:grid-cols-2">
+              <div className="grid gap-1.5 @4xl:grid-cols-2">
                 {info.interfaces.map((iface, i) => (
                   <div
                     key={`${iface.name}-${iface.ip}-${i}`}
@@ -1343,7 +1343,7 @@ export function NetworkTools() {
           different active treatments, keeping the azure accent restrained. */}
       <div className="shrink-0 border-b border-line">
         {/* Primary: categories — underline tabs */}
-        <div className="flex items-center gap-0.5 overflow-x-auto no-scrollbar px-2 sm:px-3" role="tablist" aria-label={m('categoryLabel')}>
+        <div className="flex items-center gap-0.5 overflow-x-auto no-scrollbar px-2 @lg:px-3" role="tablist" aria-label={m('categoryLabel')}>
           {CATEGORIES.map((cat) => {
             const Icon = cat.icon;
             const active = cat.id === activeCategory;
@@ -1371,7 +1371,7 @@ export function NetworkTools() {
           })}
         </div>
         {/* Secondary: views within the active category — tinted pills */}
-        <div className="flex items-center gap-1 overflow-x-auto no-scrollbar px-2 pb-2 pt-1.5 sm:px-3" role="tablist" aria-label={m('viewLabel')}>
+        <div className="flex items-center gap-1 overflow-x-auto no-scrollbar px-2 pb-2 pt-1.5 @lg:px-3" role="tablist" aria-label={m('viewLabel')}>
           {subViews.map((v) => {
             const meta = VIEW_META[v];
             const Icon = meta.icon;
@@ -1398,7 +1398,7 @@ export function NetworkTools() {
       </div>
 
       {/* Active view — content is width-constrained so wide screens stay readable */}
-      <div className="flex-1 min-h-0 p-3 sm:p-4">
+      <div className="flex-1 min-h-0 p-3 @lg:p-4">
         <div className="mx-auto h-full w-full max-w-5xl">
           {view === 'dns' && <DnsView />}
           {view === 'propagation' && <PropagationView />}

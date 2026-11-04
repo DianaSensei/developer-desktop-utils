@@ -789,3 +789,18 @@
 - Bài học chung: khi đổi một giả định vòng đời ("điều hướng = unmount"), grep mọi
   `window.addEventListener`, `document.querySelector` và `useSearchParams` — đó là nơi code ngầm
   dựa vào giả định cũ.
+
+## [2026-11-04] Responsive — breakpoint viewport sai khi tool nằm trong khung split view
+- Bối cảnh: yêu cầu "app và mọi tool phải responsive". Audit tự động (Playwright: mọi tool ×
+  1280/1024/800×600/640/390, đo phần tử vượt mép khung tool mà không nằm trong vùng cuộn ngang)
+  tìm ra: tab Encode·Hash·Encrypt tràn ở ≤1024, nút/thanh công cụ tràn ở 390, và nhiều tool hai
+  cột/sidebar cố định bị bóp méo (không tràn nên audit tràn không bắt — phải xem ảnh).
+- Bẫy: tool dùng `sm:/md:/lg:` (viewport). Từ khi có split view, một tool chỉ được nửa cửa sổ
+  nhưng breakpoint vẫn tính theo cửa sổ → bố cục "rộng" trong khung hẹp. Fix: `@container` trên
+  wrapper tool (ToolHost) + đổi 37 chỗ sang container variant (`sm→@lg`, `md→@2xl`, `lg→@4xl`,
+  `xl→@6xl`, trừ hao sidebar). Ngoại lệ: dialog/popover portal ra `body` không có container cha —
+  container variant ở đó KHÔNG BAO GIỜ khớp, nên giữ breakpoint viewport (PipelineTemplateBar).
+- Gốc rễ chung hơn: `SplitPane` tự xếp dọc khi hẹp, `Segmented` tự cuộn ngang, `SettingRow` tự xuống
+  dòng — sửa ở component dùng chung bao được nhiều tool một lúc hơn là vá từng tool.
+- Bài học: audit "tràn" chỉ bắt được một nửa; layout bị bóp (cột 120px chữ xuống từng từ) phải
+  nhìn ảnh. Ghép ảnh thành contact sheet (PIL) để duyệt 20+ tool một lượt.

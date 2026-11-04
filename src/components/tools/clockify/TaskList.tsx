@@ -280,7 +280,7 @@ function TaskRow({ task, now, highlighted, onEdit }: { task: Task; now: number; 
       </button>
       <JiraKeyChip task={task} />
       {a.status === 'doing' && !done && (
-        <span className="hidden shrink-0 rounded-sm bg-acc-tint px-1.5 py-0.5 text-[11px] font-medium text-acc-ink sm:inline">
+        <span className="hidden shrink-0 rounded-sm bg-acc-tint px-1.5 py-0.5 text-[11px] font-medium text-acc-ink @lg:inline">
           {tr('todo.status.doing')}
         </span>
       )}
@@ -433,7 +433,7 @@ function BoardView({ tasks, now, highlight, onEdit, onMove, tr }: {
   };
 
   return (
-    <div className="grid h-full min-h-[320px] grid-cols-1 gap-3 p-3 md:grid-cols-3">
+    <div className="grid h-full min-h-[320px] grid-cols-1 gap-3 p-3 @2xl:grid-cols-3">
       {STATUSES.map((status) => {
         const items = tasks.filter((t) => statusOf(t) === status);
         return (
@@ -593,7 +593,7 @@ function TaskEditor({ task, onClose }: { task: Task; onClose: () => void }) {
       className={cn(
         'flex w-[400px] max-w-full shrink-0 flex-col border-l border-line bg-card',
         // Narrow windows: overlay the list instead of squeezing it.
-        'max-lg:absolute max-lg:inset-y-0 max-lg:right-0 max-lg:z-20 max-lg:shadow-lift',
+        '@max-3xl:absolute @max-3xl:inset-y-0 @max-3xl:right-0 @max-3xl:z-20 @max-3xl:shadow-lift',
       )}
     >
       <div className="flex h-ctl shrink-0 items-center gap-2 border-b border-line px-3">

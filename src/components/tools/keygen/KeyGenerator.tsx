@@ -152,13 +152,13 @@ function PairOutput({ result }: { result: KeyPairResult }) {
       </div>
 
       {current === 'pem' && (
-        <div className={cn('grid gap-3 md:grid-cols-2')}>
+        <div className={cn('grid gap-3 @2xl:grid-cols-2')}>
           <OutputBlock label={t('keygen.privateKey')} value={result.privatePem} rows={8} hint="PKCS#8" />
           <OutputBlock label={t('keygen.publicKey')} value={result.publicPem} rows={8} hint="SPKI / X.509 SubjectPublicKeyInfo" />
         </div>
       )}
       {current === 'jwk' && (
-        <div className="grid gap-3 md:grid-cols-2">
+        <div className="grid gap-3 @2xl:grid-cols-2">
           <OutputBlock label={t('keygen.privateJwk')} value={JSON.stringify(result.privateJwk, null, 2)} rows={10} />
           <OutputBlock label={t('keygen.jwks')} value={result.jwks} rows={10} hint={t('keygen.jwksHint')} />
         </div>
@@ -170,7 +170,7 @@ function PairOutput({ result }: { result: KeyPairResult }) {
         </div>
       )}
       {current === 'wireguard' && result.wireguard && (
-        <div className="grid gap-3 md:grid-cols-2">
+        <div className="grid gap-3 @2xl:grid-cols-2">
           <OutputBlock label="PrivateKey" value={result.wireguard.privateKey} rows={2} hint={t('keygen.wgPrivateHint')} />
           <OutputBlock label="PublicKey" value={result.wireguard.publicKey} rows={2} hint={t('keygen.wgPublicHint')} />
         </div>
