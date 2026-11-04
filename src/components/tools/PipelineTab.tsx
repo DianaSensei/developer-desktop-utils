@@ -14,7 +14,7 @@ import {
   Hash, KeyRound, Code2, Type, Scissors, Search, CornerDownRight,
   AlertTriangle, CheckCircle2, ArrowRight, FileText, Braces,
   Lock, LockOpen, ScanText, ShieldCheck, Stamp, TextSearch, Split, Route, Combine,
-  Minimize2, Quote, TextQuote, ArrowDownAZ, FileCode2,
+  Minimize2, Quote, TextQuote, ArrowDownAZ, FileCode2, ChevronsDownUp, ChevronsUpDown,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useQuickPaste } from '@/hooks/useQuickPaste';
@@ -1101,6 +1101,55 @@ function StepCard({ step, index, total, result, input, priorSteps, showKey, onTo
   );
 }
 
+// ─── Collapsed middle steps ────────────────────────────────────────────────────
+
+/** The steps between the first and the last, as one row of chips. A failing
+ *  step turns the bar red so a collapsed pipeline never hides an error. */
+function CollapsedSteps({ steps, results, firstIndex, onExpand }: {
+  steps: PipelineStep[];
+  results: Record<string, StepResult | undefined>;
+  firstIndex: number;
+  onExpand: () => void;
+}) {
+  const t = useMessages(MESSAGES);
+  const failed = steps.filter((s) => results[s.id]?.error).length;
+  return (
+    <button
+      type="button"
+      onClick={onExpand}
+      title={t('expandSteps')}
+      className={cn(
+        'flex w-full flex-wrap items-center gap-1.5 rounded-lg border border-dashed px-3 py-2 text-left transition-colors',
+        'focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus',
+        failed ? 'border-bad/50 bg-bad/5 hover:bg-bad/10' : 'border-line bg-bg-2/40 hover:bg-bg-2',
+      )}
+    >
+      <span className={cn('mr-1 text-xs font-medium', failed ? 'text-bad' : 'text-fg-mute')}>
+        {t('hiddenSteps', { n: steps.length })}
+        {failed > 0 && ` · ${t('hiddenFailed', { n: failed })}`}
+      </span>
+      {steps.map((s, i) => {
+        const m = OP_META[s.op];
+        const Icon = m.icon;
+        const bad = !!results[s.id]?.error;
+        return (
+          <span key={s.id} className="inline-flex items-center gap-1">
+            {i > 0 && <ArrowRight className="h-3 w-3 text-fg-mute/50" aria-hidden />}
+            <span className={cn('inline-flex items-center gap-1 rounded-sm border bg-card px-1.5 py-0.5 text-[11px]', bad ? 'border-bad/50 text-bad' : 'border-line text-fg')}>
+              <span className="tabular-nums text-fg-mute">{firstIndex + i + 1}</span>
+              <Icon className={cn('h-3 w-3', bad ? 'text-bad' : m.color)} />
+              {t(`op.${s.op}`)}
+            </span>
+          </span>
+        );
+      })}
+      <span className="ml-auto inline-flex items-center gap-1 text-[11px] text-acc-ink">
+        <ChevronsUpDown className="h-3 w-3" />{t('expandSteps')}
+      </span>
+    </button>
+  );
+}
+
 // ─── Add step panel ────────────────────────────────────────────────────────────
 
 function AddStepPanel({ onAdd }: { onAdd: (op: StepOp) => void }) {
@@ -1220,6 +1269,8 @@ export function PipelineTab({ active }: { active: boolean }) {
   const t = useMessages(MESSAGES);
   const sdk = usePluginSdkFor('base64');
   const [steps, setSteps] = usePluginState<PipelineStep[]>(sdk, 'pipeline:steps-v2', DEFAULT_STEPS, { legacyKey: 'devtool:pipeline:steps-v2' });
+  // Long pipelines: show only the first and last step, the rest as one bar.
+  const [collapsedPref, setCollapsed] = usePluginState<boolean>(sdk, 'pipeline:collapsed', false);
   // Keys, passphrases and PEM keys are credentials: kept in the vault by step
   // id, never in the plain settings file that holds the steps.
   const [stepKeys, setStepKeys, stepKeysReady] = useSecretState<Record<string, string>>(sdk, 'pipeline:step-keys', {});
@@ -1321,6 +1372,8 @@ export function PipelineTab({ active }: { active: boolean }) {
     setShowKeys({});
   };
 
+  const collapsed = collapsedPref && steps.length > 2;
+
   const addStep = (op: StepOp) => {
     const { key: _key, ...defaults } = STEP_DEFAULTS[op] ?? {};
     setSteps((prev) => [...prev, { id: makeId(), op, ...defaults }]);
@@ -1339,9 +1392,44 @@ export function PipelineTab({ active }: { active: boolean }) {
         </div>
       )}
 
+      {/* Collapse: only the first and last step stay open. */}
+      {steps.length > 2 && (
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-[11px] text-fg-mute">{t('stepCount', { n: steps.length })}</span>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-1.5 text-xs"
+            aria-pressed={collapsed}
+            onClick={() => setCollapsed(!collapsed)}
+          >
+            {collapsed ? <ChevronsUpDown className="h-3.5 w-3.5" /> : <ChevronsDownUp className="h-3.5 w-3.5" />}
+            {collapsed ? t('expandSteps') : t('collapseSteps')}
+          </Button>
+        </div>
+      )}
+
       {/* Steps */}
       <div className="space-y-0">
-        {stepsWithKeys.map((step, index) => (
+        {stepsWithKeys.map((step, index) => {
+          const hidden = collapsed && index > 0 && index < steps.length - 1;
+          if (hidden) {
+            // One summary bar in place of every middle step.
+            if (index !== 1) return null;
+            const middle = steps.slice(1, -1);
+            return (
+              <div key="collapsed">
+                <CollapsedSteps
+                  steps={middle}
+                  results={run.byId}
+                  firstIndex={1}
+                  onExpand={() => setCollapsed(false)}
+                />
+                <div className="flex justify-center py-0.5"><div className="w-px h-4 bg-line/50" /></div>
+              </div>
+            );
+          }
+          return (
           <div key={step.id}>
             <StepCard
               step={step} index={index} total={steps.length}
@@ -1361,7 +1449,8 @@ export function PipelineTab({ active }: { active: boolean }) {
               </div>
             )}
           </div>
-        ))}
+          );
+        })}
         <AddStepPanel onAdd={addStep} />
       </div>
 
