@@ -239,7 +239,7 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
       'Password tab: hash a password with bcrypt or Argon2 (id/i/d) and a fresh random salt, or Verify a password against an existing hash (algorithm auto-detected).',
       'Encrypt tab: AES-256 GCM by default — enter a passphrase and encrypt/decrypt. The AES-CBC/CTR/CFB/OFB, 3DES and Rabbit modes below it exist to exchange ciphertext with a crypto-js caller.',
       'Keys tab: generate Ed25519, RSA 2048/3072/4096, EC P-256/384/521 and X25519 key pairs — as PEM (PKCS#8 / SPKI), JWK and a public JWK Set (kid = RFC 7638 thumbprint), OpenSSH (authorized_keys line + private key, SHA256 fingerprint) or WireGuard keys — and HMAC / AES / random secrets as base64, base64url, hex or an oct JWK.',
-      'Pipeline tab: chain steps — Input (text / JSON fields), Encode/Decode (every codec), Hash / HMAC / Encrypt / Decrypt, JWT & JWS (decode, sign, verify), Extract (JSON path, regex, split, and Compose — several labelled fields, each with its own transforms, joined into one string to sign) and Transform (case, trim, prepend/append, find & replace with regex, JSON pretty/minify). Each step shows its own output; the last is the final result. Save a pipeline as a template to reuse it, or start from an example (Apple Advanced Commerce / App Store notification JWS, payment HMAC).',
+      'Pipeline tab: chain steps — Input (text / JSON fields), Encode/Decode (every codec), Hash / HMAC / Encrypt / Decrypt, JWT & JWS (decode, sign, verify), Extract (JSON path, regex, split, and Compose — several labelled fields, each with its own transforms, joined into one string to sign) Transform (case, trim, prepend/append, find & replace with regex) and JSON (format with 2/4 spaces or tab, minify, JSON → escaped string and back, sort keys, JSON ⇄ YAML). Each step shows its own output; the last is the final result. Save a pipeline as a template to reuse it, or start from an example (Apple Advanced Commerce / App Store notification JWS, payment HMAC).',
       'JWT tab (formerly the JWT Debugger tool) — Decode: paste a JWT (header.payload.signature) — header and payload show as formatted JSON instantly, with exp / nbf / iat rendered as real times and flagged when expired.',
       <>Verify: pick the algorithm you <strong className="text-fg">expect</strong>, paste the key (shared secret for <Tok>HS*</Tok>; PEM public key, X.509 certificate, JWK or a whole JWK Set for the rest), and optionally require an issuer / audience.</>,
       <>Sign: edit the claims, set an expiry like <Tok>1h</Tok> or <Tok>7d</Tok>, paste a private key — or press <strong className="text-fg">Generate pair</strong> to get a fresh one, which also fills the public key for the Verify side.</>,
@@ -480,6 +480,8 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
 // again once, the next time they open that tool. Tools not listed default to
 // version 1 (their guide's initial version).
 export const TOOL_GUIDE_VERSIONS: Record<string, number> = {
+  // 2 — Pipeline JSON steps (minify, to/from string, sort keys, YAML).
+  base64: 2,
   // 2 — assignable "open a tool" shortcuts.
   settings: 2,
   // 5 — script review when importing a collection.

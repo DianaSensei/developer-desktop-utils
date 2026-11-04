@@ -259,3 +259,54 @@ describe('Pipeline engine — compose', () => {
     expect(b[2].output).toBe('two');
   });
 });
+
+describe('JSON steps', () => {
+  const out = async (steps: PipelineStep[]) => (await final(steps)).output;
+  const json = '{ "b": 2, "a": { "d": [3, { "z": 1, "y": 0 }], "c": "x\\ny" } }';
+
+  it('formats with 2/4 spaces or tabs, and minifies', async () => {
+    expect(await out([text(json), step({ op: 'json-format', jsonIndent: 'pretty4' })])).toContain('\n    "b": 2');
+    expect(await out([text(json), step({ op: 'json-format', jsonIndent: 'tab' })])).toContain('\n\t"b": 2');
+    expect(await out([text(json), step({ op: 'json-minify' })])).toBe('{"b":2,"a":{"d":[3,{"z":1,"y":0}],"c":"x\\ny"}}');
+  });
+
+  it('JSON → String escapes into a string literal, minifying valid JSON first', async () => {
+    expect(await out([text(json), step({ op: 'json-stringify' })]))
+      .toBe('"{\\"b\\":2,\\"a\\":{\\"d\\":[3,{\\"z\\":1,\\"y\\":0}],\\"c\\":\\"x\\\\ny\\"}}"');
+    expect(await out([text('{"a": 1}'), step({ op: 'json-stringify', stringifyQuotes: false })])).toBe('{\\"a\\":1}');
+    expect(await out([text('{"a": 1}'), step({ op: 'json-stringify', stringifyMinify: false })])).toBe('"{\\"a\\": 1}"');
+    // Not JSON: escaped as is.
+    expect(await out([text('say "hi"\n'), step({ op: 'json-stringify' })])).toBe('"say \\"hi\\"\\n"');
+  });
+
+  it('String → JSON reverses it, with or without quotes', async () => {
+    expect(await out([text(json), step({ op: 'json-stringify' }), step({ op: 'json-parse-string', unescapePretty: false })]))
+      .toBe(JSON.stringify(JSON.parse(json)));
+    expect(await out([text('{\\"a\\":1}'), step({ op: 'json-parse-string' })])).toBe('{\n  "a": 1\n}');
+    expect(await out([text('"plain \\"text\\""'), step({ op: 'json-parse-string' })])).toBe('plain "text"');
+    const bad = await executePipeline([text('"unterminated'), step({ op: 'json-parse-string' })]);
+    expect(bad[1].error).toMatch(/not a JSON string/);
+  });
+
+  it('sorts keys at every level, either way, keeping array order', async () => {
+    expect(await out([text(json), step({ op: 'json-sort-keys', jsonIndent: 'minify' })]))
+      .toBe('{"a":{"c":"x\\ny","d":[3,{"y":0,"z":1}]},"b":2}');
+    expect(await out([text(json), step({ op: 'json-sort-keys', jsonSort: 'desc', jsonIndent: 'minify' })]))
+      .toBe('{"b":2,"a":{"d":[3,{"z":1,"y":0}],"c":"x\\ny"}}');
+  });
+
+  it('converts JSON ⇄ YAML', async () => {
+    const yaml = await out([text('{"name":"Ada","tags":["red","blue"],"count":1}'), step({ op: 'json-to-yaml' })]);
+    expect(yaml).toBe('name: Ada\ntags:\n  - red\n  - blue\ncount: 1');
+    expect(await out([text(yaml), step({ op: 'yaml-to-json', jsonIndent: 'minify' })])).toBe('{"name":"Ada","tags":["red","blue"],"count":1}');
+    // YAML 1.1 booleans stay strings on the way out (`y` is quoted).
+    expect(await out([text('["y","n"]'), step({ op: 'json-to-yaml' })])).toBe("- 'y'\n- 'n'");
+    const bad = await executePipeline([text('a: [1, 2'), step({ op: 'yaml-to-json' })]);
+    expect(bad[1].error).toMatch(/not valid YAML/);
+  });
+
+  it('reports invalid JSON input clearly', async () => {
+    const r = await executePipeline([text('{oops'), step({ op: 'json-minify' })]);
+    expect(r[1].error).toMatch(/Input is not valid JSON/);
+  });
+});
