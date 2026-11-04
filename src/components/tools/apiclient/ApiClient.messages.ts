@@ -250,6 +250,7 @@ export default defineMessages({
   'res.unknownType': { vi: 'không rõ loại', en: 'unknown type' },
 
   // ── Sidebar ────────────────────────────────────────────────────────────
+  'side.collections': { vi: 'Collection', en: 'Collections' },
   'side.newCollection': { vi: 'Collection mới', en: 'New collection' },
   'side.importCollection': { vi: 'Nhập collection / OpenAPI / .bru', en: 'Import collection / OpenAPI / .bru' },
   'side.importCurl': { vi: 'Nhập cURL', en: 'Import cURL' },

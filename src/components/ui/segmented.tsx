@@ -53,6 +53,12 @@ export function Segmented<T extends string>({
     const measure = () => {
       // `offsetLeft` is relative to the track (position: relative).
       setThumb({ x: el.offsetLeft, w: el.offsetWidth });
+      // Too many options for the width: the track scrolls; keep the
+      // selected one in view.
+      if (el.offsetLeft < track.scrollLeft) track.scrollLeft = el.offsetLeft;
+      else if (el.offsetLeft + el.offsetWidth > track.scrollLeft + track.clientWidth) {
+        track.scrollLeft = el.offsetLeft + el.offsetWidth - track.clientWidth;
+      }
     };
     measure();
     // Re-measure when button widths change (language switch, badge,
@@ -96,7 +102,9 @@ export function Segmented<T extends string>({
       role="tablist"
       aria-label={props['aria-label']}
       className={cn(
-        'relative inline-flex items-center gap-0.5 rounded-sm border border-line bg-sunk p-0.5',
+        // max-w-full + overflow-x-auto: a narrow window or split pane scrolls
+        // the options instead of pushing them off-screen.
+        'no-scrollbar relative inline-flex min-w-0 max-w-full items-center gap-0.5 overflow-x-auto rounded-sm border border-line bg-sunk p-0.5',
         'shadow-[inset_0_1px_2px_hsl(var(--fg-c)/0.05)]',
         trackH,
         className
@@ -129,7 +137,7 @@ export function Segmented<T extends string>({
             onKeyDown={onKeyDown}
             className={cn(
               // Text above the thumb; rounded-md to match it.
-              'relative z-10 inline-flex h-full items-center justify-center gap-1.5 whitespace-nowrap rounded-md px-3',
+              'relative z-10 inline-flex h-full shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-md px-3',
               'transition-colors duration-fast ease-out-soft',
               // Focus ring drawn inward so the track does not clip it.
               'focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus',

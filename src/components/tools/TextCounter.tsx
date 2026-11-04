@@ -52,9 +52,9 @@ export function TextCounter() {
   useInputHistory(text, setText);
 
   return (
-    <div className="flex h-full flex-col overflow-hidden md:flex-row">
+    <div className="flex h-full flex-col overflow-hidden @2xl:flex-row">
       {/* Left (top on narrow windows): textarea input */}
-      <div className="flex h-2/5 min-h-0 shrink-0 flex-col border-b border-line md:h-auto md:w-2/5 md:border-b-0 md:border-r">
+      <div className="flex h-2/5 min-h-0 shrink-0 flex-col border-b border-line @2xl:h-auto @2xl:w-2/5 @2xl:border-b-0 @2xl:border-r">
         <PaneHeader label={m('textInput')} hint={quickPasteHint} />
         <Textarea
           value={text}
@@ -108,7 +108,7 @@ export function TextCounter() {
           </ul>
         </div>
 
-        <div className="border-t pt-4 grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+        <div className="border-t pt-4 grid grid-cols-1 @2xl:grid-cols-2 gap-4 text-xs">
           <div>
             <p className="font-semibold text-sm mb-2">{m('textDetails')}</p>
             <ul className="space-y-1 text-fg-mute">

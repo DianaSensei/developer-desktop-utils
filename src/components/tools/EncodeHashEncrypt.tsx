@@ -230,7 +230,7 @@ export function EncodeHashEncrypt() {
       {/* One toolbar with two rows (tabs, then the active tab's options)
           under a single background and border, instead of stacked bands. */}
       <ToolToolbar className="px-4 py-1.5 flex flex-col gap-1.5">
-      <div className="flex items-center gap-3">
+      <div className="flex min-w-0 items-center gap-3">
         <Segmented
           value={tab}
           onValueChange={setTab}
@@ -266,7 +266,7 @@ export function EncodeHashEncrypt() {
               ]}
               aria-label={m('encodeModeLabel')}
             />
-            <span className="text-xs text-fg-mute truncate hidden sm:block">{m(`codec.${codec.id}` as 'codec.base64')}</span>
+            <span className="text-xs text-fg-mute truncate hidden @lg:block">{m(`codec.${codec.id}` as 'codec.base64')}</span>
           </div>
         )}
       </ToolToolbar>

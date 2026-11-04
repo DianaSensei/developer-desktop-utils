@@ -102,6 +102,9 @@ Answer these first; if unknown, ask or state the assumption inline:
 ### Responsive
 
 - Desktop-first (this is a cross-platform desktop tool), but content must reflow down to narrow widths without horizontal scroll — use the responsive scaffolding utilities rather than fixed pixel widths.
+- **Inside a tool, respond to the tool's own width, not the window's.** Every tool renders in an `@container` (ToolHost), and with a split view a tool may get half the window. Use container variants (`@lg:` ≈ 512px, `@2xl:` ≈ 672px, `@4xl:` ≈ 896px, `@6xl:` ≈ 1152px), never `sm:/md:/lg:/xl:` in tool code. Exception: content portalled out of the tool (dialogs, popovers) has no container ancestor — viewport breakpoints are right there.
+- Side-by-side panes: `SplitPane` stacks by itself below `stackBelow` (560px); hand-made two-column layouts use `flex-col @2xl:flex-row`. A fixed-width sidebar (collections, stub list) becomes a drawer or a stacked strip when its pane is narrow (`useElementWidth`).
+- Segmented controls scroll sideways when they don't fit; rows with a control (`SettingRow`) wrap the control under the text. The audit used for this: every tool at 1280/1024/800×600/640/390 and every pair in split view, flagging elements past their pane that aren't inside a horizontal scroller.
 
 ---
 

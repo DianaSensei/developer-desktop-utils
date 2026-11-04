@@ -68,7 +68,7 @@ export function MeetingNotes({ focusId, onFocused }: { focusId?: string | null; 
   };
 
   return (
-    <div className="grid h-full grid-cols-1 overflow-hidden md:grid-cols-[260px_1fr]">
+    <div className="grid h-full grid-cols-1 overflow-hidden @2xl:grid-cols-[260px_1fr]">
       {/* List pane */}
       <div className="flex min-h-0 flex-col border-r">
         <div className="shrink-0 space-y-2 border-b border-line p-2.5">

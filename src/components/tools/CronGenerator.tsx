@@ -725,7 +725,7 @@ export function CronGenerator() {
           </div>
         </div>
 
-        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-2 @2xl:grid-cols-2 @6xl:grid-cols-3">
           {rules.map((rule) => {
             const suggestions = SUGGESTIONS[mode][rule.key] ?? [];
             const fieldErrors = validateField(fields[rule.key], rule, m);

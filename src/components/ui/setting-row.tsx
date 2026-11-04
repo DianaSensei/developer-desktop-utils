@@ -59,7 +59,9 @@ export function SettingRow({
           <Icon className="h-4 w-4" />
         </span>
       )}
-      <span className="min-w-0 flex-1">
+      {/* min-w-[12rem]: in a narrow pane the control wraps under the text
+          instead of squeezing the description into a column. */}
+      <span className="min-w-[12rem] flex-1">
         <span className="block text-sm font-medium leading-snug">{title}</span>
         {description && (
           <span className="mt-0.5 block text-xs leading-snug text-fg-mute">
@@ -77,7 +79,7 @@ export function SettingRow({
   // The main row is separate from the outer frame so the preview can sit
   // below it without breaking the row's flex layout.
   const row = cn(
-    'flex w-full items-center gap-3 px-3.5 py-3 text-left',
+    'flex w-full flex-wrap items-center gap-3 px-3.5 py-3 text-left',
     disabled && 'pointer-events-none opacity-50',
   );
   const outer = cn('border-b border-line-soft last:border-b-0', className);

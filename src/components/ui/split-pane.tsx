@@ -11,7 +11,7 @@
 // used to hand-roll their own pointer-drag resize logic. Use this instead of
 // reimplementing clamp/ResizeObserver-reclamp/cursor-lock again.
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { useMessages } from '@/contexts/LocaleContext';
 import UI from '@/components/ui/ui.messages';
@@ -31,6 +31,10 @@ export interface SplitPaneProps {
   // Hard minimum size (px) each pane keeps while dragging, so content never gets
   // squeezed out of view.
   minPanePx?: number;
+  /** A side-by-side split narrower than this (px) stacks vertically instead,
+   *  so neither pane is squeezed to a sliver in a small window or a split-view
+   *  pane. 0 turns it off. */
+  stackBelow?: number;
   className?: string;
 }
 
@@ -39,13 +43,28 @@ const DEFAULT_PERCENT = 50;
 export function SplitPane({
   direction, first, second, percent: percentProp, onPercentChange,
   initialPercent = DEFAULT_PERCENT, minPercent = 20, maxPercent = 80, minPanePx = 360,
-  className,
+  stackBelow = 560, className,
 }: SplitPaneProps) {
   const ui = useMessages(UI);
   const [dragging, setDragging] = useState(false);
   const [uncontrolled, setUncontrolled] = useState(initialPercent);
   const containerRef = useRef<HTMLDivElement>(null);
-  const horizontal = direction === 'horizontal';
+  // Too narrow for side by side: stack (responsive, and per pane — it reads
+  // the split's own width, not the window's).
+  const [narrow, setNarrow] = useState(false);
+  useLayoutEffect(() => {
+    const el = containerRef.current;
+    if (!el || direction !== 'horizontal' || stackBelow <= 0) { setNarrow(false); return; }
+    const check = () => {
+      const w = el.getBoundingClientRect().width;
+      if (w > 0) setNarrow(w < stackBelow);
+    };
+    check();
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [direction, stackBelow]);
+  const horizontal = direction === 'horizontal' && !narrow;
 
   const percent = percentProp ?? uncontrolled;
   const setPercent = useCallback((p: number) => {

@@ -455,7 +455,7 @@ function AddAccountForm({ onAdd, onCancel }: AddAccountFormProps) {
 
       <div className="p-4 space-y-4">
         {/* Name + Issuer */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 @lg:grid-cols-2 gap-3">
           <div className="space-y-1.5">
             <Label className="text-xs">{m('accountName')}</Label>
             <Input
@@ -552,7 +552,7 @@ function InfoPanel() {
   const m = useMessages(MESSAGES);
   return (
     <div className="rounded-lg border bg-bg-2/30 p-4 text-xs space-y-3 text-fg-mute leading-relaxed">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 @lg:grid-cols-2 gap-3">
         <div className="space-y-1">
           <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--cat-4)]">
             {m('totpTitle')}
@@ -1025,7 +1025,7 @@ export function TwoFactorAuth() {
                 onChange={setSearch}
                 placeholder={m('searchPlaceholder')}
                 className="h-ctl text-xs"
-                containerClassName="ml-auto w-full sm:w-56"
+                containerClassName="ml-auto w-full @lg:w-56"
               />
             )}
           </div>
@@ -1033,7 +1033,7 @@ export function TwoFactorAuth() {
 
         {/* ── Account grid ── */}
         {filtered.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 @2xl:grid-cols-2 gap-3">
             {filtered.map((account) => (
               <OTPCard
                 key={account.id}

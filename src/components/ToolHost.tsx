@@ -144,7 +144,9 @@ export function ToolHost({ tools, fallback }: { tools: HostedTool[]; fallback: R
                 t={t}
               />
             )}
-            <div className={cn('min-h-0 flex-1', tool.fullHeight ? 'overflow-hidden' : 'overflow-y-auto')}>
+            {/* `@container`: tools size themselves to their pane (a split
+                view pane is half the window), not to the viewport. */}
+            <div className={cn('@container min-h-0 flex-1', tool.fullHeight ? 'overflow-hidden' : 'overflow-y-auto')}>
               <div
                 className={cn(
                   // Fades in when the tab comes back (display: none → flex restarts it).

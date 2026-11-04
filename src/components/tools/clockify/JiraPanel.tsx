@@ -67,7 +67,7 @@ export function JiraToolbar() {
         {jira.syncing ? m('syncing') : m('sync')}
       </Button>
       {last && !jira.syncing && (
-        <span className="hidden text-[11px] text-fg-mute lg:inline" title={jira.lastResult ? m('syncResult', { added: jira.lastResult.added, updated: jira.lastResult.updated }) : undefined}>
+        <span className="hidden text-[11px] text-fg-mute @4xl:inline" title={jira.lastResult ? m('syncResult', { added: jira.lastResult.added, updated: jira.lastResult.updated }) : undefined}>
           {m('syncedAgo', { ago: agoText(last, now, m) })}
         </span>
       )}

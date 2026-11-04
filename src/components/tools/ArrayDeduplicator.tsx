@@ -451,10 +451,11 @@ export function ArrayDeduplicator() {
       </div>
 
       {/* ── Editor ── */}
-      <div className="flex-1 min-h-0 flex">
+      {/* Side by side in a wide pane, stacked in a narrow one (container query). */}
+      <div className="flex-1 min-h-0 flex flex-col @2xl:flex-row">
 
         {/* Input pane */}
-        <div className={cn('flex-1 min-w-0 flex flex-col', mode === 'sort' && 'border-r border-line')}>
+        <div className={cn('flex-1 min-h-0 min-w-0 flex flex-col', mode === 'sort' && 'border-b border-line @2xl:border-b-0 @2xl:border-r')}>
           <PaneHeader
             label={m('inputHint')}
             action={

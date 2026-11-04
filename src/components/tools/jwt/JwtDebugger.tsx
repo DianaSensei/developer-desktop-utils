@@ -175,7 +175,7 @@ export function JwtDebugger() {
         </div>
       )}
 
-      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4 sm:p-5">
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4 @lg:p-5">
         {mode === 'decode' && <DecodeBody decoded={decoded} tokenReady={tokenReady} />}
 
         {mode === 'verify' && (
@@ -190,7 +190,7 @@ export function JwtDebugger() {
               onGenerate={handleGenerate}
               generating={generating}
             />
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className="grid gap-3 @lg:grid-cols-3">
               <LabelledInput label={m('expectedIssuer')} value={issuer} onChange={setIssuer} placeholder="https://auth.example.com" />
               <LabelledInput label={m('expectedAudience')} value={audience} onChange={setAudience} placeholder="my-api" />
               <LabelledInput label={m('clockTolerance')} value={clockTolerance} onChange={setClockTolerance} placeholder="0" />
@@ -211,7 +211,7 @@ export function JwtDebugger() {
                 <JsonEditor value={payload} onChange={setPayload} />
               </div>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-3 @lg:grid-cols-2">
               <LabelledInput label={m('expiresIn')} value={expiresIn} onChange={setExpiresIn} placeholder={m('expiresPlaceholder')} />
               <LabelledInput label={m('keyId')} value={kid} onChange={setKid} placeholder={m('optional')} />
             </div>

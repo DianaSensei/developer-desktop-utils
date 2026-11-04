@@ -8,8 +8,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { usePluginConfig, usePluginMcpBridgeActive, usePluginSdkFor, usePluginState } from '@/platform';
-import { Plus, Search, Send } from 'lucide-react';
+import { PanelLeft, Plus, Search, Send } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useElementWidth } from '@/hooks/useElementWidth';
 import { Button } from '@/components/ui/button';
 import type { InlineCodeFieldHandle } from '@/design-system';
 import { RequestQuickOpen } from './RequestQuickOpen';
@@ -47,6 +48,9 @@ interface RunState {
   tests: TestResult[];
   logs: LogEntry[];
 }
+/** Narrower than this, the collections sidebar becomes a drawer. */
+const NARROW_PX = 720;
+
 const EMPTY_RUN: RunState = { response: null, error: null, sending: false, tests: [], logs: [] };
 
 export function ApiClient() {
@@ -82,6 +86,13 @@ export function ApiClient() {
   const [splitH, setSplitH] = usePluginState(sdk, 'apiclient:split:horizontal', 50, { legacyKey: 'devtool:apiclient:split:horizontal' });
   const [splitV, setSplitV] = usePluginState(sdk, 'apiclient:split:vertical', 50, { legacyKey: 'devtool:apiclient:split:vertical' });
   const [sidebarWidth, setSidebarWidth] = usePluginState(sdk, 'apiclient:sidebarWidth', 288, { legacyKey: 'devtool:apiclient:sidebarWidth' });
+  // Below this the collections sidebar turns into a drawer (see the layout).
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const bodyWidth = useElementWidth(bodyRef);
+  const narrow = bodyWidth > 0 && bodyWidth < NARROW_PX;
+  const [navOpen, setNavOpen] = useState(false);
+  const activeIdForDrawer = store.activeRequestId;
+  useEffect(() => { setNavOpen(false); }, [activeIdForDrawer]);
   const [resizing, setResizing] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   // Bumped by RequestTabs' "reveal in sidebar" button. The sidebar already
@@ -448,23 +459,45 @@ export function ApiClient() {
       className="flex h-full min-h-0 flex-col overflow-hidden"
       data-claims-shortcuts={activeRef.current && store.openRequests.length > 0 ? 'mod-digit' : undefined}
     >
-      <div className="flex min-h-0 flex-1 overflow-hidden">
-        <div className="shrink-0 overflow-hidden" style={{ width: sidebarWidth }}>
+      <div ref={bodyRef} className="relative flex min-h-0 flex-1 overflow-hidden">
+        {/* Narrow (small window or split pane): the collections become a
+            drawer over the work surface, opened from the toolbar button. */}
+        {narrow && navOpen && (
+          <div className="absolute inset-0 z-20 bg-black/20" onClick={() => setNavOpen(false)} aria-hidden />
+        )}
+        <div
+          className={cn(
+            'shrink-0 overflow-hidden',
+            narrow && 'absolute inset-y-0 left-0 z-30 bg-chrome shadow-lift',
+            narrow && !navOpen && 'hidden',
+          )}
+          style={{ width: narrow ? Math.min(sidebarWidth, Math.round(bodyWidth * 0.85)) : sidebarWidth }}
+        >
           <Sidebar store={store} searchInputRef={searchInputRef} onRun={handleRun} revealTick={revealTick} />
         </div>
-        <div
-          onPointerDown={startSidebarResize}
-          className={cn(
-            'group relative w-px shrink-0 cursor-col-resize bg-line transition-colors hover:bg-acc/40',
-            resizing && 'bg-acc/60',
-          )}
-        >
-          {/* wider invisible hit area for easier grabbing */}
-          <span className="absolute -inset-x-1 inset-y-0" />
-        </div>
+        {!narrow && (
+          <div
+            onPointerDown={startSidebarResize}
+            className={cn(
+              'group relative w-px shrink-0 cursor-col-resize bg-line transition-colors hover:bg-acc/40',
+              resizing && 'bg-acc/60',
+            )}
+          >
+            {/* wider invisible hit area for easier grabbing */}
+            <span className="absolute -inset-x-1 inset-y-0" />
+          </div>
+        )}
 
         {/* The work surface, brighter than the `--chrome` nav column. */}
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-card">
+          {narrow && (
+            <div className="flex shrink-0 items-center border-b border-line bg-chrome px-1.5 py-1">
+              <Button variant="ghost" size="sm" className="gap-1.5 text-xs" onClick={() => setNavOpen(true)} aria-expanded={navOpen}>
+                <PanelLeft className="h-3.5 w-3.5" />
+                {t('side.collections')}
+              </Button>
+            </div>
+          )}
           <RequestTabs
             store={store}
             runs={runs}
@@ -536,7 +569,7 @@ export function ApiClient() {
                 <p className="text-sm font-medium text-fg/70">{t('shell.noRequestOpen')}</p>
                 <p className="mt-1 text-xs">{t('shell.selectOrCreate')}</p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center justify-center gap-2">
                 <Button size="sm" onClick={newRequest} sc="B" scMod className="h-ctl gap-1.5">
                   <Plus className="h-3.5 w-3.5" /> {t('shell.newRequest')}
                 </Button>
