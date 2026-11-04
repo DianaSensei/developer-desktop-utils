@@ -7,6 +7,7 @@ mod editor;
 mod editor_backup;
 mod editor_history;
 mod editor_view;
+mod editor_search;
 mod editor_fs;
 mod netinfo;
 mod files;
@@ -188,6 +189,8 @@ fn main() {
             editor::editor_forget_root,
             editor::editor_list_dir,
             editor::editor_list_files,
+            editor::editor_search,
+            editor::editor_search_cancel,
             editor::editor_stat,
             editor::editor_read_file,
             editor::editor_write_file,

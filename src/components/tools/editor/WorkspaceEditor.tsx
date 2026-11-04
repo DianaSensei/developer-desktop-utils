@@ -25,7 +25,11 @@ import { LanguagePicker } from './LanguagePicker';
 import { Timeline, absoluteTime } from './Timeline';
 import { SnapshotDiff } from './SnapshotDiff';
 import type { HistoryEntry } from './fs';
-import { getEditorStore } from './session';
+import { getEditorStore, getSearchSession } from './session';
+import { SearchPanel } from './SearchPanel';
+import { Files, Search } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { IS_MAC } from '@/components/ui/keycap';
 import type { Notice } from './store';
 import { toFsError } from './fs';
 import { basename, isUnder, relativeTo } from './paths';
@@ -63,6 +67,8 @@ export function WorkspaceEditor() {
   const m = useMessages(MESSAGES);
   const sdk = usePluginSdkFor('text-editor');
   const store = getEditorStore(sdk);
+  const search = getSearchSession(sdk);
+  const [view, setView] = usePluginState<'explorer' | 'search'>(sdk, 'sidebarView', 'explorer');
   const snap = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
   const [sidebarPct, setSidebarPct] = usePluginState(sdk, 'sidebarPct', 22);
   const [pending, setPending] = useState<PendingEdit | null>(null);
@@ -182,8 +188,15 @@ export function WorkspaceEditor() {
     store.focusEditor();
   }, [store]);
 
-  const handlers = useRef({ save, saveAs, requestClose, setQuickOpen, newUntitled, format });
-  handlers.current = { save, saveAs, requestClose, setQuickOpen, newUntitled, format };
+  /** ⌘⇧F: the Search view, seeded with the editor's one-line selection. */
+  const openSearch = useCallback(() => {
+    setView('search');
+    const sel = store.selectedText();
+    search.focus(sel && !sel.includes('\n') && sel.length <= 200 ? sel : undefined);
+  }, [store, search, setView]);
+
+  const handlers = useRef({ save, saveAs, requestClose, setQuickOpen, newUntitled, format, openSearch, setView });
+  handlers.current = { save, saveAs, requestClose, setQuickOpen, newUntitled, format, openSearch, setView };
 
   const activeRef = useToolActiveRef();
   useEffect(() => {
@@ -205,6 +218,12 @@ export function WorkspaceEditor() {
       } else if (mod && !e.altKey && !e.shiftKey && e.code === 'KeyS') {
         e.preventDefault();
         if (active) void h.save(active);
+      } else if (mod && !e.altKey && e.shiftKey && e.code === 'KeyF') {
+        e.preventDefault();
+        h.openSearch();
+      } else if (mod && !e.altKey && e.shiftKey && e.code === 'KeyE') {
+        e.preventDefault();
+        h.setView('explorer');
       } else if (mod && !e.altKey && e.shiftKey && e.code === 'KeyT') {
         e.preventDefault();
         void store.reopenClosed();
@@ -258,17 +277,31 @@ export function WorkspaceEditor() {
         maxPercent={50}
         minPanePx={200}
         first={(
-          <Explorer
-            store={store}
-            snap={snap}
-            activePath={activeTab?.path ?? null}
-            pending={pending}
-            setPending={setPending}
-            onRequestDelete={setDeletePath}
-            onRequestCloseFolder={(p) => void requestCloseFolder(p)}
-            onCopyPath={(p, rel) => void copyPath(p, rel)}
-            footer={<Timeline store={store} snap={snap} tab={activeTab} onView={setViewing} />}
-          />
+          <div className="flex h-full min-h-0 min-w-0">
+            <ActivityBar
+              view={view}
+              onChange={(v) => (v === 'search' ? openSearch() : setView(v))}
+              labels={{ explorer: m('viewExplorer'), search: m('viewSearch') }}
+            />
+            {/* Both stay mounted: switching keeps the tree's inline edits and
+                the search field's caret. */}
+            <div className={cn('min-h-0 min-w-0 flex-1', view !== 'explorer' && 'hidden')}>
+              <Explorer
+                store={store}
+                snap={snap}
+                activePath={activeTab?.path ?? null}
+                pending={pending}
+                setPending={setPending}
+                onRequestDelete={setDeletePath}
+                onRequestCloseFolder={(p) => void requestCloseFolder(p)}
+                onCopyPath={(p, rel) => void copyPath(p, rel)}
+                footer={<Timeline store={store} snap={snap} tab={activeTab} onView={setViewing} />}
+              />
+            </div>
+            <div className={cn('min-h-0 min-w-0 flex-1', view !== 'search' && 'hidden')}>
+              <SearchPanel store={store} search={search} folderCount={snap.folders.length} />
+            </div>
+          </div>
         )}
         second={(
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">
@@ -388,6 +421,41 @@ export function WorkspaceEditor() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+/** VS Code's activity bar: switches the side bar between Explorer and Search. */
+function ActivityBar({ view, onChange, labels }: {
+  view: 'explorer' | 'search';
+  onChange: (v: 'explorer' | 'search') => void;
+  labels: Record<'explorer' | 'search', string>;
+}) {
+  const keys = { explorer: IS_MAC ? '⇧⌘E' : 'Ctrl+Shift+E', search: IS_MAC ? '⇧⌘F' : 'Ctrl+Shift+F' };
+  return (
+    <div role="tablist" aria-orientation="vertical" className="flex w-9 shrink-0 flex-col items-center gap-1 border-r border-line bg-chrome py-1.5">
+      {(['explorer', 'search'] as const).map((v) => {
+        const Icon = v === 'explorer' ? Files : Search;
+        const on = view === v;
+        return (
+          <button
+            key={v}
+            type="button"
+            role="tab"
+            aria-selected={on}
+            title={`${labels[v]} (${keys[v]})`}
+            aria-label={labels[v]}
+            onClick={() => onChange(v)}
+            className={cn(
+              'relative inline-flex h-ctl w-ctl items-center justify-center rounded-sm transition-colors focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus',
+              on ? 'text-fg' : 'text-fg-mute/70 hover:bg-bg-2 hover:text-fg',
+            )}
+          >
+            {on && <span className="absolute inset-y-1.5 -left-0.5 w-0.5 rounded-full bg-acc" aria-hidden />}
+            <Icon className="h-[18px] w-[18px]" />
+          </button>
+        );
+      })}
     </div>
   );
 }

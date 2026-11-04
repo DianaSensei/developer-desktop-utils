@@ -5,6 +5,7 @@
 // in-memory workspace stands in with the same semantics and error codes.
 
 import type { PluginSdk } from '@/platform';
+import type { TextSearchQuery, TextSearchResult } from './textSearch';
 
 export interface DirEntry {
   name: string;
@@ -152,6 +153,10 @@ export interface EditorFs {
   forgetRoot(path: string): Promise<void>;
   listDir(path: string): Promise<DirListing>;
   listFiles(root: string, limit?: number): Promise<FileList>;
+  /** Search (⌘⇧F): text in every file under the opened folders. A newer
+   *  call stops an older one (its result comes back `cancelled`). */
+  searchText(query: TextSearchQuery): Promise<TextSearchResult>;
+  cancelSearch(): Promise<void>;
   stat(path: string): Promise<FileStat>;
   readFile(path: string): Promise<FileContent>;
   writeFile(path: string, content: string, opts?: WriteOptions): Promise<FileStat>;
@@ -215,6 +220,8 @@ export function createNativeFs(sdk: PluginSdk): EditorFs {
     forgetRoot: async (path) => { await call<boolean>('editor_forget_root', { path }); },
     listDir: (path) => call<DirListing>('editor_list_dir', { path }),
     listFiles: (root, limit) => call<FileList>('editor_list_files', { root, limit }),
+    searchText: (query) => call<TextSearchResult>('editor_search', { query }),
+    cancelSearch: () => call<void>('editor_search_cancel'),
     stat: (path) => call<FileStat>('editor_stat', { path }),
     // Both directions as raw bytes: a 200 MB file must not become a JSON
     // string on the way through the IPC bridge.

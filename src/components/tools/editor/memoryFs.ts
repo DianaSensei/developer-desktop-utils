@@ -7,6 +7,7 @@ import {
   EditorFsError, type BackupStore, type DirEntry, type HistoryEntry, type HistoryStore, type ViewerStore, type ViewLine, type EditorFs, type FileContent, type FileList, type FileStat,
 } from './fs';
 import { basename, dirname, isUnder, join, relativeTo } from './paths';
+import { DEFAULT_MAX_RESULTS, GlobSet, buildRegExp, emptyResult, fileIncluded, gitignoreGlobs, searchText } from './textSearch';
 
 type Node =
   | { kind: 'file'; content: string; modified: number }
@@ -87,6 +88,7 @@ export function createMemoryFs(opts: MemoryFsOptions = {}): MemoryFs {
   }
 
   const files: string[] = [];
+  let searchEpoch = 0;
   const within = (p: string) => roots.some((r) => isUnder(p, r)) || files.includes(p);
   const resolve = (p: string): Node => {
     const node = nodes.get(p);
@@ -311,6 +313,42 @@ export function createMemoryFs(opts: MemoryFsOptions = {}): MemoryFs {
       }
       return { files, truncated };
     }); },
+    searchText(q) { return run(() => {
+      const started = Date.now();
+      const epoch = ++searchEpoch;
+      const result = emptyResult();
+      const re = buildRegExp(q);
+      if (!re) return result;
+      const include = new GlobSet(q.include);
+      const exclude = new GlobSet(q.exclude);
+      const limit = Math.min(Math.max(1, q.maxResults ?? DEFAULT_MAX_RESULTS), 50_000);
+      const wanted = q.roots?.length ? q.roots : roots;
+      for (const root of wanted) {
+        if (!roots.includes(root)) throw new EditorFsError('denied', 'Only opened folders can be searched.');
+      }
+      for (const root of wanted) {
+        const gi = nodes.get(join(root, '.gitignore'));
+        const ignore = q.useIgnoreFiles && gi?.kind === 'file' ? gitignoreGlobs(gi.content) : undefined;
+        const keys = [...nodes.keys()].filter((k) => k !== root && isUnder(k, root)).sort(byName);
+        for (const k of keys) {
+          const n = nodes.get(k)!;
+          if (n.kind !== 'file') continue;
+          const rel = relativeTo(k, root);
+          if (rel.split('/').slice(0, -1).some((seg) => SKIP_DIRS.has(seg))) continue;
+          if (!fileIncluded(rel, include, exclude, ignore)) continue;
+          if (epoch !== searchEpoch) return { ...result, cancelled: true };
+          result.filesSearched++;
+          if (n.content.includes('\0')) continue;
+          const matches = searchText(n.content, re, limit - result.matchCount);
+          if (!matches.length) continue;
+          result.matchCount += matches.length;
+          result.files.push({ path: k, root, rel, matches });
+          if (result.matchCount >= limit) return { ...result, truncated: true, elapsedMs: Date.now() - started };
+        }
+      }
+      return { ...result, elapsedMs: Date.now() - started };
+    }); },
+    cancelSearch() { searchEpoch++; return Promise.resolve(); },
     stat(path) { return run(() => { return stat(resolve(path)); }); },
     readFile(path): Promise<FileContent> { return run(() => {
       const n = resolve(path);
