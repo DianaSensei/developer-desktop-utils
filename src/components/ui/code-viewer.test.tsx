@@ -4,18 +4,18 @@ import { render } from '@testing-library/react';
 import { CodeViewer, type CodeViewerHandle } from './code-viewer';
 
 // CodeMirror mounts its own DOM inside the container, so these assert against
-// the rendered `.cm-search` panel (see @codemirror/search's own class name)
+// the rendered `.cm-find` widget (code-find.ts)
 // rather than any React-visible state — `openSearch` is an imperative escape
 // hatch precisely because there's nothing else to hook into from outside.
 describe('CodeViewer — openSearch', () => {
   it('opens the find panel for a normal (syntax-highlighted) viewer', () => {
     const ref = createRef<CodeViewerHandle>();
     const { container } = render(<CodeViewer ref={ref} value={'{"a":1}'} language="json" />);
-    expect(container.querySelector('.cm-search')).toBeNull();
+    expect(container.querySelector('.cm-find')).toBeNull();
 
     ref.current?.openSearch();
 
-    expect(container.querySelector('.cm-search')).not.toBeNull();
+    expect(container.querySelector('.cm-find')).not.toBeNull();
   });
 
   it('opens the find panel for a plain (large-body) viewer too', () => {
@@ -27,6 +27,6 @@ describe('CodeViewer — openSearch', () => {
 
     ref.current?.openSearch();
 
-    expect(container.querySelector('.cm-search')).not.toBeNull();
+    expect(container.querySelector('.cm-find')).not.toBeNull();
   });
 });

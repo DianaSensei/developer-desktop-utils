@@ -77,6 +77,14 @@
     --ij-deleted: #c7222d;
     --ij-hint-fg: #6c707e;
     --ij-hint-bg: #ebecf0;
+    /* Find (⌘F) matches in every editor (code-find.ts): every match an
+       amber wash with a hairline, the current one a solid amber block with
+       a strong outline — readable over syntax colors and distinct from the
+       blue selection. */
+    --find-match-bg: hsl(32 100% 55% / 0.30);
+    --find-match-edge: hsl(30 90% 45% / 0.55);
+    --find-current-bg: hsl(42 100% 62%);
+    --find-current-edge: hsl(28 95% 38%);
     /* JSON tree view (JsonFormatter): strings, numbers and booleans reuse the
        SQL hues; only keys and null get their own. */
     --json-key: hsl(202 88% 35%);
@@ -158,6 +166,10 @@
     --ij-deleted: #f75464;
     --ij-hint-fg: #8c8f96;
     --ij-hint-bg: #2b2d30;
+    --find-match-bg: hsl(24 92% 50% / 0.33);
+    --find-match-edge: hsl(28 95% 58% / 0.55);
+    --find-current-bg: hsl(39 96% 32%);
+    --find-current-edge: hsl(44 100% 64%);
     --json-key: hsl(202 85% 68%);
     --json-null: hsl(350 75% 72%);
 
