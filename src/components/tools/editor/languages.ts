@@ -83,7 +83,9 @@ export function guessLanguage(text: string): string | null {
     try { JSON.parse(text); return 'JSON'; } catch { /* not JSON */ }
   }
   if (/^<([a-z][\w-]*)[\s>][\s\S]*<\/\1>\s*$/i.test(head)) return 'HTML';
-  if (/^(SELECT|WITH|INSERT\s+INTO|UPDATE\s+\w+\s+SET|DELETE\s+FROM|CREATE\s+(TABLE|INDEX|VIEW|OR\s+REPLACE)|ALTER\s+TABLE|DROP\s+TABLE)\b/i.test(head)) return 'SQL';
+  // SQL scripts often open with `--` / `/* */` comments: look past them.
+  const sqlHead = head.replace(/^(?:--[^\n]*(?:\n|$)|\/\*[\s\S]*?\*\/|\s+)+/, '');
+  if (/^(SELECT|WITH|INSERT\s+INTO|UPDATE\s+\w+\s+SET|DELETE\s+FROM|CREATE\s+(TABLE|INDEX|VIEW|OR\s+REPLACE)|ALTER\s+TABLE|DROP\s+TABLE|START\s+TRANSACTION|SET\s+@)\b/i.test(sqlHead)) return 'SQL';
   if (/^(import\s.+\sfrom\s|export\s+(default\s+)?(function|const|class|interface|type)\b)/m.test(head)) {
     return /:\s*(string|number|boolean|any)\b|\binterface\s+\w+|\btype\s+\w+\s*=/.test(head) ? 'TypeScript' : 'JavaScript';
   }

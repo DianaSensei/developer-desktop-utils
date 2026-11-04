@@ -346,7 +346,9 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
       <><Key>{mod}</Key>+<Key>S</Key> saves, <Key>{mod}</Key>+<Key>⇧</Key>+<Key>S</Key> saves as, <Key>{mod}</Key>+<Key>P</Key> jumps to any file by name, <Key>{mod}</Key>+<Key>W</Key> closes the tab, <Key>Ctrl</Key>+<Key>Tab</Key> cycles tabs, <Key>{mod}</Key>+<Key>F</Key> finds/replaces in the file, <Key>Alt</Key>+<Key>Z</Key> toggles word wrap.</>,
     ],
     know: [
-      'Highlighting uses VS Code’s Light+ / Dark+ colors, with bracket pairs colored by depth and indentation guides. The language comes from the file name (~150 languages) or, for an untitled tab, from what you type; click the language in the status bar to change it.',
+      <><strong className="text-fg">Aa</strong> in the status bar sets how code looks, for every tab: the <strong className="text-fg">IntelliJ</strong> colors (default — calm palette, grey comments, italic function names) or <strong className="text-fg">VS Code</strong> Light+ / Dark+ with bracket pairs colored by depth; the font (JetBrains Mono by default, IBM Plex Mono, Fira Code, or the app’s Code font) and its size — also <Key>{mod}</Key>+<Key>=</Key> / <Key>{mod}</Key>+<Key>−</Key> / <Key>{mod}</Key>+<Key>0</Key>.</>,
+      <>In SQL, <Tok>INSERT INTO t (a, b, c) SELECT …</Tok> and <Tok>… VALUES (…)</Tok> show each value’s column name as a small grey chip in front of it, as IntelliJ does (a value already named like its column gets none). Turn it off in the <strong className="text-fg">Aa</strong> menu.</>,
+      'The language comes from the file name (~150 languages) or, for an untitled tab, from what you type; click the language in the status bar to change it.',
       <><strong className="text-fg">Format Document</strong> — <Key>⇧</Key>+<Key>Alt</Key>+<Key>F</Key>, the formatter name in the status bar, or right-click a tab: Prettier for JS/TS/JSX, JSON, CSS/SCSS/LESS, HTML, Vue, Markdown, YAML and XML (your project’s <Tok>.prettierrc</Tok> or <Tok>package.json</Tok> “prettier” is used), sql-formatter for SQL dialects, and re-indenting by the grammar for every other language. Turn on <strong className="text-fg">Format on Save</strong> from the same status-bar menu.</>,
       <><strong className="text-fg">Large files</strong> — up to 200 MB stay editable; above 10 MB highlighting, bracket colors, indent guides, formatting and Local History turn off to keep typing smooth. Bigger files (GB-size logs, CSV exports) open in a <strong className="text-fg">read-only viewer</strong> that reads from disk as you scroll: go to line, search the whole file (text or regex), and <strong className="text-fg">Follow</strong> to tail a growing log. Right-click any file → Open in Viewer to use it for smaller logs too.</>,
       <><strong className="text-fg">Local History</strong> — the switch in the <strong className="text-fg">Timeline</strong> at the bottom of the Explorer. While on, every save keeps a snapshot of the file (the first save also keeps the version from before it). Click a snapshot to compare it with the current text; restore it into the editor or delete it from there or from the row’s buttons.</>,
@@ -493,7 +495,7 @@ export const TOOL_GUIDE_VERSIONS: Record<string, number> = {
   // 2 — match count + jump, keyboard tree navigation.
   json: 2,
   // 5 — large files: 200 MB editable, read-only viewer with search and tail -f.
-  'text-editor': 5,
+  'text-editor': 6,
   // 3 — Jira Cloud: issues as tasks, status push, worklogs.
   'task-tracker': 3,
 };

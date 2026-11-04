@@ -8,9 +8,9 @@ import { storageGet, storageSet } from '@/lib/persistentStore';
  * Must match the `[data-mono-font="…"]` blocks in design/tokens.css
  * (checked by monoFontPreference.test.ts).
  */
-export type MonoFontPreference = 'ibm-plex-mono' | 'fira-code';
+export type MonoFontPreference = 'ibm-plex-mono' | 'fira-code' | 'jetbrains-mono';
 
-export const MONO_FONT_PREFERENCES: MonoFontPreference[] = ['ibm-plex-mono', 'fira-code'];
+export const MONO_FONT_PREFERENCES: MonoFontPreference[] = ['ibm-plex-mono', 'fira-code', 'jetbrains-mono'];
 
 const MONO_FONT_KEY = 'devtool-mono-font';
 const DEFAULT_MONO_FONT: MonoFontPreference = 'ibm-plex-mono';

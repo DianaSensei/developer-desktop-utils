@@ -83,6 +83,8 @@ export interface CodeThemeOptions {
   activeLine?: boolean;
   /** `false` drops the flex sizing, for a single-line field. Default true. */
   fill?: boolean;
+  /** Font stack. Default `var(--mono)` (the app's Code font setting). */
+  fontFamily?: string;
 }
 
 /**
@@ -99,6 +101,7 @@ export function resolveCodeThemeOptions(opts: CodeThemeOptions = {}) {
     gutter: opts.gutter ?? 'panel',
     activeLine: opts.activeLine ?? true,
     fill: opts.fill ?? true,
+    fontFamily: opts.fontFamily ?? CODE_FONT,
   } as const;
 }
 
@@ -108,7 +111,7 @@ export function resolveCodeThemeOptions(opts: CodeThemeOptions = {}) {
  * intentionally doesn't restate.
  */
 export function codeTheme(dark: boolean, opts: CodeThemeOptions = {}): Extension {
-  const { fontSize, paddingY, paddingX, gutter, activeLine, fill } = resolveCodeThemeOptions(opts);
+  const { fontSize, paddingY, paddingX, gutter, activeLine, fill, fontFamily } = resolveCodeThemeOptions(opts);
 
   return EditorView.theme(
     {
@@ -118,7 +121,7 @@ export function codeTheme(dark: boolean, opts: CodeThemeOptions = {}): Extension
         // and content stack vertically instead of sitting side by side.
         ...(fill ? { flex: '1 1 0', minHeight: '0' } : {}),
         fontSize,
-        fontFamily: CODE_FONT,
+        fontFamily,
         backgroundColor: 'transparent',
         // Explicit line height (CodeMirror sets none, so it varied with the
         // fallback font); close to the app's `leading-relaxed`.
@@ -211,7 +214,7 @@ export function codeTheme(dark: boolean, opts: CodeThemeOptions = {}): Extension
       '.cm-tooltip-autocomplete > ul > li': {
         // Same font size as the editor.
         padding: '4px 10px',
-        fontFamily: CODE_FONT,
+        fontFamily,
         fontSize,
         color: 'hsl(var(--fg-c))',
       },
@@ -279,6 +282,44 @@ export const vscodeHighlight = HighlightStyle.define([
   { tag: t.deleted, color: 'var(--vsc-deleted)' },
   { tag: t.changed, color: 'var(--vsc-constant)' },
   { tag: t.invalid, color: 'var(--vsc-invalid)' },
+]);
+
+/**
+ * JetBrains' New UI Light / Dark editor schemes (the Text Editor's default
+ * "IntelliJ" theme). Deliberately fewer hues than VS Code: identifiers,
+ * operators, punctuation and type names stay the plain foreground; comments
+ * are grey so they recede; keywords share one warm color. Colors come from the
+ * `--ij-*` tokens (tokens.css). SQL function calls and types are marked by
+ * the editor's SQL assist (they are plain identifiers in the grammar).
+ */
+export const intellijHighlight = HighlightStyle.define([
+  { tag: [t.comment, t.lineComment, t.blockComment, t.quote], color: 'var(--ij-comment)' },
+  { tag: t.docComment, color: 'var(--ij-doc-comment)', fontStyle: 'italic' },
+  {
+    tag: [t.keyword, t.definitionKeyword, t.modifier, t.operatorKeyword, t.controlKeyword, t.moduleKeyword,
+      t.self, t.bool, t.null, t.atom, t.standard(t.typeName)],
+    color: 'var(--ij-keyword)',
+  },
+  { tag: [t.string, t.special(t.string), t.character, t.docString, t.attributeValue, t.regexp, t.monospace], color: 'var(--ij-string)' },
+  { tag: t.escape, color: 'var(--ij-escape)' },
+  { tag: [t.number, t.integer, t.float, t.unit, t.color], color: 'var(--ij-number)' },
+  { tag: [t.function(t.definition(t.variableName)), t.function(t.variableName), t.function(t.propertyName), t.macroName], color: 'var(--ij-function)' },
+  { tag: [t.propertyName, t.definition(t.propertyName)], color: 'var(--ij-property)' },
+  { tag: [t.constant(t.variableName), t.constant(t.propertyName), t.standard(t.variableName)], color: 'var(--ij-property)', fontStyle: 'italic' },
+  { tag: [t.typeName, t.className, t.namespace, t.definition(t.typeName), t.definition(t.className)], color: 'var(--ij-type)' },
+  { tag: [t.tagName, t.angleBracket], color: 'var(--ij-tag)' },
+  { tag: t.attributeName, color: 'var(--ij-attribute)' },
+  { tag: [t.meta, t.processingInstruction, t.documentMeta, t.annotation], color: 'var(--ij-annotation)' },
+  { tag: [t.heading, t.heading1, t.heading2, t.heading3, t.heading4, t.heading5, t.heading6], color: 'var(--ij-keyword)', fontWeight: '700' },
+  { tag: [t.list, t.contentSeparator], color: 'var(--ij-keyword)' },
+  { tag: [t.link, t.url], color: 'var(--ij-link)', textDecoration: 'underline' },
+  { tag: t.emphasis, fontStyle: 'italic' },
+  { tag: t.strong, fontWeight: '700' },
+  { tag: t.strikethrough, textDecoration: 'line-through' },
+  { tag: t.inserted, color: 'var(--ij-inserted)' },
+  { tag: t.deleted, color: 'var(--ij-deleted)' },
+  { tag: t.changed, color: 'var(--ij-function)' },
+  { tag: t.invalid, color: 'var(--ij-invalid)' },
 ]);
 
 /** The editor chrome plus the VS Code palette — the Text Editor's pair. */

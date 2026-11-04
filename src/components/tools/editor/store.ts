@@ -20,7 +20,8 @@ import { keymap } from '@codemirror/view';
 import { indentWithTab } from '@codemirror/commands';
 import { Compartment, EditorState, Text, type Extension, type StateEffect, type TransactionSpec } from '@codemirror/state';
 import { indentUnit, indentRange } from '@codemirror/language';
-import { codeThemeWithVscodeHighlight, smartBracketSkip } from '@/components/ui/code-theme';
+import { smartBracketSkip } from '@/components/ui/code-theme';
+import { appearanceExtension, normalizeAppearance, DEFAULT_APPEARANCE, type EditorAppearance } from './appearance';
 import { bracketPairColorization, detectIndent, indentGuides, type DetectedIndent } from '@/components/ui/code-vscode';
 import { FormatError, PRETTIER_CONFIG_FILES, formatWithTool, formatterFor, parsePrettierConfig } from './format';
 import {
@@ -118,6 +119,8 @@ export interface EditorSnapshot {
   historyEnabled: boolean;
   /** Bumped whenever a snapshot is added or removed, so the Timeline re-lists. */
   historyVersion: number;
+  /** Color theme, font, size, SQL hints (appearance.ts). */
+  appearance: EditorAppearance;
 }
 
 export type FormatResult = 'formatted' | 'unchanged' | 'unsupported' | 'failed';
@@ -141,6 +144,7 @@ const KEYS = {
   formatOnSave: 'formatOnSave',
   history: 'localHistory',
   viewerTabs: 'viewerTabs',
+  appearance: 'appearance',
 } as const;
 
 const DEFAULT_INDENT: DetectedIndent = { useTabs: false, size: 4 };
@@ -223,7 +227,7 @@ export function suggestFileName(tab: Pick<Tab, 'name' | 'kind'>): string {
 export class EditorStore {
   private snap: EditorSnapshot = {
     hydrated: false, folders: [], recent: [], dirs: {}, expanded: {}, selected: null,
-    tabs: [], activeId: null, wrap: false, cut: null, notice: null, closed: [], formatOnSave: false,
+    tabs: [], activeId: null, wrap: false, cut: null, notice: null, closed: [], formatOnSave: false, appearance: DEFAULT_APPEARANCE,
     historyEnabled: false, historyVersion: 0,
   };
   private listeners = new Set<() => void>();
@@ -321,6 +325,7 @@ export class EditorStore {
       [KEYS.formatOnSave]: s.formatOnSave,
       [KEYS.history]: s.historyEnabled,
       [KEYS.viewerTabs]: s.tabs.filter((t) => t.mode === 'viewer').map((t) => t.path),
+      [KEYS.appearance]: s.appearance,
     };
     for (const [key, value] of Object.entries(values)) {
       const json = JSON.stringify(value);
@@ -385,6 +390,7 @@ export class EditorStore {
     const untitledMeta = readJson<{ key: string; no: number | null; lang?: string | null }[]>(this.storage, KEYS.untitled, []);
     const formatOnSave = readJson<boolean>(this.storage, KEYS.formatOnSave, false);
     const historyEnabled = readJson<boolean>(this.storage, KEYS.history, false);
+    const appearance = normalizeAppearance(readJson<unknown>(this.storage, KEYS.appearance, null));
     const viewerTabs = new Set(readJson<string[]>(this.storage, KEYS.viewerTabs, []));
     const closedSaved = readJson<ClosedEntry[]>(this.storage, KEYS.closed, []);
 
@@ -446,6 +452,7 @@ export class EditorStore {
       closed,
       formatOnSave,
       historyEnabled,
+      appearance,
     });
     this.syncView(true);
     for (const t of tabs) if (t.kind === 'untitled') void this.applyLanguage(t.id);
@@ -1411,8 +1418,16 @@ export class EditorStore {
     this.view?.dispatch({ effects: this.wrapSlot.reconfigure(wrap ? EditorView.lineWrapping : []) });
   }
 
+  /** Changes the theme / font / size / hints of every tab. */
+  setAppearance(patch: Partial<EditorAppearance>) {
+    const appearance = normalizeAppearance({ ...this.snap.appearance, ...patch });
+    this.set({ appearance });
+    this.persist();
+    this.view?.dispatch({ effects: this.themeSlot.reconfigure(this.themeExtension()) });
+  }
+
   private themeExtension(): Extension {
-    return codeThemeWithVscodeHighlight(this.dark, { gutter: 'flush', paddingX: 8 });
+    return appearanceExtension(this.dark, this.snap.appearance);
   }
 
   private createState(id: string, doc: string, indent: DetectedIndent = DEFAULT_INDENT, large = false): EditorState {

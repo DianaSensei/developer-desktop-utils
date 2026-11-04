@@ -245,6 +245,7 @@ const CORNER_LABEL_KEY: Record<CornerStyle, TranslationKey> = {
 const MONO_FONT_LABEL_KEY: Record<MonoFontPreference, TranslationKey> = {
   'ibm-plex-mono': 'settings.monoFont.ibmPlexMono',
   'fira-code': 'settings.monoFont.firaCode',
+  'jetbrains-mono': 'settings.monoFont.jetbrainsMono',
 };
 
 

@@ -4,11 +4,11 @@
 // formatter (click: Format Document, Format on Save) and word wrap. Only the
 // cursor readout re-renders on typing.
 
-import { Check, WrapText } from 'lucide-react';
+import { Check, Minus, Plus, WrapText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Spinner } from '@/components/ui/spinner';
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { IS_MAC } from '@/components/ui/keycap';
 import { useMessages } from '@/contexts/LocaleContext';
@@ -17,12 +17,17 @@ import type { EditorStore, Tab } from './store';
 import { useCursor } from './EditorPane';
 import { relativeTo } from './paths';
 import { formatterFor } from './format';
+import {
+  DEFAULT_APPEARANCE, EDITOR_FONTS, EDITOR_THEMES, MAX_FONT_SIZE, MIN_FONT_SIZE, fontFamilyFor,
+  type EditorAppearance, type EditorFont,
+} from './appearance';
 
 interface Props {
   store: EditorStore;
   tab: Tab | null;
   wrap: boolean;
   formatOnSave: boolean;
+  appearance: EditorAppearance;
   onFormat: () => void;
   onChangeLanguage: () => void;
 }
@@ -32,7 +37,7 @@ const ITEM = cn(
   'focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus',
 );
 
-export function StatusBar({ store, tab, wrap, formatOnSave, onFormat, onChangeLanguage }: Props) {
+export function StatusBar({ store, tab, wrap, formatOnSave, appearance, onFormat, onChangeLanguage }: Props) {
   const m = useMessages(MESSAGES);
   const root = tab ? store.rootOf(tab.path) : null;
   const viewer = tab?.mode === 'viewer';
@@ -40,7 +45,7 @@ export function StatusBar({ store, tab, wrap, formatOnSave, onFormat, onChangeLa
   const fmt = ready ? formatterFor(tab.language) : null;
   const formatKeys = IS_MAC ? '⇧⌥F' : 'Shift+Alt+F';
   return (
-    <div className="flex h-6 shrink-0 items-center gap-1 overflow-hidden border-t border-line bg-chrome px-2 text-[11px] text-fg-mute">
+    <div className="flex h-6 shrink-0 items-center gap-1 overflow-hidden whitespace-nowrap border-t border-line bg-chrome px-2 text-[11px] text-fg-mute">
       <span className="min-w-0 truncate px-1" title={tab?.kind === 'untitled' ? m('untitledHint') : tab?.path}>
         {tab?.kind === 'untitled'
           ? <>{tab.name} <span className="text-fg-mute/80">· {m('untitledHint')}</span></>
@@ -109,6 +114,7 @@ export function StatusBar({ store, tab, wrap, formatOnSave, onFormat, onChangeLa
           </DropdownMenuContent>
         </DropdownMenu>
       )}
+      <AppearanceMenu store={store} appearance={appearance} />
       <button
         type="button"
         onClick={() => store.toggleWrap()}
@@ -131,5 +137,59 @@ function CursorReadout({ store }: { store: EditorStore }) {
       {m('lnCol', { line: c.line, col: c.col })}
       {c.selected > 0 && ` ${m('selected', { n: c.selected })}`}
     </span>
+  );
+}
+
+const FONT_LABEL: Record<Exclude<EditorFont, 'app'>, string> = {
+  'jetbrains-mono': 'JetBrains Mono',
+  'ibm-plex-mono': 'IBM Plex Mono',
+  'fira-code': 'Fira Code',
+};
+
+/** "Aa": color theme, font, size and SQL hints, for every tab. */
+function AppearanceMenu({ store, appearance: a }: { store: EditorStore; appearance: EditorAppearance }) {
+  const m = useMessages(MESSAGES);
+  const tick = (on: boolean) => (on ? <Check className="h-3.5 w-3.5" /> : <span className="w-3.5" />);
+  const step = 'inline-flex h-6 w-6 items-center justify-center rounded-xs border border-line text-fg-mute transition-colors hover:bg-bg-2 hover:text-fg disabled:opacity-40 disabled:hover:bg-transparent focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus';
+  return (
+    <DropdownMenu className="h-full">
+      <DropdownMenuTrigger className={ITEM} title={m('appearance')} aria-label={m('appearance')}>
+        <span className="font-medium">Aa</span>
+        <span className="tabular-nums">{a.fontSize}</span>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-64 p-1.5">
+        <DropdownMenuLabel>{m('appearanceTheme')}</DropdownMenuLabel>
+        {EDITOR_THEMES.map((theme) => (
+          <DropdownMenuItem key={theme} icon={tick(a.theme === theme)} closeOnSelect={false} onClick={() => store.setAppearance({ theme })}>
+            {theme === 'intellij' ? m('themeIntellij') : m('themeVscode')}
+          </DropdownMenuItem>
+        ))}
+        <DropdownMenuSeparator />
+        <DropdownMenuLabel>{m('appearanceFont')}</DropdownMenuLabel>
+        {EDITOR_FONTS.map((font) => (
+          <DropdownMenuItem key={font} icon={tick(a.font === font)} closeOnSelect={false} onClick={() => store.setAppearance({ font })}>
+            <span style={{ fontFamily: fontFamilyFor(font) }}>{font === 'app' ? m('fontApp') : FONT_LABEL[font]}</span>
+          </DropdownMenuItem>
+        ))}
+        <DropdownMenuSeparator />
+        <div className="flex items-center gap-1.5 px-2 py-1 text-xs">
+          <span className="flex-1">{m('appearanceSize')}</span>
+          <button type="button" className={step} disabled={a.fontSize <= MIN_FONT_SIZE} onClick={() => store.setAppearance({ fontSize: a.fontSize - 1 })} title={m('fontSmaller')} aria-label={m('fontSmaller')}>
+            <Minus className="h-3 w-3" />
+          </button>
+          <span className="w-7 text-center tabular-nums">{a.fontSize}</span>
+          <button type="button" className={step} disabled={a.fontSize >= MAX_FONT_SIZE} onClick={() => store.setAppearance({ fontSize: a.fontSize + 1 })} title={m('fontLarger')} aria-label={m('fontLarger')}>
+            <Plus className="h-3 w-3" />
+          </button>
+          <button type="button" className={cn(step, 'w-auto px-1.5 text-[11px]')} disabled={a.fontSize === DEFAULT_APPEARANCE.fontSize} onClick={() => store.setAppearance({ fontSize: DEFAULT_APPEARANCE.fontSize })}>
+            {m('fontReset')}
+          </button>
+        </div>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem icon={tick(a.hints)} closeOnSelect={false} onClick={() => store.setAppearance({ hints: !a.hints })}>
+          {m('sqlHints')}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

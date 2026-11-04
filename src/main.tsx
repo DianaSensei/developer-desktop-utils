@@ -79,6 +79,14 @@ import '@fontsource/fira-code/latin-400.css';
 import '@fontsource/fira-code/latin-500.css';
 import '@fontsource/fira-code/latin-600.css';
 import '@fontsource/fira-code/latin-700.css';
+// JetBrains Mono, the Text Editor's default face (and a Code font choice):
+// tall x-height, open shapes. Italic for the IntelliJ theme's function names;
+// the vietnamese subset keeps diacritics in comments on the same face.
+import '@fontsource/jetbrains-mono/latin-400.css';
+import '@fontsource/jetbrains-mono/latin-400-italic.css';
+import '@fontsource/jetbrains-mono/latin-700.css';
+import '@fontsource/jetbrains-mono/vietnamese-400.css';
+import '@fontsource/jetbrains-mono/vietnamese-400-italic.css';
 import './styles/globals.css';
 import { clearPersistentStore, initPersistentStore } from './lib/persistentStore';
 // Imported from the module directly, not the '@/platform' barrel, which
