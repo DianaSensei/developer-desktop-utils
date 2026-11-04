@@ -88,10 +88,12 @@ export function indentGuides(): Extension {
       highlightActiveBlock: true,
       markerType: 'fullScope',
       thickness: 1,
-      // VS Code's editorIndentGuide.background / activeBackground. Literal
-      // values: the extension switches light/dark itself (CodeMirror's dark
-      // flag, which codeTheme sets) and splices them into a gradient.
-      colors: { light: '#d3d3d3', dark: '#404040', activeLight: '#939393', activeDark: '#707070' },
+      // Hairlines that stay in the background (close to IntelliJ's indent
+      // guides; VS Code's #404040 / #707070 read as rails on the app's darker
+      // pane). Literal values: the extension switches light/dark itself
+      // (CodeMirror's dark flag, which codeTheme sets) and splices them into
+      // a gradient.
+      colors: { light: '#e2e3e6', dark: '#2c2f35', activeLight: '#c3c5ca', activeDark: '#474a51' },
     }),
     // The markers are a `z-index: -1` pseudo-element; without a stacking
     // context on the content they sink below the pane's own background.

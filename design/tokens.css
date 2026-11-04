@@ -309,7 +309,7 @@
 }
 
 /* ============================================================================
-   MONO FONT PRESETS — both are bundled, self-hosted fonts (Fira Code has
+   MONO FONT PRESETS — all bundled, self-hosted fonts (Fira Code has
    ligatures). Set data-mono-font on the `html` element. */
 [data-mono-font="ibm-plex-mono"] {
   --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo,
@@ -317,6 +317,10 @@
 }
 [data-mono-font="fira-code"] {
   --mono: "Fira Code", ui-monospace, SFMono-Regular, "SF Mono", Menlo,
+          Consolas, "Liberation Mono", monospace;
+}
+[data-mono-font="jetbrains-mono"] {
+  --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo,
           Consolas, "Liberation Mono", monospace;
 }
 

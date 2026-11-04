@@ -55,6 +55,28 @@
     --vsc-bracket-1: #0431fa;
     --vsc-bracket-2: #319331;
     --vsc-bracket-3: #7b3814;
+    /* Text Editor "IntelliJ" theme: JetBrains' New UI Light / Dark editor
+       schemes. Fewer, calmer hues than VS Code's: grey comments that recede,
+       plain identifiers, keywords in one warm color, function names italic. */
+    --ij-fg: #080808;
+    --ij-comment: #8c8c8c;
+    --ij-doc-comment: #8c8c8c;
+    --ij-keyword: #0033b3;
+    --ij-string: #067d17;
+    --ij-escape: #0037a6;
+    --ij-number: #1750eb;
+    --ij-function: #00627a;
+    --ij-property: #871094;
+    --ij-type: #000000;
+    --ij-annotation: #9e880d;
+    --ij-tag: #0033b3;
+    --ij-attribute: #174ad4;
+    --ij-link: #006dcc;
+    --ij-invalid: #f50000;
+    --ij-inserted: #067d17;
+    --ij-deleted: #c7222d;
+    --ij-hint-fg: #6c707e;
+    --ij-hint-bg: #ebecf0;
     /* JSON tree view (JsonFormatter): strings, numbers and booleans reuse the
        SQL hues; only keys and null get their own. */
     --json-key: hsl(202 88% 35%);
@@ -117,6 +139,25 @@
     --vsc-bracket-1: #ffd700;
     --vsc-bracket-2: #da70d6;
     --vsc-bracket-3: #179fff;
+    --ij-fg: #bcbec4;
+    --ij-comment: #7a7e85;
+    --ij-doc-comment: #5f826b;
+    --ij-keyword: #cf8e6d;
+    --ij-string: #6aab73;
+    --ij-escape: #cf8e6d;
+    --ij-number: #2aacb8;
+    --ij-function: #56a8f5;
+    --ij-property: #c77dbb;
+    --ij-type: #bcbec4;
+    --ij-annotation: #b3ae60;
+    --ij-tag: #d5b778;
+    --ij-attribute: #bababa;
+    --ij-link: #548af7;
+    --ij-invalid: #f75464;
+    --ij-inserted: #6aab73;
+    --ij-deleted: #f75464;
+    --ij-hint-fg: #8c8f96;
+    --ij-hint-bg: #2b2d30;
     --json-key: hsl(202 85% 68%);
     --json-null: hsl(350 75% 72%);
 

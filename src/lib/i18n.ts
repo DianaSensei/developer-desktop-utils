@@ -102,6 +102,7 @@ export const DICTIONARY = {
   },
   'settings.monoFont.ibmPlexMono': { vi: 'IBM Plex Mono (mặc định)', en: 'IBM Plex Mono (default)' },
   'settings.monoFont.firaCode': { vi: 'Fira Code (có ligature)', en: 'Fira Code (with ligatures)' },
+  'settings.monoFont.jetbrainsMono': { vi: 'JetBrains Mono (chữ cao, dễ đọc)', en: 'JetBrains Mono (tall, easy to read)' },
   'settings.monoFont.previewLabel': { vi: 'Xem trước', en: 'Preview' },
 
   // ── Sidebar: status, tooltips, buttons ─────────────────────────────────

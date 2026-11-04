@@ -222,6 +222,17 @@ export default defineMessages({
   wrapOn: { vi: 'Xuống dòng: bật', en: 'Wrap: on' },
   wrapOff: { vi: 'Xuống dòng: tắt', en: 'Wrap: off' },
   saving: { vi: 'Đang lưu…', en: 'Saving…' },
+  appearance: { vi: 'Giao diện chữ: theme, font, cỡ chữ', en: 'Appearance: theme, font, size' },
+  appearanceTheme: { vi: 'Màu cú pháp', en: 'Color theme' },
+  themeIntellij: { vi: 'IntelliJ (dịu mắt)', en: 'IntelliJ (calm)' },
+  themeVscode: { vi: 'VS Code', en: 'VS Code' },
+  appearanceFont: { vi: 'Font', en: 'Font' },
+  fontApp: { vi: 'Theo cài đặt app', en: 'Same as app Code font' },
+  appearanceSize: { vi: 'Cỡ chữ', en: 'Font size' },
+  fontSmaller: { vi: 'Nhỏ hơn', en: 'Smaller' },
+  fontLarger: { vi: 'Lớn hơn', en: 'Larger' },
+  fontReset: { vi: 'Mặc định', en: 'Reset' },
+  sqlHints: { vi: 'Gợi ý tên cột trong SQL INSERT', en: 'Column hints in SQL INSERT' },
 
   // Quick Open
   quickOpenTitle: { vi: 'Mở nhanh file', en: 'Go to File' },

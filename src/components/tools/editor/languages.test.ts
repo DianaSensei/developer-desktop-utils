@@ -7,6 +7,8 @@ describe('guessLanguage', () => {
     ['<?xml version="1.0"?><a/>', 'XML'],
     ['<!DOCTYPE html><html></html>', 'HTML'],
     ['SELECT * FROM users WHERE id = 1', 'SQL'],
+    ['-- migrate wallets\n/* step 1 */\nINSERT INTO t (a) VALUES (1);', 'SQL'],
+    ['-- setup\nSET @run_ts = 1;', 'SQL'],
     ["import { x } from './x';\nconst a: string = x;", 'TypeScript'],
     ["import x from 'x'\nx()", 'JavaScript'],
     ['def main():\n    return 0', 'Python'],

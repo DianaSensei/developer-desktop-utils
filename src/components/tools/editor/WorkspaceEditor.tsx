@@ -15,6 +15,7 @@ import {
 import { SplitPane } from '@/components/ui/split-pane';
 import { useCurrentLocale, useMessages } from '@/contexts/LocaleContext';
 import MESSAGES from './WorkspaceEditor.messages';
+import { DEFAULT_APPEARANCE } from './appearance';
 import { Explorer, type PendingEdit } from './Explorer';
 import { EditorTabs } from './EditorTabs';
 import { EditorPane } from './EditorPane';
@@ -228,6 +229,11 @@ export function WorkspaceEditor() {
       } else if (e.altKey && !mod && !e.shiftKey && e.code === 'KeyZ') {
         e.preventDefault();
         store.toggleWrap();
+      } else if (mod && !e.altKey && (e.code === 'Equal' || e.code === 'Minus' || e.code === 'Digit0')) {
+        // Editor font size, as in VS Code / IntelliJ: ⌘= / ⌘− / ⌘0.
+        e.preventDefault();
+        const size = store.getSnapshot().appearance.fontSize;
+        store.setAppearance({ fontSize: e.code === 'Digit0' ? DEFAULT_APPEARANCE.fontSize : size + (e.code === 'Equal' ? 1 : -1) });
       }
     };
     window.addEventListener('keydown', onKeyDown);
@@ -300,6 +306,7 @@ export function WorkspaceEditor() {
               tab={activeTab}
               wrap={snap.wrap}
               formatOnSave={snap.formatOnSave}
+              appearance={snap.appearance}
               onFormat={() => void format(activeTab?.id ?? null)}
               onChangeLanguage={() => setLanguagePicker(true)}
             />
