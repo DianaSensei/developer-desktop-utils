@@ -145,6 +145,8 @@ export const TOOL_COMBOS: Array<{ combo: string; toolId: string; action: string 
   { combo: 'Mod+Shift+KeyK', toolId: 'text-editor', action: 'Delete line' },
   { combo: 'Mod+KeyG', toolId: 'text-editor', action: 'Find next' },
   { combo: 'Mod+KeyI', toolId: 'text-editor', action: 'Select line' },
+  { combo: 'Mod+Shift+KeyF', toolId: 'text-editor', action: 'Search in files' },
+  { combo: 'Mod+Shift+KeyE', toolId: 'text-editor', action: 'Explorer' },
   { combo: 'Mod+Equal', toolId: 'text-editor', action: 'Larger font' },
   { combo: 'Mod+Minus', toolId: 'text-editor', action: 'Smaller font' },
   { combo: 'Mod+Digit0', toolId: 'text-editor', action: 'Reset font size' },

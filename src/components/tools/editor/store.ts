@@ -831,6 +831,65 @@ export class EditorStore {
     await this.ensureLoaded(tab.id);
   }
 
+  /** Opens `path` (if it is not open yet) and selects `length` characters at
+   *  line/column (1-based line), scrolled to the middle — Search results. */
+  async openAt(path: string, line: number, column: number, length: number, focus = false) {
+    await this.openFile(path);
+    const tab = this.snap.tabs.find((t) => t.path === path);
+    if (!tab) return;
+    await this.ensureLoaded(tab.id);
+    const now = this.tab(tab.id);
+    const state = this.currentState(tab.id);
+    if (!now || now.status !== 'ready' || now.mode === 'viewer' || !state) return;
+    const l = state.doc.line(Math.min(Math.max(1, line), state.doc.lines));
+    const from = Math.min(l.from + column, l.to);
+    const to = Math.min(from + length, l.to);
+    this.dispatchSpec(tab.id, {
+      selection: { anchor: from, head: to },
+      effects: EditorView.scrollIntoView(from, { y: 'center' }),
+    });
+    if (focus) this.focusEditor();
+  }
+
+  /** The active editor's main selection (empty when none). */
+  selectedText(): string {
+    const view = this.view;
+    if (!view || !this.viewTabId) return '';
+    const { from, to } = view.state.selection.main;
+    return view.state.sliceDoc(from, to);
+  }
+
+  /** Open file tabs with unsaved edits — Search reads these instead of disk. */
+  dirtyBuffers(): { path: string; text: string }[] {
+    return this.snap.tabs
+      .filter((t) => t.kind === 'file' && t.dirty && t.status === 'ready' && t.mode === 'edit')
+      .map((t) => ({ path: t.path, text: this.currentState(t.id)?.doc.toString() ?? '' }));
+  }
+
+  /**
+   * Replace in Files: rewrites one file's text. An open, loaded tab is edited
+   * in place (undoable, left unsaved, like VS Code); any other file is read,
+   * changed and written straight to disk with the on-disk conflict check.
+   */
+  async replaceFileText(path: string, transform: (text: string) => string): Promise<'buffer' | 'disk' | 'unchanged'> {
+    const tab = this.snap.tabs.find((t) => t.path === path && t.kind === 'file');
+    const state = tab ? this.currentState(tab.id) : null;
+    if (tab && state && tab.status === 'ready' && tab.mode === 'edit') {
+      const before = state.doc.toString();
+      const after = transform(before);
+      if (after === before) return 'unchanged';
+      this.dispatchSpec(tab.id, { changes: minimalChange(before, after), userEvent: 'input.replace' });
+      return 'buffer';
+    }
+    const file = await this.fs.readFile(path);
+    if (file.binary) return 'unchanged';
+    const after = transform(file.content);
+    if (after === file.content) return 'unchanged';
+    await this.fs.writeFile(path, after, { bom: file.bom, expectedModified: file.modified });
+    if (tab) this.patchTab(tab.id, { status: 'idle' });
+    return 'disk';
+  }
+
   activate(id: string) {
     if (this.snap.activeId === id) return;
     const tab = this.tab(id);

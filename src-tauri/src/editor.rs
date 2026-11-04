@@ -12,6 +12,7 @@
 
 use crate::editor_backup;
 use crate::editor_view;
+use crate::editor_search;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use crate::editor_history;
@@ -268,6 +269,20 @@ pub async fn editor_list_dir(app: AppHandle, path: String) -> FsResult<DirListin
 pub async fn editor_list_files(app: AppHandle, root: String, limit: Option<usize>) -> FsResult<FileList> {
     let roots = snapshot(&app);
     blocking(move || roots.list_files(&root, limit)).await
+}
+
+/// Search (⌘⇧F): text in every file under the opened folders. A newer call
+/// stops an older one that is still walking.
+#[tauri::command]
+pub async fn editor_search(app: AppHandle, query: editor_search::SearchQuery) -> FsResult<editor_search::SearchOutput> {
+    let roots = snapshot(&app);
+    let epoch = editor_search::next_epoch();
+    blocking(move || editor_search::search(&roots, &query, epoch)).await
+}
+
+#[tauri::command]
+pub fn editor_search_cancel() {
+    editor_search::cancel();
 }
 
 #[tauri::command]

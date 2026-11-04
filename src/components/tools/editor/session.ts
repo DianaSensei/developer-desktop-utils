@@ -5,8 +5,10 @@ import type { PluginSdk } from '@/platform';
 import { createNativeFs } from './fs';
 import { createMemoryFs, DEMO_ROOT } from './memoryFs';
 import { EditorStore } from './store';
+import { SearchSession } from './search';
 
 let session: EditorStore | null = null;
+let search: SearchSession | null = null;
 
 export function getEditorStore(sdk: PluginSdk): EditorStore {
   if (!session) {
@@ -24,8 +26,16 @@ export function getEditorStore(sdk: PluginSdk): EditorStore {
   return session;
 }
 
+/** The Search view's state, for the same session. */
+export function getSearchSession(sdk: PluginSdk): SearchSession {
+  const store = getEditorStore(sdk);
+  if (!search) search = new SearchSession(store, sdk.storage);
+  return search;
+}
+
 /** Tests only: flushes pending writes and starts over. */
 export function resetEditorSession() {
   session?.flushPersist();
   session = null;
+  search = null;
 }

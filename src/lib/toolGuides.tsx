@@ -343,10 +343,11 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
       <>New File accepts a path — <Tok>src/util/x.ts</Tok> creates the missing folders too. <Key>F2</Key> renames, <Key>Delete</Key> (or <Key>{mod}</Key>+<Key>⌫</Key>) deletes, arrow keys walk the tree.</>,
       <><Key>{mod}</Key>+<Key>N</Key> opens a new untitled tab — type anything, no folder or file name needed. Its text is kept automatically (also across restarts); <Key>{mod}</Key>+<Key>S</Key> on it asks where to save it as a file.</>,
       <>Closing an untitled tab never loses it: it goes to <strong className="text-fg">Recently Closed</strong> (the clock icon at the end of the tab strip, or the welcome screen). <Key>{mod}</Key>+<Key>⇧</Key>+<Key>T</Key> reopens the last closed tab.</>,
+      <><strong className="text-fg">Search in files</strong> — <Key>{mod}</Key>+<Key>⇧</Key>+<Key>F</Key> or the magnifier at the left of the Explorer (<Key>{mod}</Key>+<Key>⇧</Key>+<Key>E</Key> goes back). Finds text or a regex in every open folder, with Match Case / Whole Word toggles and <strong className="text-fg">Filter files</strong> (<Tok>*.ts</Tok>, <Tok>src/**/*.sql</Tok>; <Tok>.gitignore</Tok> is respected). Click a line to jump there, ↑/↓ to walk the results; the arrow opens Replace, with Replace All or per file.</>,
       <><Key>{mod}</Key>+<Key>S</Key> saves, <Key>{mod}</Key>+<Key>⇧</Key>+<Key>S</Key> saves as, <Key>{mod}</Key>+<Key>P</Key> jumps to any file by name, <Key>{mod}</Key>+<Key>W</Key> closes the tab, <Key>Ctrl</Key>+<Key>Tab</Key> cycles tabs, <Key>{mod}</Key>+<Key>F</Key> finds/replaces in the file, <Key>Alt</Key>+<Key>Z</Key> toggles word wrap.</>,
     ],
     know: [
-      <><strong className="text-fg">Aa</strong> in the status bar sets how code looks, for every tab: the <strong className="text-fg">IntelliJ</strong> colors (default — calm palette, grey comments, italic function names) or <strong className="text-fg">VS Code</strong> Light+ / Dark+ with bracket pairs colored by depth; the font (JetBrains Mono by default, IBM Plex Mono, Fira Code, or the app’s Code font) and its size — also <Key>{mod}</Key>+<Key>=</Key> / <Key>{mod}</Key>+<Key>−</Key> / <Key>{mod}</Key>+<Key>0</Key>.</>,
+      <><strong className="text-fg">Aa</strong> in the status bar sets how code looks, for every tab: the <strong className="text-fg">IntelliJ</strong> colors (default — calm palette, grey comments, italic function names) or <strong className="text-fg">VS Code</strong> Light+ / Dark+ with bracket pairs colored by depth; the font (JetBrains Mono by default, IBM Plex Mono, Fira Code, or the app’s Code font) and its size — also <Key>{mod}</Key>+<Key>=</Key> / <Key>{mod}</Key>+<Key>−</Key> / <Key>{mod}</Key>+<Key>0</Key>; line height, letter spacing, weight, smoothing (Crisp or Full) and the padding around the text.</>,
       <>In SQL, <Tok>INSERT INTO t (a, b, c) SELECT …</Tok> and <Tok>… VALUES (…)</Tok> show each value’s column name as a small grey chip in front of it, as IntelliJ does (a value already named like its column gets none). Turn it off in the <strong className="text-fg">Aa</strong> menu.</>,
       'The language comes from the file name (~150 languages) or, for an untitled tab, from what you type; click the language in the status bar to change it.',
       <><strong className="text-fg">Format Document</strong> — <Key>⇧</Key>+<Key>Alt</Key>+<Key>F</Key>, the formatter name in the status bar, or right-click a tab: Prettier for JS/TS/JSX, JSON, CSS/SCSS/LESS, HTML, Vue, Markdown, YAML and XML (your project’s <Tok>.prettierrc</Tok> or <Tok>package.json</Tok> “prettier” is used), sql-formatter for SQL dialects, and re-indenting by the grammar for every other language. Turn on <strong className="text-fg">Format on Save</strong> from the same status-bar menu.</>,
@@ -495,7 +496,7 @@ export const TOOL_GUIDE_VERSIONS: Record<string, number> = {
   // 2 — match count + jump, keyboard tree navigation.
   json: 2,
   // 5 — large files: 200 MB editable, read-only viewer with search and tail -f.
-  'text-editor': 6,
+  'text-editor': 7,
   // 3 — Jira Cloud: issues as tasks, status push, worklogs.
   'task-tracker': 3,
 };

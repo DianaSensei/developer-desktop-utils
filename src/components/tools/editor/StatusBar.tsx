@@ -17,9 +17,11 @@ import type { EditorStore, Tab } from './store';
 import { useCursor } from './EditorPane';
 import { relativeTo } from './paths';
 import { formatterFor } from './format';
+import { Segmented } from '@/components/ui/segmented';
 import {
-  DEFAULT_APPEARANCE, EDITOR_FONTS, EDITOR_THEMES, MAX_FONT_SIZE, MIN_FONT_SIZE, fontFamilyFor,
-  type EditorAppearance, type EditorFont,
+  DEFAULT_APPEARANCE, EDITOR_FONTS, EDITOR_PADDINGS, EDITOR_SMOOTHING, EDITOR_THEMES, EDITOR_WEIGHTS,
+  MAX_FONT_SIZE, MAX_LETTER_SPACING, MAX_LINE_HEIGHT, MIN_FONT_SIZE, MIN_LETTER_SPACING, MIN_LINE_HEIGHT,
+  fontFamilyFor, type EditorAppearance, type EditorFont, type EditorWeight,
 } from './appearance';
 
 interface Props {
@@ -146,50 +148,124 @@ const FONT_LABEL: Record<Exclude<EditorFont, 'app'>, string> = {
   'fira-code': 'Fira Code',
 };
 
-/** "Aa": color theme, font, size and SQL hints, for every tab. */
+/** One labelled −/value/+ row. */
+function Stepper({ label, value, display, min, max, step, onChange, lessLabel, moreLabel }: {
+  label: string; value: number; display: string; min: number; max: number; step: number;
+  onChange: (v: number) => void; lessLabel: string; moreLabel: string;
+}) {
+  return (
+    <div className="flex items-center gap-1.5 px-2 py-1 text-xs">
+      <span className="flex-1">{label}</span>
+      <button type="button" className={STEP} disabled={value <= min} onClick={() => onChange(value - step)} title={lessLabel} aria-label={`${label}: ${lessLabel}`}>
+        <Minus className="h-3 w-3" />
+      </button>
+      <span className="w-10 text-center tabular-nums">{display}</span>
+      <button type="button" className={STEP} disabled={value >= max} onClick={() => onChange(value + step)} title={moreLabel} aria-label={`${label}: ${moreLabel}`}>
+        <Plus className="h-3 w-3" />
+      </button>
+    </div>
+  );
+}
+
+const STEP = 'inline-flex h-6 w-6 items-center justify-center rounded-xs border border-line text-fg-mute transition-colors hover:bg-bg-2 hover:text-fg disabled:opacity-40 disabled:hover:bg-transparent focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus';
+
+/** "Aa": color theme, font, size, spacing and SQL hints, for every tab. */
 function AppearanceMenu({ store, appearance: a }: { store: EditorStore; appearance: EditorAppearance }) {
   const m = useMessages(MESSAGES);
+  const set = (patch: Partial<EditorAppearance>) => store.setAppearance(patch);
   const tick = (on: boolean) => (on ? <Check className="h-3.5 w-3.5" /> : <span className="w-3.5" />);
-  const step = 'inline-flex h-6 w-6 items-center justify-center rounded-xs border border-line text-fg-mute transition-colors hover:bg-bg-2 hover:text-fg disabled:opacity-40 disabled:hover:bg-transparent focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus';
+  const isDefault = (Object.keys(DEFAULT_APPEARANCE) as (keyof EditorAppearance)[])
+    .every((k) => k === 'theme' || k === 'font' || k === 'hints' || a[k] === DEFAULT_APPEARANCE[k]);
   return (
     <DropdownMenu className="h-full">
       <DropdownMenuTrigger className={ITEM} title={m('appearance')} aria-label={m('appearance')}>
         <span className="font-medium">Aa</span>
         <span className="tabular-nums">{a.fontSize}</span>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-64 p-1.5">
+      <DropdownMenuContent align="end" className="max-h-[min(80vh,640px)] w-80 overflow-y-auto p-1.5">
         <DropdownMenuLabel>{m('appearanceTheme')}</DropdownMenuLabel>
         {EDITOR_THEMES.map((theme) => (
-          <DropdownMenuItem key={theme} icon={tick(a.theme === theme)} closeOnSelect={false} onClick={() => store.setAppearance({ theme })}>
+          <DropdownMenuItem key={theme} icon={tick(a.theme === theme)} closeOnSelect={false} onClick={() => set({ theme })}>
             {theme === 'intellij' ? m('themeIntellij') : m('themeVscode')}
           </DropdownMenuItem>
         ))}
         <DropdownMenuSeparator />
         <DropdownMenuLabel>{m('appearanceFont')}</DropdownMenuLabel>
         {EDITOR_FONTS.map((font) => (
-          <DropdownMenuItem key={font} icon={tick(a.font === font)} closeOnSelect={false} onClick={() => store.setAppearance({ font })}>
+          <DropdownMenuItem key={font} icon={tick(a.font === font)} closeOnSelect={false} onClick={() => set({ font })}>
             <span style={{ fontFamily: fontFamilyFor(font) }}>{font === 'app' ? m('fontApp') : FONT_LABEL[font]}</span>
           </DropdownMenuItem>
         ))}
         <DropdownMenuSeparator />
-        <div className="flex items-center gap-1.5 px-2 py-1 text-xs">
-          <span className="flex-1">{m('appearanceSize')}</span>
-          <button type="button" className={step} disabled={a.fontSize <= MIN_FONT_SIZE} onClick={() => store.setAppearance({ fontSize: a.fontSize - 1 })} title={m('fontSmaller')} aria-label={m('fontSmaller')}>
-            <Minus className="h-3 w-3" />
-          </button>
-          <span className="w-7 text-center tabular-nums">{a.fontSize}</span>
-          <button type="button" className={step} disabled={a.fontSize >= MAX_FONT_SIZE} onClick={() => store.setAppearance({ fontSize: a.fontSize + 1 })} title={m('fontLarger')} aria-label={m('fontLarger')}>
-            <Plus className="h-3 w-3" />
-          </button>
-          <button type="button" className={cn(step, 'w-auto px-1.5 text-[11px]')} disabled={a.fontSize === DEFAULT_APPEARANCE.fontSize} onClick={() => store.setAppearance({ fontSize: DEFAULT_APPEARANCE.fontSize })}>
-            {m('fontReset')}
-          </button>
-        </div>
+        <DropdownMenuLabel>{m('appearanceText')}</DropdownMenuLabel>
+        <Stepper
+          label={m('appearanceSize')} value={a.fontSize} display={`${a.fontSize}px`} min={MIN_FONT_SIZE} max={MAX_FONT_SIZE} step={1}
+          onChange={(fontSize) => set({ fontSize })} lessLabel={m('fontSmaller')} moreLabel={m('fontLarger')}
+        />
+        <Stepper
+          label={m('lineHeight')} value={a.lineHeight} display={a.lineHeight.toFixed(1)} min={MIN_LINE_HEIGHT} max={MAX_LINE_HEIGHT} step={0.1}
+          onChange={(lineHeight) => set({ lineHeight })} lessLabel={m('less')} moreLabel={m('more')}
+        />
+        <Stepper
+          label={m('letterSpacing')} value={a.letterSpacing} display={`${a.letterSpacing > 0 ? '+' : ''}${a.letterSpacing}`} min={MIN_LETTER_SPACING} max={MAX_LETTER_SPACING} step={0.25}
+          onChange={(letterSpacing) => set({ letterSpacing })} lessLabel={m('less')} moreLabel={m('more')}
+        />
+        <ChoiceRow label={m('fontWeight')}>
+          <Segmented
+            size="sm"
+            aria-label={m('fontWeight')}
+            value={String(a.weight) as `${EditorWeight}`}
+            onValueChange={(v) => set({ weight: Number(v) as EditorWeight })}
+            options={EDITOR_WEIGHTS.map((w) => ({ value: String(w) as `${EditorWeight}`, label: m(WEIGHT_LABEL[w]) }))}
+          />
+        </ChoiceRow>
+        <ChoiceRow label={m('smoothing')} title={m('smoothingHint')}>
+          <Segmented
+            size="sm"
+            aria-label={m('smoothing')}
+            value={a.smoothing}
+            onValueChange={(smoothing) => set({ smoothing })}
+            options={EDITOR_SMOOTHING.map((v) => ({ value: v, label: v === 'thin' ? m('smoothingThin') : m('smoothingFull') }))}
+          />
+        </ChoiceRow>
+        <ChoiceRow label={m('padding')}>
+          <Segmented
+            size="sm"
+            aria-label={m('padding')}
+            value={a.padding}
+            onValueChange={(padding) => set({ padding })}
+            options={EDITOR_PADDINGS.map((v) => ({ value: v, label: m(PADDING_LABEL[v]) }))}
+          />
+        </ChoiceRow>
+        <DropdownMenuItem
+          icon={<span className="w-3.5" />}
+          closeOnSelect={false}
+          disabled={isDefault}
+          className="disabled:opacity-40 disabled:hover:bg-transparent"
+          onClick={() => set({
+            fontSize: DEFAULT_APPEARANCE.fontSize, lineHeight: DEFAULT_APPEARANCE.lineHeight, letterSpacing: DEFAULT_APPEARANCE.letterSpacing,
+            weight: DEFAULT_APPEARANCE.weight, smoothing: DEFAULT_APPEARANCE.smoothing, padding: DEFAULT_APPEARANCE.padding,
+          })}
+        >
+          {m('resetText')}
+        </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem icon={tick(a.hints)} closeOnSelect={false} onClick={() => store.setAppearance({ hints: !a.hints })}>
+        <DropdownMenuItem icon={tick(a.hints)} closeOnSelect={false} onClick={() => set({ hints: !a.hints })}>
           {m('sqlHints')}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
+  );
+}
+
+const WEIGHT_LABEL = { 300: 'weightLight', 400: 'weightRegular', 500: 'weightMedium' } as const;
+const PADDING_LABEL = { compact: 'paddingCompact', normal: 'paddingNormal', roomy: 'paddingRoomy' } as const;
+
+function ChoiceRow({ label, title, children }: { label: string; title?: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-2 px-2 py-1 text-xs" title={title}>
+      <span className="flex-1">{label}</span>
+      {children}
+    </div>
   );
 }
