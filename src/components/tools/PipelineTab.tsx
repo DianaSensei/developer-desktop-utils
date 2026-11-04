@@ -1103,7 +1103,7 @@ function StepCard({ step, index, total, result, input, priorSteps, showKey, onTo
 
 // ─── Collapsed middle steps ────────────────────────────────────────────────────
 
-/** The steps between the first and the last, as one row of chips. A failing
+/** The steps after the first, as one row of chips. A failing
  *  step turns the bar red so a collapsed pipeline never hides an error. */
 function CollapsedSteps({ steps, results, firstIndex, onExpand }: {
   steps: PipelineStep[];
@@ -1125,7 +1125,7 @@ function CollapsedSteps({ steps, results, firstIndex, onExpand }: {
       )}
     >
       <span className={cn('mr-1 text-xs font-medium', failed ? 'text-bad' : 'text-fg-mute')}>
-        {t('hiddenSteps', { n: steps.length })}
+        {steps.length === 1 ? t('hiddenStep') : t('hiddenSteps', { n: steps.length })}
         {failed > 0 && ` · ${t('hiddenFailed', { n: failed })}`}
       </span>
       {steps.map((s, i) => {
@@ -1269,7 +1269,7 @@ export function PipelineTab({ active }: { active: boolean }) {
   const t = useMessages(MESSAGES);
   const sdk = usePluginSdkFor('base64');
   const [steps, setSteps] = usePluginState<PipelineStep[]>(sdk, 'pipeline:steps-v2', DEFAULT_STEPS, { legacyKey: 'devtool:pipeline:steps-v2' });
-  // Long pipelines: show only the first and last step, the rest as one bar.
+  // Collapse: show only the first step and the Final Result, the rest as one bar.
   const [collapsedPref, setCollapsed] = usePluginState<boolean>(sdk, 'pipeline:collapsed', false);
   // Keys, passphrases and PEM keys are credentials: kept in the vault by step
   // id, never in the plain settings file that holds the steps.
@@ -1372,11 +1372,15 @@ export function PipelineTab({ active }: { active: boolean }) {
     setShowKeys({});
   };
 
-  const collapsed = collapsedPref && steps.length > 2;
+  // Collapsed: the first step (the input) and the Final Result only; every
+  // later step folds into one bar.
+  const collapsed = collapsedPref && steps.length > 1;
 
   const addStep = (op: StepOp) => {
     const { key: _key, ...defaults } = STEP_DEFAULTS[op] ?? {};
     setSteps((prev) => [...prev, { id: makeId(), op, ...defaults }]);
+    // A step added while collapsed would land inside the bar, out of sight.
+    if (collapsed) setCollapsed(false);
   };
 
   return (
@@ -1392,8 +1396,8 @@ export function PipelineTab({ active }: { active: boolean }) {
         </div>
       )}
 
-      {/* Collapse: only the first and last step stay open. */}
-      {steps.length > 2 && (
+      {/* Collapse: only the first step and the Final Result stay open. */}
+      {steps.length > 1 && (
         <div className="flex items-center justify-between gap-2">
           <span className="text-[11px] text-fg-mute">{t('stepCount', { n: steps.length })}</span>
           <Button
@@ -1412,11 +1416,11 @@ export function PipelineTab({ active }: { active: boolean }) {
       {/* Steps */}
       <div className="space-y-0">
         {stepsWithKeys.map((step, index) => {
-          const hidden = collapsed && index > 0 && index < steps.length - 1;
+          const hidden = collapsed && index > 0;
           if (hidden) {
-            // One summary bar in place of every middle step.
+            // One summary bar in place of every step after the first.
             if (index !== 1) return null;
-            const middle = steps.slice(1, -1);
+            const middle = steps.slice(1);
             return (
               <div key="collapsed">
                 <CollapsedSteps
