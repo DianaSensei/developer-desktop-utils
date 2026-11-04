@@ -14,6 +14,7 @@ import {
   Hash, KeyRound, Code2, Type, Scissors, Search, CornerDownRight,
   AlertTriangle, CheckCircle2, ArrowRight, FileText, Braces,
   Lock, LockOpen, ScanText, ShieldCheck, Stamp, TextSearch, Split, Route, Combine,
+  Minimize2, Quote, TextQuote, ArrowDownAZ, FileCode2, ChevronsDownUp, ChevronsUpDown,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useQuickPaste } from '@/hooks/useQuickPaste';
@@ -24,7 +25,7 @@ import {
   ENCRYPT_ALGOS, HASH_ALGORITHMS, HMAC_ALGORITHMS, JWS_ALGORITHMS, JWT_ALGORITHMS,
   KEY_REQUIRED, PIPELINE_CODECS, SECRET_OPS, STEP_FAILED, StepCache,
   executePipeline, flattenJson,
-  type DigestFormat, type FieldConfig, type JwtPart, type PipelineStep, type StepOp, type StepResult,
+  type DigestFormat, type FieldConfig, type JsonIndent, type JwtPart, type PipelineStep, type StepOp, type StepResult,
 } from './pipelineEngine';
 import { SECRET_ENCODINGS, isAsymmetric, isHmac, type AlgorithmSpec, type JwtAlgorithm, type SecretEncoding } from './jwt/jwtCrypto';
 import type { EncryptAlgo } from './encodeCore';
@@ -61,16 +62,31 @@ const OP_META: Record<StepOp, OpMeta> = {
   prepend:         { icon: CornerDownRight, color: 'text-fg-mute' },
   append:          { icon: CornerDownRight, color: 'text-fg-mute' },
   replace:         { icon: Search,          color: 'text-fg-mute' },
-  'json-format':   { icon: Braces,          color: 'text-fg-mute' },
+  'json-format':   { icon: Braces,          color: 'text-[var(--cat-4)]' },
+  'json-minify':   { icon: Minimize2,       color: 'text-[var(--cat-4)]' },
+  'json-stringify': { icon: Quote,          color: 'text-[var(--cat-4)]' },
+  'json-parse-string': { icon: TextQuote,   color: 'text-[var(--cat-4)]' },
+  'json-sort-keys': { icon: ArrowDownAZ,    color: 'text-[var(--cat-4)]' },
+  'json-to-yaml':  { icon: FileCode2,       color: 'text-[var(--cat-4)]' },
+  'yaml-to-json':  { icon: FileCode2,       color: 'text-[var(--cat-4)]' },
 };
 
-const OP_GROUPS: { label: 'Input' | 'Encode' | 'Crypto' | 'JWT' | 'Extract' | 'Transform'; ops: StepOp[] }[] = [
+const OP_GROUPS: { label: 'Input' | 'Encode' | 'Crypto' | 'JWT' | 'Extract' | 'Transform' | 'JSON'; ops: StepOp[] }[] = [
   { label: 'Input',     ops: ['text-sunk', 'json-input'] },
   { label: 'Encode',    ops: ['encode', 'decode'] },
   { label: 'Crypto',    ops: ['hash', 'hmac', 'encrypt', 'decrypt'] },
   { label: 'JWT',       ops: ['jwt-decode', 'jwt-sign', 'jwt-verify', 'jws-sign', 'jws-verify'] },
   { label: 'Extract',   ops: ['json-path', 'regex-extract', 'split-pick', 'compose'] },
-  { label: 'Transform', ops: ['uppercase', 'lowercase', 'trim', 'prepend', 'append', 'replace', 'json-format'] },
+  { label: 'Transform', ops: ['uppercase', 'lowercase', 'trim', 'prepend', 'append', 'replace'] },
+  { label: 'JSON',      ops: ['json-format', 'json-minify', 'json-stringify', 'json-parse-string', 'json-sort-keys', 'json-to-yaml', 'yaml-to-json'] },
+];
+
+/** Output layout for steps that write JSON. */
+const INDENT_OPTIONS: { value: JsonIndent; label: string }[] = [
+  { value: 'pretty', label: '2 spaces' },
+  { value: 'pretty4', label: '4 spaces' },
+  { value: 'tab', label: 'Tab' },
+  { value: 'minify', label: 'Minify' },
 ];
 
 const SEP_OPTIONS = [
@@ -1033,25 +1049,104 @@ function StepCard({ step, index, total, result, input, priorSteps, showKey, onTo
           </div>
         )}
 
-        {/* JSON format */}
-        {step.op === 'json-format' && (
-          <Segmented
-            value={step.jsonIndent ?? 'pretty'}
-            onValueChange={(v) => onUpdate({ jsonIndent: v })}
-            size="sm"
-            options={[{ value: 'pretty', label: t('pretty') }, { value: 'minify', label: t('minify') }]}
-            aria-label={t('op.json-format')}
-          />
+        {/* JSON layout: format, sort keys, YAML → JSON */}
+        {(step.op === 'json-format' || step.op === 'json-sort-keys' || step.op === 'yaml-to-json') && (
+          <div className="flex flex-wrap items-center gap-2">
+            {step.op === 'json-sort-keys' && (
+              <Segmented
+                value={step.jsonSort === 'desc' ? 'desc' : 'asc'}
+                onValueChange={(v) => onUpdate({ jsonSort: v })}
+                size="sm"
+                options={[{ value: 'asc', label: 'A→Z' }, { value: 'desc', label: 'Z→A' }]}
+                aria-label={t('sortOrder')}
+              />
+            )}
+            <Segmented<JsonIndent>
+              value={step.jsonIndent ?? 'pretty'}
+              onValueChange={(v) => onUpdate({ jsonIndent: v })}
+              size="sm"
+              options={INDENT_OPTIONS.map((o) => ({ value: o.value, label: o.value === 'minify' ? t('minify') : o.label }))}
+              aria-label={t('jsonLayout')}
+            />
+          </div>
+        )}
+
+        {/* JSON → string */}
+        {step.op === 'json-stringify' && (
+          <div className="flex flex-wrap items-center gap-2">
+            <ToggleChip pressed={step.stringifyMinify ?? true} onPressedChange={(v) => onUpdate({ stringifyMinify: v })} className="px-2">
+              {t('stringifyMinify')}
+            </ToggleChip>
+            <ToggleChip pressed={step.stringifyQuotes ?? true} onPressedChange={(v) => onUpdate({ stringifyQuotes: v })} className="px-2">
+              {t('stringifyQuotes')}
+            </ToggleChip>
+          </div>
+        )}
+
+        {/* String → JSON */}
+        {step.op === 'json-parse-string' && (
+          <ToggleChip pressed={step.unescapePretty ?? true} onPressedChange={(v) => onUpdate({ unescapePretty: v })} className="px-2">
+            {t('unescapePretty')}
+          </ToggleChip>
         )}
 
         {/* No-param ops */}
-        {(step.op === 'uppercase' || step.op === 'lowercase' || step.op === 'trim') && (
+        {(step.op === 'uppercase' || step.op === 'lowercase' || step.op === 'trim' || step.op === 'json-minify' || step.op === 'json-to-yaml') && (
           <p className="text-xs text-fg-mute">{t(`opHint.${step.op}`)}</p>
         )}
       </div>
 
       <StepOutputBar result={result} />
     </div>
+  );
+}
+
+// ─── Collapsed middle steps ────────────────────────────────────────────────────
+
+/** The steps between the first and the last, as one row of chips. A failing
+ *  step turns the bar red so a collapsed pipeline never hides an error. */
+function CollapsedSteps({ steps, results, firstIndex, onExpand }: {
+  steps: PipelineStep[];
+  results: Record<string, StepResult | undefined>;
+  firstIndex: number;
+  onExpand: () => void;
+}) {
+  const t = useMessages(MESSAGES);
+  const failed = steps.filter((s) => results[s.id]?.error).length;
+  return (
+    <button
+      type="button"
+      onClick={onExpand}
+      title={t('expandSteps')}
+      className={cn(
+        'flex w-full flex-wrap items-center gap-1.5 rounded-lg border border-dashed px-3 py-2 text-left transition-colors',
+        'focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus',
+        failed ? 'border-bad/50 bg-bad/5 hover:bg-bad/10' : 'border-line bg-bg-2/40 hover:bg-bg-2',
+      )}
+    >
+      <span className={cn('mr-1 text-xs font-medium', failed ? 'text-bad' : 'text-fg-mute')}>
+        {t('hiddenSteps', { n: steps.length })}
+        {failed > 0 && ` · ${t('hiddenFailed', { n: failed })}`}
+      </span>
+      {steps.map((s, i) => {
+        const m = OP_META[s.op];
+        const Icon = m.icon;
+        const bad = !!results[s.id]?.error;
+        return (
+          <span key={s.id} className="inline-flex items-center gap-1">
+            {i > 0 && <ArrowRight className="h-3 w-3 text-fg-mute/50" aria-hidden />}
+            <span className={cn('inline-flex items-center gap-1 rounded-sm border bg-card px-1.5 py-0.5 text-[11px]', bad ? 'border-bad/50 text-bad' : 'border-line text-fg')}>
+              <span className="tabular-nums text-fg-mute">{firstIndex + i + 1}</span>
+              <Icon className={cn('h-3 w-3', bad ? 'text-bad' : m.color)} />
+              {t(`op.${s.op}`)}
+            </span>
+          </span>
+        );
+      })}
+      <span className="ml-auto inline-flex items-center gap-1 text-[11px] text-acc-ink">
+        <ChevronsUpDown className="h-3 w-3" />{t('expandSteps')}
+      </span>
+    </button>
   );
 }
 
@@ -1151,6 +1246,10 @@ const STEP_DEFAULTS: Partial<Record<StepOp, Partial<PipelineStep>>> = {
   append:          { text: '' },
   replace:         { find: '', replacement: '', regex: false },
   'json-format':   { jsonIndent: 'pretty' },
+  'json-stringify': { stringifyMinify: true, stringifyQuotes: true },
+  'json-parse-string': { unescapePretty: true },
+  'json-sort-keys': { jsonSort: 'asc', jsonIndent: 'pretty' },
+  'yaml-to-json':  { jsonIndent: 'pretty' },
 };
 
 const DEFAULT_STEPS: PipelineStep[] = [];
@@ -1158,7 +1257,9 @@ const DEFAULT_STEPS: PipelineStep[] = [];
 /** Settings for a transform inside a Compose part: a one-line value wants minified JSON. */
 function partStepDefaults(op: StepOp): Partial<PipelineStep> {
   const { key: _key, ...defaults } = STEP_DEFAULTS[op] ?? {};
-  return op === 'json-format' ? { ...defaults, jsonIndent: 'minify' } : defaults;
+  if (op === 'json-format' || op === 'json-sort-keys') return { ...defaults, jsonIndent: 'minify' };
+  if (op === 'json-parse-string') return { ...defaults, unescapePretty: false };
+  return defaults;
 }
 
 /** Delay before a run, so typing in a key box doesn't start one per keystroke. */
@@ -1168,6 +1269,8 @@ export function PipelineTab({ active }: { active: boolean }) {
   const t = useMessages(MESSAGES);
   const sdk = usePluginSdkFor('base64');
   const [steps, setSteps] = usePluginState<PipelineStep[]>(sdk, 'pipeline:steps-v2', DEFAULT_STEPS, { legacyKey: 'devtool:pipeline:steps-v2' });
+  // Long pipelines: show only the first and last step, the rest as one bar.
+  const [collapsedPref, setCollapsed] = usePluginState<boolean>(sdk, 'pipeline:collapsed', false);
   // Keys, passphrases and PEM keys are credentials: kept in the vault by step
   // id, never in the plain settings file that holds the steps.
   const [stepKeys, setStepKeys, stepKeysReady] = useSecretState<Record<string, string>>(sdk, 'pipeline:step-keys', {});
@@ -1269,6 +1372,8 @@ export function PipelineTab({ active }: { active: boolean }) {
     setShowKeys({});
   };
 
+  const collapsed = collapsedPref && steps.length > 2;
+
   const addStep = (op: StepOp) => {
     const { key: _key, ...defaults } = STEP_DEFAULTS[op] ?? {};
     setSteps((prev) => [...prev, { id: makeId(), op, ...defaults }]);
@@ -1287,9 +1392,44 @@ export function PipelineTab({ active }: { active: boolean }) {
         </div>
       )}
 
+      {/* Collapse: only the first and last step stay open. */}
+      {steps.length > 2 && (
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-[11px] text-fg-mute">{t('stepCount', { n: steps.length })}</span>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-1.5 text-xs"
+            aria-pressed={collapsed}
+            onClick={() => setCollapsed(!collapsed)}
+          >
+            {collapsed ? <ChevronsUpDown className="h-3.5 w-3.5" /> : <ChevronsDownUp className="h-3.5 w-3.5" />}
+            {collapsed ? t('expandSteps') : t('collapseSteps')}
+          </Button>
+        </div>
+      )}
+
       {/* Steps */}
       <div className="space-y-0">
-        {stepsWithKeys.map((step, index) => (
+        {stepsWithKeys.map((step, index) => {
+          const hidden = collapsed && index > 0 && index < steps.length - 1;
+          if (hidden) {
+            // One summary bar in place of every middle step.
+            if (index !== 1) return null;
+            const middle = steps.slice(1, -1);
+            return (
+              <div key="collapsed">
+                <CollapsedSteps
+                  steps={middle}
+                  results={run.byId}
+                  firstIndex={1}
+                  onExpand={() => setCollapsed(false)}
+                />
+                <div className="flex justify-center py-0.5"><div className="w-px h-4 bg-line/50" /></div>
+              </div>
+            );
+          }
+          return (
           <div key={step.id}>
             <StepCard
               step={step} index={index} total={steps.length}
@@ -1309,7 +1449,8 @@ export function PipelineTab({ active }: { active: boolean }) {
               </div>
             )}
           </div>
-        ))}
+          );
+        })}
         <AddStepPanel onAdd={addStep} />
       </div>
 

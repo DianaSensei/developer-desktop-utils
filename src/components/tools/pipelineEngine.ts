@@ -45,7 +45,13 @@ export type StepOp =
   // Extract
   | 'json-path' | 'regex-extract' | 'split-pick' | 'compose'
   // Transform
-  | 'uppercase' | 'lowercase' | 'trim' | 'prepend' | 'append' | 'replace' | 'json-format';
+  | 'uppercase' | 'lowercase' | 'trim' | 'prepend' | 'append' | 'replace'
+  // JSON
+  | 'json-format' | 'json-minify' | 'json-stringify' | 'json-parse-string' | 'json-sort-keys'
+  | 'json-to-yaml' | 'yaml-to-json';
+
+/** How JSON output is written: 2 spaces, 4 spaces, tabs, or one line. */
+export type JsonIndent = 'pretty' | 'pretty4' | 'tab' | 'minify';
 
 /** Where one part of a Compose step reads its value from. */
 export type ComposeSource = 'json-path' | 'regex' | 'text' | 'step';
@@ -128,8 +134,16 @@ export interface PipelineStep {
   find?: string;
   replacement?: string;
   regex?: boolean;
-  // JSON format
-  jsonIndent?: 'pretty' | 'minify';
+  // JSON format / sort keys / YAML → JSON
+  jsonIndent?: JsonIndent;
+  // JSON → string
+  /** Minify the input first when it is valid JSON (default true). */
+  stringifyMinify?: boolean;
+  /** Keep the surrounding quotes (default true); off = escaped content only. */
+  stringifyQuotes?: boolean;
+  // String → JSON
+  /** Pretty-print the unescaped text when it is JSON (default true). */
+  unescapePretty?: boolean;
 }
 
 export interface StepResult { output: string; error?: string; }
@@ -149,7 +163,8 @@ const SOURCE_OPS: ReadonlySet<StepOp> = new Set<StepOp>(['text-sunk', 'json-inpu
  */
 export const PART_OPS: readonly StepOp[] = [
   'trim', 'uppercase', 'lowercase', 'prepend', 'append', 'replace',
-  'encode', 'decode', 'hash', 'json-path', 'regex-extract', 'split-pick', 'json-format',
+  'encode', 'decode', 'hash', 'json-path', 'regex-extract', 'split-pick',
+  'json-format', 'json-minify', 'json-stringify', 'json-parse-string', 'json-sort-keys',
 ];
 const PART_OP_SET: ReadonlySet<StepOp> = new Set(PART_OPS);
 
@@ -232,6 +247,50 @@ export function flattenJson(value: unknown, prefix = ''): Record<string, string>
 function parseJson(text: string, what: string): unknown {
   try { return JSON.parse(text); }
   catch (e) { throw new Error(`${what} is not valid JSON: ${(e as Error).message}`); }
+}
+
+/** JSON text in the chosen layout. */
+export function formatJson(value: unknown, indent: JsonIndent): string {
+  if (indent === 'minify') return JSON.stringify(value);
+  return JSON.stringify(value, null, indent === 'tab' ? '\t' : indent === 'pretty4' ? 4 : 2);
+}
+
+/** Object keys sorted at every depth (arrays keep their order). */
+export function sortKeysDeep(value: unknown, order: 'asc' | 'desc' = 'asc'): unknown {
+  if (Array.isArray(value)) return value.map((v) => sortKeysDeep(v, order));
+  if (value === null || typeof value !== 'object') return value;
+  const keys = Object.keys(value).sort(compareCodeUnits);
+  if (order === 'desc') keys.reverse();
+  const out: Record<string, unknown> = {};
+  for (const k of keys) out[k] = sortKeysDeep((value as Record<string, unknown>)[k], order);
+  return out;
+}
+
+/** Input as a JSON string literal — `{"a":1}` → `"{\"a\":1}"` — for pasting
+ *  JSON into a string field, an env var or source code. Valid JSON is
+ *  minified first unless told not to; `quotes: false` drops the outer quotes. */
+export function jsonStringLiteral(input: string, opts: { minify: boolean; quotes: boolean }): string {
+  let text = input;
+  if (opts.minify) {
+    try { text = JSON.stringify(JSON.parse(input)); } catch { /* not JSON: escape as is */ }
+  }
+  const literal = JSON.stringify(text);
+  return opts.quotes ? literal : literal.slice(1, -1);
+}
+
+/** The reverse: a JSON string literal, with or without its quotes, back to
+ *  text — pretty-printed when that text is itself JSON (unless turned off). */
+export function parseJsonStringLiteral(input: string, pretty: boolean): string {
+  const t = input.trim();
+  let text: unknown;
+  try {
+    text = JSON.parse(t.startsWith('"') ? t : `"${t}"`);
+  } catch (e) {
+    throw new Error(`Input is not a JSON string: ${(e as Error).message}`);
+  }
+  if (typeof text !== 'string') throw new Error('Input is not a JSON string');
+  if (!pretty) return text;
+  try { return JSON.stringify(JSON.parse(text), null, 2); } catch { return text; }
 }
 
 /** A value as the next step should see it: strings raw, everything else as JSON. */
@@ -600,9 +659,31 @@ async function run(step: PipelineStep, input: string, ctx: RunContext = {}): Pro
     case 'replace':
       if (step.regex) return step.find ? input.replace(new RegExp(step.find, 'g'), step.replacement ?? '') : input;
       return input.split(step.find ?? '').join(step.replacement ?? '');
-    case 'json-format': {
+    case 'json-format':
+      return formatJson(parseJson(input, 'Input'), step.jsonIndent ?? 'pretty');
+    case 'json-minify':
+      return JSON.stringify(parseJson(input, 'Input'));
+    case 'json-stringify':
+      return jsonStringLiteral(input, { minify: step.stringifyMinify ?? true, quotes: step.stringifyQuotes ?? true });
+    case 'json-parse-string':
+      return parseJsonStringLiteral(input, step.unescapePretty ?? true);
+    case 'json-sort-keys':
+      return formatJson(sortKeysDeep(parseJson(input, 'Input'), step.jsonSort === 'desc' ? 'desc' : 'asc'), step.jsonIndent ?? 'pretty');
+    case 'json-to-yaml': {
       const value = parseJson(input, 'Input');
-      return step.jsonIndent === 'minify' ? JSON.stringify(value) : JSON.stringify(value, null, 2);
+      const { dump } = await import('js-yaml');
+      return dump(value, { indent: 2, lineWidth: -1, noRefs: true }).replace(/\n$/, '');
+    }
+    case 'yaml-to-json': {
+      const { load, CORE_SCHEMA, mergeTag } = await import('js-yaml');
+      let value: unknown;
+      try {
+        // js-yaml 5's default schema leaves `<<: *anchor` as a literal key.
+        value = load(input, { schema: CORE_SCHEMA.withTags(mergeTag) });
+      } catch (e) {
+        throw new Error(`Input is not valid YAML: ${(e as Error).message}`);
+      }
+      return formatJson(value ?? null, step.jsonIndent ?? 'pretty');
     }
     default:
       return input;
