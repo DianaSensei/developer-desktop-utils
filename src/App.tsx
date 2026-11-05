@@ -58,6 +58,8 @@ import { AppConfigProvider } from '@/contexts/AppConfigContext';
 import { MeetingsProvider } from '@/lib/meetings';
 import { UpdateDialog } from '@/components/UpdateDialog';
 import { ToolGuideModal } from '@/components/ToolGuideModal';
+import { ToolDataMenu } from '@/components/ToolDataMenu';
+import { ConfigNotice } from '@/components/ConfigNotice';
 import { OnboardingProvider, useOnboarding } from '@/contexts/OnboardingContext';
 import { OnboardingFlow } from '@/components/onboarding/OnboardingFlow';
 import { useToolGuideTracking } from '@/hooks/useToolGuideTracking';
@@ -895,6 +897,7 @@ function AppContent() {
   const titlebarHelpAction = (
     <>
       {newsPill(true)}
+      <ToolDataMenu toolId={activeTool.featureId} label={activeTool.label} compact />
       <Button
         variant="ghost"
         size="icon"
@@ -1029,6 +1032,7 @@ function AppContent() {
               <div id="tool-header-actions" className="flex items-center gap-1" />
               <SplitToggle />
               {newsPill(false)}
+              <ToolDataMenu toolId={activeTool.featureId} label={activeTool.label} />
               <Button
                 variant="ghost"
                 size="icon"
@@ -1065,6 +1069,7 @@ function AppContent() {
       </main>
       </div>
 
+      <ConfigNotice />
       <ToolGuideModal
         toolId={activeTool.featureId}
         label={activeTool.label}

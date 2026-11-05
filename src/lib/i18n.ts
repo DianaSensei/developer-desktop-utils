@@ -249,6 +249,7 @@ export const DICTIONARY = {
 
   // ── Settings — Shortcuts ─────────────────────────────────────────────────
   'settings.section.shortcuts': { vi: 'Phím tắt', en: 'Keyboard Shortcuts' },
+  'settings.section.backup': { vi: 'Sao lưu & khôi phục', en: 'Backup & restore' },
   'settings.shortcuts.description': {
     vi: 'Các phím tắt hoạt động ở mọi nơi trong app, cộng với phím tắt riêng của từng tool.',
     en: 'Shortcuts that work anywhere in the app, plus ones specific to each tool.',

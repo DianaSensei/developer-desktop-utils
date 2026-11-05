@@ -533,6 +533,19 @@ A TOTP / HOTP one-time-password generator — the same codes a phone authenticat
 
 ---
 
+## Backup & restore (export / import settings)
+
+Settings → **Backup & restore**, or **⋯** in any tool's header for that tool alone.
+
+- **Export** writes a JSON file (`devtool-config-<date>.json`, or `devtool-<tool>-config-<date>.json` for one tool) through the OS Save dialog: each chosen tool's saved data (`devtool:<tool>:*` in the settings store — options, collections, history, tasks…, stored values unchanged) and, optionally, the app settings (`devtool-*`: theme, language, fonts, workspaces and tabs, tool order, favorites, shortcuts).
+- **Never exported:** the encrypted secret vault (2FA seeds, API tokens, passwords, the Jira token), files on disk (Text Editor folders, untitled-tab backups, Local History), per-machine bookkeeping (pending update, last update check). Re-enter secrets after importing on another machine.
+- **Import** reads a file you pick (OS Open dialog), shows what it contains, and writes the parts you choose: **Replace** (a chosen tool ends up with exactly the file's data) or **Merge** (only the file's entries are overwritten). Unknown fields and non-string values are dropped; tool ids are checked; app keys are limited to `devtool-*`. The app then reloads so every tool starts from the imported values. A tool's **⋯ → Import** loads only that tool's part of any export file (Replace).
+- **Undo:** before writing, the current value of every key an import or a tool reset touches is kept as one undo snapshot in the settings store; "Undo" (in the notice after the reload, or in Backup & restore) puts them back. One level only: the next import replaces it.
+- **⋯ → Reset data** clears one tool's saved data (vault secrets kept), with the same undo.
+- Nothing is sent anywhere; the file is plain JSON on disk, so treat it like the data it holds (API collections and history may contain URLs and request bodies).
+
+---
+
 ## What never happens in any tool
 
 - **No telemetry, analytics, or crash reporting.** The only outbound network activity is: Kafka connections you initiate, RabbitMQ management API calls and Request/Response AMQP connections you initiate, DNS/IP lookups you initiate in Network Tools, HTTP requests you send from the API Client, and the app update check described below.

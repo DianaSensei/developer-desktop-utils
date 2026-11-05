@@ -470,6 +470,7 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
       <><strong className="text-fg">Tools</strong> section: search, enable/disable individual tools, drag rows to reorder the sidebar, and star a tool to pin it near the top.</>,
       <><strong className="text-fg">Configuration</strong> section: tunable numbers (editor limits, generator defaults, Kafka/update timings) — changes save and apply immediately, no restart needed.</>,
       <><strong className="text-fg">Keyboard Shortcuts</strong> section: give any tool a combo (up to 3 keys, e.g. <Key>{mod}</Key>+<Key>⇧</Key>+<Key>J</Key>) that opens it from anywhere in the app; click Set and press the keys. Reserved combos are refused, and overlaps with a tool's own shortcut are flagged.</>,
+      <><strong className="text-fg">Backup & restore</strong> section: export the whole app or chosen tools to a JSON file and import it back (Replace or Merge) — on this machine or another. Secrets (2FA, tokens, passwords) are never in the file. Each tool's <strong className="text-fg">⋯</strong> menu in the header does the same for that tool alone, plus Reset data; every import or reset can be undone.</>,
       <><strong className="text-fg">Data & Storage</strong> section: see where your local data lives on disk and reveal it in Finder/Explorer.</>,
       <><strong className="text-fg">About</strong> section: current version, auto-update toggle/schedule, and the “Xem lại” button to reopen the welcome tour.</>,
     ],
@@ -486,7 +487,7 @@ export const TOOL_GUIDE_VERSIONS: Record<string, number> = {
   // 2 — Pipeline JSON steps (minify, to/from string, sort keys, YAML).
   base64: 2,
   // 2 — assignable "open a tool" shortcuts.
-  settings: 2,
+  settings: 3,
   // 5 — script review when importing a collection.
   'api-client': 5,
   // 2 — case modes work per line; PascalCase/CONSTANT/kebab/Title + "All cases" view.
