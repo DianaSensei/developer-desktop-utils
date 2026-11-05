@@ -112,13 +112,23 @@ export function storageGet(key: string): string | null {
   return cache.has(key) ? cache.get(key)! : null;
 }
 
+// Set by an import just before it reloads the app: whatever the page still
+// writes while it unloads (a tool's debounced save) must not overwrite what
+// was imported. Never unset; the reload starts a fresh module.
+let frozen = false;
+export function freezeWrites(): void {
+  frozen = true;
+}
+
 export function storageSet(key: string, value: string): void {
+  if (frozen) return;
   cache.set(key, value);
   if (isTauri) void store?.set(key, value);
   else try { localStorage.setItem(key, value); } catch { /* unavailable — cache is still authoritative for this session */ }
 }
 
 export function storageRemove(key: string): void {
+  if (frozen) return;
   cache.delete(key);
   if (isTauri) void store?.delete(key);
   else try { localStorage.removeItem(key); } catch { /* unavailable */ }

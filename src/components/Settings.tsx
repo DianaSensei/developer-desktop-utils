@@ -13,6 +13,7 @@ import { useLocale } from '@/contexts/LocaleContext';
 import type { TranslationKey } from '@/lib/i18n';
 import { Segmented } from '@/components/ui/segmented';
 import { SettingRow, SettingGroup } from '@/components/ui/setting-row';
+import { ConfigBackup } from '@/components/ConfigBackup';
 import {
   ACCENT_TONES, getAccentPreference, setAccentPreference,
   applyAccentToDocument, type AccentTone,
@@ -284,6 +285,7 @@ const SETTINGS_SECTIONS = [
   { id: 'appearance', label: 'settings.section.appearance' },
   { id: 'tools', label: 'settings.section.tools' },
   { id: 'shortcuts', label: 'settings.section.shortcuts' },
+  { id: 'backup', label: 'settings.section.backup' },
   { id: 'extensions', label: 'settings.section.extensions' },
   { id: 'mcp', label: 'settings.mcp.title' },
   { id: 'permissions', label: 'settings.permissions.title' },
@@ -839,6 +841,8 @@ export function Settings() {
         </div>
             </section>
           )}
+
+          {activeSection === 'backup' && <ConfigBackup />}
 
           {activeSection === 'permissions' && (
             <section className="space-y-3">

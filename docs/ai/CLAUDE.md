@@ -1360,6 +1360,9 @@ Editable CodeMirror 6 editor. Props: `value`, `onChange`, `language` (`'json'|'t
 ### `ResponseViewer` — `src/components/tools/apiclient/ResponseViewer.tsx`
 Read-only CodeMirror 6 viewer with JSON/text syntax highlight. Props: `value`, `language`. Used for RPC reply and Kafka/RabbitMQ consume message body.
 
+### Settings backup — `src/lib/configTransfer.ts`
+Export/import of the settings store as a `devtool-config` v1 JSON file: `tools` = `devtool:<id>:*` namespaces (raw strings), `app` = `devtool-*` keys minus `APP_EXCLUDED`. The vault (`platform/secrets.ts`) and on-disk files are never included. `importConfig` (replace|merge) and `resetToolData` store one undo snapshot under `devtool-config-undo`; `reloadWith` flushes, calls `freezeWrites()` (persistentStore drops later writes so a tool's debounced save can't clobber the import) and reloads; `ConfigNotice` shows the one-time notice + Undo. UI: `ConfigBackup.tsx` (Settings → Backup & restore), `ToolDataMenu.tsx` (⋯ in the tool header), file dialogs in `lib/configFile.ts` (shell code: dialog/fs plugins directly, not a plugin SDK). A new per-machine `devtool-*` key that must not travel between machines goes in `APP_EXCLUDED`.
+
 ### CodeMirror theming — `src/components/ui/code-theme.ts`
 All four CodeMirror editors (`CodeEditor`, `ResponseViewer`, `VarInput`, `SqlFormatter`) share one theme and one syntax palette. **Never write a new `EditorView.theme()` or `HighlightStyle.define()` for a new editor** — use `useCodeTheme`:
 
