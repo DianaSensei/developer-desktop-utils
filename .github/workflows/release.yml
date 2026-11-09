@@ -179,12 +179,14 @@ jobs:
           dir="${XDG_CACHE_HOME:-$HOME/.cache}/tauri"
           mkdir -p "$dir"
           fetch() {
-            [ -s "$dir/$2" ] && { echo "have $2"; return; }
+            local url="$1" name="$2"
+            local target="$dir/$name"
+            [ -s "$target" ] && { echo "have $name"; return; }
             curl -fsSL --retry 6 --retry-delay 10 --retry-all-errors \
-              --connect-timeout 20 --max-time 300 -o "$dir/$2.part" "$1"
-            mv "$dir/$2.part" "$dir/$2"
-            chmod +x "$dir/$2"
-            echo "fetched $2 ($(stat -c %s "$dir/$2") bytes)"
+              --connect-timeout 20 --max-time 300 -o "$target.part" "$url"
+            mv "$target.part" "$target"
+            chmod +x "$target"
+            echo "fetched $name ($(stat -c %s "$target") bytes)"
           }
           fetch https://github.com/tauri-apps/binary-releases/releases/download/apprun-old/AppRun-x86_64 AppRun-x86_64
           fetch https://github.com/tauri-apps/binary-releases/releases/download/linuxdeploy-07333c6/linuxdeploy-x86_64.AppImage linuxdeploy-x86_64.AppImage
