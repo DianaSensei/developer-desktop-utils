@@ -163,6 +163,35 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-tauri-bundler-
 
+      # AppImage bundling downloads three tools from GitHub release assets into
+      # ~/.cache/tauri on every run (tauri-bundler's linuxdeploy.rs). Those
+      # downloads intermittently time out; when the appimage plugin's does,
+      # tauri falls back to an older built-in plugin that then fails with
+      # "failed to run linuxdeploy" — v1.8.0's first two Linux builds died
+      # exactly like that. Fetch them first, with retries, under the names
+      # tauri looks for (it skips a download when the file exists; a wrong
+      # name would only mean tauri downloads it itself, as before).
+      - name: Pre-fetch AppImage bundler tools (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          dir="${XDG_CACHE_HOME:-$HOME/.cache}/tauri"
+          mkdir -p "$dir"
+          fetch() {
+            local url="$1" name="$2"
+            local target="$dir/$name"
+            [ -s "$target" ] && { echo "have $name"; return; }
+            curl -fsSL --retry 6 --retry-delay 10 --retry-all-errors \
+              --connect-timeout 20 --max-time 300 -o "$target.part" "$url"
+            mv "$target.part" "$target"
+            chmod +x "$target"
+            echo "fetched $name ($(stat -c %s "$target") bytes)"
+          }
+          fetch https://github.com/tauri-apps/binary-releases/releases/download/apprun-old/AppRun-x86_64 AppRun-x86_64
+          fetch https://github.com/tauri-apps/binary-releases/releases/download/linuxdeploy-07333c6/linuxdeploy-x86_64.AppImage linuxdeploy-x86_64.AppImage
+          fetch https://github.com/linuxdeploy/linuxdeploy-plugin-appimage/releases/download/continuous/linuxdeploy-plugin-appimage-x86_64.AppImage linuxdeploy-plugin-appimage.AppImage
+
       # Plain `tauri build` CLI, not tauri-action: tauri-action bundles
       # build+release+updater-manifest into one step, which is exactly the
       # coupling this workflow is undoing. Signing (.sig files) and the
