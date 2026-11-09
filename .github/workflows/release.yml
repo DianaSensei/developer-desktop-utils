@@ -305,6 +305,18 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
+          # Re-running this job after a later step failed would otherwise add a
+          # second draft with the same name (drafts have no git tag yet, so
+          # `gh release create` does not see the first one), and the steps
+          # below would upload to whichever `gh` finds. Remove leftover DRAFTS
+          # for this tag first; a published release is never touched (if one
+          # exists, `gh release create` below fails on the existing tag).
+          gh api --paginate "repos/${GITHUB_REPOSITORY}/releases?per_page=100" \
+            --jq ".[] | select(.draft and .tag_name == \"${RELEASE_TAG}\") | .id" |
+            while read -r id; do
+              echo "Removing leftover draft release ${id} for ${RELEASE_TAG}"
+              gh api -X DELETE "repos/${GITHUB_REPOSITORY}/releases/${id}"
+            done
           gh release create "${RELEASE_TAG}" \
             --repo "${GITHUB_REPOSITORY}" \
             --title "DevTool ${RELEASE_TAG}" \
@@ -363,7 +375,44 @@ jobs:
           cat "$sums"
           gh release upload "${RELEASE_TAG}" "$sums" --clobber --repo "${GITHUB_REPOSITORY}"
 
-      - name: Generate SBOM
+      # The action downloads syft from GitHub release assets on every run, and
+      # those downloads intermittently time out (HTTP 504 — v1.8.0's release
+      # failed here twice in a row). Up to three attempts with a pause in
+      # between; only the last one can fail the job, so the "no release
+      # without an SBOM" guarantee below still holds.
+      - name: Generate SBOM (attempt 1)
+        id: sbom1
+        continue-on-error: true
+        uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
+        with:
+          path: .
+          format: spdx-json
+          output-file: devtool-sbom.spdx.json
+          upload-artifact: false
+          upload-release-assets: false
+
+      - name: Wait before retrying the SBOM
+        if: steps.sbom1.outcome == 'failure'
+        run: sleep 30
+
+      - name: Generate SBOM (attempt 2)
+        id: sbom2
+        if: steps.sbom1.outcome == 'failure'
+        continue-on-error: true
+        uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
+        with:
+          path: .
+          format: spdx-json
+          output-file: devtool-sbom.spdx.json
+          upload-artifact: false
+          upload-release-assets: false
+
+      - name: Wait before the last SBOM attempt
+        if: steps.sbom2.outcome == 'failure'
+        run: sleep 90
+
+      - name: Generate SBOM (attempt 3)
+        if: steps.sbom2.outcome == 'failure'
         uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
         with:
           path: .
@@ -376,11 +425,16 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload "${RELEASE_TAG}" devtool-sbom.spdx.json --clobber --repo "${GITHUB_REPOSITORY}"
+        run: |
+          set -euo pipefail
+          # Whichever attempt succeeded wrote it; fail loudly if none did.
+          test -s devtool-sbom.spdx.json
+          gh release upload "${RELEASE_TAG}" devtool-sbom.spdx.json --clobber --repo "${GITHUB_REPOSITORY}"
 
       # The point of no return: every step above succeeded (a failure in any
-      # of them would have stopped this job before reaching here — no
-      # continue-on-error anywhere in this job), so this is the first and
+      # of them would have stopped this job before reaching here — the only
+      # continue-on-error steps are the first two SBOM attempts, and the third
+      # has none, so the SBOM still cannot be skipped), so this is the first and
       # only point where the release actually becomes visible to the in-app
       # updater. If this workflow run stops before this step for any reason,
       # what's left behind is a draft — not a broken published release.
