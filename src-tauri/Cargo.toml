@@ -56,7 +56,7 @@ memchr = "2"
 base64 = "0.23"
 # MCP SDK, used only by the devtool-mcp-server bin. >=1.4 avoids
 # GHSA-89vp-x53w-74fx (HTTP transport only; this bin uses stdio).
-rmcp = { version = "3.3", features = ["transport-io"] }
+rmcp = { version = "3.9", features = ["transport-io"] }
 # Secret vault key storage (src/secrets_vault.rs). The macOS store must be
 # enabled explicitly, otherwise macOS falls back to the key file.
 keyring = { version = "4", features = ["apple-native-keyring-store"] }
