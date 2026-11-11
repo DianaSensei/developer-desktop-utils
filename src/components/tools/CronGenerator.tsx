@@ -754,8 +754,11 @@ export function CronGenerator() {
                     <SelectTrigger
                       aria-label={m('suggestions', { field: fieldName(rule, m) })}
                       title={m('suggestionsShort')}
-                      className="group relative h-ctl w-9 flex-none justify-center rounded-sm px-0 text-fg-mute hover:text-fg [&>span]:hidden [&>svg:last-child]:hidden"
+                      className="group relative h-ctl w-9 flex-none justify-center rounded-sm px-0 text-fg-mute hover:text-fg [&>span>span]:hidden [&>svg:last-child]:hidden"
                     >
+                      {/* SelectTrigger wraps its children in a span (the combobox's
+                          name), so the value to hide is one level down: hiding
+                          `&>span` also hid the icon and left a blank square. */}
                       <Lightbulb className="h-4 w-4" />
                       <SelectValue className="sr-only" placeholder={m('suggestionsShort')} />
                     </SelectTrigger>
