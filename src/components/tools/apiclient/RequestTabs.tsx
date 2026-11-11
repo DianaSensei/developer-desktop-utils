@@ -254,8 +254,11 @@ export function RequestTabs({
       {/* max-w-[45%] stops this cluster from squeezing the tab strip
           (`flex-1 min-w-0`) to a couple of tabs on narrow windows.
           overflow-x-auto lets it scroll internally once it cannot shrink
-          further, so History and the layout toggle stay reachable. */}
-      <div className="flex min-w-0 max-w-[45%] shrink items-center gap-1 overflow-x-auto no-scrollbar border-l border-line py-1 pl-2 pr-1.5 text-fg-mute">
+          further, so History and the layout toggle stay reachable.
+          From @4xl up the tool is wide enough to give the cluster more:
+          at 45% an environment name was cut to "No E…" (and "production"
+          to "prod…") next to an empty tab strip. */}
+      <div className="flex min-w-0 max-w-[45%] @4xl:max-w-[65%] shrink items-center gap-1 overflow-x-auto no-scrollbar border-l border-line py-1 pl-2 pr-1.5 text-fg-mute">
         {/* Two independent pickers, not one — a Collection env and a Global
             env can both be active at once (Collection wins on a name
             collision; see EnvQuickView's precedence note). The folder/globe
@@ -272,7 +275,7 @@ export function RequestTabs({
               truncation is applied here with `[&>span]`. Without it a long
               name wraps onto a second line. */}
           <SelectTrigger
-            className="h-ctl w-28 min-w-[4.5rem] shrink text-xs rounded-sm"
+            className="h-ctl w-auto min-w-[4.5rem] max-w-48 shrink gap-1 px-2 text-xs rounded-sm"
             title={t('tabs.collectionEnvHint')}
           >
             <div className="flex min-w-0 items-center gap-1 [&>span]:min-w-0 [&>span]:flex-1 [&>span]:truncate">
@@ -295,7 +298,7 @@ export function RequestTabs({
           onValueChange={(v) => store.setActiveGlobalEnv(v === 'none' ? null : v)}
         >
           <SelectTrigger
-            className="h-ctl w-28 min-w-[4.5rem] shrink text-xs rounded-sm"
+            className="h-ctl w-auto min-w-[4.5rem] max-w-48 shrink gap-1 px-2 text-xs rounded-sm"
             title={t('tabs.globalEnvHint')}
           >
             <div className="flex min-w-0 items-center gap-1 [&>span]:min-w-0 [&>span]:flex-1 [&>span]:truncate">

@@ -93,8 +93,10 @@ export function Timeline({ store, snap, tab, onView }: Props) {
             <Trash2 className="h-3 w-3" />
           </IconButton>
         )}
-        <label className="flex items-center gap-1.5 text-[11px] text-fg-mute" title={snap.historyEnabled ? m('historyOnHint') : m('historyPaused')}>
-          {m('localHistory')}
+        {/* The side bar can be 180px wide: the caption next to the switch
+            pushed into the "Timeline" heading. The switch keeps its name
+            (aria-label) and the hint as a tooltip. */}
+        <label className="flex shrink-0 items-center" title={`${m('localHistory')} — ${snap.historyEnabled ? m('historyOnHint') : m('historyPaused')}`}>
           <Switch
             checked={snap.historyEnabled}
             onCheckedChange={(on) => store.setHistoryEnabled(on)}

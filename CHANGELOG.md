@@ -6,6 +6,20 @@ the app.
 
 ## Unreleased
 
+### Fixes
+
+- **Pasting very large text no longer freezes the app.** Pasting a few megabytes of
+  single-line text (a minified JSON, a long Base64 string) into Text Counter, Text
+  Transformer, Encode · Hash · Encrypt or Regex Tester while the cursor was in the field
+  could hang the window for 15–45 seconds, and again each time you switched back to that
+  tool. It now takes about a second.
+- **Cron Generator:** the suggestions button next to each field shows its icon again
+  (it was a blank square).
+- **Text Editor:** the Timeline heading no longer overlaps the Local History switch in
+  a narrow side bar. The switch's name is in its tooltip.
+- **API Client:** the environment pickers show the full environment name on wide
+  windows instead of cutting it to "No E…".
+
 ### Encode · Hash · Encrypt: JWT tab, key generator, a real pipeline
 
 - **JWT Debugger is now the JWT tab** of Encode · Hash · Encrypt. Your token, keys and
