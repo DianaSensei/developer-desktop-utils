@@ -60,7 +60,8 @@ function EntryView({ entry, highlighted, m }: { entry: TranscriptEntry; highligh
       className={cn(
         'rounded-md border px-3 py-2 transition-shadow',
         mine ? 'border-acc-edge bg-acc-tint' : 'border-line bg-card',
-        highlighted && 'ring-2 ring-focus',
+        // A search-hit marker, not a focus ring: the accent, not the focus color.
+        highlighted && 'ring-2 ring-acc',
       )}
     >
       <div className="mb-1 flex items-center gap-2 text-[11px] text-fg-mute">
