@@ -8,7 +8,7 @@ import {
 import { useMessages } from '@/contexts/LocaleContext';
 import { usePluginSdkFor } from '@/platform';
 import MESSAGES from './ClaudeManager.messages';
-import { DEFAULT_PROFILE, launchCommand, type Profile } from './usage';
+import { DEFAULT_PROFILE, lastSegment, launchCommand, type Profile } from './usage';
 
 type M = ReturnType<typeof useMessages<typeof MESSAGES>>;
 
@@ -81,7 +81,8 @@ export function summarizeSettings(text: string): SettingsSummary | null {
         hooks.push({
           event,
           matcher: typeof group.matcher === 'string' && group.matcher ? group.matcher : '*',
-          command: String(hook.command ?? hook.prompt ?? hook.url ?? hook.type ?? ''),
+          // What the hook runs, whichever kind it is; never a stringified object.
+          command: [hook.command, hook.prompt, hook.url, hook.type].find((v): v is string => typeof v === 'string') ?? '',
         });
       }
     }
@@ -336,7 +337,7 @@ export function ConfigView({ profiles }: { profiles: Profile[] }) {
                       <Tr key={`${s.scope}:${s.name}`}>
                         <Td className="whitespace-nowrap font-medium">{s.name} <Badge mono>{s.transport}</Badge></Td>
                         <Td className="max-w-[12rem] truncate" title={s.scope}>
-                          {user ? m('mcpScopeUser') : s.scope.replace(/[\\/]+$/, '').split(/[\\/]/).pop()}
+                          {user ? m('mcpScopeUser') : lastSegment(s.scope)}
                         </Td>
                         <Td mono className="break-all">{s.target}</Td>
                         <Td>

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  MAX_DAILY_BARS, NO_BUDGETS, budgetStates, chartSeries, dueBudgetAlerts, exportRows, monthStartHour, toCsv,
+  MAX_DAILY_BARS, NO_BUDGETS, lastSegment, budgetStates, chartSeries, dueBudgetAlerts, exportRows, monthStartHour, toCsv,
   DEFAULT_PROFILE, MS_PER_HOUR, estimateCost, formatCost, formatTokens, labelFromDir, lastFiveHoursStart,
   launchCommand, localDayKey, projectName, rangeStartHour, resumeCommand, sessionModels, sessionStatus,
   sessionTotals, shortModel, totalUsage, uniqueLabel, usageByDay, usageByModel, usageByProfile, usageByProject,
@@ -136,6 +136,10 @@ describe('display helpers', () => {
   it('names a project from its working directory', () => {
     expect(projectName(session({ cwd: 'C:\\Users\\me\\code\\app\\' }))).toBe('app');
     expect(projectName(session({ cwd: null }))).toBe('-work-app');
+    expect(projectName(session({ cwd: '/' }))).toBe('-work-app');
+    expect(lastSegment('/a/b///')).toBe('b');
+    expect(lastSegment('plain')).toBe('plain');
+    expect(lastSegment('')).toBe('');
   });
 
   it('builds shell commands that select the account', () => {

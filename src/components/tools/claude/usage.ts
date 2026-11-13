@@ -290,10 +290,21 @@ export function lastFiveHoursStart(now: number): number {
 
 // ── Display helpers ──────────────────────────────────────────────────────
 
+/**
+ * Last segment of a path, ignoring trailing separators. A loop rather than
+ * `/[\\/]+$/`, which backtracks quadratically on a long run of separators.
+ */
+export function lastSegment(path: string): string {
+  let end = path.length;
+  while (end > 0 && (path[end - 1] === '/' || path[end - 1] === '\\')) end -= 1;
+  const start = Math.max(path.lastIndexOf('/', end - 1), path.lastIndexOf('\\', end - 1)) + 1;
+  return path.slice(start, end);
+}
+
 /** Last path segment of the working directory, or the transcript folder. */
 export function projectName(session: SessionInfo): string {
-  const cwd = session.cwd?.replace(/[\\/]+$/, '');
-  if (cwd) return cwd.split(/[\\/]/).pop() || cwd;
+  const name = session.cwd ? lastSegment(session.cwd) : '';
+  if (name) return name;
   return session.project || '—';
 }
 
@@ -350,7 +361,7 @@ export function resumeCommand(session: SessionInfo, profile: Profile): string {
 
 /** A label for a detected directory: `~/.claude-work` → `work`. */
 export function labelFromDir(configDir: string): string {
-  const name = configDir.replace(/[\\/]+$/, '').split(/[\\/]/).pop() ?? configDir;
+  const name = lastSegment(configDir) || configDir;
   const suffix = name.replace(/^\.claude[-_]?/, '');
   return suffix || DEFAULT_PROFILE.label;
 }
@@ -385,11 +396,13 @@ const dayKeyOf = (date: Date) => localDayKey(Math.floor(date.getTime() / MS_PER_
  * into weeks ending today.
  */
 export function chartSeries(sessions: SessionRow[], fromHour: number, now: number): ChartSeries {
-  const byDay = new Map(usageByDay(sessions, fromHour).map((g) => [g.key, g.totals]));
-  if (byDay.size === 0) return { granularity: 'day', bars: [] };
+  const groups = usageByDay(sessions, fromHour);
+  if (groups.length === 0) return { granularity: 'day', bars: [] };
+  const byDay = new Map(groups.map((g) => [g.key, g.totals]));
   const today = new Date(now);
   today.setHours(0, 0, 0, 0);
-  const firstUsed = [...byDay.keys()].sort()[0];
+  // `usageByDay` is newest first, so the earliest day used is its last group.
+  const firstUsed = groups[groups.length - 1].key;
   const rangeStart = fromHour > 0 ? localDayKey(fromHour) : firstUsed;
   const days: ChartBar[] = [];
   for (const cursor = new Date(today); ; cursor.setDate(cursor.getDate() - 1)) {
