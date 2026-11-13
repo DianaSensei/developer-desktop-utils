@@ -34,7 +34,8 @@ const PINNED_ORDER = [
   "markdown",
   "lucky-wheel",
   "network",
-  "2fa"
+  "2fa",
+  "claude-manager"
 ];
 
 const PINNED_ROUTES: Record<string, string> = {
@@ -59,7 +60,8 @@ const PINNED_ROUTES: Record<string, string> = {
   "api-client": "/api-client",
   "mock-server": "/mock-server",
   "2fa": "/2fa",
-  "text-editor": "/text-editor"
+  "text-editor": "/text-editor",
+  "claude-manager": "/claude-manager"
 };
 
 const PINNED_LABELS: Record<string, string> = {
@@ -84,7 +86,8 @@ const PINNED_LABELS: Record<string, string> = {
   "api-client": "API Client",
   "mock-server": "Mock Server",
   "2fa": "2FA Authenticator",
-  "text-editor": "Text Editor"
+  "text-editor": "Text Editor",
+  "claude-manager": "Claude Manager"
 };
 
 const PINNED_DEFAULT_ENABLED: Record<string, boolean> = {
@@ -109,7 +112,8 @@ const PINNED_DEFAULT_ENABLED: Record<string, boolean> = {
   "network": false,
   "lucky-wheel": false,
   "2fa": true,
-  "text-editor": true
+  "text-editor": true,
+  "claude-manager": true
 };
 
 describe('registry — tính toàn vẹn', () => {

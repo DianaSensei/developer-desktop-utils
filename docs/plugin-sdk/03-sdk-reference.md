@@ -100,6 +100,7 @@ await sdk.clipboard.writeImage(blobOrDataUrl)
 
 ```ts
 const paths = await sdk.files.pickOpen({ multiple: true, filters: [{ name: 'JSON', extensions: ['json'] }] });
+const folders = await sdk.files.pickOpen({ directory: true });   // chọn thư mục thay vì file
 const path = await sdk.files.pickSave({ defaultPath: 'export.json' });
 const text = await sdk.files.readText(path);
 await sdk.files.writeText(path, contents, { append: true });

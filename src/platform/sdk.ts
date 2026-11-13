@@ -113,7 +113,13 @@ export interface PluginFileFilter {
 
 export interface PluginFiles {
   /** OS open dialog; `null` when cancelled. */
-  pickOpen(options?: { title?: string; multiple?: boolean; filters?: PluginFileFilter[] }): Promise<string[] | null>;
+  pickOpen(options?: {
+    title?: string;
+    multiple?: boolean;
+    filters?: PluginFileFilter[];
+    /** Pick folders instead of files. */
+    directory?: boolean;
+  }): Promise<string[] | null>;
   /** OS save dialog; `null` when cancelled. */
   pickSave(options?: { title?: string; defaultPath?: string; filters?: PluginFileFilter[] }): Promise<string | null>;
   readText(path: string): Promise<string>;
@@ -286,6 +292,7 @@ export function createPluginSdk(manifest: PluginManifest): PluginSdk {
           title: options?.title,
           multiple: options?.multiple ?? false,
           filters: options?.filters,
+          directory: options?.directory ?? false,
         });
         if (picked === null) return null;
         return Array.isArray(picked) ? picked : [picked];

@@ -6,6 +6,33 @@ the app.
 
 ## Unreleased
 
+### New tool: Claude Manager
+
+- **See every Claude Code session on this machine in one place** — which ones are
+  working, which are waiting for you, which are idle — with the project, branch, model,
+  subagent count and process id of each.
+- **Usage:** tokens and an estimated cost for today, 7 days, 30 days or all time, broken
+  down by account, model, project and day, plus the last five hours at a glance. Cost is
+  an estimate at API list prices; it is not your remaining plan limit.
+- **Several accounts, wherever they live:** each account is a Claude Code config
+  directory. They are found automatically — in the standard locations, from Claude
+  processes started by other tools (account switchers, agent orchestrators), and by a
+  search of your home folder — and you can add any other path by typing it or browsing
+  to it; a parent folder holding several accounts works too. See who is signed in to
+  each, and copy the command that starts Claude with that account or reopens a session
+  in it.
+- **Read and search conversations:** click a session to read it (tool calls on request),
+  or search what you and Claude wrote across every session and jump to the match.
+- **Chart, budgets, export:** cost or tokens over time; a daily and a monthly budget with
+  a system notification at 80% and when exceeded (while the tool is open in a tab); the
+  selected range as CSV or JSON.
+- **Config per account:** see an account's `settings.json`, `CLAUDE.md`, hooks, MCP
+  servers, agents, commands and skills. `settings.json` and `CLAUDE.md` can be edited or
+  copied to another account — the previous version is kept as `.devtool-bak`.
+- Local only: it never opens the credentials file and sends nothing anywhere. The only
+  files it changes are `settings.json` and `CLAUDE.md`, when you save them. Desktop app
+  only.
+
 ### Fixes
 
 - **Pasting very large text no longer freezes the app.** Pasting a few megabytes of
