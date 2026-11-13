@@ -62,6 +62,40 @@ không dừng, không nhắn cho phiên nào.
 - **Chi phí** là ước tính theo bảng giá API (`PRICES` trong `usage.ts`, khớp theo tiền tố
   dài nhất). Model không có trong bảng → không tính, và UI nói rõ số lượt bị bỏ.
 
+## Mở rộng: transcript, ngân sách, cấu hình (2026-11)
+
+Ba bổ sung sau bản đầu, mỗi cái nới một ràng buộc ban đầu một cách có chủ đích:
+
+- **Nội dung hội thoại, theo yêu cầu** (`claude_transcript.rs`). Bản đầu không trả nội
+  dung về webview; người dùng đã chọn có trình xem. Ranh giới mới: `scan` vẫn chỉ trả
+  tiêu đề, còn nội dung chỉ đi qua IPC khi người dùng mở một phiên
+  (`claude_monitor_transcript`, phân trang 300 mục, mỗi mục ≤ 20.000 ký tự) hoặc tìm kiếm
+  (`claude_monitor_search`, chỉ trả đoạn trích ±80 ký tự). Không lưu gì vào storage.
+  Chỉ số mục (`index`) được tính bởi cùng một hàm `read_entries` cho cả hai lệnh, nên kết
+  quả tìm kiếm mở đúng chỗ trong trình xem. Tìm kiếm bỏ qua tool call / kết quả tool và
+  transcript của agent con: chúng lấn át hội thoại và chiếm phần lớn dung lượng. Tên
+  `project` / `session` từ UI được kiểm (`safe_name`) để không thoát khỏi `projects/`.
+  Tìm kiếm đọc lại mọi file mỗi lần (không có chỉ mục) — chấp nhận được với debounce
+  350 ms; nếu chậm trên kho transcript lớn thì thêm chỉ mục hoặc lọc trước theo byte.
+- **Ngân sách và thông báo** (`budgetStates` / `dueBudgetAlerts` trong `usage.ts`). Tính
+  trên chi phí ước tính của **mọi** tài khoản (không theo bộ lọc trên thanh công cụ), theo
+  ngày và tháng lịch địa phương. Mỗi ngưỡng (80%, 100%) báo một lần mỗi kỳ nhờ nhật ký
+  `budgetAlerts` = `<kỳ>:<mức>` lưu trong storage. Không gắn component nền vào `App.tsx`:
+  thông báo chỉ chạy khi tool đang mở trong một tab; tab không ở trước vẫn quét lại mỗi
+  30 giây (`BACKGROUND_POLL_MS`). Đổi lại, đóng tab là hết cảnh báo — đã ghi rõ trong UI.
+- **Ghi cấu hình, phạm vi hẹp** (`claude_config.rs`). Tool không còn hoàn toàn chỉ-đọc:
+  `claude_monitor_write_config` ghi được đúng hai file, `settings.json` và `CLAUDE.md`
+  (danh sách trắng theo tên, không nhận đường dẫn), và chỉ trong thư mục có `projects/`.
+  Mỗi lần ghi: kiểm `expected_mtime_ms` (file đổi sau khi mở → `conflict`, không ghi đè),
+  `settings.json` phải là JSON object, bản cũ chép sang `<tên>.devtool-bak`, bản mới ghi ra
+  file tạm rồi `rename` để Claude Code không bao giờ đọc file dở. **MCP server chỉ xem**:
+  chúng nằm trong `.claude.json`, file Claude Code tự ghi lại liên tục khi đang chạy (lịch
+  sử, cache, số liệu) — một bên ghi thứ hai sẽ đua với nó và có thể làm mất dữ liệu. Thay
+  vào đó có nút chép lệnh `claude mcp remove`. Giá trị `env` / `headers` của MCP server
+  được parse thành `IgnoredAny` nên không bao giờ rời Rust; chỉ tên khoá được trả về.
+- **Biểu đồ** một chuỗi (chi phí hoặc token theo ngày, gộp tuần khi > 62 ngày) dùng màu
+  accent của app, không có bảng màu phân loại; phân tách theo model nằm ở bảng bên dưới.
+
 ## Lý do
 
 - **Không đụng credential.** Con số "còn bao nhiêu % hạn mức 5 giờ / tuần" chỉ máy chủ

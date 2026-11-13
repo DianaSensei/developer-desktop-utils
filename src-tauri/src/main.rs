@@ -2,7 +2,9 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod checksum;
+mod claude_config;
 mod claude_monitor;
+mod claude_transcript;
 mod dropped;
 mod editor;
 mod editor_backup;
@@ -146,6 +148,10 @@ fn main() {
             checksum::hash_file,
             claude_monitor::claude_monitor_scan,
             claude_monitor::claude_monitor_detect,
+            claude_transcript::claude_monitor_transcript,
+            claude_transcript::claude_monitor_search,
+            claude_config::claude_monitor_config,
+            claude_config::claude_monitor_write_config,
             netinfo::local_network_info,
             ports::list_listening_ports,
             files::read_file_data_url,

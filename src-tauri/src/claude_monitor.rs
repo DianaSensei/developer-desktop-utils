@@ -203,7 +203,7 @@ struct FileState {
     anonymous: u64,
 }
 
-fn parse_ts(raw: &str) -> Option<i64> {
+pub(crate) fn parse_ts(raw: &str) -> Option<i64> {
     chrono::DateTime::parse_from_rfc3339(raw)
         .ok()
         .map(|t| t.timestamp_millis())
@@ -332,7 +332,7 @@ impl FileState {
     }
 }
 
-fn mtime_ms(meta: &fs::Metadata) -> i64 {
+pub(crate) fn mtime_ms(meta: &fs::Metadata) -> i64 {
     meta.modified()
         .ok()
         .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
@@ -566,7 +566,7 @@ struct OauthAccount {
     display_name: Option<String>,
 }
 
-fn home_dir() -> Option<PathBuf> {
+pub(crate) fn home_dir() -> Option<PathBuf> {
     std::env::var_os("HOME")
         .or_else(|| std::env::var_os("USERPROFILE"))
         .map(PathBuf::from)
@@ -595,7 +595,7 @@ fn read_account(config_dir: &Path, home: Option<&Path>) -> Option<Account> {
 
 // ── Scan ────────────────────────────────────────────────────────────────
 
-fn expand_home(raw: &str, home: Option<&Path>) -> PathBuf {
+pub(crate) fn expand_home(raw: &str, home: Option<&Path>) -> PathBuf {
     let trimmed = raw.trim();
     match (trimmed.strip_prefix('~'), home) {
         (Some(rest), Some(home)) if rest.is_empty() || rest.starts_with(['/', '\\']) => {

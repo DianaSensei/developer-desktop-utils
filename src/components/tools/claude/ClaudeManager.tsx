@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Bot, FolderOpen, FolderSearch, Plus, RefreshCw, Terminal, Trash2 } from 'lucide-react';
+import { Bot, Download, FolderOpen, FolderSearch, Plus, RefreshCw, Terminal, Trash2 } from 'lucide-react';
 import {
   Badge, Button, Callout, ConfirmDialog, CopyButton, DataTable, EmptyState, IconButton, Input, LoadingRow,
   SearchInput, SectionLabel, Segmented, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Stat,
@@ -9,21 +9,30 @@ import { ToolToolbar } from '@/components/ui/tool-layout';
 import { v4 as newId } from 'uuid';
 import { useMessages } from '@/contexts/LocaleContext';
 import { usePluginSdkFor, usePluginState, useToolActiveRef } from '@/platform';
+import { saveTextFile } from '@/lib/fileio';
 import MESSAGES from './ClaudeManager.messages';
+import { ConfigView } from './ConfigView';
+import { TranscriptViewer, type TranscriptTarget } from './TranscriptViewer';
+import { BudgetBars, UsageChart } from './UsageChart';
 import {
   DEFAULT_PROFILE, formatCost, formatTokens, isRunning, lastFiveHoursStart, launchCommand,
   projectName, rangeStartHour, resumeCommand, sessionModels, sessionStatus, sessionTotals, shortModel,
-  totalUsage, uniqueLabel, usageByDay, usageByModel, usageByProfile, usageByProject,
-  type Detected, type Profile, type ProfileSnapshot, type RangeId, type SessionRow, type SessionStatus, type UsageGroup,
+  NO_BUDGETS, budgetStates, chartSeries, dueBudgetAlerts, exportRows, toCsv,
+  totalUsage, uniqueLabel, usageByDay, usageByModel, usageByProfile, usageByProject, localDayKey, MS_PER_HOUR,
+  type BudgetAlertLog, type BudgetState, type Budgets, type Detected, type Profile, type ProfileSnapshot, type RangeId, type SessionRow, type SessionStatus, type UsageGroup,
   type UsageTotals,
 } from './usage';
 
 const PLUGIN_ID = 'claude-manager';
 const POLL_MS = 5000;
+/** A kept-alive tool that is not in front still rescans, for budget alerts. */
+const BACKGROUND_POLL_MS = 30_000;
+const SEARCH_DEBOUNCE_MS = 350;
 const PAGE_SIZE = 100;
 const RECENT_COUNT = 8;
 
-type TabId = 'overview' | 'sessions' | 'usage' | 'accounts';
+type TabId = 'overview' | 'sessions' | 'usage' | 'config' | 'accounts';
+type SearchMode = 'title' | 'content';
 type StatusFilter = 'all' | 'running' | 'ended';
 type M = ReturnType<typeof useMessages<typeof MESSAGES>>;
 
@@ -70,9 +79,14 @@ function useClaudeScan(profiles: Profile[], auto: boolean) {
 
   useEffect(() => {
     if (!auto) return;
-    // Kept tools stay mounted in the background; only the one in front polls.
+    // Kept tools stay mounted in the background: the one in front rescans
+    // every tick, the others only every BACKGROUND_POLL_MS.
+    let lastScan = Date.now();
     const timer = setInterval(() => {
-      if (activeRef.current && document.visibilityState === 'visible') void refresh();
+      const inFront = activeRef.current && document.visibilityState === 'visible';
+      if (!inFront && Date.now() - lastScan < BACKGROUND_POLL_MS) return;
+      lastScan = Date.now();
+      void refresh();
     }, POLL_MS);
     return () => clearInterval(timer);
   }, [auto, refresh, activeRef]);
@@ -109,10 +123,11 @@ interface SessionTableProps {
   profiles: Profile[];
   fromHour: number;
   now: number;
+  onOpen: (target: TranscriptTarget) => void;
   m: M;
 }
 
-function SessionTable({ rows, profiles, fromHour, now, m }: SessionTableProps) {
+function SessionTable({ rows, profiles, fromHour, now, onOpen, m }: SessionTableProps) {
   const profileById = useMemo(() => new Map(profiles.map((p) => [p.id, p])), [profiles]);
   const showAccount = profiles.length > 1;
   return (
@@ -146,9 +161,14 @@ function SessionTable({ rows, profiles, fromHour, now, m }: SessionTableProps) {
               <Td className="max-w-0 w-[40%]">
                 <div className="flex items-center gap-2 min-w-0">
                   <StatusBadge status={status} m={m} />
-                  <span className="truncate font-medium" title={s.title ?? undefined}>
+                  <button
+                    type="button"
+                    className="truncate text-left font-medium hover:underline focus-visible:underline focus-visible:outline-hidden"
+                    title={m('openTranscript')}
+                    onClick={() => onOpen({ session: s })}
+                  >
                     {s.title ?? s.live?.name ?? m('untitled')}
-                  </span>
+                  </button>
                 </div>
                 <div className="mt-0.5 truncate text-[11px] text-fg-mute">{details}</div>
               </Td>
@@ -241,12 +261,16 @@ function UsageTable({ title, keyLabel, groups, total, formatKey, mono = true, m 
 interface ViewProps {
   rows: SessionRow[];
   profiles: Profile[];
+  /** The accounts the toolbar filter currently lets through. */
+  scope: Profile[];
+  onOpen: (target: TranscriptTarget) => void;
+  budgets: BudgetState[];
   fromHour: number;
   now: number;
   m: M;
 }
 
-function OverviewView({ rows, profiles, fromHour, now, m }: ViewProps) {
+function OverviewView({ rows, profiles, fromHour, now, onOpen, budgets, m }: ViewProps) {
   const statuses = useMemo(() => rows.map((s) => sessionStatus(s, now)), [rows, now]);
   const running = rows.filter((_, i) => isRunning(statuses[i]));
   const recent = rows.filter((_, i) => !isRunning(statuses[i])).slice(0, RECENT_COUNT);
@@ -275,64 +299,168 @@ function OverviewView({ rows, profiles, fromHour, now, m }: ViewProps) {
           sub={m('statWindowSub', { cost: formatCost(window.cost), requests: window.requests.toLocaleString() })}
         />
       </StatGrid>
+      <BudgetBars states={budgets} />
 
       <section className="space-y-2">
         <SectionLabel count={running.length}>{m('runningNow')}</SectionLabel>
         {running.length === 0
           ? <p className="text-sm text-fg-mute">{m('nothingRunning')}</p>
-          : <SessionTable rows={running} profiles={profiles} fromHour={0} now={now} m={m} />}
+          : <SessionTable rows={running} profiles={profiles} fromHour={0} now={now} onOpen={onOpen} m={m} />}
       </section>
 
       {recent.length > 0 && (
         <section className="space-y-2">
           <SectionLabel>{m('recentSessions')}</SectionLabel>
-          <SessionTable rows={recent} profiles={profiles} fromHour={0} now={now} m={m} />
+          <SessionTable rows={recent} profiles={profiles} fromHour={0} now={now} onOpen={onOpen} m={m} />
         </section>
       )}
     </>
   );
 }
 
-function SessionsView({ rows, profiles, fromHour, now, m }: ViewProps) {
+/** Mirrors `SearchHit` in src-tauri/src/claude_transcript.rs. */
+interface SearchHit {
+  dirIndex: number;
+  project: string;
+  session: string;
+  index: number;
+  kind: 'user' | 'assistant';
+  ts: number | null;
+  before: string;
+  matched: string;
+  after: string;
+}
+
+/** Searches what was said in every session of `scope`, as the user types. */
+function ContentSearch({ query, rows, scope, now, onOpen, m }: {
+  query: string;
+  rows: SessionRow[];
+  scope: Profile[];
+  now: number;
+  onOpen: (target: TranscriptTarget) => void;
+  m: M;
+}) {
+  const sdk = usePluginSdkFor(PLUGIN_ID);
+  const [result, setResult] = useState<{ query: string; hits: SearchHit[]; capped: boolean } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const trimmed = query.trim();
+  const dirs = useMemo(() => scope.map((p) => p.configDir), [scope]);
+
+  useEffect(() => {
+    if (trimmed.length < 2) {
+      setResult(null);
+      return;
+    }
+    let stale = false;
+    const timer = setTimeout(() => {
+      sdk.native.invoke<{ hits: SearchHit[]; capped: boolean }>('claude_monitor_search', { dirs, query: trimmed })
+        .then((found) => { if (!stale) { setResult({ query: trimmed, ...found }); setError(null); } })
+        .catch((e) => { if (!stale) setError(e instanceof Error ? e.message : String(e)); });
+    }, SEARCH_DEBOUNCE_MS);
+    return () => {
+      stale = true;
+      clearTimeout(timer);
+    };
+  }, [sdk, dirs, trimmed]);
+
+  if (trimmed.length < 2) return <p className="text-sm text-fg-mute">{m('searchContentHint')}</p>;
+  if (error) return <Callout tone="error" size="sm">{error}</Callout>;
+  if (result?.query !== trimmed) return <LoadingRow label={m('searching')} />;
+  if (result.hits.length === 0) return <p className="text-sm text-fg-mute">{m('noHits', { query: trimmed })}</p>;
+
+  return (
+    <>
+      <p className="text-[11px] text-fg-mute">
+        {m(result.capped ? 'hitsCapped' : 'hitsCount', { count: result.hits.length })}
+      </p>
+      <ul className="divide-y divide-line overflow-hidden rounded-md border border-line">
+        {result.hits.map((hit) => {
+          const profile = scope[hit.dirIndex];
+          const session = rows.find((s) => s.id === hit.session && s.profileId === profile?.id);
+          if (!session) return null;
+          return (
+            <li key={`${hit.dirIndex}:${hit.session}:${hit.index}`}>
+              <button
+                type="button"
+                className="block w-full px-3 py-2 text-left transition-colors hover:bg-bg-2/60 focus-visible:bg-bg-2/60 focus-visible:outline-hidden"
+                onClick={() => onOpen({ session, around: hit.index })}
+              >
+                <div className="flex items-center gap-2 text-[11px] text-fg-mute">
+                  <span className="truncate font-medium text-fg">{session.title ?? m('untitled')}</span>
+                  <span className="shrink-0">{projectName(session)}</span>
+                  {scope.length > 1 && <span className="shrink-0">{profile.label}</span>}
+                  <span className="ml-auto shrink-0">{timeAgo(m, hit.ts, now)}</span>
+                </div>
+                <div className="mt-0.5 break-words text-sm">
+                  <span className="text-fg-mute">{hit.kind === 'user' ? m('roleYou') : m('roleClaude')}: </span>
+                  {hit.before}
+                  <mark className="rounded-xs bg-warn-tint px-0.5 text-fg">{hit.matched}</mark>
+                  {hit.after}
+                </div>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </>
+  );
+}
+
+function SessionsView({ rows, profiles, scope, fromHour, now, onOpen, m }: ViewProps) {
   const [query, setQuery] = useState('');
+  const [mode, setMode] = useState<SearchMode>('title');
   const [filter, setFilter] = useState<StatusFilter>('all');
   const [limit, setLimit] = useState(PAGE_SIZE);
 
   const matched = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const q = mode === 'title' ? query.trim().toLowerCase() : '';
     return rows.filter((s) => {
       if (filter !== 'all' && isRunning(sessionStatus(s, now)) !== (filter === 'running')) return false;
       if (!q) return true;
       return [s.title, s.cwd, s.gitBranch, s.id, s.live?.name]
         .some((field) => field?.toLowerCase().includes(q));
     });
-  }, [rows, query, filter, now]);
+  }, [rows, query, mode, filter, now]);
 
   return (
     <>
       <div className="flex flex-wrap items-center gap-2">
+        <Segmented
+          value={mode}
+          onValueChange={setMode}
+          aria-label={m('searchMode')}
+          options={[
+            { value: 'title', label: m('searchModeTitle') },
+            { value: 'content', label: m('searchModeContent') },
+          ]}
+        />
         <SearchInput
           value={query}
           onChange={setQuery}
-          placeholder={m('searchSessions')}
+          placeholder={m(mode === 'title' ? 'searchSessions' : 'searchContent')}
           containerClassName="min-w-[14rem] flex-1"
         />
-        <Segmented
-          value={filter}
-          onValueChange={setFilter}
-          aria-label={m('statusFilter')}
-          options={[
-            { value: 'all', label: m('filterAll') },
-            { value: 'running', label: m('filterRunning') },
-            { value: 'ended', label: m('filterEnded') },
-          ]}
-        />
-        <Badge pill>{matched.length}</Badge>
+        {mode === 'title' && (
+          <>
+            <Segmented
+              value={filter}
+              onValueChange={setFilter}
+              aria-label={m('statusFilter')}
+              options={[
+                { value: 'all', label: m('filterAll') },
+                { value: 'running', label: m('filterRunning') },
+                { value: 'ended', label: m('filterEnded') },
+              ]}
+            />
+            <Badge pill>{matched.length}</Badge>
+          </>
+        )}
       </div>
-      {matched.length === 0
+      {mode === 'content' && <ContentSearch query={query} rows={rows} scope={scope} now={now} onOpen={onOpen} m={m} />}
+      {mode === 'title' && (matched.length === 0
         ? <p className="text-sm text-fg-mute">{m('noMatch')}</p>
-        : <SessionTable rows={matched.slice(0, limit)} profiles={profiles} fromHour={fromHour} now={now} m={m} />}
-      {matched.length > limit && (
+        : <SessionTable rows={matched.slice(0, limit)} profiles={profiles} fromHour={fromHour} now={now} onOpen={onOpen} m={m} />)}
+      {mode === 'title' && matched.length > limit && (
         <Button variant="outline" size="sm" onClick={() => setLimit((n) => n + PAGE_SIZE)}>
           {m('showMore', { count: Math.min(PAGE_SIZE, matched.length - limit) })}
         </Button>
@@ -341,37 +469,126 @@ function SessionsView({ rows, profiles, fromHour, now, m }: ViewProps) {
   );
 }
 
-function UsageView({ rows, profiles, fromHour, m }: ViewProps) {
+interface UsageViewProps extends ViewProps {
+  limits: Budgets;
+  setLimits: (next: Budgets) => void;
+}
+
+/** A dollar amount typed by the user; anything unusable switches the budget off. */
+function parseLimit(raw: string): number {
+  const value = Number(raw);
+  return Number.isFinite(value) && value > 0 ? value : 0;
+}
+
+function UsageView({ rows, profiles, fromHour, now, budgets, limits, setLimits, m }: UsageViewProps) {
+  const sdk = usePluginSdkFor(PLUGIN_ID);
   const totals = useMemo(() => totalUsage(rows, fromHour), [rows, fromHour]);
+  const series = useMemo(() => chartSeries(rows, fromHour, now), [rows, fromHour, now]);
   const byProfile = useMemo(() => {
     const map = usageByProfile(rows, fromHour);
     return profiles
       .filter((p) => map.has(p.id))
       .map((p) => ({ key: p.label, totals: map.get(p.id)! }));
   }, [rows, profiles, fromHour]);
+  const [exportError, setExportError] = useState<string | null>(null);
 
-  if (totals.requests === 0) return <p className="text-sm text-fg-mute">{m('noUsage')}</p>;
+  const exportAs = async (format: 'csv' | 'json') => {
+    const data = exportRows(rows, profiles, fromHour);
+    const name = `claude-usage-${localDayKey(Math.floor(now / MS_PER_HOUR))}.${format}`;
+    try {
+      await saveTextFile(sdk, name, format === 'csv' ? toCsv(data) : `${JSON.stringify(data, null, 2)}\n`);
+      setExportError(null);
+    } catch (e) {
+      setExportError(e instanceof Error ? e.message : String(e));
+    }
+  };
+
   const shared = { total: totals.tokens, m };
   return (
     <>
-      <StatGrid columns={4}>
-        <Stat label={m('statInput')} value={formatTokens(totals.input)} variant="compact" />
-        <Stat label={m('statOutput')} value={formatTokens(totals.output)} variant="compact" />
-        <Stat label={m('statCacheWrite')} value={formatTokens(totals.cacheWrite)} variant="compact" />
-        <Stat label={m('statCacheRead')} value={formatTokens(totals.cacheRead)} variant="compact" />
-      </StatGrid>
-      <Callout tone="info" size="sm">
-        {m('costNote')}
-        {totals.unpriced > 0 && ` ${m('unpricedNote', { count: totals.unpriced })}`}
-      </Callout>
-      {byProfile.length > 1 && (
-        <UsageTable title={m('byAccount')} keyLabel={m('colAccount')} groups={byProfile} mono={false} {...shared} />
+      <section className="space-y-2">
+        <SectionLabel>{m('budgets')}</SectionLabel>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
+          {(['dailyUsd', 'monthlyUsd'] as const).map((field) => (
+            <label key={field} className="flex items-center gap-1.5 text-fg-mute">
+              {m(field === 'dailyUsd' ? 'budgetDaily' : 'budgetMonthly')}
+              <Input
+                type="number"
+                min={0}
+                step="any"
+                inputMode="decimal"
+                value={limits[field] || ''}
+                onChange={(e) => setLimits({ ...limits, [field]: parseLimit(e.target.value) })}
+                placeholder={m('budgetOff')}
+                className="w-24"
+              />
+              USD
+            </label>
+          ))}
+        </div>
+        <p className="text-[11px] text-fg-mute">{m('budgetHint')}</p>
+        <BudgetBars states={budgets} />
+      </section>
+
+      {totals.requests === 0 ? <p className="text-sm text-fg-mute">{m('noUsage')}</p> : (
+        <>
+          <StatGrid columns={4}>
+            <Stat label={m('statInput')} value={formatTokens(totals.input)} variant="compact" />
+            <Stat label={m('statOutput')} value={formatTokens(totals.output)} variant="compact" />
+            <Stat label={m('statCacheWrite')} value={formatTokens(totals.cacheWrite)} variant="compact" />
+            <Stat label={m('statCacheRead')} value={formatTokens(totals.cacheRead)} variant="compact" />
+          </StatGrid>
+          <UsageChart series={series} dailyBudget={budgets.find((b) => b.period === 'daily')} />
+          <Callout tone="info" size="sm">
+            {m('costNote')}
+            {totals.unpriced > 0 && ` ${m('unpricedNote', { count: totals.unpriced })}`}
+          </Callout>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs text-fg-mute">{m('exportLabel')}</span>
+            <Button size="sm" variant="outline" onClick={() => void exportAs('csv')}>
+              <Download className="mr-1.5 h-3.5 w-3.5" />CSV
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => void exportAs('json')}>
+              <Download className="mr-1.5 h-3.5 w-3.5" />JSON
+            </Button>
+          </div>
+          {exportError && <Callout tone="error" size="sm">{exportError}</Callout>}
+          {byProfile.length > 1 && (
+            <UsageTable title={m('byAccount')} keyLabel={m('colAccount')} groups={byProfile} mono={false} {...shared} />
+          )}
+          <UsageTable title={m('byModel')} keyLabel={m('colModel')} groups={usageByModel(rows, fromHour)} formatKey={shortModel} {...shared} />
+          <UsageTable title={m('byProject')} keyLabel={m('colProject')} groups={usageByProject(rows, fromHour)} {...shared} />
+          <UsageTable title={m('byDay')} keyLabel={m('colDay')} groups={usageByDay(rows, fromHour)} {...shared} />
+        </>
       )}
-      <UsageTable title={m('byModel')} keyLabel={m('colModel')} groups={usageByModel(rows, fromHour)} formatKey={shortModel} {...shared} />
-      <UsageTable title={m('byProject')} keyLabel={m('colProject')} groups={usageByProject(rows, fromHour)} {...shared} />
-      <UsageTable title={m('byDay')} keyLabel={m('colDay')} groups={usageByDay(rows, fromHour)} {...shared} />
     </>
   );
+}
+
+/**
+ * Sends a system notification the first time a budget reaches 80% and the
+ * first time it is exceeded, per day / month. Budgets cover every account,
+ * whatever the toolbar filter shows.
+ */
+function useBudgetAlerts(states: BudgetState[], m: M) {
+  const sdk = usePluginSdkFor(PLUGIN_ID);
+  const [log, setLog] = usePluginState<BudgetAlertLog>(sdk, 'budgetAlerts', {});
+  const logRef = useRef(log);
+  logRef.current = log;
+  useEffect(() => {
+    const { due, log: next } = dueBudgetAlerts(states, logRef.current);
+    if (due.length === 0) return;
+    logRef.current = next;
+    setLog(next);
+    for (const s of due) {
+      void sdk.notify({
+        title: m(s.level === 'over' ? 'alertOverTitle' : 'alertNearTitle'),
+        body: m(s.period === 'daily' ? 'alertBodyDaily' : 'alertBodyMonthly', {
+          spent: formatCost(s.spent), limit: formatCost(s.limit), percent: Math.round(s.ratio * 100),
+        }),
+      });
+    }
+  }, [states, sdk, setLog, m]);
 }
 
 // ── Accounts ─────────────────────────────────────────────────────────────
@@ -675,6 +892,8 @@ export function ClaudeManager() {
   const [accountFilter, setAccountFilter] = useState('all');
   const { snapshots, error, busy, scannedAt, refresh } = useClaudeScan(profiles, auto);
   const detection = useAccountDetection(profiles, setProfiles);
+  const [limits, setLimits] = usePluginState<Budgets>(sdk, 'budgets', NO_BUDGETS);
+  const [viewing, setViewing] = useState<TranscriptTarget | null>(null);
 
   const allRows = useMemo<SessionRow[]>(() => {
     // Snapshots come back in the order the directories were sent.
@@ -689,6 +908,12 @@ export function ClaudeManager() {
     [allRows, activeFilter],
   );
   const fromHour = useMemo(() => rangeStartHour(range, scannedAt), [range, scannedAt]);
+  const budgets = useMemo(() => budgetStates(allRows, limits, scannedAt), [allRows, limits, scannedAt]);
+  useBudgetAlerts(budgets, m);
+  const scope = useMemo(
+    () => (activeFilter === 'all' ? profiles : profiles.filter((p) => p.id === activeFilter)),
+    [profiles, activeFilter],
+  );
   const runningCount = useMemo(
     () => rows.filter((s) => isRunning(sessionStatus(s, scannedAt))).length,
     [rows, scannedAt],
@@ -702,11 +927,13 @@ export function ClaudeManager() {
     );
   }
 
-  const view: ViewProps = { rows, profiles, fromHour, now: scannedAt, m };
+  const view: ViewProps = { rows, profiles, scope, fromHour, now: scannedAt, onOpen: setViewing, budgets, m };
+  const viewingProfile = viewing && profiles.find((p) => p.id === viewing.session.profileId);
   const tabs = [
     { id: 'overview', label: m('tabOverview') },
     { id: 'sessions', label: m('tabSessions'), badge: runningCount > 0 ? <Badge tone="success" pill>{runningCount}</Badge> : undefined },
     { id: 'usage', label: m('tabUsage') },
+    { id: 'config', label: m('tabConfig') },
     { id: 'accounts', label: m('tabAccounts'), badge: detection.suggestions.length > 0
         ? <Badge tone="accent" pill>+{detection.suggestions.length}</Badge>
         : profiles.length > 1 ? <Badge pill>{profiles.length}</Badge> : undefined,
@@ -766,7 +993,8 @@ export function ClaudeManager() {
             m={m}
           />
         )}
-        {snapshots !== null && tab !== 'accounts' && allRows.length === 0 && (
+        {snapshots !== null && tab === 'config' && <ConfigView profiles={profiles} />}
+        {snapshots !== null && tab !== 'accounts' && tab !== 'config' && allRows.length === 0 && (
           <EmptyState
             icon={Bot}
             title={m('noDataTitle')}
@@ -776,8 +1004,13 @@ export function ClaudeManager() {
         )}
         {snapshots !== null && allRows.length > 0 && tab === 'overview' && <OverviewView {...view} />}
         {snapshots !== null && allRows.length > 0 && tab === 'sessions' && <SessionsView {...view} />}
-        {snapshots !== null && allRows.length > 0 && tab === 'usage' && <UsageView {...view} />}
+        {snapshots !== null && allRows.length > 0 && tab === 'usage' && (
+          <UsageView {...view} limits={limits} setLimits={setLimits} />
+        )}
       </div>
+      {viewing && viewingProfile && (
+        <TranscriptViewer target={viewing} profile={viewingProfile} onClose={() => setViewing(null)} />
+      )}
     </div>
   );
 }

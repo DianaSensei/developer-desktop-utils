@@ -360,3 +360,207 @@ export function uniqueLabel(configDir: string, taken: string[]): string {
   const label = labelFromDir(configDir);
   return taken.includes(label) ? configDir : label;
 }
+
+// ── Chart ────────────────────────────────────────────────────────────────
+
+/** Above this many days the chart switches to one bar per week. */
+export const MAX_DAILY_BARS = 62;
+
+export interface ChartBar {
+  /** Local date the bar starts on, `YYYY-MM-DD`. */
+  key: string;
+  totals: UsageTotals;
+}
+
+export interface ChartSeries {
+  granularity: 'day' | 'week';
+  bars: ChartBar[];
+}
+
+const dayKeyOf = (date: Date) => localDayKey(Math.floor(date.getTime() / MS_PER_HOUR));
+
+/**
+ * One bar per local day from the first day with usage (or the range start)
+ * to today, with empty days kept so gaps read as gaps. Long ranges fold
+ * into weeks ending today.
+ */
+export function chartSeries(sessions: SessionRow[], fromHour: number, now: number): ChartSeries {
+  const byDay = new Map(usageByDay(sessions, fromHour).map((g) => [g.key, g.totals]));
+  if (byDay.size === 0) return { granularity: 'day', bars: [] };
+  const today = new Date(now);
+  today.setHours(0, 0, 0, 0);
+  const firstUsed = [...byDay.keys()].sort()[0];
+  const rangeStart = fromHour > 0 ? localDayKey(fromHour) : firstUsed;
+  const days: ChartBar[] = [];
+  for (const cursor = new Date(today); ; cursor.setDate(cursor.getDate() - 1)) {
+    const key = dayKeyOf(cursor);
+    if (key < rangeStart && key < firstUsed) break;
+    days.unshift({ key, totals: byDay.get(key) ?? emptyTotals() });
+    if (days.length > 366 * 5) break;
+  }
+  if (days.length <= MAX_DAILY_BARS) return { granularity: 'day', bars: days };
+
+  const weeks: ChartBar[] = [];
+  for (let end = days.length; end > 0; end -= 7) {
+    const slice = days.slice(Math.max(0, end - 7), end);
+    const totals = emptyTotals();
+    for (const day of slice) {
+      for (const field of Object.keys(totals) as Array<keyof UsageTotals>) totals[field] += day.totals[field];
+    }
+    weeks.unshift({ key: slice[0].key, totals });
+  }
+  return { granularity: 'week', bars: weeks };
+}
+
+// ── Budgets ──────────────────────────────────────────────────────────────
+
+/** Spending limits in USD of estimated cost; 0 turns one off. */
+export interface Budgets {
+  dailyUsd: number;
+  monthlyUsd: number;
+}
+
+export const NO_BUDGETS: Budgets = { dailyUsd: 0, monthlyUsd: 0 };
+
+export type BudgetLevel = 'ok' | 'warn' | 'over';
+export type BudgetPeriod = 'daily' | 'monthly';
+
+/** Share of a budget at which the first warning fires. */
+export const BUDGET_WARN_RATIO = 0.8;
+
+export interface BudgetState {
+  period: BudgetPeriod;
+  /** `2026-11-13` or `2026-11` — changes when the period rolls over. */
+  periodKey: string;
+  limit: number;
+  spent: number;
+  ratio: number;
+  level: BudgetLevel;
+}
+
+export function monthStartHour(now: number): number {
+  const start = new Date(now);
+  start.setHours(0, 0, 0, 0);
+  start.setDate(1);
+  return Math.floor(start.getTime() / MS_PER_HOUR);
+}
+
+/** State of each budget that is switched on, across every account. */
+export function budgetStates(sessions: SessionRow[], budgets: Budgets, now: number): BudgetState[] {
+  const today = localDayKey(Math.floor(now / MS_PER_HOUR));
+  const periods: Array<[BudgetPeriod, number, number, string]> = [
+    ['daily', budgets.dailyUsd, rangeStartHour('today', now), today],
+    ['monthly', budgets.monthlyUsd, monthStartHour(now), today.slice(0, 7)],
+  ];
+  return periods
+    .filter(([, limit]) => limit > 0)
+    .map(([period, limit, fromHour, periodKey]) => {
+      const spent = totalUsage(sessions, fromHour).cost;
+      const ratio = spent / limit;
+      const level: BudgetLevel = ratio >= 1 ? 'over' : ratio >= BUDGET_WARN_RATIO ? 'warn' : 'ok';
+      return { period, periodKey, limit, spent, ratio, level };
+    });
+}
+
+/** What was last announced per period, as `<periodKey>:<level>`. */
+export type BudgetAlertLog = Partial<Record<BudgetPeriod, string>>;
+
+/**
+ * Budgets that crossed a threshold not yet announced for their current
+ * period. Returns the alerts and the log to store, so each crossing is
+ * announced once however often the usage is rescanned.
+ */
+export function dueBudgetAlerts(states: BudgetState[], log: BudgetAlertLog): { due: BudgetState[]; log: BudgetAlertLog } {
+  const next: BudgetAlertLog = { ...log };
+  const due: BudgetState[] = [];
+  for (const state of states) {
+    if (state.level === 'ok') continue;
+    const stamp = `${state.periodKey}:${state.level}`;
+    // "over" was announced: a later rescan at "warn" level cannot happen
+    // within a period, and must not re-announce if it somehow does.
+    if (log[state.period] === stamp || log[state.period] === `${state.periodKey}:over`) continue;
+    next[state.period] = stamp;
+    due.push(state);
+  }
+  return { due, log: next };
+}
+
+// ── Export ───────────────────────────────────────────────────────────────
+
+export interface ExportRow {
+  date: string;
+  account: string;
+  project: string;
+  model: string;
+  input: number;
+  output: number;
+  cacheWrite: number;
+  cacheRead: number;
+  requests: number;
+  tokens: number;
+  /** `null` when the model has no known price. */
+  costUsd: number | null;
+}
+
+/** One row per day × account × project × model, oldest day first. */
+export function exportRows(sessions: SessionRow[], profiles: Profile[], fromHour: number): ExportRow[] {
+  const labels = new Map(profiles.map((p) => [p.id, p.label]));
+  const rows = new Map<string, ExportRow>();
+  for (const session of sessions) {
+    const account = labels.get(session.profileId) ?? session.profileId;
+    const project = projectName(session);
+    for (const b of session.buckets) {
+      if (b.hour < fromHour) continue;
+      const date = localDayKey(b.hour);
+      const key = [date, account, project, b.model].join('\u0000');
+      let row = rows.get(key);
+      if (!row) {
+        row = {
+          date, account, project, model: b.model, input: 0, output: 0, cacheWrite: 0, cacheRead: 0,
+          requests: 0, tokens: 0, costUsd: estimateCost(b.model, b) === null ? null : 0,
+        };
+        rows.set(key, row);
+      }
+      const cacheWrite = b.cacheWrite5m + b.cacheWrite1h;
+      row.input += b.input;
+      row.output += b.output;
+      row.cacheWrite += cacheWrite;
+      row.cacheRead += b.cacheRead;
+      row.requests += b.requests;
+      row.tokens += b.input + b.output + cacheWrite + b.cacheRead;
+      const cost = estimateCost(b.model, b);
+      if (row.costUsd !== null && cost !== null) row.costUsd += cost;
+    }
+  }
+  return [...rows.values()].sort((a, b) =>
+    a.date.localeCompare(b.date) || a.account.localeCompare(b.account) ||
+    a.project.localeCompare(b.project) || a.model.localeCompare(b.model));
+}
+
+const EXPORT_COLUMNS: Array<[header: string, value: (row: ExportRow) => string | number]> = [
+  ['date', (r) => r.date],
+  ['account', (r) => r.account],
+  ['project', (r) => r.project],
+  ['model', (r) => r.model],
+  ['input_tokens', (r) => r.input],
+  ['output_tokens', (r) => r.output],
+  ['cache_write_tokens', (r) => r.cacheWrite],
+  ['cache_read_tokens', (r) => r.cacheRead],
+  ['requests', (r) => r.requests],
+  ['total_tokens', (r) => r.tokens],
+  ['estimated_cost_usd', (r) => (r.costUsd === null ? '' : r.costUsd.toFixed(6))],
+];
+
+function csvField(value: string | number): string {
+  if (typeof value === 'number') return String(value);
+  // A leading = + - @ would run as a formula when the file opens in a
+  // spreadsheet; account and project names come from the file system.
+  const safe = /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
+  return /[",\r\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
+}
+
+export function toCsv(rows: ExportRow[]): string {
+  const lines = [EXPORT_COLUMNS.map(([header]) => header).join(',')];
+  for (const row of rows) lines.push(EXPORT_COLUMNS.map(([, value]) => csvField(value(row))).join(','));
+  return `${lines.join('\r\n')}\r\n`;
+}

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  MAX_DAILY_BARS, NO_BUDGETS, budgetStates, chartSeries, dueBudgetAlerts, exportRows, monthStartHour, toCsv,
   DEFAULT_PROFILE, MS_PER_HOUR, estimateCost, formatCost, formatTokens, labelFromDir, lastFiveHoursStart,
   launchCommand, localDayKey, projectName, rangeStartHour, resumeCommand, sessionModels, sessionStatus,
   sessionTotals, shortModel, totalUsage, uniqueLabel, usageByDay, usageByModel, usageByProfile, usageByProject,
@@ -152,5 +153,102 @@ describe('display helpers', () => {
     expect(labelFromDir('/opt/accounts/client-a/')).toBe('client-a');
     expect(uniqueLabel('~/.ccs/instances/work', ['Default'])).toBe('work');
     expect(uniqueLabel('~/other/work', ['Default', 'work'])).toBe('~/other/work');
+  });
+});
+
+describe('chartSeries', () => {
+  const hourOf = (iso: string) => Math.floor(new Date(iso).getTime() / MS_PER_HOUR);
+  const now = new Date('2026-11-13T15:00:00').getTime();
+  const used = (iso: string, input: number) => bucket({ hour: hourOf(iso), input });
+
+  it('keeps empty days between the range start and today', () => {
+    const rows = [session({ buckets: [used('2026-11-10T09:00:00', 10), used('2026-11-12T09:00:00', 30)] })];
+    const series = chartSeries(rows, rangeStartHour('7d', now), now);
+    expect(series.granularity).toBe('day');
+    expect(series.bars.map((b) => b.key)).toEqual([
+      '2026-11-07', '2026-11-08', '2026-11-09', '2026-11-10', '2026-11-11', '2026-11-12', '2026-11-13',
+    ]);
+    expect(series.bars.map((b) => b.totals.input)).toEqual([0, 0, 0, 10, 0, 30, 0]);
+  });
+
+  it('for all time starts at the first day used, and folds long spans into weeks', () => {
+    const short = chartSeries([session({ buckets: [used('2026-11-11T09:00:00', 5)] })], 0, now);
+    expect(short.bars.map((b) => b.key)).toEqual(['2026-11-11', '2026-11-12', '2026-11-13']);
+
+    const long = chartSeries(
+      [session({ buckets: [used('2026-08-01T09:00:00', 7), used('2026-11-13T09:00:00', 3)] })], 0, now);
+    expect(long.granularity).toBe('week');
+    expect(long.bars.length).toBeLessThanOrEqual(MAX_DAILY_BARS);
+    expect(long.bars[long.bars.length - 1].key).toBe('2026-11-07');
+    expect(long.bars[long.bars.length - 1].totals.input).toBe(3);
+    expect(long.bars.reduce((sum, b) => sum + b.totals.input, 0)).toBe(10);
+  });
+
+  it('is empty when there is no usage', () => {
+    expect(chartSeries([session({})], 0, now).bars).toEqual([]);
+  });
+});
+
+describe('budgets', () => {
+  const now = new Date('2026-11-13T15:00:00').getTime();
+  const hourOf = (iso: string) => Math.floor(new Date(iso).getTime() / MS_PER_HOUR);
+  // opus-5-5 output is $20 / MTok.
+  const spend = (iso: string, usd: number) => bucket({ hour: hourOf(iso), output: (usd / 20) * 1e6 });
+  const rows = [session({ buckets: [spend('2026-11-13T10:00:00', 9), spend('2026-11-02T10:00:00', 30), spend('2026-10-30T10:00:00', 500)] })];
+
+  it('measures each switched-on budget over its own period', () => {
+    expect(budgetStates(rows, NO_BUDGETS, now)).toEqual([]);
+    const [daily, monthly] = budgetStates(rows, { dailyUsd: 10, monthlyUsd: 30 }, now);
+    expect(daily).toMatchObject({ period: 'daily', periodKey: '2026-11-13', level: 'warn' });
+    expect(daily.spent).toBeCloseTo(9, 6);
+    expect(monthly).toMatchObject({ period: 'monthly', periodKey: '2026-11', level: 'over' });
+    expect(monthly.spent).toBeCloseTo(39, 6);
+    expect(localDayKey(monthStartHour(now))).toBe('2026-11-01');
+  });
+
+  it('announces each crossing once per period', () => {
+    const states = budgetStates(rows, { dailyUsd: 10, monthlyUsd: 30 }, now);
+    const first = dueBudgetAlerts(states, {});
+    expect(first.due.map((s) => s.period)).toEqual(['daily', 'monthly']);
+    expect(first.log).toEqual({ daily: '2026-11-13:warn', monthly: '2026-11:over' });
+    expect(dueBudgetAlerts(states, first.log).due).toEqual([]);
+
+    // Warn → over is a new crossing; a new day starts over.
+    const over = states.map((s) => ({ ...s, level: 'over' as const }));
+    expect(dueBudgetAlerts(over, first.log).due.map((s) => s.period)).toEqual(['daily']);
+    expect(dueBudgetAlerts(states, { daily: '2026-11-12:over', monthly: '2026-11:over' }).due.map((s) => s.period))
+      .toEqual(['daily']);
+    expect(dueBudgetAlerts(states, { daily: '2026-11-13:over' }).due.map((s) => s.period)).toEqual(['monthly']);
+  });
+});
+
+describe('export', () => {
+  const hourOf = (iso: string) => Math.floor(new Date(iso).getTime() / MS_PER_HOUR);
+  const profiles = [{ id: 'p1', label: 'Work, Inc.', configDir: '~/.claude' }];
+  const rows = [
+    session({
+      profileId: 'p1', cwd: '/work/=cmd',
+      buckets: [
+        bucket({ hour: hourOf('2026-11-02T09:00:00'), input: 100, output: 10 }),
+        bucket({ hour: hourOf('2026-11-02T17:00:00'), input: 50, cacheWrite1h: 5, cacheRead: 5, requests: 2 }),
+        bucket({ hour: hourOf('2026-11-01T09:00:00'), model: 'mystery-model', input: 1 }),
+      ],
+    }),
+  ];
+
+  it('merges buckets into one row per day, account, project and model', () => {
+    const out = exportRows(rows, profiles, 0);
+    expect(out.map((r) => [r.date, r.model])).toEqual([['2026-11-01', 'mystery-model'], ['2026-11-02', 'claude-opus-5-5']]);
+    expect(out[1]).toMatchObject({ account: 'Work, Inc.', project: '=cmd', input: 150, output: 10, cacheWrite: 5, cacheRead: 5, requests: 3, tokens: 170 });
+    expect(out[0].costUsd).toBeNull();
+    expect(exportRows(rows, profiles, hourOf('2026-11-02T00:00:00'))).toHaveLength(1);
+  });
+
+  it('writes CSV that quotes commas and defuses spreadsheet formulas', () => {
+    const lines = toCsv(exportRows(rows, profiles, 0)).split('\r\n');
+    expect(lines[0]).toBe('date,account,project,model,input_tokens,output_tokens,cache_write_tokens,cache_read_tokens,requests,total_tokens,estimated_cost_usd');
+    expect(lines[1]).toBe(`2026-11-01,"Work, Inc.",'=cmd,mystery-model,1,0,0,0,1,1,`);
+    expect(lines[2].startsWith(`2026-11-02,"Work, Inc.",'=cmd,claude-opus-5-5,150,10,5,5,3,170,0.000`)).toBe(true);
+    expect(lines[3]).toBe('');
   });
 });

@@ -11,10 +11,11 @@ export default definePlugin({
   route: '/claude-manager',
   order: 270,
   defaultEnabled: true,
-  permissions: ['storage', 'clipboard:write', 'files:read', 'native'],
-  // Read-only: finds Claude Code's config directories and reads their
-  // transcripts. `files:read` is for the folder picker only.
-  commands: ['claude_monitor_scan', 'claude_monitor_detect'],
+  permissions: ['storage', 'clipboard:write', 'files:read', 'files:write', 'notifications', 'native'],
+  // `files:read` is the folder picker, `files:write` the usage export. The
+  // Rust side only ever writes settings.json and CLAUDE.md of a config
+  // directory, and only when the user saves them.
+  commands: ['claude_monitor_'],
   sdk: '^1.0.0',
   load: () => import('@/components/tools/claude/ClaudeManager').then((m) => m.ClaudeManager),
 });

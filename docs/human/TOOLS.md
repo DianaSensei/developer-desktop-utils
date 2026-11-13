@@ -30,7 +30,7 @@ This document describes every tool in the app: what computation it performs, wha
 | RabbitMQ | ✓ | — | — | **✓ HTTP/HTTPS (mgmt API, browse/create) + AMQP 5672/5671 (publish/consume/RPC)** | Connection profiles incl. password & client identity (app data) |
 | Redis | ✓ | — | — | **✓ TCP 6379/6380 (RESP protocol)** | Connection profiles incl. password (app data) |
 | Network Tools | ✓ | — | — | **✓ HTTPS** + local read | In-memory session, cleared on app restart |
-| Claude Manager | ✓ | **✓ Claude Code config directories it finds or you add (transcripts, session registry, account name) — read-only; folder names in your home folder while detecting** | — | — | Tracked directories, selected tab/range (localStorage) |
+| Claude Manager | ✓ | **✓ Claude Code config directories it finds or you add (transcripts, session registry, account name) — folder names in your home folder while detecting** | **✓ `settings.json` / `CLAUDE.md` of an account when you save them; a usage export where you choose** | — | Tracked directories, budgets, selected tab/range (localStorage); **system notifications** for budget alerts (asks the OS first) |
 | API Client | ✓ | ✓ (import) | ✓ (export) | **✓ HTTP/HTTPS — any URL you send to** | Collections, environments & history (localStorage) |
 | Mock Server | ✓ | — | — | **✓ Local HTTP listener you start (127.0.0.1, or 0.0.0.0 = LAN)** | Stubs + server settings (localStorage); request log in-memory, cleared on restart |
 | 2FA Authenticator | ✓ | ✓ (QR image) | — | — | Accounts **including TOTP/HOTP secrets** (localStorage) |
@@ -465,7 +465,7 @@ The **Ports** tab has two layouts (toggle in the toolbar): **Processes** (groupe
 
 ### Claude Manager
 
-A read-only monitor for Claude Code on this machine: which sessions are open and what they are doing, every past session, token usage with an estimated cost, and several accounts side by side.
+A monitor for Claude Code on this machine: which sessions are open and what they are doing, every past session and what was said in it, token usage with an estimated cost and budgets, several accounts side by side, and each account's settings. It reads Claude Code's own files; the only two it can change are an account's `settings.json` and `CLAUDE.md`, and only when you press Save.
 
 One **account** is one Claude Code config directory — `~/.claude` by default. Account switchers and agent orchestrators keep one directory per account in their own place and point Claude at it with `CLAUDE_CONFIG_DIR`, so the tool does not assume a location:
 
@@ -481,7 +481,13 @@ One **account** is one Claude Code config directory — `~/.claude` by default. 
 | Process list | The OS, via `sysinfo` | Checking that a registry entry's PID is still alive; during detection, the value of `CLAUDE_CONFIG_DIR` in each process's environment (no other variable is looked at, and nothing else is kept) |
 | Folder names | Your home folder (bounded walk), or a folder you pick | Finding config directories — only folder names and the presence of the files above are examined |
 
-**What it never does:** it does not open `.credentials.json` (or the OS keychain), does not write to any Claude Code file, makes no network request, and cannot start, stop or message a session. Message bodies are not returned to the UI — only a title per session (Claude Code's own title, or the first 140 characters of the first prompt). The "copy" buttons put a shell command on the clipboard (`claude --resume <id>`, prefixed with `CLAUDE_CONFIG_DIR=…` for a non-default account); you run it yourself.
+**Conversations.** Scanning returns only a title per session (Claude Code's own title, or the first 140 characters of the first prompt). The text of a conversation is read only when you ask for it: clicking a session opens it (300 entries at a time, each capped at 20,000 characters; tool calls and their output are hidden until you switch them on), and **Sessions → Conversations** searches what you and Claude wrote across the tracked accounts (case-insensitive, literal text, at most 200 matches; tool calls and subagent transcripts are not searched). Nothing read this way is stored by DevTool.
+
+**Usage chart, budgets, export.** The Usage tab charts cost or tokens per day (per week for long ranges). A daily and a monthly **budget** in USD of estimated cost can be set; they cover every account, show as progress bars, and send a **system notification** the first time a budget reaches 80% and the first time it is exceeded in that day / month — only while the tool is open in a tab (it rescans every 30 seconds when it is not the tab in front). **Export** writes the selected range as CSV or JSON to a file you choose, one row per day × account × project × model.
+
+**Config tab.** For one account it shows `settings.json` (with a summary of model, permissions, hooks and env names), `CLAUDE.md`, the MCP servers registered in `.claude.json`, and the agents, commands and skills folders. `settings.json` and `CLAUDE.md` can be edited and saved, or copied to another tracked account. A save is refused if the file changed on disk since it was loaded or if `settings.json` is not a JSON object; the previous version is kept beside the file as `<name>.devtool-bak`, and the new one is written to a temporary file and renamed into place. MCP servers are view-only, because Claude Code rewrites `.claude.json` while it runs; the values of their `env` and `headers` entries are never read into the UI — only the names.
+
+**What it never does:** it does not open `.credentials.json` (or the OS keychain), does not write any Claude Code file other than the two above, makes no network request, and cannot start, stop or message a session. The "copy" buttons put a shell command on the clipboard (`claude --resume <id>`, prefixed with `CLAUDE_CONFIG_DIR=…` for a non-default account); you run it yourself.
 
 **What leaves the machine:** nothing.
 
@@ -493,7 +499,7 @@ One **account** is one Claude Code config directory — `~/.claude` by default. 
 
 **Refresh:** rescans every 5 seconds while the tool is the one in front (toggle in the toolbar). A rescan only reads the part of each transcript that was appended since the last one.
 
-**Permissions (Tauri):** `dialog:allow-open` for the **Browse…** folder picker; otherwise two Rust commands, `claude_monitor_scan` and `claude_monitor_detect` (`src-tauri/src/claude_monitor.rs`). Desktop app only.
+**Permissions (Tauri):** `dialog:allow-open` for the **Browse…** folder picker, `dialog:allow-save` + file write for the export, and notifications for budget alerts (the OS asks first). Everything else goes through six Rust commands — `claude_monitor_scan`, `_detect` (`claude_monitor.rs`), `_transcript`, `_search` (`claude_transcript.rs`), `_config`, `_write_config` (`claude_config.rs`). Desktop app only.
 
 ### API Client
 

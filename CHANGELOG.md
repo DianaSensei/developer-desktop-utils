@@ -21,8 +21,17 @@ the app.
   to it; a parent folder holding several accounts works too. See who is signed in to
   each, and copy the command that starts Claude with that account or reopens a session
   in it.
-- Read-only and local: it reads Claude Code's transcripts, never the credentials file,
-  and sends nothing anywhere. Desktop app only.
+- **Read and search conversations:** click a session to read it (tool calls on request),
+  or search what you and Claude wrote across every session and jump to the match.
+- **Chart, budgets, export:** cost or tokens over time; a daily and a monthly budget with
+  a system notification at 80% and when exceeded (while the tool is open in a tab); the
+  selected range as CSV or JSON.
+- **Config per account:** see an account's `settings.json`, `CLAUDE.md`, hooks, MCP
+  servers, agents, commands and skills. `settings.json` and `CLAUDE.md` can be edited or
+  copied to another account — the previous version is kept as `.devtool-bak`.
+- Local only: it never opens the credentials file and sends nothing anywhere. The only
+  files it changes are `settings.json` and `CLAUDE.md`, when you save them. Desktop app
+  only.
 
 ### Fixes
 

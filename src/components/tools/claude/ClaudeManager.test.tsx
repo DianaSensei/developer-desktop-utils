@@ -9,10 +9,16 @@ import type { Detected, ProfileSnapshot, SessionInfo, UsageBucket } from './usag
  */
 
 const invokeMock = vi.fn();
+const notifyMock = vi.fn();
+vi.mock('@tauri-apps/plugin-notification', () => ({
+  isPermissionGranted: async () => true,
+  requestPermission: async () => 'granted',
+  sendNotification: (options: unknown) => notifyMock(options),
+}));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: (...args: unknown[]) => invokeMock(...args) }));
 
 const HOUR = Math.floor(Date.now() / 3_600_000);
-const KEYS = ['profiles', 'tab', 'range', 'autoRefresh', 'autoDetected', 'ignoredDirs'].map((k) => `devtool:claude-manager:${k}`);
+const KEYS = ['profiles', 'tab', 'range', 'autoRefresh', 'autoDetected', 'ignoredDirs', 'budgets', 'budgetAlerts'].map((k) => `devtool:claude-manager:${k}`);
 
 const bucket = (over: Partial<UsageBucket>): UsageBucket => ({
   hour: HOUR, model: 'claude-opus-5-5', input: 1_000_000, output: 100_000, cacheWrite5m: 0, cacheWrite1h: 0,
@@ -50,6 +56,30 @@ const found = (configDir: string, over: Partial<Detected> = {}): Detected => ({
 /** What a rescan of the machine finds; each test sets its own. */
 let onMachine: Detected[] = [];
 
+const entry = (index: number, kind: string, text: string, tool: string | null = null) => ({
+  index, kind, ts: Date.now(), text, truncated: false, tool, model: kind === 'assistant' ? 'claude-opus-5-5' : null,
+});
+function transcript(args: { at?: { around?: number } | null }) {
+  return {
+    start: args.at?.around === undefined ? 0 : 5,
+    total: 9,
+    entries: [
+      entry(5, 'user', 'Why does sign-in break?'),
+      entry(6, 'tool_use', '{"pattern":"login"}', 'Grep'),
+      entry(7, 'assistant', 'the Login handler fails on empty tokens'),
+    ],
+  };
+}
+
+let settingsOnDisk = { exists: true, text: '{}', mtimeMs: 100 };
+const config = {
+  memory: { exists: false, text: '', mtimeMs: 0 },
+  mcpServers: [{ name: 'github', scope: 'user', transport: 'stdio', target: 'npx -y gh-mcp', envKeys: ['GITHUB_TOKEN'], headerKeys: [] }],
+  agents: [{ name: 'reviewer', description: 'Reviews diffs' }],
+  commands: [],
+  skills: [],
+};
+
 let Tool: ComponentType;
 let Providers: ComponentType<{ children: ReactNode }>;
 const ClaudeManager = () => <Providers><Tool /></Providers>;
@@ -63,6 +93,8 @@ beforeAll(async () => {
   (window as unknown as { __TAURI_INTERNALS__: unknown }).__TAURI_INTERNALS__ = {
     invoke: (command: string, args?: unknown) => invokeMock(command, args),
   };
+  // jsdom has no layout, so no scrollIntoView.
+  Element.prototype.scrollIntoView = () => {};
   ({ storageSet, storageRemove } = await import('@/lib/persistentStore'));
   ({ AppConfigProvider: Providers } = await import('@/contexts/AppConfigContext'));
   ({ ClaudeManager: Tool } = await import('./ClaudeManager'));
@@ -76,7 +108,26 @@ beforeEach(() => {
   KEYS.forEach((key) => storageRemove(key));
   invokeMock.mockReset();
   onMachine = [found('~/.claude', { source: 'default' })];
+  settingsOnDisk = { exists: true, text: '{\n  "model": "opus"\n}', mtimeMs: 100 };
+  notifyMock.mockReset();
   invokeMock.mockImplementation(async (command: string, args?: { dirs?: string[]; roots?: string[] | null }) => {
+    if (command === 'claude_monitor_transcript') return transcript(args as { at?: { around?: number } | null });
+    if (command === 'claude_monitor_search') {
+      return {
+        capped: false,
+        hits: [{
+          dirIndex: 0, project: '-work-app', session: 'sess-1', index: 7, kind: 'assistant', ts: Date.now() - 60_000,
+          before: 'the ', matched: 'Login', after: ' handler fails',
+        }],
+      };
+    }
+    if (command === 'claude_monitor_config') return { ...config, settings: { ...settingsOnDisk } };
+    if (command === 'claude_monitor_write_config') {
+      const write = args as unknown as { text: string; expectedMtimeMs: number | null };
+      if (write.expectedMtimeMs !== settingsOnDisk.mtimeMs) throw new Error('conflict');
+      settingsOnDisk = { exists: true, text: write.text, mtimeMs: settingsOnDisk.mtimeMs + 1 };
+      return settingsOnDisk;
+    }
     if (command === 'claude_monitor_detect') {
       if (!args?.roots) return onMachine;
       return args.roots.map((root) => found(root, { source: 'custom', valid: root.includes('claude') }));
@@ -177,6 +228,75 @@ describe('ClaudeManager', () => {
     for (const heading of [/By account|Theo tài khoản/, /By model|Theo model/, /By project|Theo dự án/, /By day|Theo ngày/]) {
       expect(screen.getByText(heading)).toBeTruthy();
     }
+  });
+
+  it('opens a session and shows the conversation, with tool calls on request', async () => {
+    render(<ClaudeManager />);
+    fireEvent.click(await screen.findByText('Fix login bug'));
+    expect(await screen.findByText('Why does sign-in break?')).toBeTruthy();
+    expect(invokeMock).toHaveBeenCalledWith('claude_monitor_transcript', {
+      dir: '~/.claude', project: '-work-app', session: 'sess-1', at: null,
+    });
+    expect(screen.getByText('the Login handler fails on empty tokens')).toBeTruthy();
+    expect(screen.queryByText(/Grep/)).toBeNull();
+    fireEvent.click(screen.getByRole('switch', { name: /Show tool calls|Hiện lệnh gọi công cụ/ }));
+    expect(screen.getByText(/Grep/)).toBeTruthy();
+  });
+
+  it('searches conversations and opens the session at the hit', async () => {
+    setTab('sessions');
+    render(<ClaudeManager />);
+    await screen.findByText('Fix login bug');
+    fireEvent.click(screen.getByRole('tab', { name: /^Conversations$|^Nội dung$/ }));
+    fireEvent.change(screen.getByPlaceholderText(/Search prompts and replies|Tìm trong lời nhắc/), { target: { value: 'login' } });
+    const hit = await screen.findByText('Login', {}, { timeout: 3000 });
+    expect(invokeMock).toHaveBeenCalledWith('claude_monitor_search', { dirs: ['~/.claude'], query: 'login' });
+    fireEvent.click(hit);
+    await waitFor(() => expect(invokeMock).toHaveBeenCalledWith('claude_monitor_transcript', {
+      dir: '~/.claude', project: '-work-app', session: 'sess-1', at: { around: 7 },
+    }));
+  });
+
+  it('shows budget progress and notifies once when a budget is exceeded', async () => {
+    // Both sessions used $6 of opus this hour: $12 today.
+    storageSet(KEYS[6], JSON.stringify({ dailyUsd: 10, monthlyUsd: 0 }));
+    setTab('usage');
+    render(<ClaudeManager />);
+    expect((await screen.findAllByText(/exceeded|đã vượt/)).length).toBeGreaterThan(0);
+    expect(screen.getByText(/\$12\.00 \/ \$10\.00 · 120%/)).toBeTruthy();
+    expect(screen.getByText(/Estimated cost per day|Chi phí ước tính theo ngày/)).toBeTruthy();
+    await waitFor(() => expect(notifyMock).toHaveBeenCalledTimes(1));
+    expect(notifyMock.mock.calls[0][0].title).toMatch(/budget exceeded|đã vượt ngân sách/);
+
+    cleanup();
+    render(<ClaudeManager />);
+    await screen.findAllByText(/exceeded|đã vượt/);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(notifyMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('lists an account\'s setup with secret names only, and copies settings to another account', async () => {
+    storageSet(KEYS[0], JSON.stringify([
+      { id: 'default', label: 'Default', configDir: '~/.claude' },
+      { id: 'w', label: 'Work', configDir: '~/.claude-work' },
+    ]));
+    storageSet(KEYS[4], JSON.stringify(true));
+    setTab('config');
+    render(<ClaudeManager />);
+    expect(await screen.findByText('github')).toBeTruthy();
+    expect(screen.getByText('GITHUB_TOKEN')).toBeTruthy();
+    expect(screen.getByText('reviewer')).toBeTruthy();
+    expect(screen.getByText(/model: opus/)).toBeTruthy();
+    // Nothing edited yet: Save is off.
+    expect((screen.getAllByRole('button', { name: /^Save$|^Lưu$/ })[0] as HTMLButtonElement).disabled).toBe(true);
+
+    fireEvent.click(screen.getAllByRole('button', { name: /Copy to account|Chép sang tài khoản/ })[0]);
+    fireEvent.click(await screen.findByText('Work'));
+    fireEvent.click(await screen.findByRole('button', { name: /^Overwrite$|^Ghi đè$/ }));
+    await waitFor(() => expect(invokeMock).toHaveBeenCalledWith('claude_monitor_write_config', {
+      dir: '~/.claude-work', file: 'settings', text: '{\n  "model": "opus"\n}', expectedMtimeMs: 100,
+    }));
+    expect(await screen.findByText(/Copied settings\.json to "Work"|Đã chép settings\.json sang "Work"/)).toBeTruthy();
   });
 
   it('shows the scan error instead of an empty list', async () => {
