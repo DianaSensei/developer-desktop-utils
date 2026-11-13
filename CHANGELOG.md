@@ -14,9 +14,13 @@ the app.
 - **Usage:** tokens and an estimated cost for today, 7 days, 30 days or all time, broken
   down by account, model, project and day, plus the last five hours at a glance. Cost is
   an estimate at API list prices; it is not your remaining plan limit.
-- **Several accounts:** track one Claude Code config directory per account (Detect finds
-  `~/.claude` and `~/.claude-*`), see who is signed in to each, and copy the command that
-  starts Claude with that account or reopens a session in it.
+- **Several accounts, wherever they live:** each account is a Claude Code config
+  directory. They are found automatically — in the standard locations, from Claude
+  processes started by other tools (account switchers, agent orchestrators), and by a
+  search of your home folder — and you can add any other path by typing it or browsing
+  to it; a parent folder holding several accounts works too. See who is signed in to
+  each, and copy the command that starts Claude with that account or reopens a session
+  in it.
 - Read-only and local: it reads Claude Code's transcripts, never the credentials file,
   and sends nothing anywhere. Desktop app only.
 

@@ -11,8 +11,9 @@ export default definePlugin({
   route: '/claude-manager',
   order: 270,
   defaultEnabled: true,
-  permissions: ['storage', 'clipboard:write', 'native'],
-  // Read-only: scans Claude Code's config directories for transcripts.
+  permissions: ['storage', 'clipboard:write', 'files:read', 'native'],
+  // Read-only: finds Claude Code's config directories and reads their
+  // transcripts. `files:read` is for the folder picker only.
   commands: ['claude_monitor_scan', 'claude_monitor_detect'],
   sdk: '^1.0.0',
   load: () => import('@/components/tools/claude/ClaudeManager').then((m) => m.ClaudeManager),

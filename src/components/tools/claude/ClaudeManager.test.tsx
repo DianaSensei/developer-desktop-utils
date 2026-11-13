@@ -1,7 +1,7 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ComponentType, ReactNode } from 'react';
-import type { ProfileSnapshot, SessionInfo, UsageBucket } from './usage';
+import type { Detected, ProfileSnapshot, SessionInfo, UsageBucket } from './usage';
 
 /**
  * Renders the tool against a mocked `claude_monitor_*` IPC. `isTauri` is read
@@ -12,7 +12,7 @@ const invokeMock = vi.fn();
 vi.mock('@tauri-apps/api/core', () => ({ invoke: (...args: unknown[]) => invokeMock(...args) }));
 
 const HOUR = Math.floor(Date.now() / 3_600_000);
-const KEYS = ['profiles', 'tab', 'range', 'autoRefresh'].map((k) => `devtool:claude-manager:${k}`);
+const KEYS = ['profiles', 'tab', 'range', 'autoRefresh', 'autoDetected', 'ignoredDirs'].map((k) => `devtool:claude-manager:${k}`);
 
 const bucket = (over: Partial<UsageBucket>): UsageBucket => ({
   hour: HOUR, model: 'claude-opus-5-5', input: 1_000_000, output: 100_000, cacheWrite5m: 0, cacheWrite1h: 0,
@@ -44,6 +44,12 @@ const work: ProfileSnapshot = {
   sessions: [session({ id: 'work-1', title: 'Review PR', cwd: '/work/site', buckets: [bucket({ model: 'claude-haiku-5-5' })] })],
 };
 
+const found = (configDir: string, over: Partial<Detected> = {}): Detected => ({
+  configDir, source: 'scan', valid: true, email: null, sessions: 1, ...over,
+});
+/** What a rescan of the machine finds; each test sets its own. */
+let onMachine: Detected[] = [];
+
 let Tool: ComponentType;
 let Providers: ComponentType<{ children: ReactNode }>;
 const ClaudeManager = () => <Providers><Tool /></Providers>;
@@ -51,7 +57,12 @@ let storageSet: (key: string, value: string) => void;
 let storageRemove: (key: string) => void;
 
 beforeAll(async () => {
-  (window as unknown as { __TAURI_INTERNALS__: unknown }).__TAURI_INTERNALS__ = {};
+  // `invoke` here too: the tool makes two IPC calls on mount, each through
+  // its own dynamic import, and under Vitest the second one can resolve to
+  // the real module instead of the mock above.
+  (window as unknown as { __TAURI_INTERNALS__: unknown }).__TAURI_INTERNALS__ = {
+    invoke: (command: string, args?: unknown) => invokeMock(command, args),
+  };
   ({ storageSet, storageRemove } = await import('@/lib/persistentStore'));
   ({ AppConfigProvider: Providers } = await import('@/contexts/AppConfigContext'));
   ({ ClaudeManager: Tool } = await import('./ClaudeManager'));
@@ -64,8 +75,12 @@ afterAll(() => {
 beforeEach(() => {
   KEYS.forEach((key) => storageRemove(key));
   invokeMock.mockReset();
-  invokeMock.mockImplementation(async (command: string, args?: { dirs?: string[] }) => {
-    if (command === 'claude_monitor_detect') return ['~/.claude', '~/.claude-work'];
+  onMachine = [found('~/.claude', { source: 'default' })];
+  invokeMock.mockImplementation(async (command: string, args?: { dirs?: string[]; roots?: string[] | null }) => {
+    if (command === 'claude_monitor_detect') {
+      if (!args?.roots) return onMachine;
+      return args.roots.map((root) => found(root, { source: 'custom', valid: root.includes('claude') }));
+    }
     return (args?.dirs ?? []).map((dir) => (dir === '~/.claude-work' ? work : personal));
   });
 });
@@ -100,15 +115,53 @@ describe('ClaudeManager', () => {
     expect(screen.getByText(/No sessions match|Không có phiên nào khớp/)).toBeTruthy();
   });
 
-  it('detects a second account and rescans both directories', async () => {
+  it('tracks everything it finds the first time it opens, wherever other tools keep it', async () => {
+    onMachine = [found('~/.claude', { source: 'default' }), found('~/.switcher/instances/claude-work', { source: 'process' })];
+    setTab('accounts');
+    render(<ClaudeManager />);
+    await screen.findByText('~/.switcher/instances/claude-work');
+    await waitFor(() => expect(invokeMock).toHaveBeenCalledWith(
+      'claude_monitor_scan', { dirs: ['~/.claude', '~/.switcher/instances/claude-work'] }));
+    // Nothing left to offer.
+    expect(screen.queryByText(/Found on this machine|Tìm thấy trên máy/)).toBeNull();
+  });
+
+  it('after the first run, only offers new finds — and a removed directory stays removed', async () => {
+    storageSet(KEYS[4], JSON.stringify(true));
+    onMachine = [found('~/.claude', { source: 'default' }), found('~/.claude-work', { email: 'me@work.example' })];
+    setTab('accounts');
+    render(<ClaudeManager />);
+    await screen.findByText(/Found on this machine|Tìm thấy trên máy/);
+    expect(invokeMock).not.toHaveBeenCalledWith('claude_monitor_scan', { dirs: ['~/.claude', '~/.claude-work'] });
+
+    fireEvent.click(screen.getByRole('button', { name: /^Ignore$|^Bỏ qua$/ }));
+    expect(screen.queryByText(/Found on this machine|Tìm thấy trên máy/)).toBeNull();
+    expect(screen.getByText(/1 directories ignored|Đang bỏ qua 1 thư mục/)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: /Show them again|Hiện lại/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /^Add all$|^Thêm tất cả$/ }));
+    await waitFor(() => expect(invokeMock).toHaveBeenCalledWith(
+      'claude_monitor_scan', { dirs: ['~/.claude', '~/.claude-work'] }));
+  });
+
+  it('adds a custom path, and says so when the folder holds no Claude data', async () => {
+    storageSet(KEYS[4], JSON.stringify(true));
     setTab('accounts');
     render(<ClaudeManager />);
     await screen.findByText('me@example.com');
-    fireEvent.click(screen.getByRole('button', { name: /^Detect$|^Tự tìm$/ }));
-    await screen.findByText('me@work.example');
-    expect(screen.getByText('~/.claude-work')).toBeTruthy();
-    await waitFor(() =>
-      expect(invokeMock).toHaveBeenCalledWith('claude_monitor_scan', { dirs: ['~/.claude', '~/.claude-work'] }));
+    const path = screen.getByLabelText(/Config directory|Thư mục cấu hình/);
+
+    fireEvent.change(path, { target: { value: '/data/photos' } });
+    fireEvent.keyDown(path, { key: 'Enter' });
+    expect(await screen.findByText(/No Claude Code data in "\/data\/photos"|Không thấy dữ liệu Claude Code trong "\/data\/photos"/)).toBeTruthy();
+
+    fireEvent.change(screen.getByLabelText(/^Label$|^Tên gọi$/), { target: { value: 'Client A' } });
+    fireEvent.change(path, { target: { value: '/opt/tools/claude-accounts/a' } });
+    fireEvent.keyDown(path, { key: 'Enter' });
+    expect(await screen.findByText('Client A')).toBeTruthy();
+    expect(invokeMock).toHaveBeenCalledWith('claude_monitor_detect', { roots: ['/opt/tools/claude-accounts/a'] });
+    await waitFor(() => expect(invokeMock).toHaveBeenCalledWith(
+      'claude_monitor_scan', { dirs: ['~/.claude', '/opt/tools/claude-accounts/a'] }));
   });
 
   it('breaks usage down by account, model, project and day', async () => {

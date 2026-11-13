@@ -30,7 +30,7 @@ This document describes every tool in the app: what computation it performs, wha
 | RabbitMQ | ✓ | — | — | **✓ HTTP/HTTPS (mgmt API, browse/create) + AMQP 5672/5671 (publish/consume/RPC)** | Connection profiles incl. password & client identity (app data) |
 | Redis | ✓ | — | — | **✓ TCP 6379/6380 (RESP protocol)** | Connection profiles incl. password (app data) |
 | Network Tools | ✓ | — | — | **✓ HTTPS** + local read | In-memory session, cleared on app restart |
-| Claude Manager | ✓ | **✓ Claude Code config directories you track (transcripts, session registry, account name) — read-only** | — | — | Tracked directories, selected tab/range (localStorage) |
+| Claude Manager | ✓ | **✓ Claude Code config directories it finds or you add (transcripts, session registry, account name) — read-only; folder names in your home folder while detecting** | — | — | Tracked directories, selected tab/range (localStorage) |
 | API Client | ✓ | ✓ (import) | ✓ (export) | **✓ HTTP/HTTPS — any URL you send to** | Collections, environments & history (localStorage) |
 | Mock Server | ✓ | — | — | **✓ Local HTTP listener you start (127.0.0.1, or 0.0.0.0 = LAN)** | Stubs + server settings (localStorage); request log in-memory, cleared on restart |
 | 2FA Authenticator | ✓ | ✓ (QR image) | — | — | Accounts **including TOTP/HOTP secrets** (localStorage) |
@@ -467,14 +467,19 @@ The **Ports** tab has two layouts (toggle in the toolbar): **Processes** (groupe
 
 A read-only monitor for Claude Code on this machine: which sessions are open and what they are doing, every past session, token usage with an estimated cost, and several accounts side by side.
 
-One **account** is one Claude Code config directory — `~/.claude` by default, plus any directory you add (the one you point `CLAUDE_CONFIG_DIR` at for a second sign-in). **Detect** looks in your home folder for `.claude` and `.claude-*` directories that contain a `projects` folder.
+One **account** is one Claude Code config directory — `~/.claude` by default. Account switchers and agent orchestrators keep one directory per account in their own place and point Claude at it with `CLAUDE_CONFIG_DIR`, so the tool does not assume a location:
+
+- **Auto-detect** runs when the tool opens (and on **Rescan**). It recognises a config directory by what is inside it — a `projects` folder together with session transcripts, or with Claude Code's `.claude.json` / `.credentials.json` (checked for existence only, never opened) — and looks in three places: the standard locations (`~/.claude`, `~/.config/claude`); the `CLAUDE_CONFIG_DIR` of running processes, which is how a directory used by another tool is found while that tool has Claude open; and the home folder, four levels deep (at most 20,000 folders; `node_modules`, `.git`, caches and the like are skipped, symlinks are not followed).
+- The first time the tool opens, everything found is tracked. After that, new finds are listed under **Found on this machine** with *Add* / *Ignore*; a directory you stopped tracking is not offered again unless you ask.
+- **Custom path:** type or **Browse…** to any folder. If it is a config directory it is added; if it is a parent folder holding several, the ones inside it (up to three levels) are added.
 
 | What is read | From | Used for |
 |--------------|------|----------|
 | Session transcripts | `<dir>/projects/<project>/<session>.jsonl` and `<session>/subagents/*.jsonl` | Title, folder, branch, timestamps, prompt count, and the token counts the API reported for each response |
 | Live-process registry | `<dir>/sessions/<pid>.json` | Which sessions have a running process and the status it reports (busy / idle / waiting) |
 | Signed-in account | `<dir>/.claude.json`, or `~/.claude.json` for the default directory | E-mail and organization name shown in the Accounts tab — only the `oauthAccount` block is parsed |
-| Process list | The OS, via `sysinfo` | Checking that a registry entry's PID is still alive |
+| Process list | The OS, via `sysinfo` | Checking that a registry entry's PID is still alive; during detection, the value of `CLAUDE_CONFIG_DIR` in each process's environment (no other variable is looked at, and nothing else is kept) |
+| Folder names | Your home folder (bounded walk), or a folder you pick | Finding config directories — only folder names and the presence of the files above are examined |
 
 **What it never does:** it does not open `.credentials.json` (or the OS keychain), does not write to any Claude Code file, makes no network request, and cannot start, stop or message a session. Message bodies are not returned to the UI — only a title per session (Claude Code's own title, or the first 140 characters of the first prompt). The "copy" buttons put a shell command on the clipboard (`claude --resume <id>`, prefixed with `CLAUDE_CONFIG_DIR=…` for a non-default account); you run it yourself.
 
@@ -488,7 +493,7 @@ One **account** is one Claude Code config directory — `~/.claude` by default, 
 
 **Refresh:** rescans every 5 seconds while the tool is the one in front (toggle in the toolbar). A rescan only reads the part of each transcript that was appended since the last one.
 
-**Permissions (Tauri):** no plugin capability — two Rust commands, `claude_monitor_scan` and `claude_monitor_detect` (`src-tauri/src/claude_monitor.rs`). Desktop app only.
+**Permissions (Tauri):** `dialog:allow-open` for the **Browse…** folder picker; otherwise two Rust commands, `claude_monitor_scan` and `claude_monitor_detect` (`src-tauri/src/claude_monitor.rs`). Desktop app only.
 
 ### API Client
 

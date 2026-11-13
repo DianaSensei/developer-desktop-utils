@@ -64,6 +64,17 @@ export interface Profile {
   configDir: string;
 }
 
+/** A config directory found by `claude_monitor_detect`. */
+export interface Detected {
+  /** `~`-shortened when under the home folder. */
+  configDir: string;
+  source: 'default' | 'env' | 'process' | 'scan' | 'custom';
+  /** False only for a folder the user named that holds no Claude Code data. */
+  valid: boolean;
+  email: string | null;
+  sessions: number;
+}
+
 export const DEFAULT_PROFILE: Profile = { id: 'default', label: 'Default', configDir: '~/.claude' };
 
 // ── Status ───────────────────────────────────────────────────────────────
@@ -342,4 +353,10 @@ export function labelFromDir(configDir: string): string {
   const name = configDir.replace(/[\\/]+$/, '').split(/[\\/]/).pop() ?? configDir;
   const suffix = name.replace(/^\.claude[-_]?/, '');
   return suffix || DEFAULT_PROFILE.label;
+}
+
+/** `labelFromDir`, falling back to the path itself when the name is taken. */
+export function uniqueLabel(configDir: string, taken: string[]): string {
+  const label = labelFromDir(configDir);
+  return taken.includes(label) ? configDir : label;
 }

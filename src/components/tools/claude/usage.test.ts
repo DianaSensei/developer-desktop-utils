@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_PROFILE, MS_PER_HOUR, estimateCost, formatCost, formatTokens, labelFromDir, lastFiveHoursStart,
   launchCommand, localDayKey, projectName, rangeStartHour, resumeCommand, sessionModels, sessionStatus,
-  sessionTotals, shortModel, totalUsage, usageByDay, usageByModel, usageByProfile, usageByProject,
+  sessionTotals, shortModel, totalUsage, uniqueLabel, usageByDay, usageByModel, usageByProfile, usageByProject,
   type SessionInfo, type SessionRow, type UsageBucket,
 } from './usage';
 
@@ -150,5 +150,7 @@ describe('display helpers', () => {
     expect(labelFromDir('~/.claude-work')).toBe('work');
     expect(labelFromDir('~/.claude')).toBe('Default');
     expect(labelFromDir('/opt/accounts/client-a/')).toBe('client-a');
+    expect(uniqueLabel('~/.ccs/instances/work', ['Default'])).toBe('work');
+    expect(uniqueLabel('~/other/work', ['Default', 'work'])).toBe('~/other/work');
   });
 });

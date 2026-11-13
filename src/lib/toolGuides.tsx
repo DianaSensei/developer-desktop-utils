@@ -417,7 +417,7 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
       'Overview shows every Claude Code session open right now — working, waiting for you, or idle — and what the chosen range has used.',
       'Sessions lists everything on disk; search by title, project or branch, and copy the command that reopens a session in its own folder and account.',
       'Usage breaks tokens and estimated cost down by account, model, project and day.',
-      'Accounts: add one config directory per Claude account (or hit Detect for ~/.claude and ~/.claude-*).',
+      'Accounts: config directories are found automatically, wherever another tool keeps them; add any other path by typing it or with Browse — a parent folder holding several accounts works too.',
     ],
     know: [
       'A second account is a second config directory: start Claude with CLAUDE_CONFIG_DIR=~/.claude-work and sign in there.',

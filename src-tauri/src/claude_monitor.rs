@@ -678,30 +678,217 @@ pub async fn claude_monitor_scan(dirs: Vec<String>) -> Result<Vec<ProfileSnapsho
     .map_err(|e| e.to_string())
 }
 
-fn detect_in(home: &Path) -> Vec<String> {
-    let mut found: Vec<String> = fs::read_dir(home)
+// ── Detection ───────────────────────────────────────────────────────────
+//
+// Account switchers and agent orchestrators keep one config directory per
+// account wherever they like, and point Claude Code at it through
+// `CLAUDE_CONFIG_DIR`. Detection therefore does not rely on a list of known
+// tools. It recognises a config directory by its contents, and looks in
+// three places: the standard locations, the environment of running
+// processes, and a bounded walk of the home folder.
+
+/// How deep below the home folder the walk goes (`~/.tool/accounts/work`
+/// is depth 3).
+const HOME_SCAN_DEPTH: usize = 4;
+/// How deep below a folder the user picked.
+const CUSTOM_SCAN_DEPTH: usize = 3;
+/// Directories read per walk, so a huge home folder cannot stall a scan.
+const SCAN_BUDGET: usize = 20_000;
+
+/// Never hold a config directory; large enough to be worth not entering.
+const SKIP_DIRS: &[&str] = &[
+    "node_modules", ".git", "target", ".cache", "Caches", ".npm", ".cargo", ".rustup", ".gradle",
+    ".m2", ".Trash", "Trash", ".venv", "venv", "__pycache__", ".nvm", ".pyenv", "DerivedData", "Pods",
+];
+
+#[derive(Serialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct Detected {
+    /// `~`-shortened when under the home folder.
+    config_dir: String,
+    /// "default" | "env" | "process" | "scan" | "custom"
+    source: &'static str,
+    /// Looks like a Claude Code config directory. Only `false` for a folder
+    /// the user named in which nothing was found.
+    valid: bool,
+    email: Option<String>,
+    sessions: u64,
+}
+
+/// Transcripts are named after the session's UUID, or `agent-<id>`.
+fn is_transcript_name(name: &str) -> bool {
+    let Some(stem) = name.strip_suffix(".jsonl") else { return false };
+    stem.starts_with("agent-")
+        || (stem.len() == 36 && stem.bytes().filter(|b| *b == b'-').count() == 4)
+}
+
+fn count_transcripts(config_dir: &Path) -> u64 {
+    fs::read_dir(config_dir.join("projects"))
         .into_iter()
         .flatten()
         .flatten()
-        .filter_map(|e| {
-            let name = e.file_name().to_string_lossy().into_owned();
-            let is_candidate = name == ".claude"
-                || name.starts_with(".claude-")
-                || name.starts_with(".claude_");
-            (is_candidate && e.path().join("projects").is_dir()).then(|| format!("~/{name}"))
-        })
-        .collect();
-    found.sort();
+        .flat_map(|project| fs::read_dir(project.path()).into_iter().flatten().flatten())
+        .filter(|e| is_transcript_name(&e.file_name().to_string_lossy()))
+        .count() as u64
+}
+
+/// A `projects` folder alone is too common a name, so it must come with
+/// transcripts or with Claude Code's own config / credential file. The
+/// credential file is only checked for existence, never opened.
+fn looks_like_config_dir(dir: &Path) -> bool {
+    dir.join("projects").is_dir()
+        && (dir.join(".claude.json").is_file()
+            || dir.join(".credentials.json").is_file()
+            || count_transcripts(dir) > 0)
+}
+
+fn shorten(path: &Path, home: Option<&Path>) -> String {
+    match home.and_then(|h| path.strip_prefix(h).ok()) {
+        Some(rest) if rest.as_os_str().is_empty() => "~".to_string(),
+        Some(rest) => format!("~/{}", rest.to_string_lossy().replace('\\', "/")),
+        None => path.to_string_lossy().into_owned(),
+    }
+}
+
+/// Breadth-first, so the shallow, likely places are covered before the
+/// budget runs out. Does not enter a config directory it has found.
+fn find_config_dirs(root: &Path, max_depth: usize) -> Vec<PathBuf> {
+    let mut found = Vec::new();
+    let mut queue = std::collections::VecDeque::from([(root.to_path_buf(), 0usize)]);
+    let mut budget = SCAN_BUDGET;
+    while let Some((dir, depth)) = queue.pop_front() {
+        if looks_like_config_dir(&dir) {
+            found.push(dir);
+            continue;
+        }
+        if depth == max_depth || budget == 0 {
+            continue;
+        }
+        budget -= 1;
+        let mut children: Vec<PathBuf> = fs::read_dir(&dir)
+            .into_iter()
+            .flatten()
+            .flatten()
+            // `file_type` does not follow symlinks, so links are not entered.
+            .filter(|e| e.file_type().is_ok_and(|t| t.is_dir()))
+            .filter(|e| !SKIP_DIRS.contains(&e.file_name().to_string_lossy().as_ref()))
+            .map(|e| e.path())
+            .collect();
+        children.sort();
+        queue.extend(children.into_iter().map(|c| (c, depth + 1)));
+    }
     found
 }
 
-/// Config directories in the home folder that look like Claude Code's:
-/// `~/.claude` and `~/.claude-*` that contain a `projects` folder.
+/// `CLAUDE_CONFIG_DIR` of every process whose environment the OS lets us
+/// read — how a directory used by another tool is found while that tool
+/// has Claude running. Only that one variable is looked at.
+fn process_config_dirs() -> Vec<PathBuf> {
+    let mut sys = sysinfo::System::new();
+    sys.refresh_processes_specifics(
+        sysinfo::ProcessesToUpdate::All,
+        true,
+        sysinfo::ProcessRefreshKind::nothing().with_environ(sysinfo::UpdateKind::Always),
+    );
+    sys.processes()
+        .values()
+        .flat_map(|p| p.environ())
+        .filter_map(|kv| kv.to_str()?.strip_prefix("CLAUDE_CONFIG_DIR=").map(PathBuf::from))
+        .collect()
+}
+
+struct Collector<'a> {
+    home: Option<&'a Path>,
+    seen: HashSet<PathBuf>,
+    out: Vec<Detected>,
+}
+
+impl Collector<'_> {
+    /// First source to name a directory wins; later ones are duplicates.
+    fn add(&mut self, dir: &Path, source: &'static str, valid: bool) {
+        let canonical = fs::canonicalize(dir).unwrap_or_else(|_| dir.to_path_buf());
+        if !self.seen.insert(canonical) {
+            return;
+        }
+        self.out.push(Detected {
+            config_dir: shorten(dir, self.home),
+            source,
+            valid,
+            email: read_account(dir, self.home).and_then(|a| a.email),
+            sessions: count_transcripts(dir),
+        });
+    }
+}
+
+/// Everything detection can find without being told where to look.
+/// `env_dirs` are `CLAUDE_CONFIG_DIR` values, with where each was seen.
+fn detect_auto(home: Option<&Path>, env_dirs: &[(PathBuf, &'static str)]) -> Vec<Detected> {
+    let mut c = Collector { home, seen: HashSet::new(), out: Vec::new() };
+    if let Some(home) = home {
+        // The two places Claude Code itself uses.
+        for dir in [home.join(".claude"), home.join(".config").join("claude")] {
+            if dir.join("projects").is_dir() {
+                c.add(&dir, "default", true);
+            }
+        }
+    }
+    for (dir, source) in env_dirs {
+        // A directory Claude was started with is one even before it has data.
+        if dir.is_dir() {
+            c.add(dir, source, true);
+        }
+    }
+    if let Some(home) = home {
+        for dir in find_config_dirs(home, HOME_SCAN_DEPTH) {
+            c.add(&dir, "scan", true);
+        }
+    }
+    c.out
+}
+
+/// Checks folders the user named: each one itself, then the folders below
+/// it. A folder with nothing in it comes back once, marked not valid.
+fn detect_in_roots(roots: &[String], home: Option<&Path>) -> Vec<Detected> {
+    let mut c = Collector { home, seen: HashSet::new(), out: Vec::new() };
+    for raw in roots {
+        let root = expand_home(raw, home);
+        if looks_like_config_dir(&root) {
+            c.add(&root, "custom", true);
+            continue;
+        }
+        let inside = find_config_dirs(&root, CUSTOM_SCAN_DEPTH);
+        if inside.is_empty() {
+            c.add(&root, "custom", false);
+        }
+        for dir in inside {
+            c.add(&dir, "scan", true);
+        }
+    }
+    c.out
+}
+
+/// Finds Claude Code config directories. With no `roots`: the standard
+/// locations, `CLAUDE_CONFIG_DIR` of this app and of running processes,
+/// and a bounded walk of the home folder. With `roots`: those folders and
+/// what is below them.
 #[tauri::command]
-pub async fn claude_monitor_detect() -> Result<Vec<String>, String> {
-    tokio::task::spawn_blocking(|| home_dir().map(|h| detect_in(&h)).unwrap_or_default())
-        .await
-        .map_err(|e| e.to_string())
+pub async fn claude_monitor_detect(roots: Option<Vec<String>>) -> Result<Vec<Detected>, String> {
+    tokio::task::spawn_blocking(move || {
+        let home = home_dir();
+        match roots.filter(|r| !r.is_empty()) {
+            Some(roots) => detect_in_roots(&roots, home.as_deref()),
+            None => {
+                let mut env_dirs: Vec<(PathBuf, &'static str)> = std::env::var_os("CLAUDE_CONFIG_DIR")
+                    .map(|d| (PathBuf::from(d), "env"))
+                    .into_iter()
+                    .collect();
+                env_dirs.extend(process_config_dirs().into_iter().map(|d| (d, "process")));
+                detect_auto(home.as_deref(), &env_dirs)
+            }
+        }
+    })
+    .await
+    .map_err(|e| e.to_string())
 }
 
 #[cfg(test)]
@@ -888,7 +1075,6 @@ mod tests {
         home.write(".claude-work/.claude.json", r#"{"oauthAccount":{"emailAddress":"b@example.com"}}"#);
         home.write(".claude-empty/readme.txt", "");
 
-        assert_eq!(detect_in(&home.0), vec!["~/.claude", "~/.claude-work"]);
 
         let scan_home = |dir: &str| scan_profile(dir, Some(&home.0), &Cache::default(), &|_| HashSet::new());
         let default = scan_home("~/.claude");
@@ -897,5 +1083,73 @@ mod tests {
         assert_eq!(account.email.as_deref(), Some("a@example.com"));
         assert_eq!(account.organization.as_deref(), Some("Acme"));
         assert_eq!(scan_home("~/.claude-work").account.unwrap().email.as_deref(), Some("b@example.com"));
+    }
+
+    const UUID_A: &str = "0a0a0a0a-1111-2222-3333-444444444444.jsonl";
+
+    fn dirs(found: &[Detected]) -> Vec<(&str, &str)> {
+        found.iter().map(|d| (d.config_dir.as_str(), d.source)).collect()
+    }
+
+    #[test]
+    fn detects_directories_wherever_other_tools_keep_them() {
+        let home = TempDir::new("detect");
+        home.write(&format!(".claude/projects/p/{UUID_A}"), "");
+        home.write(".claude.json", r#"{"oauthAccount":{"emailAddress":"a@example.com"}}"#);
+        // A switcher's per-account directories, three levels down.
+        home.write(&format!(".switcher/instances/work/projects/p/{UUID_A}"), "");
+        home.write(".switcher/instances/work/.claude.json", r#"{"oauthAccount":{"emailAddress":"w@example.com"}}"#);
+        // Signed in but never used: no transcripts yet.
+        home.write(".switcher/instances/fresh/.credentials.json", "{}");
+        fs::create_dir_all(home.0.join(".switcher/instances/fresh/projects")).unwrap();
+        // Named by a running process, still empty.
+        fs::create_dir_all(home.0.join("agents/acct-b")).unwrap();
+        // Not config directories: a plain `projects` folder, and one that
+        // only sits inside a skipped folder.
+        home.write("code/projects/site/data.jsonl", "");
+        home.write(&format!("node_modules/x/projects/p/{UUID_A}"), "");
+
+        let env = [(home.0.join("agents/acct-b"), "process"), (home.0.join(".claude"), "env")];
+        let found = detect_auto(Some(&home.0), &env);
+        assert_eq!(
+            dirs(&found),
+            vec![
+                ("~/.claude", "default"),
+                ("~/agents/acct-b", "process"),
+                ("~/.switcher/instances/fresh", "scan"),
+                ("~/.switcher/instances/work", "scan"),
+            ]
+        );
+        assert!(found.iter().all(|d| d.valid));
+        assert_eq!(found[0].email.as_deref(), Some("a@example.com"));
+        assert_eq!(found[0].sessions, 1);
+        assert_eq!(found[3].email.as_deref(), Some("w@example.com"));
+    }
+
+    #[test]
+    fn a_named_folder_is_checked_itself_then_searched() {
+        let home = TempDir::new("roots");
+        home.write(&format!("acct/one/projects/p/{UUID_A}"), "");
+        home.write(&format!("acct/two/projects/p/{UUID_A}"), "");
+        fs::create_dir_all(home.0.join("empty")).unwrap();
+
+        let roots = |list: &[&str]| -> Vec<String> { list.iter().map(|s| s.to_string()).collect() };
+        let exact = detect_in_roots(&roots(&["~/acct/one"]), Some(&home.0));
+        assert_eq!(dirs(&exact), vec![("~/acct/one", "custom")]);
+
+        let parent = detect_in_roots(&roots(&["~/acct", "~/acct/one"]), Some(&home.0));
+        assert_eq!(dirs(&parent), vec![("~/acct/one", "scan"), ("~/acct/two", "scan")]);
+
+        let nothing = detect_in_roots(&roots(&["~/empty", "/definitely/not/here"]), Some(&home.0));
+        assert_eq!(nothing.len(), 2);
+        assert!(nothing.iter().all(|d| !d.valid && d.source == "custom"));
+    }
+
+    #[test]
+    fn the_walk_stops_at_its_depth_limit() {
+        let home = TempDir::new("depth");
+        home.write(&format!("a/b/c/d/e/projects/p/{UUID_A}"), "");
+        assert!(find_config_dirs(&home.0, HOME_SCAN_DEPTH).is_empty());
+        assert_eq!(find_config_dirs(&home.0, 5).len(), 1);
     }
 }

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Bot, FolderSearch, Plus, RefreshCw, Terminal, Trash2 } from 'lucide-react';
+import { Bot, FolderOpen, FolderSearch, Plus, RefreshCw, Terminal, Trash2 } from 'lucide-react';
 import {
   Badge, Button, Callout, ConfirmDialog, CopyButton, DataTable, EmptyState, IconButton, Input, LoadingRow,
   SearchInput, SectionLabel, Segmented, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Stat,
@@ -11,10 +11,10 @@ import { useMessages } from '@/contexts/LocaleContext';
 import { usePluginSdkFor, usePluginState, useToolActiveRef } from '@/platform';
 import MESSAGES from './ClaudeManager.messages';
 import {
-  DEFAULT_PROFILE, formatCost, formatTokens, isRunning, labelFromDir, lastFiveHoursStart, launchCommand,
+  DEFAULT_PROFILE, formatCost, formatTokens, isRunning, lastFiveHoursStart, launchCommand,
   projectName, rangeStartHour, resumeCommand, sessionModels, sessionStatus, sessionTotals, shortModel,
-  totalUsage, usageByDay, usageByModel, usageByProfile, usageByProject,
-  type Profile, type ProfileSnapshot, type RangeId, type SessionRow, type SessionStatus, type UsageGroup,
+  totalUsage, uniqueLabel, usageByDay, usageByModel, usageByProfile, usageByProject,
+  type Detected, type Profile, type ProfileSnapshot, type RangeId, type SessionRow, type SessionStatus, type UsageGroup,
   type UsageTotals,
 } from './usage';
 
@@ -374,58 +374,145 @@ function UsageView({ rows, profiles, fromHour, m }: ViewProps) {
   );
 }
 
+// ── Accounts ─────────────────────────────────────────────────────────────
+
+const SOURCE_LABEL = {
+  default: 'sourceDefault', env: 'sourceEnv', process: 'sourceProcess', scan: 'sourceScan', custom: 'sourceCustom',
+} as const;
+
+/**
+ * Finds config directories on this machine. The first time the tool opens,
+ * everything found is tracked straight away; after that, new finds are only
+ * offered, so a directory the user removed does not come back by itself.
+ */
+function useAccountDetection(profiles: Profile[], setProfiles: (next: Profile[]) => void) {
+  const sdk = usePluginSdkFor(PLUGIN_ID);
+  const [autoDone, setAutoDone] = usePluginState(sdk, 'autoDetected', false);
+  const [ignored, setIgnored] = usePluginState<string[]>(sdk, 'ignoredDirs', []);
+  const [found, setFound] = useState<Detected[]>([]);
+  const [detecting, setDetecting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const profilesRef = useRef(profiles);
+  profilesRef.current = profiles;
+  const autoDoneRef = useRef(autoDone);
+  autoDoneRef.current = autoDone;
+
+  /** Tracks every valid, not-yet-tracked directory; returns how many. */
+  const track = useCallback((items: Detected[], label?: string) => {
+    const current = profilesRef.current;
+    const fresh = items.filter((d) => d.valid && !current.some((p) => p.configDir === d.configDir));
+    if (fresh.length === 0) return 0;
+    const next = [...current];
+    for (const d of fresh) {
+      const wanted = fresh.length === 1 ? label?.trim() : '';
+      next.push({ id: newId(), label: wanted || uniqueLabel(d.configDir, next.map((p) => p.label)), configDir: d.configDir });
+    }
+    profilesRef.current = next;
+    setProfiles(next);
+    setIgnored((dirs) => dirs.filter((dir) => !fresh.some((d) => d.configDir === dir)));
+    return fresh.length;
+  }, [setProfiles, setIgnored]);
+
+  const detect = useCallback(async (roots?: string[]): Promise<Detected[]> => {
+    setDetecting(true);
+    try {
+      const list = await sdk.native.invoke<Detected[]>('claude_monitor_detect', { roots: roots ?? null });
+      setError(null);
+      if (!roots) setFound(list);
+      return list;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      return [];
+    } finally {
+      setDetecting(false);
+    }
+  }, [sdk]);
+
+  const started = useRef(false);
+  useEffect(() => {
+    if (!sdk.env.isTauri || started.current) return;
+    started.current = true;
+    void detect().then((list) => {
+      if (autoDoneRef.current) return;
+      setAutoDone(true);
+      const valid = list.filter((d) => d.valid);
+      if (valid.length === 0) return;
+      // Claude Code is set up somewhere else on this machine: do not keep
+      // an empty placeholder for the usual directory.
+      if (!valid.some((d) => d.configDir === DEFAULT_PROFILE.configDir)) {
+        profilesRef.current = profilesRef.current.filter((p) => p.configDir !== DEFAULT_PROFILE.configDir);
+      }
+      track(valid);
+    });
+  }, [sdk, detect, track, setAutoDone]);
+
+  const untrack = useCallback((profile: Profile) => {
+    const next = profilesRef.current.filter((p) => p.id !== profile.id);
+    profilesRef.current = next;
+    setProfiles(next);
+    setIgnored((dirs) => [...new Set([...dirs, profile.configDir])]);
+  }, [setProfiles, setIgnored]);
+
+  const suggestions = useMemo(
+    () => found.filter((d) =>
+      d.valid && !ignored.includes(d.configDir) && !profiles.some((p) => p.configDir === d.configDir)),
+    [found, ignored, profiles],
+  );
+  const hiddenCount = found.filter((d) => d.valid && ignored.includes(d.configDir)).length;
+
+  return {
+    suggestions, hiddenCount, detecting, error, detect, track, untrack,
+    ignore: (d: Detected) => setIgnored((dirs) => [...new Set([...dirs, d.configDir])]),
+    restoreIgnored: () => setIgnored([]),
+  };
+}
+
 interface AccountsViewProps {
   profiles: Profile[];
-  setProfiles: (next: Profile[]) => void;
+  detection: ReturnType<typeof useAccountDetection>;
   snapshots: ProfileSnapshot[];
   allRows: SessionRow[];
   fromHour: number;
   m: M;
 }
 
-function AccountsView({ profiles, setProfiles, snapshots, allRows, fromHour, m }: AccountsViewProps) {
+function AccountsView({ profiles, detection, snapshots, allRows, fromHour, m }: AccountsViewProps) {
   const sdk = usePluginSdkFor(PLUGIN_ID);
   const [label, setLabel] = useState('');
   const [dir, setDir] = useState('');
   const [notice, setNotice] = useState<{ tone: 'info' | 'error'; text: string } | null>(null);
   const [removing, setRemoving] = useState<Profile | null>(null);
-  const [detecting, setDetecting] = useState(false);
   const usage = useMemo(() => usageByProfile(allRows, fromHour), [allRows, fromHour]);
-  const tracked = (configDir: string) => profiles.some((p) => p.configDir === configDir);
+  const { suggestions, hiddenCount, detecting, detect, track, untrack } = detection;
 
-  const add = () => {
-    const configDir = dir.trim().replace(/[\\/]+$/, '');
-    if (!configDir) return;
-    if (tracked(configDir)) {
-      setNotice({ tone: 'error', text: m('duplicateDir') });
+  /** Adds `path` if it is a config directory, or every one found below it. */
+  const addPath = async (path: string) => {
+    const root = path.trim();
+    if (!root) return;
+    const valid = (await detect([root])).filter((d) => d.valid);
+    if (valid.length === 0) {
+      setNotice({ tone: 'error', text: m('notConfigDir', { path: root }) });
       return;
     }
-    setProfiles([...profiles, { id: newId(), label: label.trim() || labelFromDir(configDir), configDir }]);
-    setLabel('');
-    setDir('');
-    setNotice(null);
+    const added = track(valid, label);
+    setNotice(added === 0
+      ? { tone: 'error', text: m('duplicateDir') }
+      : { tone: 'info', text: m('addedSome', { count: added }) });
+    if (added > 0) {
+      setLabel('');
+      setDir('');
+    }
   };
 
-  const detect = async () => {
-    setDetecting(true);
-    try {
-      const found = await sdk.native.invoke<string[]>('claude_monitor_detect');
-      const fresh = found.filter((d) => !tracked(d));
-      if (fresh.length > 0) {
-        setProfiles([
-          ...profiles,
-          ...fresh.map((configDir) => ({ id: newId(), label: labelFromDir(configDir), configDir })),
-        ]);
-      }
-      setNotice({
-        tone: 'info',
-        text: fresh.length > 0 ? m('detectedSome', { count: fresh.length }) : m('detectedNone'),
-      });
-    } catch (e) {
-      setNotice({ tone: 'error', text: e instanceof Error ? e.message : String(e) });
-    } finally {
-      setDetecting(false);
-    }
+  const browse = async () => {
+    const picked = await sdk.files.pickOpen({ directory: true, title: m('browseTitle') });
+    if (picked?.[0]) await addPath(picked[0]);
+  };
+
+  const rescan = async () => {
+    const list = await detect();
+    const fresh = list.filter((d) => d.valid && !profiles.some((p) => p.configDir === d.configDir));
+    setNotice({ tone: 'info', text: fresh.length > 0 ? m('detectedSome', { count: fresh.length }) : m('detectedNone') });
   };
 
   return (
@@ -464,7 +551,7 @@ function AccountsView({ profiles, setProfiles, snapshots, allRows, fromHour, m }
                       )
                       : <span className="text-fg-mute">{m('notSignedIn')}</span>}
                 </Td>
-                <Td mono>{p.configDir}</Td>
+                <Td mono className="break-all">{p.configDir}</Td>
                 <Td numeric>{snap?.sessions.length ?? 0}</Td>
                 <Td numeric>{formatTokens(totals?.tokens ?? 0)}</Td>
                 <Td numeric>{totals ? <CostCell totals={totals} /> : '$0'}</Td>
@@ -491,8 +578,38 @@ function AccountsView({ profiles, setProfiles, snapshots, allRows, fromHour, m }
         </Tbody>
       </DataTable>
 
+      {suggestions.length > 0 && (
+        <section className="space-y-2">
+          <SectionLabel
+            count={suggestions.length}
+            actions={(
+              <Button size="sm" variant="outline" onClick={() => track(suggestions)}>{m('addAll')}</Button>
+            )}
+          >
+            {m('foundOnMachine')}
+          </SectionLabel>
+          <DataTable density="compact">
+            <Tbody>
+              {suggestions.map((d) => (
+                <Tr key={d.configDir}>
+                  <Td mono className="break-all">{d.configDir}</Td>
+                  <Td>{d.email ?? <span className="text-fg-mute">{m('notSignedIn')}</span>}</Td>
+                  <Td className="whitespace-nowrap text-fg-mute">{m('sessionCount', { count: d.sessions })}</Td>
+                  <Td><Badge>{m(SOURCE_LABEL[d.source])}</Badge></Td>
+                  <Td align="right" className="whitespace-nowrap">
+                    <Button size="sm" variant="ghost" onClick={() => detection.ignore(d)}>{m('ignore')}</Button>
+                    <Button size="sm" onClick={() => track([d])}>{m('add')}</Button>
+                  </Td>
+                </Tr>
+              ))}
+            </Tbody>
+          </DataTable>
+        </section>
+      )}
+
       <section className="space-y-2">
         <SectionLabel>{m('addAccount')}</SectionLabel>
+        <p className="text-[11px] text-fg-mute">{m('addHint')}</p>
         <div className="flex flex-wrap items-center gap-2">
           <Input
             value={label}
@@ -504,19 +621,31 @@ function AccountsView({ profiles, setProfiles, snapshots, allRows, fromHour, m }
           <Input
             value={dir}
             onChange={(e) => setDir(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') add(); }}
+            onKeyDown={(e) => { if (e.key === 'Enter') void addPath(dir); }}
             placeholder={m('dirPlaceholder')}
             aria-label={m('dirField')}
             className="min-w-[14rem] flex-1 font-mono"
           />
-          <Button size="sm" onClick={add} disabled={!dir.trim()}>
+          <Button size="sm" onClick={() => void addPath(dir)} disabled={!dir.trim() || detecting}>
             <Plus className="mr-1.5 h-3.5 w-3.5" />{m('add')}
           </Button>
-          <Button size="sm" variant="outline" onClick={() => void detect()} disabled={detecting} title={m('detectHint')}>
+          <Button size="sm" variant="outline" onClick={() => void browse()} disabled={detecting}>
+            <FolderOpen className="mr-1.5 h-3.5 w-3.5" />{m('browse')}
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => void rescan()} disabled={detecting} title={m('detectHint')}>
             <FolderSearch className="mr-1.5 h-3.5 w-3.5" />{m('detect')}
           </Button>
         </div>
+        {detection.error && <Callout tone="error" size="sm">{detection.error}</Callout>}
         {notice && <Callout tone={notice.tone} size="sm">{notice.text}</Callout>}
+        {hiddenCount > 0 && (
+          <p className="text-[11px] text-fg-mute">
+            {m('ignoredCount', { count: hiddenCount })}{' '}
+            <button type="button" className="underline hover:text-fg" onClick={detection.restoreIgnored}>
+              {m('restoreIgnored')}
+            </button>
+          </p>
+        )}
       </section>
 
       <ConfirmDialog
@@ -526,7 +655,7 @@ function AccountsView({ profiles, setProfiles, snapshots, allRows, fromHour, m }
         description={m('removeBody')}
         confirmLabel={m('remove')}
         onConfirm={() => {
-          if (removing) setProfiles(profiles.filter((p) => p.id !== removing.id));
+          if (removing) untrack(removing);
           setRemoving(null);
         }}
       />
@@ -545,6 +674,7 @@ export function ClaudeManager() {
   const [auto, setAuto] = usePluginState(sdk, 'autoRefresh', true);
   const [accountFilter, setAccountFilter] = useState('all');
   const { snapshots, error, busy, scannedAt, refresh } = useClaudeScan(profiles, auto);
+  const detection = useAccountDetection(profiles, setProfiles);
 
   const allRows = useMemo<SessionRow[]>(() => {
     // Snapshots come back in the order the directories were sent.
@@ -577,7 +707,10 @@ export function ClaudeManager() {
     { id: 'overview', label: m('tabOverview') },
     { id: 'sessions', label: m('tabSessions'), badge: runningCount > 0 ? <Badge tone="success" pill>{runningCount}</Badge> : undefined },
     { id: 'usage', label: m('tabUsage') },
-    { id: 'accounts', label: m('tabAccounts'), badge: profiles.length > 1 ? <Badge pill>{profiles.length}</Badge> : undefined },
+    { id: 'accounts', label: m('tabAccounts'), badge: detection.suggestions.length > 0
+        ? <Badge tone="accent" pill>+{detection.suggestions.length}</Badge>
+        : profiles.length > 1 ? <Badge pill>{profiles.length}</Badge> : undefined,
+    },
   ];
 
   return (
@@ -626,7 +759,7 @@ export function ClaudeManager() {
         {snapshots !== null && tab === 'accounts' && (
           <AccountsView
             profiles={profiles}
-            setProfiles={setProfiles}
+            detection={detection}
             snapshots={snapshots}
             allRows={allRows}
             fromHour={fromHour}

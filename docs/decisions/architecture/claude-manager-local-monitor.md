@@ -24,6 +24,26 @@ không dừng, không nhắn cho phiên nào.
   nên "multi account" là danh sách thư mục (`Profile`), lưu trong `sdk.storage`. Không
   có khái niệm "chuyển tài khoản" trong app: nút chép lệnh `CLAUDE_CONFIG_DIR=… claude`
   để người dùng tự chạy.
+- **Dò tìm thư mục theo nội dung, không theo danh sách tool.** Mỗi công cụ chuyển tài
+  khoản / điều phối agent tự chọn chỗ đặt thư mục (`~/.<tool>/instances/<tên>`, thư mục
+  app-data…), và danh sách đó thay đổi liên tục, nên không hard-code đường dẫn của tool
+  nào. `claude_monitor_detect` nhận diện một thư mục cấu hình bằng chữ ký: có `projects/`
+  **và** (có transcript tên dạng UUID / `agent-*` **hoặc** có `.claude.json` /
+  `.credentials.json` — chỉ kiểm tra tồn tại). Chỉ `projects/` thì quá phổ biến để tin.
+  Ba nguồn, theo thứ tự ưu tiên khi trùng: vị trí chuẩn (`~/.claude`, `~/.config/claude`)
+  → `CLAUDE_CONFIG_DIR` của app và của **tiến trình đang chạy** (`sysinfo` `environ()`;
+  nguồn chính xác nhất cho "tool khác", vì chính tool đó đã truyền biến này cho Claude)
+  → duyệt BFS thư mục home sâu 4 cấp, tối đa 20.000 thư mục, bỏ `node_modules`/`.git`/
+  cache, không theo symlink. BFS để các chỗ nông (khả năng cao) được xét trước khi hết
+  ngân sách.
+- **Lần đầu tự thêm, về sau chỉ gợi ý.** Lần mở đầu tiên mọi thứ tìm thấy được theo dõi
+  luôn (`autoDetected`). Sau đó thư mục mới chỉ hiện ở "Tìm thấy trên máy"; thư mục người
+  dùng đã bỏ theo dõi vào `ignoredDirs` để không tự quay lại.
+- **Đường dẫn tùy ý**: cùng lệnh đó với `roots` — kiểm tra chính thư mục, rồi tìm bên
+  trong 3 cấp (chọn thư mục cha chứa nhiều tài khoản là đủ). Không thấy gì thì từ chối
+  kèm lý do, thay vì thêm một dòng rỗng. Nút chọn thư mục dùng
+  `sdk.files.pickOpen({ directory: true })` (tùy chọn `directory` được thêm vào SDK cho
+  việc này).
 - **Trạng thái** lấy từ registry `sessions/<pid>.json` (`status`: busy / idle / …) khi
   PID còn sống. Không có registry (bản Claude Code cũ, chạy qua SDK) thì transcript vừa
   được ghi trong 2 phút = đang chạy. Chuỗi `status` được truyền nguyên về frontend và
@@ -62,6 +82,9 @@ không dừng, không nhắn cho phiên nào.
   trường đều `Option` và dòng không parse được bị bỏ qua, nên thay đổi định dạng làm
   thiếu số liệu chứ không làm hỏng tool — nhưng số liệu thiếu thì khó nhận ra. Khi thấy
   usage bằng 0 bất thường, kiểm tra lại tên trường trong `Line` / `Usage` trước.
+- **Dò tìm có thể sót**: thư mục nằm ngoài home, sâu hơn 4 cấp, hoặc sau symlink sẽ
+  không được quét — khi đó chỉ thấy lúc tool kia đang chạy Claude (nguồn tiến trình),
+  hoặc người dùng thêm tay. Môi trường của tiến trình thuộc user khác không đọc được.
 - **PID tái sử dụng**: registry có `procStart` nhưng chưa đối chiếu; một PID chết rồi
   được tiến trình khác dùng lại sẽ hiện phiên là "đang mở" cho tới khi Claude Code dọn
   file registry.
