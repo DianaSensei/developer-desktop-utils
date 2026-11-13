@@ -2,6 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod checksum;
+mod claude_monitor;
 mod dropped;
 mod editor;
 mod editor_backup;
@@ -143,6 +144,8 @@ fn main() {
         )
         .invoke_handler(tauri::generate_handler![
             checksum::hash_file,
+            claude_monitor::claude_monitor_scan,
+            claude_monitor::claude_monitor_detect,
             netinfo::local_network_info,
             ports::list_listening_ports,
             files::read_file_data_url,

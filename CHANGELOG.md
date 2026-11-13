@@ -6,6 +6,20 @@ the app.
 
 ## Unreleased
 
+### New tool: Claude Manager
+
+- **See every Claude Code session on this machine in one place** — which ones are
+  working, which are waiting for you, which are idle — with the project, branch, model,
+  subagent count and process id of each.
+- **Usage:** tokens and an estimated cost for today, 7 days, 30 days or all time, broken
+  down by account, model, project and day, plus the last five hours at a glance. Cost is
+  an estimate at API list prices; it is not your remaining plan limit.
+- **Several accounts:** track one Claude Code config directory per account (Detect finds
+  `~/.claude` and `~/.claude-*`), see who is signed in to each, and copy the command that
+  starts Claude with that account or reopens a session in it.
+- Read-only and local: it reads Claude Code's transcripts, never the credentials file,
+  and sends nothing anywhere. Desktop app only.
+
 ### Fixes
 
 - **Pasting very large text no longer freezes the app.** Pasting a few megabytes of

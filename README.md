@@ -33,12 +33,13 @@ The app is **~3–10 MB** (Tauri uses your OS's native WebView instead of bundli
 
 ## Tools
 
-24 tools, all local-first. Full descriptions and per-tool system access live in **[docs/human/TOOLS.md](docs/human/TOOLS.md)**; the few that reach the network (marked 🌐) only act when you tell them to.
+25 tools, all local-first. Full descriptions and per-tool system access live in **[docs/human/TOOLS.md](docs/human/TOOLS.md)**; the few that reach the network (marked 🌐) only act when you tell them to.
 
 - **Text & data** — Text Transformer, Text Counter, Deduplicate, Text Diff, Regex Tester, JSON Formatter, SQL Formatter, Markdown
 - **Encoding, hashing & crypto** — Encode·Hash·Encrypt (with JWT decode/verify/sign and a step pipeline), Checksum, Image ↔ Base64, 2FA Authenticator
 - **Generators & pickers** — Generator, Cron Generator, QR Code, Color Picker, Lucky Wheel
 - **Time & productivity** — Time Tracker, Meeting Notes, Date / Time
+- **AI agents** — Claude Manager (Claude Code sessions, status, usage and accounts — read locally)
 - **Network & services** 🌐 — API Client, Kafka Explorer, Network Tools
 
 ---

@@ -910,6 +910,7 @@ git push origin main --tags
 | `sql-formatter` | SQL Formatter | ❌ | SQL + MongoDB aggregation formatting |
 | `network` | Network Tools | ❌ | DNS, propagation, DNSSEC, IP, listening ports |
 | `lucky-wheel` | Lucky Wheel | ❌ | Random winner spinner |
+| `claude-manager` | Claude Manager | ✅ | Read-only Claude Code monitor: live/past sessions + status, subagents, token usage + cost estimate, multiple accounts (= config dirs). Rust `claude_monitor_*` (`claude_monitor.rs`), logic in `tools/claude/usage.ts` — see `docs/decisions/architecture/claude-manager-local-monitor.md` |
 
 ---
 

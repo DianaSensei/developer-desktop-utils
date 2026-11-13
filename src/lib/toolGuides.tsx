@@ -412,6 +412,24 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
     ],
   }),
 
+  'claude-manager': makeGuide({
+    use: [
+      'Overview shows every Claude Code session open right now — working, waiting for you, or idle — and what the chosen range has used.',
+      'Sessions lists everything on disk; search by title, project or branch, and copy the command that reopens a session in its own folder and account.',
+      'Usage breaks tokens and estimated cost down by account, model, project and day.',
+      'Accounts: add one config directory per Claude account (or hit Detect for ~/.claude and ~/.claude-*).',
+    ],
+    know: [
+      'A second account is a second config directory: start Claude with CLAUDE_CONFIG_DIR=~/.claude-work and sign in there.',
+      'Subagent usage is counted in the session that started it.',
+    ],
+    caveat: [
+      'Read-only and local: it reads Claude Code’s transcripts and never opens the credentials file; it cannot start, stop or message a session.',
+      'Cost is an estimate at API list prices — subscription plans are not billed per token, and this is not your remaining plan limit.',
+      'Desktop app only.',
+    ],
+  }),
+
   'lucky-wheel': makeGuide({
     use: [
       'Enter choices (one per line; duplicates raise the odds); optionally toggle “Unique only” and “Remove winner”.',

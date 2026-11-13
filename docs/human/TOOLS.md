@@ -30,6 +30,7 @@ This document describes every tool in the app: what computation it performs, wha
 | RabbitMQ | ✓ | — | — | **✓ HTTP/HTTPS (mgmt API, browse/create) + AMQP 5672/5671 (publish/consume/RPC)** | Connection profiles incl. password & client identity (app data) |
 | Redis | ✓ | — | — | **✓ TCP 6379/6380 (RESP protocol)** | Connection profiles incl. password (app data) |
 | Network Tools | ✓ | — | — | **✓ HTTPS** + local read | In-memory session, cleared on app restart |
+| Claude Manager | ✓ | **✓ Claude Code config directories you track (transcripts, session registry, account name) — read-only** | — | — | Tracked directories, selected tab/range (localStorage) |
 | API Client | ✓ | ✓ (import) | ✓ (export) | **✓ HTTP/HTTPS — any URL you send to** | Collections, environments & history (localStorage) |
 | Mock Server | ✓ | — | — | **✓ Local HTTP listener you start (127.0.0.1, or 0.0.0.0 = LAN)** | Stubs + server settings (localStorage); request log in-memory, cleared on restart |
 | 2FA Authenticator | ✓ | ✓ (QR image) | — | — | Accounts **including TOTP/HOTP secrets** (localStorage) |
@@ -461,6 +462,33 @@ The **Ports** tab has two layouts (toggle in the toolbar): **Processes** (groupe
 **Accuracy note:** IP geolocation is approximate and provided by a third party; DoH answers reflect the chosen resolver's cache and may differ from your system resolver.
 
 **Permissions (Tauri):** `http:default`, scoped in `capabilities/default.json` to exactly the seven hosts above (Cloudflare/Google/Quad9/AdGuard DNS + ipapi.co/ipwho.is/freeipapi.com) — no other URLs are reachable. In the desktop app, HTTP requests are made from Rust via the HTTP plugin (so they aren't blocked by browser CORS/Origin rules); the web build uses the WebView's `fetch` (where some IP services may be unreachable due to CORS). Local network info uses the `local_network_info` Rust command (reads interfaces only, no file access), and the Ports tab uses the `list_listening_ports` Rust command (reads the OS socket table + process list locally, no file or network access).
+
+### Claude Manager
+
+A read-only monitor for Claude Code on this machine: which sessions are open and what they are doing, every past session, token usage with an estimated cost, and several accounts side by side.
+
+One **account** is one Claude Code config directory — `~/.claude` by default, plus any directory you add (the one you point `CLAUDE_CONFIG_DIR` at for a second sign-in). **Detect** looks in your home folder for `.claude` and `.claude-*` directories that contain a `projects` folder.
+
+| What is read | From | Used for |
+|--------------|------|----------|
+| Session transcripts | `<dir>/projects/<project>/<session>.jsonl` and `<session>/subagents/*.jsonl` | Title, folder, branch, timestamps, prompt count, and the token counts the API reported for each response |
+| Live-process registry | `<dir>/sessions/<pid>.json` | Which sessions have a running process and the status it reports (busy / idle / waiting) |
+| Signed-in account | `<dir>/.claude.json`, or `~/.claude.json` for the default directory | E-mail and organization name shown in the Accounts tab — only the `oauthAccount` block is parsed |
+| Process list | The OS, via `sysinfo` | Checking that a registry entry's PID is still alive |
+
+**What it never does:** it does not open `.credentials.json` (or the OS keychain), does not write to any Claude Code file, makes no network request, and cannot start, stop or message a session. Message bodies are not returned to the UI — only a title per session (Claude Code's own title, or the first 140 characters of the first prompt). The "copy" buttons put a shell command on the clipboard (`claude --resume <id>`, prefixed with `CLAUDE_CONFIG_DIR=…` for a non-default account); you run it yourself.
+
+**What leaves the machine:** nothing.
+
+**Accuracy notes:**
+- **Status** comes from Claude Code's own registry when it exists. A session with no registry entry counts as *working* only while its transcript was written in the last two minutes; otherwise it is *ended*.
+- **Usage** is what each transcript recorded. A response is counted once even though Claude Code writes it as several lines, and once even when a resumed session copies it into a new transcript. Subagent usage is added to the session that started it. Transcripts Claude Code has already deleted (its own retention cleanup) are gone from the totals too.
+- **Cost** is an estimate at Anthropic's API list prices (cache writes and reads priced separately). Subscription plans are not billed per token, so read it as a way to compare sessions and accounts. It is **not** your remaining plan limit — that is only known to Anthropic's servers, and the tool does not ask them. Models with no known price are left out of the cost and called out in the Usage tab.
+- **"Last 5 hours"** is the current clock hour plus the four before it, not Anthropic's exact rolling window.
+
+**Refresh:** rescans every 5 seconds while the tool is the one in front (toggle in the toolbar). A rescan only reads the part of each transcript that was appended since the last one.
+
+**Permissions (Tauri):** no plugin capability — two Rust commands, `claude_monitor_scan` and `claude_monitor_detect` (`src-tauri/src/claude_monitor.rs`). Desktop app only.
 
 ### API Client
 
