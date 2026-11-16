@@ -299,6 +299,25 @@ describe('ClaudeManager', () => {
     expect(await screen.findByText(/Copied settings\.json to "Work"|Đã chép settings\.json sang "Work"/)).toBeTruthy();
   });
 
+  it('lets you add a path even when the scan fails or has not finished', async () => {
+    storageSet(KEYS[4], JSON.stringify(true));
+    invokeMock.mockImplementation(async (command: string, args?: { roots?: string[] | null }) => {
+      if (command === 'claude_monitor_scan') throw new Error('scan broke');
+      if (command === 'claude_monitor_detect') {
+        return (args?.roots ?? []).map((root) => found(root, { source: 'custom' }));
+      }
+      return null;
+    });
+    render(<ClaudeManager />);
+    expect(await screen.findByText('scan broke')).toBeTruthy();
+    // The toolbar entry is there on every tab.
+    fireEvent.click(screen.getByRole('button', { name: /^Add account$|^Thêm tài khoản$/ }));
+    const path = await screen.findByLabelText(/Config directory|Thư mục cấu hình/);
+    fireEvent.change(path, { target: { value: '/opt/claude-b' } });
+    fireEvent.keyDown(path, { key: 'Enter' });
+    expect(await screen.findByText('/opt/claude-b')).toBeTruthy();
+  });
+
   it('shows the scan error instead of an empty list', async () => {
     invokeMock.mockRejectedValue(new Error('boom'));
     render(<ClaudeManager />);

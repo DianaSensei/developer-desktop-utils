@@ -6,6 +6,13 @@ the app.
 
 ## Unreleased
 
+### Fixes
+
+- **Claude Manager:** adding an account is easier to find and no longer waits for the
+  scan. There is an **Add account** button in the toolbar, the path field and **Browse…**
+  are at the top of the Accounts tab, and the Accounts and Config tabs open even while
+  the first scan is still running or when it fails — which is when you most need them.
+
 ### New tool: Claude Manager
 
 - **See every Claude Code session on this machine in one place** — which ones are

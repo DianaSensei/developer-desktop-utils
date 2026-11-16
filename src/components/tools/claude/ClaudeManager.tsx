@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Bot, Download, FolderOpen, FolderSearch, Plus, RefreshCw, Terminal, Trash2 } from 'lucide-react';
 import {
-  Badge, Button, Callout, ConfirmDialog, CopyButton, DataTable, EmptyState, IconButton, Input, LoadingRow,
+  Badge, Button, Callout, ConfirmDialog, CopyButton, DataTable, EmptyState, IconButton, Input, LoadingRow, Spinner,
   SearchInput, SectionLabel, Segmented, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Stat,
   StatGrid, StatusDot, Switch, Tabs, Tbody, Td, Th, Thead, Tr, type BadgeTone, type StatusDotTone,
 } from '@/design-system';
@@ -687,7 +687,8 @@ function useAccountDetection(profiles: Profile[], setProfiles: (next: Profile[])
 interface AccountsViewProps {
   profiles: Profile[];
   detection: ReturnType<typeof useAccountDetection>;
-  snapshots: ProfileSnapshot[];
+  /** `null` until the first scan returns. */
+  snapshots: ProfileSnapshot[] | null;
   allRows: SessionRow[];
   fromHour: number;
   m: M;
@@ -735,6 +736,46 @@ function AccountsView({ profiles, detection, snapshots, allRows, fromHour, m }: 
   return (
     <>
       <Callout tone="info" size="sm">{m('accountsIntro')}</Callout>
+      <section className="space-y-2">
+        <SectionLabel>{m('addAccount')}</SectionLabel>
+        <p className="text-[11px] text-fg-mute">{m('addHint')}</p>
+        <div className="flex flex-wrap items-center gap-2">
+          <Input
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            placeholder={m('labelPlaceholder')}
+            aria-label={m('labelField')}
+            className="w-40"
+          />
+          <Input
+            value={dir}
+            onChange={(e) => setDir(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') void addPath(dir); }}
+            placeholder={m('dirPlaceholder')}
+            aria-label={m('dirField')}
+            className="min-w-[14rem] flex-1 font-mono"
+          />
+          <Button size="sm" onClick={() => void addPath(dir)} disabled={!dir.trim() || detecting}>
+            <Plus className="mr-1.5 h-3.5 w-3.5" />{m('add')}
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => void browse()} disabled={detecting}>
+            <FolderOpen className="mr-1.5 h-3.5 w-3.5" />{m('browse')}
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => void rescan()} disabled={detecting} title={m('detectHint')}>
+            <FolderSearch className="mr-1.5 h-3.5 w-3.5" />{m('detect')}
+          </Button>
+        </div>
+        {detection.error && <Callout tone="error" size="sm">{detection.error}</Callout>}
+        {notice && <Callout tone={notice.tone} size="sm">{notice.text}</Callout>}
+        {hiddenCount > 0 && (
+          <p className="text-[11px] text-fg-mute">
+            {m('ignoredCount', { count: hiddenCount })}{' '}
+            <button type="button" className="underline hover:text-fg" onClick={detection.restoreIgnored}>
+              {m('restoreIgnored')}
+            </button>
+          </p>
+        )}
+      </section>
       <DataTable>
         <Thead>
           <Tr>
@@ -749,13 +790,15 @@ function AccountsView({ profiles, detection, snapshots, allRows, fromHour, m }: 
         </Thead>
         <Tbody>
           {profiles.map((p, i) => {
-            const snap = snapshots[i];
+            const snap = snapshots?.[i];
             const totals = usage.get(p.id);
             return (
               <Tr key={p.id}>
                 <Td className="font-medium whitespace-nowrap">{p.label}</Td>
                 <Td>
-                  {!snap?.exists
+                  {!snap
+                    ? <Spinner size="sm" />
+                    : !snap.exists
                     ? <Badge tone="danger">{m('dirMissing')}</Badge>
                     : snap.account?.email
                       ? (
@@ -769,7 +812,7 @@ function AccountsView({ profiles, detection, snapshots, allRows, fromHour, m }: 
                       : <span className="text-fg-mute">{m('notSignedIn')}</span>}
                 </Td>
                 <Td mono className="break-all">{p.configDir}</Td>
-                <Td numeric>{snap?.sessions.length ?? 0}</Td>
+                <Td numeric>{snap ? snap.sessions.length : '—'}</Td>
                 <Td numeric>{formatTokens(totals?.tokens ?? 0)}</Td>
                 <Td numeric>{totals ? <CostCell totals={totals} /> : '$0'}</Td>
                 <Td align="right" className="whitespace-nowrap">
@@ -824,46 +867,6 @@ function AccountsView({ profiles, detection, snapshots, allRows, fromHour, m }: 
         </section>
       )}
 
-      <section className="space-y-2">
-        <SectionLabel>{m('addAccount')}</SectionLabel>
-        <p className="text-[11px] text-fg-mute">{m('addHint')}</p>
-        <div className="flex flex-wrap items-center gap-2">
-          <Input
-            value={label}
-            onChange={(e) => setLabel(e.target.value)}
-            placeholder={m('labelPlaceholder')}
-            aria-label={m('labelField')}
-            className="w-40"
-          />
-          <Input
-            value={dir}
-            onChange={(e) => setDir(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') void addPath(dir); }}
-            placeholder={m('dirPlaceholder')}
-            aria-label={m('dirField')}
-            className="min-w-[14rem] flex-1 font-mono"
-          />
-          <Button size="sm" onClick={() => void addPath(dir)} disabled={!dir.trim() || detecting}>
-            <Plus className="mr-1.5 h-3.5 w-3.5" />{m('add')}
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => void browse()} disabled={detecting}>
-            <FolderOpen className="mr-1.5 h-3.5 w-3.5" />{m('browse')}
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => void rescan()} disabled={detecting} title={m('detectHint')}>
-            <FolderSearch className="mr-1.5 h-3.5 w-3.5" />{m('detect')}
-          </Button>
-        </div>
-        {detection.error && <Callout tone="error" size="sm">{detection.error}</Callout>}
-        {notice && <Callout tone={notice.tone} size="sm">{notice.text}</Callout>}
-        {hiddenCount > 0 && (
-          <p className="text-[11px] text-fg-mute">
-            {m('ignoredCount', { count: hiddenCount })}{' '}
-            <button type="button" className="underline hover:text-fg" onClick={detection.restoreIgnored}>
-              {m('restoreIgnored')}
-            </button>
-          </p>
-        )}
-      </section>
 
       <ConfirmDialog
         open={removing !== null}
@@ -927,6 +930,7 @@ export function ClaudeManager() {
     );
   }
 
+  const setupTab = tab === 'accounts' || tab === 'config';
   const view: ViewProps = { rows, profiles, scope, fromHour, now: scannedAt, onOpen: setViewing, budgets, m };
   const viewingProfile = viewing && profiles.find((p) => p.id === viewing.session.profileId);
   const tabs = [
@@ -966,6 +970,9 @@ export function ClaudeManager() {
           ]}
         />
         <div className="ml-auto flex items-center gap-2">
+          <Button size="sm" variant="outline" onClick={() => setTab('accounts')}>
+            <Plus className="mr-1.5 h-3.5 w-3.5" />{m('addAccount')}
+          </Button>
           <span className="hidden text-[11px] text-fg-mute @2xl:inline">
             {m('updatedAt', { time: new Date(scannedAt).toLocaleTimeString() })}
           </span>
@@ -982,8 +989,10 @@ export function ClaudeManager() {
 
       <div className="tool-scrollable tool-padding tool-spacer min-h-0 flex-1">
         {error && <Callout tone="error" title={m('scanFailed')}>{error}</Callout>}
-        {snapshots === null && !error && <LoadingRow label={m('scanning')} />}
-        {snapshots !== null && tab === 'accounts' && (
+        {/* Accounts and Config do not wait for the scan: a slow or failed
+            scan is exactly when the tracked directories need changing. */}
+        {snapshots === null && !error && !setupTab && <LoadingRow label={m('scanning')} />}
+        {tab === 'accounts' && (
           <AccountsView
             profiles={profiles}
             detection={detection}
@@ -993,8 +1002,8 @@ export function ClaudeManager() {
             m={m}
           />
         )}
-        {snapshots !== null && tab === 'config' && <ConfigView profiles={profiles} />}
-        {snapshots !== null && tab !== 'accounts' && tab !== 'config' && allRows.length === 0 && (
+        {tab === 'config' && <ConfigView profiles={profiles} />}
+        {snapshots !== null && !setupTab && allRows.length === 0 && (
           <EmptyState
             icon={Bot}
             title={m('noDataTitle')}
