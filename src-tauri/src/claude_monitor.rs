@@ -96,6 +96,12 @@ pub struct ProfileSnapshot {
     exists: bool,
     account: Option<Account>,
     sessions: Vec<SessionInfo>,
+    /// Sessions of this directory that an earlier directory in the same
+    /// scan already listed, and that directory's `config_dir`. Tools that
+    /// keep one directory per account often link or copy `projects/`
+    /// between them, so the same transcripts show up under each.
+    shared_sessions: u64,
+    shares_data_with: Option<String>,
 }
 
 // ── Transcript lines (only the fields we read) ──────────────────────────
@@ -610,6 +616,9 @@ fn scan_profile(
     home: Option<&Path>,
     cache: &Cache,
     is_alive: &dyn Fn(&[u32]) -> HashSet<u32>,
+    // API message ids already counted, shared across the directories of one
+    // scan so a transcript reachable from two of them is counted once.
+    seen: &mut HashSet<String>,
 ) -> ProfileSnapshot {
     let dir = expand_home(raw_dir, home);
     let mut snapshot = ProfileSnapshot { config_dir: raw_dir.to_string(), ..Default::default() };
@@ -630,9 +639,7 @@ fn scan_profile(
     // the session that originally paid for it.
     let mut files: Vec<SessionFiles> = by_id.into_values().collect();
     files.sort_by_key(|f| (f.main.as_ref().and_then(|m| m.started_at).unwrap_or(i64::MAX), f.id.clone()));
-    let mut seen = HashSet::new();
-    let mut sessions: Vec<SessionInfo> =
-        files.into_iter().map(|f| build_session(f, &mut seen)).collect();
+    let mut sessions: Vec<SessionInfo> = files.into_iter().map(|f| build_session(f, seen)).collect();
 
     let registry = read_registry(&dir);
     let alive = is_alive(&registry.iter().map(|r| r.pid).collect::<Vec<_>>());
@@ -665,14 +672,58 @@ fn scan_profile(
     snapshot
 }
 
+/// Scans the directories in order. A session id is globally unique, so one
+/// that an earlier directory already listed is the same session reached
+/// again (a linked or copied `projects/`): it stays with the first
+/// directory, and the later one only reports how many it shares.
+fn scan_all(
+    dirs: &[String],
+    home: Option<&Path>,
+    cache: &Cache,
+    is_alive: &dyn Fn(&[u32]) -> HashSet<u32>,
+) -> Vec<ProfileSnapshot> {
+    let mut out: Vec<ProfileSnapshot> = Vec::new();
+    let mut owner: HashMap<String, usize> = HashMap::new();
+    let mut seen = HashSet::new();
+    for raw in dirs {
+        let mut snapshot = scan_profile(raw, home, cache, is_alive, &mut seen);
+        let mut own = Vec::new();
+        let mut shared_per_owner: HashMap<usize, u64> = HashMap::new();
+        for session in std::mem::take(&mut snapshot.sessions) {
+            match owner.get(&session.id) {
+                Some(&index) => {
+                    *shared_per_owner.entry(index).or_default() += 1;
+                    // Each directory has its own process registry: a session
+                    // running under this account is still running.
+                    if let Some(first) = out[index].sessions.iter_mut().find(|s| s.id == session.id) {
+                        if first.live.is_none() {
+                            first.live = session.live;
+                        }
+                    }
+                }
+                None => {
+                    owner.insert(session.id.clone(), out.len());
+                    own.push(session);
+                }
+            }
+        }
+        snapshot.shared_sessions = shared_per_owner.values().sum();
+        snapshot.shares_data_with = shared_per_owner
+            .into_iter()
+            .max_by_key(|(index, count)| (*count, std::cmp::Reverse(*index)))
+            .map(|(index, _)| out[index].config_dir.clone());
+        snapshot.sessions = own;
+        out.push(snapshot);
+    }
+    out
+}
+
 /// Scans each config directory. `~` expands to the home directory.
 #[tauri::command]
 pub async fn claude_monitor_scan(dirs: Vec<String>) -> Result<Vec<ProfileSnapshot>, String> {
     tokio::task::spawn_blocking(move || {
         let home = home_dir();
-        dirs.iter()
-            .map(|d| scan_profile(d, home.as_deref(), cache(), &alive_pids))
-            .collect()
+        scan_all(&dirs, home.as_deref(), cache(), &alive_pids)
     })
     .await
     .map_err(|e| e.to_string())
@@ -891,6 +942,64 @@ pub async fn claude_monitor_detect(roots: Option<Vec<String>>) -> Result<Vec<Det
     .map_err(|e| e.to_string())
 }
 
+// ── Removing an account ─────────────────────────────────────────────────
+
+const ERR_NOT_CONFIG_DIR: &str = "not-config-dir";
+const ERR_IN_USE: &str = "in-use";
+
+/// What `remove_account` will move to the trash for one config directory:
+/// the directory, plus `~/.claude.json` for the default `~/.claude` (that
+/// file is the default account's sign-in record and project history).
+fn account_paths(config_dir: &Path, home: Option<&Path>) -> Vec<PathBuf> {
+    let mut paths = vec![config_dir.to_path_buf()];
+    if let Some(home) = home {
+        let beside = home.join(".claude.json");
+        if config_dir == home.join(".claude") && beside.is_file() {
+            paths.push(beside);
+        }
+    }
+    paths
+}
+
+/// Moves an account's config directory to the OS trash. Refuses anything
+/// that is not a Claude Code config directory, the home folder or a
+/// filesystem root, and an account that has a session running.
+fn remove_account(
+    raw_dir: &str,
+    home: Option<&Path>,
+    is_alive: &dyn Fn(&[u32]) -> HashSet<u32>,
+    trash: &dyn Fn(&Path) -> Result<(), String>,
+) -> Result<Vec<String>, String> {
+    let dir = expand_home(raw_dir, home);
+    let is_home = home.is_some_and(|h| fs::canonicalize(h).ok() == fs::canonicalize(&dir).ok());
+    if is_home || dir.parent().is_none() || !dir.join("projects").is_dir() {
+        return Err(ERR_NOT_CONFIG_DIR.into());
+    }
+    let pids: Vec<u32> = read_registry(&dir).iter().map(|r| r.pid).collect();
+    if !is_alive(&pids).is_empty() {
+        return Err(ERR_IN_USE.into());
+    }
+    let paths = account_paths(&dir, home);
+    for path in &paths {
+        trash(path)?;
+    }
+    Ok(paths.iter().map(|p| shorten(p, home)).collect())
+}
+
+/// Moves one account's config directory to the trash / recycle bin and
+/// returns what was moved. Fails with "in-use" while a Claude Code session
+/// of that account is running, and "not-config-dir" for any other folder.
+#[tauri::command]
+pub async fn claude_monitor_remove_account(dir: String) -> Result<Vec<String>, String> {
+    tokio::task::spawn_blocking(move || {
+        remove_account(&dir, home_dir().as_deref(), &alive_pids, &|path| {
+            trash::delete(path).map_err(|e| e.to_string())
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -932,14 +1041,18 @@ mod tests {
 
     fn scan(dir: &TempDir, cache: &Cache, alive: &[u32]) -> ProfileSnapshot {
         let alive: HashSet<u32> = alive.iter().copied().collect();
-        scan_profile(&dir.0.to_string_lossy(), None, cache, &|pids| {
-            pids.iter().copied().filter(|p| alive.contains(p)).collect()
-        })
+        scan_profile(
+            &dir.0.to_string_lossy(),
+            None,
+            cache,
+            &|pids| pids.iter().copied().filter(|p| alive.contains(p)).collect(),
+            &mut HashSet::new(),
+        )
     }
 
     #[test]
     fn missing_directory_is_reported_not_an_error() {
-        let snap = scan_profile("/definitely/not/here", None, &Cache::default(), &|_| HashSet::new());
+        let snap = scan_profile("/definitely/not/here", None, &Cache::default(), &|_| HashSet::new(), &mut HashSet::new());
         assert!(!snap.exists);
         assert!(snap.sessions.is_empty());
     }
@@ -1076,7 +1189,7 @@ mod tests {
         home.write(".claude-empty/readme.txt", "");
 
 
-        let scan_home = |dir: &str| scan_profile(dir, Some(&home.0), &Cache::default(), &|_| HashSet::new());
+        let scan_home = |dir: &str| scan_profile(dir, Some(&home.0), &Cache::default(), &|_| HashSet::new(), &mut HashSet::new());
         let default = scan_home("~/.claude");
         assert_eq!(default.config_dir, "~/.claude");
         let account = default.account.unwrap();
@@ -1151,5 +1264,104 @@ mod tests {
         home.write(&format!("a/b/c/d/e/projects/p/{UUID_A}"), "");
         assert!(find_config_dirs(&home.0, HOME_SCAN_DEPTH).is_empty());
         assert_eq!(find_config_dirs(&home.0, 5).len(), 1);
+    }
+
+    fn scan_many(dirs: &[&TempDir], alive: &[u32]) -> Vec<ProfileSnapshot> {
+        let alive: HashSet<u32> = alive.iter().copied().collect();
+        let dirs: Vec<String> = dirs.iter().map(|d| d.0.to_string_lossy().into_owned()).collect();
+        scan_all(&dirs, None, &Cache::default(), &|pids| {
+            pids.iter().copied().filter(|p| alive.contains(p)).collect()
+        })
+    }
+
+    #[test]
+    fn directories_that_share_transcripts_are_counted_once() {
+        let first = TempDir::new("share-a");
+        let second = TempDir::new("share-b");
+        let body = [
+            user("2026-11-01T10:00:00Z", "start"),
+            assistant("2026-11-01T10:00:05Z", "m1", "claude-opus-5-5", 100, 10, "end_turn"),
+        ]
+        .concat();
+        // The second account's directory holds a copy of the same session
+        // (what a linked `projects/` looks like to a reader), plus the
+        // registry entry of the process running it there.
+        first.write("projects/p/s1.jsonl", &body);
+        second.write("projects/p/s1.jsonl", &body);
+        second.write("sessions/7.json", r#"{"pid":7,"sessionId":"s1","status":"busy"}"#);
+
+        let snaps = scan_many(&[&first, &second], &[7]);
+        assert_eq!(snaps[0].sessions.len(), 1);
+        assert_eq!(snaps[0].sessions[0].buckets[0].requests, 1);
+        assert_eq!(snaps[0].sessions[0].live.as_ref().unwrap().pid, 7, "live state follows the session");
+        assert_eq!((snaps[0].shared_sessions, snaps[0].shares_data_with.clone()), (0, None));
+
+        assert!(snaps[1].exists);
+        assert!(snaps[1].sessions.is_empty());
+        assert_eq!(snaps[1].shared_sessions, 1);
+        assert_eq!(snaps[1].shares_data_with.as_deref(), Some(snaps[0].config_dir.as_str()));
+    }
+
+    #[test]
+    fn a_directory_keeps_the_sessions_only_it_has() {
+        let first = TempDir::new("partial-a");
+        let second = TempDir::new("partial-b");
+        let turn = |id: &str| assistant("2026-11-01T10:00:05Z", id, "claude-opus-5-5", 1, 1, "end_turn");
+        first.write("projects/p/s1.jsonl", &turn("m1"));
+        second.write("projects/p/s1.jsonl", &turn("m1"));
+        second.write("projects/p/s2.jsonl", &turn("m2"));
+
+        let snaps = scan_many(&[&first, &second], &[]);
+        assert_eq!(snaps[1].sessions.iter().map(|s| s.id.as_str()).collect::<Vec<_>>(), vec!["s2"]);
+        assert_eq!(snaps[1].sessions[0].buckets[0].requests, 1);
+        assert_eq!(snaps[1].shared_sessions, 1);
+    }
+
+    #[test]
+    fn removing_an_account_trashes_its_directory_and_nothing_else() {
+        let home = TempDir::new("remove");
+        home.write(".claude/projects/p/s.jsonl", "");
+        home.write(".claude.json", "{}");
+        home.write(".claude-work/projects/p/s.jsonl", "");
+        home.write("documents/notes.txt", "");
+
+        let trashed = std::cell::RefCell::new(Vec::new());
+        let trash = |path: &Path| {
+            trashed.borrow_mut().push(path.to_path_buf());
+            Ok(())
+        };
+        let none_alive = |_: &[u32]| HashSet::new();
+
+        let moved = remove_account("~/.claude-work", Some(&home.0), &none_alive, &trash).unwrap();
+        assert_eq!(moved, vec!["~/.claude-work"]);
+        // The default account also owns the config file beside its directory.
+        let moved = remove_account("~/.claude", Some(&home.0), &none_alive, &trash).unwrap();
+        assert_eq!(moved, vec!["~/.claude", "~/.claude.json"]);
+        assert_eq!(trashed.borrow().len(), 3);
+
+        for folder in ["~", "~/documents", "~/missing", "/"] {
+            let err = remove_account(folder, Some(&home.0), &none_alive, &trash).unwrap_err();
+            assert_eq!(err, ERR_NOT_CONFIG_DIR, "{folder}");
+        }
+        assert_eq!(trashed.borrow().len(), 3, "nothing else was touched");
+    }
+
+    #[test]
+    fn an_account_with_a_running_session_is_not_removed() {
+        let home = TempDir::new("remove-live");
+        home.write(".claude-work/projects/p/s.jsonl", "");
+        home.write(".claude-work/sessions/9.json", r#"{"pid":9,"sessionId":"s"}"#);
+        let trash = |_: &Path| -> Result<(), String> { panic!("must not trash") };
+        let alive = |pids: &[u32]| pids.iter().copied().collect::<HashSet<u32>>();
+        assert_eq!(remove_account("~/.claude-work", Some(&home.0), &alive, &trash).unwrap_err(), ERR_IN_USE);
+    }
+
+    #[test]
+    fn a_failing_trash_is_reported() {
+        let home = TempDir::new("remove-fail");
+        home.write(".claude-work/projects/p/s.jsonl", "");
+        let trash = |_: &Path| Err("trash unavailable".to_string());
+        let err = remove_account("~/.claude-work", Some(&home.0), &|_| HashSet::new(), &trash).unwrap_err();
+        assert_eq!(err, "trash unavailable");
     }
 }

@@ -6,6 +6,24 @@ the app.
 
 ## Unreleased
 
+### Claude Manager: delete an account, and accounts that share sessions
+
+- **Delete an account from this computer.** Next to "stop tracking" (which only hides an
+  account in DevTool), each account can now be deleted: its config directory — sessions,
+  settings and stored sign-in — is moved to the Trash / Recycle Bin, so it can be
+  restored. It is refused while a session of that account is running.
+- **Accounts that share their sessions are no longer counted twice.** Account managers
+  often link the sessions folder between profiles, which made two accounts show the same
+  sessions, tokens and cost — and doubled the totals. Shared sessions are now counted
+  once, and the other account says which one it shares with.
+
+### Fixes
+
+- **Claude Manager:** adding an account is easier to find and no longer waits for the
+  scan. There is an **Add account** button in the toolbar, the path field and **Browse…**
+  are at the top of the Accounts tab, and the Accounts and Config tabs open even while
+  the first scan is still running or when it fails — which is when you most need them.
+
 ### New tool: Claude Manager
 
 - **See every Claude Code session on this machine in one place** — which ones are

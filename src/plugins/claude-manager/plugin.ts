@@ -14,7 +14,8 @@ export default definePlugin({
   permissions: ['storage', 'clipboard:write', 'files:read', 'files:write', 'notifications', 'native'],
   // `files:read` is the folder picker, `files:write` the usage export. The
   // Rust side only ever writes settings.json and CLAUDE.md of a config
-  // directory, and only when the user saves them.
+  // directory when the user saves them, and moves a whole config directory
+  // to the OS trash when the user deletes that account.
   commands: ['claude_monitor_'],
   sdk: '^1.0.0',
   load: () => import('@/components/tools/claude/ClaudeManager').then((m) => m.ClaudeManager),

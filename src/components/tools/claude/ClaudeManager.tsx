@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Bot, Download, FolderOpen, FolderSearch, Plus, RefreshCw, Terminal, Trash2 } from 'lucide-react';
+import { Bot, Download, EyeOff, FolderOpen, FolderSearch, Plus, RefreshCw, Terminal, Trash2 } from 'lucide-react';
 import {
-  Badge, Button, Callout, ConfirmDialog, CopyButton, DataTable, EmptyState, IconButton, Input, LoadingRow,
+  Badge, Button, Callout, ConfirmDialog, CopyButton, DataTable, EmptyState, IconButton, Input, LoadingRow, Spinner,
   SearchInput, SectionLabel, Segmented, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Stat,
   StatGrid, StatusDot, Switch, Tabs, Tbody, Td, Th, Thead, Tr, type BadgeTone, type StatusDotTone,
 } from '@/design-system';
@@ -670,6 +670,14 @@ function useAccountDetection(profiles: Profile[], setProfiles: (next: Profile[])
     setIgnored((dirs) => [...new Set([...dirs, profile.configDir])]);
   }, [setProfiles, setIgnored]);
 
+  /** Drops a profile whose directory is gone; nothing to ignore later. */
+  const forget = useCallback((profile: Profile) => {
+    const next = profilesRef.current.filter((p) => p.id !== profile.id);
+    profilesRef.current = next;
+    setProfiles(next);
+    setFound((list) => list.filter((d) => d.configDir !== profile.configDir));
+  }, [setProfiles]);
+
   const suggestions = useMemo(
     () => found.filter((d) =>
       d.valid && !ignored.includes(d.configDir) && !profiles.some((p) => p.configDir === d.configDir)),
@@ -678,7 +686,7 @@ function useAccountDetection(profiles: Profile[], setProfiles: (next: Profile[])
   const hiddenCount = found.filter((d) => d.valid && ignored.includes(d.configDir)).length;
 
   return {
-    suggestions, hiddenCount, detecting, error, detect, track, untrack,
+    suggestions, hiddenCount, detecting, error, detect, track, untrack, forget,
     ignore: (d: Detected) => setIgnored((dirs) => [...new Set([...dirs, d.configDir])]),
     restoreIgnored: () => setIgnored([]),
   };
@@ -687,7 +695,8 @@ function useAccountDetection(profiles: Profile[], setProfiles: (next: Profile[])
 interface AccountsViewProps {
   profiles: Profile[];
   detection: ReturnType<typeof useAccountDetection>;
-  snapshots: ProfileSnapshot[];
+  /** `null` until the first scan returns. */
+  snapshots: ProfileSnapshot[] | null;
   allRows: SessionRow[];
   fromHour: number;
   m: M;
@@ -699,8 +708,27 @@ function AccountsView({ profiles, detection, snapshots, allRows, fromHour, m }: 
   const [dir, setDir] = useState('');
   const [notice, setNotice] = useState<{ tone: 'info' | 'error'; text: string } | null>(null);
   const [removing, setRemoving] = useState<Profile | null>(null);
+  const [deleting, setDeleting] = useState<Profile | null>(null);
   const usage = useMemo(() => usageByProfile(allRows, fromHour), [allRows, fromHour]);
   const { suggestions, hiddenCount, detecting, detect, track, untrack } = detection;
+
+  const labelOf = (configDir: string) => profiles.find((p) => p.configDir === configDir)?.label ?? configDir;
+  const anyShared = (snapshots ?? []).some((snap) => snap.sharedSessions > 0);
+
+  /** Moves the account's directory to the OS trash, then stops listing it. */
+  const deleteAccount = async (profile: Profile) => {
+    try {
+      const moved = await sdk.native.invoke<string[]>('claude_monitor_remove_account', { dir: profile.configDir });
+      detection.forget(profile);
+      setNotice({ tone: 'info', text: m('deletedAccount', { label: profile.label, paths: moved.join(', ') }) });
+    } catch (e) {
+      const raw = e instanceof Error ? e.message : String(e);
+      const text = raw === 'in-use'
+        ? m('deleteInUse', { label: profile.label })
+        : raw === 'not-config-dir' ? m('saveNotConfigDir') : raw;
+      setNotice({ tone: 'error', text });
+    }
+  };
 
   /** Adds `path` if it is a config directory, or every one found below it. */
   const addPath = async (path: string) => {
@@ -735,95 +763,6 @@ function AccountsView({ profiles, detection, snapshots, allRows, fromHour, m }: 
   return (
     <>
       <Callout tone="info" size="sm">{m('accountsIntro')}</Callout>
-      <DataTable>
-        <Thead>
-          <Tr>
-            <Th>{m('colAccount')}</Th>
-            <Th>{m('colSignedIn')}</Th>
-            <Th>{m('colDirectory')}</Th>
-            <Th align="right">{m('colSessions')}</Th>
-            <Th align="right">{m('colTokens')}</Th>
-            <Th align="right">{m('colCost')}</Th>
-            <Th />
-          </Tr>
-        </Thead>
-        <Tbody>
-          {profiles.map((p, i) => {
-            const snap = snapshots[i];
-            const totals = usage.get(p.id);
-            return (
-              <Tr key={p.id}>
-                <Td className="font-medium whitespace-nowrap">{p.label}</Td>
-                <Td>
-                  {!snap?.exists
-                    ? <Badge tone="danger">{m('dirMissing')}</Badge>
-                    : snap.account?.email
-                      ? (
-                        <>
-                          <div className="truncate">{snap.account.email}</div>
-                          {snap.account.organization && (
-                            <div className="truncate text-[11px] text-fg-mute">{snap.account.organization}</div>
-                          )}
-                        </>
-                      )
-                      : <span className="text-fg-mute">{m('notSignedIn')}</span>}
-                </Td>
-                <Td mono className="break-all">{p.configDir}</Td>
-                <Td numeric>{snap?.sessions.length ?? 0}</Td>
-                <Td numeric>{formatTokens(totals?.tokens ?? 0)}</Td>
-                <Td numeric>{totals ? <CostCell totals={totals} /> : '$0'}</Td>
-                <Td align="right" className="whitespace-nowrap">
-                  <CopyButton
-                    value={() => launchCommand(p)}
-                    icon={Terminal}
-                    title={m('copyLaunch')}
-                    aria-label={m('copyLaunch')}
-                    iconClassName="h-3.5 w-3.5"
-                  />
-                  <IconButton
-                    title={m('remove')}
-                    aria-label={m('remove')}
-                    disabled={profiles.length === 1}
-                    onClick={() => setRemoving(p)}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </IconButton>
-                </Td>
-              </Tr>
-            );
-          })}
-        </Tbody>
-      </DataTable>
-
-      {suggestions.length > 0 && (
-        <section className="space-y-2">
-          <SectionLabel
-            count={suggestions.length}
-            actions={(
-              <Button size="sm" variant="outline" onClick={() => track(suggestions)}>{m('addAll')}</Button>
-            )}
-          >
-            {m('foundOnMachine')}
-          </SectionLabel>
-          <DataTable density="compact">
-            <Tbody>
-              {suggestions.map((d) => (
-                <Tr key={d.configDir}>
-                  <Td mono className="break-all">{d.configDir}</Td>
-                  <Td>{d.email ?? <span className="text-fg-mute">{m('notSignedIn')}</span>}</Td>
-                  <Td className="whitespace-nowrap text-fg-mute">{m('sessionCount', { count: d.sessions })}</Td>
-                  <Td><Badge>{m(SOURCE_LABEL[d.source])}</Badge></Td>
-                  <Td align="right" className="whitespace-nowrap">
-                    <Button size="sm" variant="ghost" onClick={() => detection.ignore(d)}>{m('ignore')}</Button>
-                    <Button size="sm" onClick={() => track([d])}>{m('add')}</Button>
-                  </Td>
-                </Tr>
-              ))}
-            </Tbody>
-          </DataTable>
-        </section>
-      )}
-
       <section className="space-y-2">
         <SectionLabel>{m('addAccount')}</SectionLabel>
         <p className="text-[11px] text-fg-mute">{m('addHint')}</p>
@@ -864,6 +803,115 @@ function AccountsView({ profiles, detection, snapshots, allRows, fromHour, m }: 
           </p>
         )}
       </section>
+      <DataTable>
+        <Thead>
+          <Tr>
+            <Th>{m('colAccount')}</Th>
+            <Th>{m('colSignedIn')}</Th>
+            <Th>{m('colDirectory')}</Th>
+            <Th align="right">{m('colSessions')}</Th>
+            <Th align="right">{m('colTokens')}</Th>
+            <Th align="right">{m('colCost')}</Th>
+            <Th />
+          </Tr>
+        </Thead>
+        <Tbody>
+          {profiles.map((p, i) => {
+            const snap = snapshots?.[i];
+            const totals = usage.get(p.id);
+            return (
+              <Tr key={p.id}>
+                <Td className="font-medium whitespace-nowrap">{p.label}</Td>
+                <Td>
+                  {!snap
+                    ? <Spinner size="sm" />
+                    : !snap.exists
+                    ? <Badge tone="danger">{m('dirMissing')}</Badge>
+                    : snap.account?.email
+                      ? (
+                        <>
+                          <div className="truncate">{snap.account.email}</div>
+                          {snap.account.organization && (
+                            <div className="truncate text-[11px] text-fg-mute">{snap.account.organization}</div>
+                          )}
+                        </>
+                      )
+                      : <span className="text-fg-mute">{m('notSignedIn')}</span>}
+                </Td>
+                <Td mono className="break-all">
+                  {p.configDir}
+                  {snap && snap.sharedSessions > 0 && snap.sharesDataWith && (
+                    <div className="mt-1 font-sans">
+                      <Badge tone="info">
+                        {m('sharesSessions', { count: snap.sharedSessions, label: labelOf(snap.sharesDataWith) })}
+                      </Badge>
+                    </div>
+                  )}
+                </Td>
+                <Td numeric>{snap ? snap.sessions.length : '—'}</Td>
+                <Td numeric>{formatTokens(totals?.tokens ?? 0)}</Td>
+                <Td numeric>{totals ? <CostCell totals={totals} /> : '$0'}</Td>
+                <Td align="right" className="whitespace-nowrap">
+                  <CopyButton
+                    value={() => launchCommand(p)}
+                    icon={Terminal}
+                    title={m('copyLaunch')}
+                    aria-label={m('copyLaunch')}
+                    iconClassName="h-3.5 w-3.5"
+                  />
+                  <IconButton
+                    title={m('remove')}
+                    aria-label={m('remove')}
+                    disabled={profiles.length === 1}
+                    onClick={() => setRemoving(p)}
+                  >
+                    <EyeOff className="h-3.5 w-3.5" />
+                  </IconButton>
+                  <IconButton
+                    title={m('deleteAccount')}
+                    aria-label={m('deleteAccount')}
+                    className="text-bad"
+                    onClick={() => setDeleting(p)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </IconButton>
+                </Td>
+              </Tr>
+            );
+          })}
+        </Tbody>
+      </DataTable>
+
+      {anyShared && <Callout tone="info" size="sm">{m('sharedNote')}</Callout>}
+      {suggestions.length > 0 && (
+        <section className="space-y-2">
+          <SectionLabel
+            count={suggestions.length}
+            actions={(
+              <Button size="sm" variant="outline" onClick={() => track(suggestions)}>{m('addAll')}</Button>
+            )}
+          >
+            {m('foundOnMachine')}
+          </SectionLabel>
+          <DataTable density="compact">
+            <Tbody>
+              {suggestions.map((d) => (
+                <Tr key={d.configDir}>
+                  <Td mono className="break-all">{d.configDir}</Td>
+                  <Td>{d.email ?? <span className="text-fg-mute">{m('notSignedIn')}</span>}</Td>
+                  <Td className="whitespace-nowrap text-fg-mute">{m('sessionCount', { count: d.sessions })}</Td>
+                  <Td><Badge>{m(SOURCE_LABEL[d.source])}</Badge></Td>
+                  <Td align="right" className="whitespace-nowrap">
+                    <Button size="sm" variant="ghost" onClick={() => detection.ignore(d)}>{m('ignore')}</Button>
+                    <Button size="sm" onClick={() => track([d])}>{m('add')}</Button>
+                  </Td>
+                </Tr>
+              ))}
+            </Tbody>
+          </DataTable>
+        </section>
+      )}
+
 
       <ConfirmDialog
         open={removing !== null}
@@ -874,6 +922,18 @@ function AccountsView({ profiles, detection, snapshots, allRows, fromHour, m }: 
         onConfirm={() => {
           if (removing) untrack(removing);
           setRemoving(null);
+        }}
+      />
+      <ConfirmDialog
+        open={deleting !== null}
+        onOpenChange={(open) => { if (!open) setDeleting(null); }}
+        title={m('deleteTitle', { label: deleting?.label ?? '' })}
+        description={m('deleteBody', { dir: deleting?.configDir ?? '' })}
+        confirmLabel={m('deleteConfirm')}
+        onConfirm={async () => {
+          const target = deleting;
+          setDeleting(null);
+          if (target) await deleteAccount(target);
         }}
       />
     </>
@@ -927,6 +987,7 @@ export function ClaudeManager() {
     );
   }
 
+  const setupTab = tab === 'accounts' || tab === 'config';
   const view: ViewProps = { rows, profiles, scope, fromHour, now: scannedAt, onOpen: setViewing, budgets, m };
   const viewingProfile = viewing && profiles.find((p) => p.id === viewing.session.profileId);
   const tabs = [
@@ -966,6 +1027,9 @@ export function ClaudeManager() {
           ]}
         />
         <div className="ml-auto flex items-center gap-2">
+          <Button size="sm" variant="outline" onClick={() => setTab('accounts')}>
+            <Plus className="mr-1.5 h-3.5 w-3.5" />{m('addAccount')}
+          </Button>
           <span className="hidden text-[11px] text-fg-mute @2xl:inline">
             {m('updatedAt', { time: new Date(scannedAt).toLocaleTimeString() })}
           </span>
@@ -982,8 +1046,10 @@ export function ClaudeManager() {
 
       <div className="tool-scrollable tool-padding tool-spacer min-h-0 flex-1">
         {error && <Callout tone="error" title={m('scanFailed')}>{error}</Callout>}
-        {snapshots === null && !error && <LoadingRow label={m('scanning')} />}
-        {snapshots !== null && tab === 'accounts' && (
+        {/* Accounts and Config do not wait for the scan: a slow or failed
+            scan is exactly when the tracked directories need changing. */}
+        {snapshots === null && !error && !setupTab && <LoadingRow label={m('scanning')} />}
+        {tab === 'accounts' && (
           <AccountsView
             profiles={profiles}
             detection={detection}
@@ -993,8 +1059,8 @@ export function ClaudeManager() {
             m={m}
           />
         )}
-        {snapshots !== null && tab === 'config' && <ConfigView profiles={profiles} />}
-        {snapshots !== null && tab !== 'accounts' && tab !== 'config' && allRows.length === 0 && (
+        {tab === 'config' && <ConfigView profiles={profiles} />}
+        {snapshots !== null && !setupTab && allRows.length === 0 && (
           <EmptyState
             icon={Bot}
             title={m('noDataTitle')}
