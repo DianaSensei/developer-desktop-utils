@@ -1339,9 +1339,9 @@ mod tests {
         assert_eq!(moved, vec!["~/.claude", "~/.claude.json"]);
         assert_eq!(trashed.borrow().len(), 3);
 
-        for not_an_account in ["~", "~/documents", "~/missing", "/"] {
-            let err = remove_account(not_an_account, Some(&home.0), &none_alive, &trash).unwrap_err();
-            assert_eq!(err, ERR_NOT_CONFIG_DIR, "{not_an_account}");
+        for folder in ["~", "~/documents", "~/missing", "/"] {
+            let err = remove_account(folder, Some(&home.0), &none_alive, &trash).unwrap_err();
+            assert_eq!(err, ERR_NOT_CONFIG_DIR, "{folder}");
         }
         assert_eq!(trashed.borrow().len(), 3, "nothing else was touched");
     }
