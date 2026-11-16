@@ -270,4 +270,23 @@ export default defineMessages({
   commands: { vi: 'Lệnh', en: 'Commands' },
   skills: { vi: 'Skill', en: 'Skills' },
   noneConfigured: { vi: 'Chưa có.', en: 'None.' },
+
+  // Accounts: shared data, delete
+  sharesSessions: { vi: 'dùng chung {{count}} phiên với "{{label}}"', en: 'shares {{count}} sessions with "{{label}}"' },
+  sharedNote: {
+    vi: 'Một số tài khoản dùng chung thư mục phiên (công cụ quản lý tài khoản thường liên kết thư mục projects giữa các profile). Các phiên đó chỉ được tính một lần, ở tài khoản đứng trước trong danh sách — transcript không ghi tài khoản nào đã chạy, nên không tách mức dùng theo từng tài khoản được.',
+    en: 'Some accounts share one sessions folder (account managers often link the projects folder between profiles). Those sessions are counted once, under the account listed first — a transcript does not record which account ran it, so usage cannot be split between them.',
+  },
+  deleteAccount: { vi: 'Xoá tài khoản khỏi máy', en: 'Delete account from this computer' },
+  deleteTitle: { vi: 'Xoá tài khoản "{{label}}" khỏi máy?', en: 'Delete account "{{label}}" from this computer?' },
+  deleteBody: {
+    vi: 'Thư mục {{dir}} — gồm phiên, cấu hình và đăng nhập lưu trong đó — sẽ được chuyển vào Thùng rác; khôi phục từ Thùng rác nếu đổi ý. Trên macOS, thông tin đăng nhập nằm trong Keychain và không bị xoá. Nếu tài khoản khác dùng chung phiên qua liên kết tới thư mục này, chúng sẽ mất các phiên đó.',
+    en: 'The folder {{dir}} — its sessions, settings and the sign-in stored in it — is moved to the Trash; restore it from there if you change your mind. On macOS the sign-in lives in the Keychain and is not removed. Accounts that share sessions through a link into this folder lose those sessions.',
+  },
+  deleteConfirm: { vi: 'Chuyển vào Thùng rác', en: 'Move to Trash' },
+  deletedAccount: { vi: 'Đã chuyển "{{label}}" vào Thùng rác: {{paths}}', en: 'Moved "{{label}}" to the Trash: {{paths}}' },
+  deleteInUse: {
+    vi: 'Tài khoản "{{label}}" đang có phiên Claude Code chạy. Đóng các phiên đó rồi thử lại.',
+    en: 'Account "{{label}}" has a Claude Code session running. Close it, then try again.',
+  },
 });

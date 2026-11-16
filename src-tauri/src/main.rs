@@ -148,6 +148,7 @@ fn main() {
             checksum::hash_file,
             claude_monitor::claude_monitor_scan,
             claude_monitor::claude_monitor_detect,
+            claude_monitor::claude_monitor_remove_account,
             claude_transcript::claude_monitor_transcript,
             claude_transcript::claude_monitor_search,
             claude_config::claude_monitor_config,

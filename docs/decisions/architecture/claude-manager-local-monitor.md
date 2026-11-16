@@ -96,6 +96,26 @@ Ba bổ sung sau bản đầu, mỗi cái nới một ràng buộc ban đầu m�
 - **Biểu đồ** một chuỗi (chi phí hoặc token theo ngày, gộp tuần khi > 62 ngày) dùng màu
   accent của app, không có bảng màu phân loại; phân tách theo model nằm ở bảng bên dưới.
 
+## Mở rộng: tài khoản dùng chung phiên, xoá tài khoản (2026-11)
+
+- **Hai thư mục, một bộ transcript.** Trình quản lý tài khoản (ví dụ profile của Orca
+  ở `…/orca/claude-profiles/<id>/home`) thường liên kết `projects/` của mỗi profile về
+  cùng một chỗ để giữ lịch sử chung. Bản đầu quét từng thư mục độc lập nên hai tài khoản
+  hiện số liệu y hệt và tổng bị nhân đôi. `scan_all` giờ quét theo thứ tự danh sách với
+  **một** tập `seen` (id message) và một bảng `owner` (id phiên → thư mục đầu tiên có
+  nó): phiên đã có chủ không được liệt kê lại, thư mục sau chỉ báo `shared_sessions` /
+  `shares_data_with`. Khử theo **id phiên** chứ không theo đường dẫn thật
+  (`canonicalize`), vì cách đó cũng đúng khi `projects/` được *chép* chứ không liên kết.
+  Trạng thái "đang chạy" lấy từ registry riêng của thư mục sau vẫn được gắn vào phiên ở
+  thư mục chủ. Hệ quả chấp nhận: phiên dùng chung thuộc về tài khoản đứng trước trong
+  danh sách — transcript không ghi tài khoản nào đã chạy nên không tách được.
+- **Xoá tài khoản = chuyển thư mục vào Thùng rác** (`claude_monitor_remove_account`,
+  crate `trash`), không `remove_dir_all`: thao tác này lấy đi phiên, cấu hình và đăng nhập,
+  nên phải hoàn tác được. Từ chối khi thư mục không có `projects/`, là thư mục home hay
+  gốc ổ đĩa, hoặc registry của nó còn PID sống. Với `~/.claude` mặc định, `~/.claude.json`
+  đi cùng. Keychain trên macOS không bị đụng tới (tool không bao giờ mở credential). Hàm
+  lõi `remove_account` nhận hàm `trash` qua tham số để test không cần Thùng rác thật.
+
 ## Lý do
 
 - **Không đụng credential.** Con số "còn bao nhiêu % hạn mức 5 giờ / tuần" chỉ máy chủ

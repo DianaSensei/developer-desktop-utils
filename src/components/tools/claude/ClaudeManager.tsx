@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Bot, Download, FolderOpen, FolderSearch, Plus, RefreshCw, Terminal, Trash2 } from 'lucide-react';
+import { Bot, Download, EyeOff, FolderOpen, FolderSearch, Plus, RefreshCw, Terminal, Trash2 } from 'lucide-react';
 import {
   Badge, Button, Callout, ConfirmDialog, CopyButton, DataTable, EmptyState, IconButton, Input, LoadingRow, Spinner,
   SearchInput, SectionLabel, Segmented, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Stat,
@@ -670,6 +670,14 @@ function useAccountDetection(profiles: Profile[], setProfiles: (next: Profile[])
     setIgnored((dirs) => [...new Set([...dirs, profile.configDir])]);
   }, [setProfiles, setIgnored]);
 
+  /** Drops a profile whose directory is gone; nothing to ignore later. */
+  const forget = useCallback((profile: Profile) => {
+    const next = profilesRef.current.filter((p) => p.id !== profile.id);
+    profilesRef.current = next;
+    setProfiles(next);
+    setFound((list) => list.filter((d) => d.configDir !== profile.configDir));
+  }, [setProfiles]);
+
   const suggestions = useMemo(
     () => found.filter((d) =>
       d.valid && !ignored.includes(d.configDir) && !profiles.some((p) => p.configDir === d.configDir)),
@@ -678,7 +686,7 @@ function useAccountDetection(profiles: Profile[], setProfiles: (next: Profile[])
   const hiddenCount = found.filter((d) => d.valid && ignored.includes(d.configDir)).length;
 
   return {
-    suggestions, hiddenCount, detecting, error, detect, track, untrack,
+    suggestions, hiddenCount, detecting, error, detect, track, untrack, forget,
     ignore: (d: Detected) => setIgnored((dirs) => [...new Set([...dirs, d.configDir])]),
     restoreIgnored: () => setIgnored([]),
   };
@@ -700,8 +708,27 @@ function AccountsView({ profiles, detection, snapshots, allRows, fromHour, m }: 
   const [dir, setDir] = useState('');
   const [notice, setNotice] = useState<{ tone: 'info' | 'error'; text: string } | null>(null);
   const [removing, setRemoving] = useState<Profile | null>(null);
+  const [deleting, setDeleting] = useState<Profile | null>(null);
   const usage = useMemo(() => usageByProfile(allRows, fromHour), [allRows, fromHour]);
   const { suggestions, hiddenCount, detecting, detect, track, untrack } = detection;
+
+  const labelOf = (configDir: string) => profiles.find((p) => p.configDir === configDir)?.label ?? configDir;
+  const anyShared = (snapshots ?? []).some((snap) => snap.sharedSessions > 0);
+
+  /** Moves the account's directory to the OS trash, then stops listing it. */
+  const deleteAccount = async (profile: Profile) => {
+    try {
+      const moved = await sdk.native.invoke<string[]>('claude_monitor_remove_account', { dir: profile.configDir });
+      detection.forget(profile);
+      setNotice({ tone: 'info', text: m('deletedAccount', { label: profile.label, paths: moved.join(', ') }) });
+    } catch (e) {
+      const raw = e instanceof Error ? e.message : String(e);
+      const text = raw === 'in-use'
+        ? m('deleteInUse', { label: profile.label })
+        : raw === 'not-config-dir' ? m('saveNotConfigDir') : raw;
+      setNotice({ tone: 'error', text });
+    }
+  };
 
   /** Adds `path` if it is a config directory, or every one found below it. */
   const addPath = async (path: string) => {
@@ -811,7 +838,16 @@ function AccountsView({ profiles, detection, snapshots, allRows, fromHour, m }: 
                       )
                       : <span className="text-fg-mute">{m('notSignedIn')}</span>}
                 </Td>
-                <Td mono className="break-all">{p.configDir}</Td>
+                <Td mono className="break-all">
+                  {p.configDir}
+                  {snap && snap.sharedSessions > 0 && snap.sharesDataWith && (
+                    <div className="mt-1 font-sans">
+                      <Badge tone="info">
+                        {m('sharesSessions', { count: snap.sharedSessions, label: labelOf(snap.sharesDataWith) })}
+                      </Badge>
+                    </div>
+                  )}
+                </Td>
                 <Td numeric>{snap ? snap.sessions.length : '—'}</Td>
                 <Td numeric>{formatTokens(totals?.tokens ?? 0)}</Td>
                 <Td numeric>{totals ? <CostCell totals={totals} /> : '$0'}</Td>
@@ -829,6 +865,14 @@ function AccountsView({ profiles, detection, snapshots, allRows, fromHour, m }: 
                     disabled={profiles.length === 1}
                     onClick={() => setRemoving(p)}
                   >
+                    <EyeOff className="h-3.5 w-3.5" />
+                  </IconButton>
+                  <IconButton
+                    title={m('deleteAccount')}
+                    aria-label={m('deleteAccount')}
+                    className="text-bad"
+                    onClick={() => setDeleting(p)}
+                  >
                     <Trash2 className="h-3.5 w-3.5" />
                   </IconButton>
                 </Td>
@@ -838,6 +882,7 @@ function AccountsView({ profiles, detection, snapshots, allRows, fromHour, m }: 
         </Tbody>
       </DataTable>
 
+      {anyShared && <Callout tone="info" size="sm">{m('sharedNote')}</Callout>}
       {suggestions.length > 0 && (
         <section className="space-y-2">
           <SectionLabel
@@ -877,6 +922,18 @@ function AccountsView({ profiles, detection, snapshots, allRows, fromHour, m }: 
         onConfirm={() => {
           if (removing) untrack(removing);
           setRemoving(null);
+        }}
+      />
+      <ConfirmDialog
+        open={deleting !== null}
+        onOpenChange={(open) => { if (!open) setDeleting(null); }}
+        title={m('deleteTitle', { label: deleting?.label ?? '' })}
+        description={m('deleteBody', { dir: deleting?.configDir ?? '' })}
+        confirmLabel={m('deleteConfirm')}
+        onConfirm={async () => {
+          const target = deleting;
+          setDeleting(null);
+          if (target) await deleteAccount(target);
         }}
       />
     </>

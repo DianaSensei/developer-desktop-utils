@@ -30,7 +30,7 @@ This document describes every tool in the app: what computation it performs, wha
 | RabbitMQ | ✓ | — | — | **✓ HTTP/HTTPS (mgmt API, browse/create) + AMQP 5672/5671 (publish/consume/RPC)** | Connection profiles incl. password & client identity (app data) |
 | Redis | ✓ | — | — | **✓ TCP 6379/6380 (RESP protocol)** | Connection profiles incl. password (app data) |
 | Network Tools | ✓ | — | — | **✓ HTTPS** + local read | In-memory session, cleared on app restart |
-| Claude Manager | ✓ | **✓ Claude Code config directories it finds or you add (transcripts, session registry, account name) — folder names in your home folder while detecting** | **✓ `settings.json` / `CLAUDE.md` of an account when you save them; a usage export where you choose** | — | Tracked directories, budgets, selected tab/range (localStorage); **system notifications** for budget alerts (asks the OS first) |
+| Claude Manager | ✓ | **✓ Claude Code config directories it finds or you add (transcripts, session registry, account name) — folder names in your home folder while detecting** | **✓ `settings.json` / `CLAUDE.md` of an account when you save them; a usage export where you choose; an account's directory moved to the Trash when you delete it** | — | Tracked directories, budgets, selected tab/range (localStorage); **system notifications** for budget alerts (asks the OS first) |
 | API Client | ✓ | ✓ (import) | ✓ (export) | **✓ HTTP/HTTPS — any URL you send to** | Collections, environments & history (localStorage) |
 | Mock Server | ✓ | — | — | **✓ Local HTTP listener you start (127.0.0.1, or 0.0.0.0 = LAN)** | Stubs + server settings (localStorage); request log in-memory, cleared on restart |
 | 2FA Authenticator | ✓ | ✓ (QR image) | — | — | Accounts **including TOTP/HOTP secrets** (localStorage) |
@@ -487,7 +487,11 @@ One **account** is one Claude Code config directory — `~/.claude` by default. 
 
 **Config tab.** For one account it shows `settings.json` (with a summary of model, permissions, hooks and env names), `CLAUDE.md`, the MCP servers registered in `.claude.json`, and the agents, commands and skills folders. `settings.json` and `CLAUDE.md` can be edited and saved, or copied to another tracked account. A save is refused if the file changed on disk since it was loaded or if `settings.json` is not a JSON object; the previous version is kept beside the file as `<name>.devtool-bak`, and the new one is written to a temporary file and renamed into place. MCP servers are view-only, because Claude Code rewrites `.claude.json` while it runs; the values of their `env` and `headers` entries are never read into the UI — only the names.
 
-**What it never does:** it does not open `.credentials.json` (or the OS keychain), does not write any Claude Code file other than the two above, makes no network request, and cannot start, stop or message a session. The "copy" buttons put a shell command on the clipboard (`claude --resume <id>`, prefixed with `CLAUDE_CONFIG_DIR=…` for a non-default account); you run it yourself.
+**Accounts that share sessions.** Tools that keep one directory per account often link (or copy) `projects/` between them, so the same transcripts are reachable from each. A session id is unique, so a session an earlier account in the list already shows is not listed or counted again; the later account shows "shares N sessions with …" instead. A transcript does not record which account ran it, so usage of shared sessions cannot be split per account.
+
+**Removing an account.** Each account row has two actions. *Stop tracking* only removes it from DevTool's list. *Delete account from this computer* moves the account's config directory — sessions, settings, and the sign-in file stored in it — to the OS Trash / Recycle Bin after a confirmation; for the default `~/.claude` it also moves `~/.claude.json`. It is refused while a Claude Code session of that account is running, and for any folder that is not a config directory. Restoring from the Trash brings the account back. On macOS the sign-in lives in the Keychain, which is not touched.
+
+**What it never does:** it does not open `.credentials.json` (or the OS keychain), does not change any Claude Code file other than saving the two above and moving a whole account directory to the Trash when you ask, makes no network request, and cannot start, stop or message a session. The "copy" buttons put a shell command on the clipboard (`claude --resume <id>`, prefixed with `CLAUDE_CONFIG_DIR=…` for a non-default account); you run it yourself.
 
 **What leaves the machine:** nothing.
 
@@ -499,7 +503,7 @@ One **account** is one Claude Code config directory — `~/.claude` by default. 
 
 **Refresh:** rescans every 5 seconds while the tool is the one in front (toggle in the toolbar). A rescan only reads the part of each transcript that was appended since the last one.
 
-**Permissions (Tauri):** `dialog:allow-open` for the **Browse…** folder picker, `dialog:allow-save` + file write for the export, and notifications for budget alerts (the OS asks first). Everything else goes through six Rust commands — `claude_monitor_scan`, `_detect` (`claude_monitor.rs`), `_transcript`, `_search` (`claude_transcript.rs`), `_config`, `_write_config` (`claude_config.rs`). Desktop app only.
+**Permissions (Tauri):** `dialog:allow-open` for the **Browse…** folder picker, `dialog:allow-save` + file write for the export, and notifications for budget alerts (the OS asks first). Everything else goes through seven Rust commands — `claude_monitor_scan`, `_detect`, `_remove_account` (`claude_monitor.rs`), `_transcript`, `_search` (`claude_transcript.rs`), `_config`, `_write_config` (`claude_config.rs`). Desktop app only.
 
 ### API Client
 

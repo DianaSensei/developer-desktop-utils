@@ -34,6 +34,8 @@ const session = (over: Partial<SessionInfo>): SessionInfo => ({
 const personal: ProfileSnapshot = {
   configDir: '~/.claude',
   exists: true,
+  sharedSessions: 0,
+  sharesDataWith: null,
   account: { email: 'me@example.com', organization: 'Personal', displayName: null },
   sessions: [
     session({
@@ -46,6 +48,8 @@ const personal: ProfileSnapshot = {
 const work: ProfileSnapshot = {
   configDir: '~/.claude-work',
   exists: true,
+  sharedSessions: 0,
+  sharesDataWith: null,
   account: { email: 'me@work.example', organization: 'Acme', displayName: null },
   sessions: [session({ id: 'work-1', title: 'Review PR', cwd: '/work/site', buckets: [bucket({ model: 'claude-haiku-5-5' })] })],
 };
@@ -316,6 +320,58 @@ describe('ClaudeManager', () => {
     fireEvent.change(path, { target: { value: '/opt/claude-b' } });
     fireEvent.keyDown(path, { key: 'Enter' });
     expect(await screen.findByText('/opt/claude-b')).toBeTruthy();
+  });
+
+  it('shows that two accounts share their sessions instead of counting them twice', async () => {
+    storageSet(KEYS[0], JSON.stringify([
+      { id: 'default', label: 'Default', configDir: '~/.claude' },
+      { id: 'o', label: 'Orca', configDir: '~/orca/home' },
+    ]));
+    storageSet(KEYS[4], JSON.stringify(true));
+    invokeMock.mockImplementation(async (command: string, args?: { dirs?: string[] }) => {
+      if (command !== 'claude_monitor_scan') return [];
+      return (args?.dirs ?? []).map((dir) => (dir === '~/.claude'
+        ? personal
+        : { ...personal, configDir: dir, sessions: [], sharedSessions: 2, sharesDataWith: '~/.claude' }));
+    });
+    setTab('accounts');
+    render(<ClaudeManager />);
+    expect(await screen.findByText(/shares 2 sessions with "Default"|dùng chung 2 phiên với "Default"/)).toBeTruthy();
+    expect(screen.getByText(/counted once|chỉ được tính một lần/)).toBeTruthy();
+    // 2.20M tokens appear for one account only.
+    expect(screen.getAllByText('2.20M')).toHaveLength(1);
+  });
+
+  it('moves an account to the trash after confirming, and reports one that is in use', async () => {
+    storageSet(KEYS[0], JSON.stringify([
+      { id: 'default', label: 'Default', configDir: '~/.claude' },
+      { id: 'w', label: 'Work', configDir: '~/.claude-work' },
+    ]));
+    storageSet(KEYS[4], JSON.stringify(true));
+    let inUse = true;
+    const base = invokeMock.getMockImplementation()!;
+    invokeMock.mockImplementation(async (command: string, args?: { dir?: string }) => {
+      if (command !== 'claude_monitor_remove_account') return base(command, args);
+      if (inUse) throw new Error('in-use');
+      return [args?.dir];
+    });
+    setTab('accounts');
+    render(<ClaudeManager />);
+    await screen.findByText('~/.claude-work');
+    const confirmDelete = async () => {
+      fireEvent.click(screen.getAllByRole('button', { name: /Delete account from this computer|Xoá tài khoản khỏi máy/ })[1]);
+      fireEvent.click(await screen.findByRole('button', { name: /^Move to Trash$|^Chuyển vào Thùng rác$/ }));
+    };
+
+    await confirmDelete();
+    expect(await screen.findByText(/has a Claude Code session running|đang có phiên Claude Code chạy/)).toBeTruthy();
+    expect(screen.getByText('~/.claude-work')).toBeTruthy();
+
+    inUse = false;
+    await confirmDelete();
+    expect(await screen.findByText(/Moved "Work" to the Trash|Đã chuyển "Work" vào Thùng rác/)).toBeTruthy();
+    expect(invokeMock).toHaveBeenCalledWith('claude_monitor_remove_account', { dir: '~/.claude-work' });
+    await waitFor(() => expect(screen.queryByRole('cell', { name: '~/.claude-work' })).toBeNull());
   });
 
   it('shows the scan error instead of an empty list', async () => {

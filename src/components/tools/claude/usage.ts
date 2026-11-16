@@ -55,6 +55,13 @@ export interface ProfileSnapshot {
   exists: boolean;
   account: Account | null;
   sessions: SessionInfo[];
+  /**
+   * Sessions of this directory that an earlier tracked directory already
+   * lists (a linked or copied `projects/`), and that directory. They are
+   * counted there, not here.
+   */
+  sharedSessions: number;
+  sharesDataWith: string | null;
 }
 
 /** One tracked account = one Claude Code config directory. */

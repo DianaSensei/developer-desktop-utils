@@ -427,6 +427,7 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
     caveat: [
       'Local only: it reads Claude Code’s files and never opens the credentials file; it cannot start, stop or message a session. The only files it writes are settings.json and CLAUDE.md, when you save them (the old version is kept as .devtool-bak).',
       'Budget alerts fire only while this tool is open in a tab.',
+      'Deleting an account moves its whole config directory to the Trash; "stop tracking" only hides it here.',
       'Cost is an estimate at API list prices — subscription plans are not billed per token, and this is not your remaining plan limit.',
       'Desktop app only.',
     ],
@@ -520,6 +521,6 @@ export const TOOL_GUIDE_VERSIONS: Record<string, number> = {
   'text-editor': 7,
   // 3 — Jira Cloud: issues as tasks, status push, worklogs.
   'task-tracker': 3,
-  // 2 — conversations, chart / budgets / export, Config tab.
-  'claude-manager': 2,
+  // 3 — delete account, shared-session accounts.
+  'claude-manager': 3,
 };
