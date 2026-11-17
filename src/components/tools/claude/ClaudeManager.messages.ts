@@ -289,4 +289,8 @@ export default defineMessages({
     vi: 'Tài khoản "{{label}}" đang có phiên Claude Code chạy. Đóng các phiên đó rồi thử lại.',
     en: 'Account "{{label}}" has a Claude Code session running. Close it, then try again.',
   },
+
+  // Rename
+  renameAccount: { vi: 'Đổi tên tài khoản', en: 'Rename account' },
+  cancelRename: { vi: 'Huỷ đổi tên', en: 'Cancel rename' },
 });

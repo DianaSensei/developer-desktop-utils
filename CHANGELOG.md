@@ -6,6 +6,15 @@ the app.
 
 ## Unreleased
 
+### Claude Manager: rename accounts
+
+- **Give an account any name.** Hover an account in the Accounts tab and click the pencil
+  to rename it — handy for profiles that other tools create with names like `home` or a
+  long folder path. Enter saves, Escape cancels; only the name shown in DevTool changes,
+  never the folder.
+- The **Add account** button is gone from the toolbar; adding an account stays at the
+  top of the Accounts tab.
+
 ### Fixes
 
 - **In-app updates no longer fail with "403 Forbidden".** The update manifest pointed

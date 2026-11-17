@@ -314,8 +314,8 @@ describe('ClaudeManager', () => {
     });
     render(<ClaudeManager />);
     expect(await screen.findByText('scan broke')).toBeTruthy();
-    // The toolbar entry is there on every tab.
-    fireEvent.click(screen.getByRole('button', { name: /^Add account$|^Thêm tài khoản$/ }));
+    // The tab label carries a count badge, so match its start.
+    fireEvent.click(screen.getAllByRole('button', { name: /^(Accounts|Tài khoản)/ })[0]);
     const path = await screen.findByLabelText(/Config directory|Thư mục cấu hình/);
     fireEvent.change(path, { target: { value: '/opt/claude-b' } });
     fireEvent.keyDown(path, { key: 'Enter' });
@@ -372,6 +372,37 @@ describe('ClaudeManager', () => {
     expect(await screen.findByText(/Moved "Work" to the Trash|Đã chuyển "Work" vào Thùng rác/)).toBeTruthy();
     expect(invokeMock).toHaveBeenCalledWith('claude_monitor_remove_account', { dir: '~/.claude-work' });
     await waitFor(() => expect(screen.queryByRole('cell', { name: '~/.claude-work' })).toBeNull());
+  });
+
+  it('renames an account in place: Enter saves, Escape cancels, an empty name is ignored', async () => {
+    storageSet(KEYS[0], JSON.stringify([
+      { id: 'default', label: 'Default', configDir: '~/.claude' },
+      { id: 'o', label: '~/orca/claude-profiles/4989/home', configDir: '~/orca/claude-profiles/4989/home' },
+    ]));
+    storageSet(KEYS[4], JSON.stringify(true));
+    setTab('accounts');
+    render(<ClaudeManager />);
+    await screen.findAllByText('me@example.com');
+    const pencil = () => screen.getAllByRole('button', { name: /^Rename account$|^Đổi tên tài khoản$/ })[1];
+    const field = () => screen.getByRole('textbox', { name: /^Rename account$|^Đổi tên tài khoản$/ });
+
+    fireEvent.click(pencil());
+    fireEvent.change(field(), { target: { value: '  Orca – hack2026  ' } });
+    fireEvent.keyDown(field(), { key: 'Enter' });
+    expect(await screen.findByText('Orca – hack2026')).toBeTruthy();
+
+    fireEvent.click(pencil());
+    fireEvent.change(field(), { target: { value: 'Something else' } });
+    fireEvent.keyDown(field(), { key: 'Escape' });
+    expect(screen.queryByText('Something else')).toBeNull();
+    expect(screen.getByText('Orca – hack2026')).toBeTruthy();
+
+    fireEvent.click(pencil());
+    fireEvent.change(field(), { target: { value: '   ' } });
+    fireEvent.keyDown(field(), { key: 'Enter' });
+    expect(screen.getByText('Orca – hack2026')).toBeTruthy();
+    // The directory is untouched and still scanned.
+    expect(invokeMock).toHaveBeenLastCalledWith('claude_monitor_scan', { dirs: ['~/.claude', '~/orca/claude-profiles/4989/home'] });
   });
 
   it('shows the scan error instead of an empty list', async () => {
