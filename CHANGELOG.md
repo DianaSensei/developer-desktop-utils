@@ -6,6 +6,13 @@ the app.
 
 ## Unreleased
 
+### Fixes
+
+- **In-app updates no longer fail with "403 Forbidden".** The update manifest pointed
+  each download at GitHub's API, which refuses unauthenticated requests after 60 an hour
+  per IP address — so on a shared office or VPN connection, **Install** failed. Updates
+  now download from the release's public download link, which has no such limit.
+
 ### Claude Manager: delete an account, and accounts that share sessions
 
 - **Delete an account from this computer.** Next to "stop tracking" (which only hides an
