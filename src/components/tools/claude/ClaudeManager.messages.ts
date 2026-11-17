@@ -293,4 +293,39 @@ export default defineMessages({
   // Rename
   renameAccount: { vi: 'Đổi tên tài khoản', en: 'Rename account' },
   cancelRename: { vi: 'Huỷ đổi tên', en: 'Cancel rename' },
+
+  // Compare
+  tabCompare: { vi: 'So sánh', en: 'Compare' },
+  compareIntro: {
+    vi: 'Mỗi cột là một tài khoản, cùng các mốc thời gian. Thanh trong ô cho thấy mức dùng so với tài khoản dùng nhiều nhất ở hàng đó.',
+    en: 'One column per account, over the same periods. The bar in each cell compares it with the heaviest account in that row.',
+  },
+  compareNeedsTwo: {
+    vi: 'Cần theo dõi ít nhất hai tài khoản để so sánh. Thêm tài khoản ở tab Tài khoản.',
+    en: 'Track at least two accounts to compare them. Add one in the Accounts tab.',
+  },
+  compareSuggestion: {
+    vi: '"{{label}}" dùng ít nhất trong 5 giờ qua — lựa chọn tốt cho phiên tiếp theo.',
+    en: '"{{label}}" used the least in the last 5 hours — a good pick for your next session.',
+  },
+  leastUsed: { vi: 'ít dùng nhất', en: 'least used' },
+  sharedAccount: { vi: 'Dùng chung (chưa rõ)', en: 'Shared (unknown)' },
+  neverUsed: { vi: 'chưa dùng', en: 'never' },
+  compareRunning: { vi: 'Phiên đang mở', en: 'Running sessions' },
+  period5h: { vi: '5 giờ qua', en: 'Last 5 hours' },
+  periodToday: { vi: 'Hôm nay', en: 'Today' },
+  period7d: { vi: '7 ngày', en: '7 days' },
+  period30d: { vi: '30 ngày', en: '30 days' },
+  compareRequests7d: { vi: 'Lượt gọi (7 ngày)', en: 'Requests (7 days)' },
+  compareTopModel: { vi: 'Model chính (7 ngày)', en: 'Main model (7 days)' },
+  compareDaily: { vi: 'Chi phí 7 ngày', en: 'Cost, last 7 days' },
+  compareDailyLabel: { vi: 'Chi phí 7 ngày qua của {{label}}', en: 'Cost over the last 7 days for {{label}}' },
+  compareNote: {
+    vi: 'Số liệu đọc từ transcript trên máy này, không phải hạn mức còn lại của gói — con số đó chỉ máy chủ Anthropic biết. "5 giờ qua" gần đúng với cửa sổ giới hạn của gói thuê bao.',
+    en: 'Figures come from the transcripts on this machine, not your plan’s remaining limit — only Anthropic’s servers know that. "Last 5 hours" approximates the subscription limit window.',
+  },
+  compareSharedNote: {
+    vi: 'Cột "Dùng chung" là phiên mà nhiều tài khoản dùng chung thư mục và chưa biết tài khoản nào chạy. Tool tự gán khi thấy phiên đang chạy dưới một tài khoản, hoặc khi .claude.json của tài khoản đó ghi nó là phiên cuối của một dự án — nên cột này nhỏ dần khi để tool mở trong lúc làm việc.',
+    en: 'The "Shared" column holds sessions in a folder several accounts share, where it is not known which account ran them. A session is assigned once it is seen running under an account, or an account’s .claude.json names it as a project’s last session — so the column shrinks while the tool stays open as you work.',
+  },
 });

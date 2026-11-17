@@ -6,6 +6,18 @@ the app.
 
 ## Unreleased
 
+### Claude Manager: compare accounts
+
+- **A Compare tab puts every account side by side** — usage in the last 5 hours, today,
+  7 and 30 days (tokens or cost), running sessions, last activity, main model and a
+  7-day cost chart — and points out the account that used the least in the last 5
+  hours, so picking the account for your next session is one look.
+- **Shared sessions are split by who ran them.** When several accounts share one
+  sessions folder (account managers such as Orca do this), a session is now credited to
+  the account seen running it, or whose `.claude.json` names it as a project's last
+  session. What cannot be attributed shows in its own "Shared (unknown)" column instead
+  of being added to the first account.
+
 ### Claude Manager: rename accounts
 
 - **Give an account any name.** Hover an account in the Accounts tab and click the pencil
