@@ -116,6 +116,51 @@ Ba bổ sung sau bản đầu, mỗi cái nới một ràng buộc ban đầu m�
   đi cùng. Keychain trên macOS không bị đụng tới (tool không bao giờ mở credential). Hàm
   lõi `remove_account` nhận hàm `trash` qua tham số để test không cần Thùng rác thật.
 
+## Mở rộng: hạn mức gói (quota) cho từng tài khoản (2026-11)
+
+Bản đầu cố ý không lấy % hạn mức vì phải đọc token. Người dùng yêu cầu rõ, sau khi được
+nêu rủi ro, chọn dùng **cả hai nguồn**, đều tắt mặc định và bật theo từng tài khoản:
+
+- **Status line (nguồn ưu tiên, `claude_quota.rs`).** Claude Code tự đưa `rate_limits`
+  (`five_hour`/`seven_day`/`spend_limit`, `used_percentage` 0–100, `resets_at` là epoch
+  **giây**) cho lệnh status line — đây là kênh Anthropic công bố. DevTool đặt một script
+  `sh` làm status line của tài khoản: lưu stdin ra `.devtool-statusline.json` rồi chuyển
+  stdin cho lệnh status line cũ (lưu nguyên vẹn để khôi phục). Ghi settings qua
+  `write_config_file` (backup, rename nguyên tử, kiểm mtime). Đổi lại: số chỉ mới khi tài
+  khoản có phiên đang chạy; serde_json không giữ thứ tự khoá nên settings.json có thể bị
+  sắp xếp lại khoá khi bật/tắt. Windows: lệnh chạy qua `sh` — chưa kiểm chứng.
+- **API (`/api/oauth/usage`, không công bố).** Token đọc trong Rust (Keychain qua
+  `/usr/bin/security`, tên dịch vụ `Claude Code-credentials` hoặc `-<sha256(dir)[:8]>` —
+  thử vài cách viết đường dẫn vì không biết giá trị `CLAUDE_CONFIG_DIR` thật; nơi khác đọc
+  `.credentials.json`), không làm mới token hết hạn, không trả về JS. Gọi tối đa 5 phút/lần
+  khi tab So sánh mở, lùi 15 phút khi bị 429. Rủi ro: API đổi/từ chối; có thể không hợp
+  điều khoản gói cá nhân (đã nêu trong hộp xác nhận).
+- **Hiển thị:** lấy bản đọc mới nhất giữa hai nguồn; cửa sổ đã qua `resets_at` coi là 0%.
+  Gợi ý tài khoản theo `max(5h, tuần)` thấp nhất; không đủ số liệu thì dùng token cục bộ.
+
+## Mở rộng: so sánh tài khoản và gán phiên dùng chung (2026-11)
+
+- **Vấn đề:** bản trước gán mọi phiên dùng chung cho tài khoản đứng đầu danh sách. Với
+  profile Orca liên kết `projects/` về `~/.claude`, mọi mức dùng dồn về "Default" và các
+  profile Orca hiện 0 — tab So sánh sẽ sai đúng ở chỗ người dùng cần nó nhất.
+- **Nguồn biết "ai chạy phiên nào":** transcript không ghi tài khoản. Có hai tín hiệu
+  riêng theo từng thư mục cấu hình: (1) registry tiến trình `sessions/<pid>.json` khi
+  phiên đang chạy, (2) `projects[*].lastSessionId` trong `.claude.json` của tài khoản đó.
+  Rust trả về cả hai dưới dạng `claimed_sessions`, cùng `shared_session_ids` (phiên mà
+  thư mục này có nhưng thư mục trước đã liệt kê).
+- **Sổ ghi `sessionOwners`** (frontend, `sdk.storage`): mỗi lần quét cập nhật
+  session id → profile theo các claim; claim sau ghi đè. Nhờ sổ được lưu, phiên đã thấy
+  chạy dưới một tài khoản vẫn thuộc tài khoản đó sau khi tiến trình thoát. `attributeRows`
+  gán `profileId` theo sổ; phiên dùng chung không có trong sổ → `SHARED_ACCOUNT`; còn
+  lại → tài khoản của thư mục. `dirProfileId` luôn là thư mục chứa transcript, dùng để
+  đọc transcript và tìm kiếm. Rust vẫn chỉ trả mỗi phiên một lần (dedup không đổi).
+- **Giới hạn:** lịch sử trước khi có sổ chỉ gán được qua `lastSessionId` (mỗi dự án một
+  phiên), nên cột "Dùng chung" có thể lớn lúc đầu và nhỏ dần khi tool được mở trong lúc
+  làm việc. Tool đóng thì không ghi nhận được phiên chạy trong lúc đó.
+- **Gợi ý tài khoản**: tài khoản (có thư mục tồn tại) dùng ít token nhất trong 5 giờ
+  qua, hoà thì lấy tài khoản rảnh lâu nhất. Đây là số liệu cục bộ; hạn mức thật của gói
+  vẫn không đọc (lý do ở mục trên).
+
 ## Lý do
 
 - **Không đụng credential.** Con số "còn bao nhiêu % hạn mức 5 giờ / tuần" chỉ máy chủ

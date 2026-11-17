@@ -62,6 +62,37 @@ export interface ProfileSnapshot {
    */
   sharedSessions: number;
   sharesDataWith: string | null;
+  /** Ids of the sessions behind `sharedSessions`. */
+  sharedSessionIds: string[];
+  /**
+   * Sessions this account is known to have run, whichever directory lists
+   * them: running in its own process registry now, or the last session of a
+   * project in its `.claude.json`.
+   */
+  claimedSessions: string[];
+  /** Plan usage saved by DevTool's status line script, if any. */
+  statuslineQuota?: QuotaReading | null;
+  /** DevTool's status line script is installed for this account. */
+  quotaHook?: boolean;
+}
+
+/** Mirrors `QuotaWindow` in src-tauri/src/claude_quota.rs. */
+export interface QuotaWindow {
+  /** "five_hour", "seven_day", "spend_limit", or a per-model key such as "seven_day_opus". */
+  key: string;
+  /** 0–100. */
+  usedPercentage: number;
+  /** Epoch milliseconds. */
+  resetsAt: number | null;
+  usedUsd: number | null;
+  limitUsd: number | null;
+}
+
+export interface QuotaReading {
+  source: 'statusline' | 'api';
+  /** Epoch milliseconds. */
+  observedAt: number;
+  windows: QuotaWindow[];
 }
 
 /** One tracked account = one Claude Code config directory. */
@@ -69,6 +100,8 @@ export interface Profile {
   id: string;
   label: string;
   configDir: string;
+  /** Ask Anthropic's usage API for this account's plan usage (opt-in). */
+  quotaApi?: boolean;
 }
 
 /** A config directory found by `claude_monitor_detect`. */
@@ -222,7 +255,14 @@ export function rangeStartHour(range: RangeId, now: number): number {
 
 /** A session tagged with the profile it was read from. */
 export interface SessionRow extends SessionInfo {
+  /**
+   * The account the usage counts toward: the account whose directory holds
+   * the transcript, the account known to have run it when several share the
+   * transcript, or `SHARED_ACCOUNT` when that is not known.
+   */
   profileId: string;
+  /** The account whose directory the transcript is read from. */
+  dirProfileId: string;
 }
 
 export function sessionTotals(session: SessionInfo, fromHour = 0): UsageTotals {
@@ -583,4 +623,180 @@ export function toCsv(rows: ExportRow[]): string {
   const lines = [EXPORT_COLUMNS.map(([header]) => header).join(',')];
   for (const row of rows) lines.push(EXPORT_COLUMNS.map(([, value]) => csvField(value(row))).join(','));
   return `${lines.join('\r\n')}\r\n`;
+}
+
+// ── Attribution ──────────────────────────────────────────────────────────
+
+/**
+ * Pseudo-account for sessions several tracked accounts share (a linked or
+ * copied `projects/`) when nothing says which account ran them.
+ */
+export const SHARED_ACCOUNT = '__shared__';
+
+/** session id → profile id of the account known to have run it. */
+export type OwnerLedger = Record<string, string>;
+
+/**
+ * Records every session an account claims in this scan. Kept across scans,
+ * so an account that was seen running a session keeps it after the process
+ * exits. A later claim wins.
+ */
+export function updateOwnerLedger(ledger: OwnerLedger, snapshots: ProfileSnapshot[], profiles: Profile[]): OwnerLedger {
+  let next: OwnerLedger | null = null;
+  snapshots.forEach((snap, i) => {
+    const profile = profiles[i];
+    if (!profile) return;
+    for (const id of snap.claimedSessions ?? []) {
+      if ((next ?? ledger)[id] === profile.id) continue;
+      next ??= { ...ledger };
+      next[id] = profile.id;
+    }
+  });
+  return next ?? ledger;
+}
+
+/** One row per session, newest first, each counted toward one account. */
+export function attributeRows(snapshots: ProfileSnapshot[], profiles: Profile[], ledger: OwnerLedger): SessionRow[] {
+  const known = new Set(profiles.map((p) => p.id));
+  const shared = new Set(snapshots.flatMap((snap) => snap.sharedSessionIds ?? []));
+  const rows = snapshots.flatMap((snap, i) => {
+    const dirProfileId = profiles[i]?.id;
+    if (!dirProfileId) return [];
+    return snap.sessions.map((s): SessionRow => {
+      const owner = ledger[s.id];
+      const profileId = owner && known.has(owner) ? owner : shared.has(s.id) ? SHARED_ACCOUNT : dirProfileId;
+      return { ...s, profileId, dirProfileId };
+    });
+  });
+  return rows.sort((a, b) => (b.lastActivityAt ?? 0) - (a.lastActivityAt ?? 0));
+}
+
+// ── Comparison ───────────────────────────────────────────────────────────
+
+export type ComparePeriod = 'fiveHours' | 'today' | 'week' | 'month';
+
+export interface AccountComparison {
+  /** A profile id, or `SHARED_ACCOUNT`. */
+  key: string;
+  periods: Record<ComparePeriod, UsageTotals>;
+  running: number;
+  lastActiveAt: number | null;
+  /** Model with the most tokens over the last 7 days. */
+  topModel: string | null;
+  /** Estimated cost of each of the last 7 local days, oldest first. */
+  dailyCost: number[];
+}
+
+/**
+ * Side-by-side numbers for each account, plus a `SHARED_ACCOUNT` column
+ * when some shared usage could not be attributed.
+ */
+export function compareAccounts(rows: SessionRow[], profiles: Profile[], now: number): AccountComparison[] {
+  const starts: Record<ComparePeriod, number> = {
+    fiveHours: lastFiveHoursStart(now),
+    today: rangeStartHour('today', now),
+    week: rangeStartHour('7d', now),
+    month: rangeStartHour('30d', now),
+  };
+  const dayKeys = Array.from({ length: 7 }, (_, i) => {
+    const day = new Date(now);
+    day.setHours(12, 0, 0, 0);
+    day.setDate(day.getDate() - (6 - i));
+    return localDayKey(Math.floor(day.getTime() / MS_PER_HOUR));
+  });
+  const keys = [...profiles.map((p) => p.id)];
+  if (rows.some((r) => r.profileId === SHARED_ACCOUNT)) keys.push(SHARED_ACCOUNT);
+
+  return keys.map((key) => {
+    const own = rows.filter((r) => r.profileId === key);
+    const byDay = new Map(usageByDay(own, starts.week).map((g) => [g.key, g.totals.cost]));
+    const lastActive = own.reduce<number | null>(
+      (latest, r) => (r.lastActivityAt !== null && (latest === null || r.lastActivityAt > latest) ? r.lastActivityAt : latest),
+      null,
+    );
+    return {
+      key,
+      periods: {
+        fiveHours: totalUsage(own, starts.fiveHours),
+        today: totalUsage(own, starts.today),
+        week: totalUsage(own, starts.week),
+        month: totalUsage(own, starts.month),
+      },
+      running: own.filter((r) => isRunning(sessionStatus(r, now))).length,
+      lastActiveAt: lastActive,
+      topModel: usageByModel(own, starts.week)[0]?.key ?? null,
+      dailyCost: dayKeys.map((k) => byDay.get(k) ?? 0),
+    };
+  });
+}
+
+/**
+ * The account to suggest: of the accounts that exist, the one that used the
+ * fewest tokens in the last five hours (ties: the one idle longest).
+ * `null` with fewer than two candidates — there is nothing to choose.
+ */
+export function leastUsedAccount(comparisons: AccountComparison[], candidates: string[]): string | null {
+  const pool = comparisons.filter((c) => c.key !== SHARED_ACCOUNT && candidates.includes(c.key));
+  if (pool.length < 2) return null;
+  const best = [...pool].sort((a, b) =>
+    a.periods.fiveHours.tokens - b.periods.fiveHours.tokens || (a.lastActiveAt ?? 0) - (b.lastActiveAt ?? 0))[0];
+  return best.key;
+}
+
+// ── Plan usage (quota) ───────────────────────────────────────────────────
+
+/** The newer of the two readings an account may have. */
+export function latestQuota(...readings: Array<QuotaReading | null | undefined>): QuotaReading | null {
+  return readings.reduce<QuotaReading | null>(
+    (best, r) => (r && (!best || r.observedAt > best.observedAt) ? r : best),
+    null,
+  );
+}
+
+/**
+ * The share used now. A window whose reset time has passed since the reading
+ * was taken has started over, whatever the reading says.
+ */
+export function currentUse(window: QuotaWindow, now: number): number {
+  return window.resetsAt !== null && window.resetsAt <= now ? 0 : window.usedPercentage;
+}
+
+export type QuotaLevel = 'ok' | 'warn' | 'over';
+
+export function quotaLevel(percent: number): QuotaLevel {
+  return percent >= 85 ? 'over' : percent >= 60 ? 'warn' : 'ok';
+}
+
+/** How close the account is to being stopped: the fuller of its 5-hour and weekly windows. */
+export function quotaPressure(reading: QuotaReading, now: number): number | null {
+  const main = reading.windows.filter((w) => w.key === 'five_hour' || w.key === 'seven_day');
+  return main.length === 0 ? null : Math.max(...main.map((w) => currentUse(w, now)));
+}
+
+/** Of the accounts with a reading, the one with the most room left; `null` with fewer than two. */
+export function roomiestAccount(readings: Array<[string, QuotaReading | null]>, now: number): string | null {
+  const scored = readings
+    .map(([key, reading]) => [key, reading ? quotaPressure(reading, now) : null] as const)
+    .filter((entry): entry is readonly [string, number] => entry[1] !== null);
+  if (scored.length < 2) return null;
+  return [...scored].sort((a, b) => a[1] - b[1])[0][0];
+}
+
+/** "1h 18m", "2d 3h", "45m", "<1m". */
+export function formatDuration(ms: number): string {
+  const minutes = Math.max(0, Math.floor(ms / 60_000));
+  if (minutes < 1) return '<1m';
+  const days = Math.floor(minutes / 1440);
+  const hours = Math.floor((minutes % 1440) / 60);
+  const mins = minutes % 60;
+  if (days > 0) return hours > 0 ? `${days}d ${hours}h` : `${days}d`;
+  if (hours > 0) return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+  return `${mins}m`;
+}
+
+/** The model a per-model window is about (`seven_day_opus` → `Opus`), or `null` for the shared ones. */
+export function quotaModel(key: string): string | null {
+  const match = /^(?:seven_day|five_hour)_(.+)$/.exec(key);
+  if (!match) return null;
+  return match[1].split('_').map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(' ');
 }

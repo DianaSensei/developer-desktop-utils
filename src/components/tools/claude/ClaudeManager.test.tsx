@@ -18,7 +18,7 @@ vi.mock('@tauri-apps/plugin-notification', () => ({
 vi.mock('@tauri-apps/api/core', () => ({ invoke: (...args: unknown[]) => invokeMock(...args) }));
 
 const HOUR = Math.floor(Date.now() / 3_600_000);
-const KEYS = ['profiles', 'tab', 'range', 'autoRefresh', 'autoDetected', 'ignoredDirs', 'budgets', 'budgetAlerts'].map((k) => `devtool:claude-manager:${k}`);
+const KEYS = ['profiles', 'tab', 'range', 'autoRefresh', 'autoDetected', 'ignoredDirs', 'budgets', 'budgetAlerts', 'sessionOwners'].map((k) => `devtool:claude-manager:${k}`);
 
 const bucket = (over: Partial<UsageBucket>): UsageBucket => ({
   hour: HOUR, model: 'claude-opus-5-5', input: 1_000_000, output: 100_000, cacheWrite5m: 0, cacheWrite1h: 0,
@@ -36,6 +36,8 @@ const personal: ProfileSnapshot = {
   exists: true,
   sharedSessions: 0,
   sharesDataWith: null,
+  sharedSessionIds: [],
+  claimedSessions: [],
   account: { email: 'me@example.com', organization: 'Personal', displayName: null },
   sessions: [
     session({
@@ -50,6 +52,8 @@ const work: ProfileSnapshot = {
   exists: true,
   sharedSessions: 0,
   sharesDataWith: null,
+  sharedSessionIds: [],
+  claimedSessions: [],
   account: { email: 'me@work.example', organization: 'Acme', displayName: null },
   sessions: [session({ id: 'work-1', title: 'Review PR', cwd: '/work/site', buckets: [bucket({ model: 'claude-haiku-5-5' })] })],
 };
@@ -88,6 +92,7 @@ let Tool: ComponentType;
 let Providers: ComponentType<{ children: ReactNode }>;
 const ClaudeManager = () => <Providers><Tool /></Providers>;
 let storageSet: (key: string, value: string) => void;
+let storageGet: (key: string) => string | null;
 let storageRemove: (key: string) => void;
 
 beforeAll(async () => {
@@ -99,7 +104,7 @@ beforeAll(async () => {
   };
   // jsdom has no layout, so no scrollIntoView.
   Element.prototype.scrollIntoView = () => {};
-  ({ storageSet, storageRemove } = await import('@/lib/persistentStore'));
+  ({ storageSet, storageRemove, storageGet } = await import('@/lib/persistentStore'));
   ({ AppConfigProvider: Providers } = await import('@/contexts/AppConfigContext'));
   ({ ClaudeManager: Tool } = await import('./ClaudeManager'));
 });
@@ -403,6 +408,71 @@ describe('ClaudeManager', () => {
     expect(screen.getByText('Orca – hack2026')).toBeTruthy();
     // The directory is untouched and still scanned.
     expect(invokeMock).toHaveBeenLastCalledWith('claude_monitor_scan', { dirs: ['~/.claude', '~/orca/claude-profiles/4989/home'] });
+  });
+
+  it('compares every account side by side and splits shared sessions by who ran them', async () => {
+    storageSet(KEYS[0], JSON.stringify([
+      { id: 'default', label: 'Default', configDir: '~/.claude' },
+      { id: 'o', label: 'Orca', configDir: '~/orca/home' },
+      { id: 'h', label: 'Hack', configDir: '~/orca/hack/home' },
+    ]));
+    storageSet(KEYS[4], JSON.stringify(true));
+    storageSet(KEYS[1], JSON.stringify('compare'));
+    // Default lists both sessions; Orca shares them and is running live-1.
+    invokeMock.mockImplementation(async (command: string, args?: { dirs?: string[] }) => {
+      if (command !== 'claude_monitor_scan') return [];
+      return (args?.dirs ?? []).map((dir) => {
+        if (dir === '~/.claude') return personal;
+        const shared = { ...personal, configDir: dir, sessions: [], sharedSessions: 2, sharesDataWith: '~/.claude', sharedSessionIds: ['live-1', 'sess-1'] };
+        return dir === '~/orca/home' ? { ...shared, claimedSessions: ['live-1'] } : shared;
+      });
+    });
+    render(<ClaudeManager />);
+    expect(await screen.findByText(/^Last 5 hours$|^5 giờ qua$/)).toBeTruthy();
+    for (const label of ['Default', 'Orca', 'Hack', /^Shared \(unknown\)$|^Dùng chung \(chưa rõ\)$/]) {
+      expect(screen.getAllByText(label).length).toBeGreaterThan(0);
+    }
+    // live-1 went to Orca, sess-1 stays unattributed; Default ran nothing itself.
+    expect(screen.getByText(/"Default" used the least|"Default" dùng ít nhất/)).toBeTruthy();
+    await waitFor(() => expect(storageGet('devtool:claude-manager:sessionOwners')).toContain('live-1'));
+  });
+
+  it('shows each account’s plan usage and fetches from the API only after confirming', async () => {
+    const soon = Date.now() + 78 * 60_000;
+    storageSet(KEYS[0], JSON.stringify([
+      { id: 'default', label: 'Default', configDir: '~/.claude' },
+      { id: 'w', label: 'Work', configDir: '~/.claude-work' },
+    ]));
+    storageSet(KEYS[4], JSON.stringify(true));
+    storageSet(KEYS[1], JSON.stringify('compare'));
+    invokeMock.mockImplementation(async (command: string, args?: { dirs?: string[]; dir?: string }) => {
+      if (command === 'claude_monitor_fetch_quota') {
+        return { source: 'api', observedAt: Date.now(), windows: [
+          { key: 'five_hour', usedPercentage: 5, resetsAt: soon, usedUsd: null, limitUsd: null },
+          { key: 'seven_day', usedPercentage: 12, resetsAt: soon, usedUsd: null, limitUsd: null },
+          { key: 'seven_day_opus', usedPercentage: 0, resetsAt: null, usedUsd: null, limitUsd: null },
+        ] };
+      }
+      if (command !== 'claude_monitor_scan') return [];
+      return (args?.dirs ?? []).map((dir) => (dir === '~/.claude'
+        ? { ...personal, quotaHook: true, statuslineQuota: { source: 'statusline', observedAt: Date.now() - 120_000, windows: [
+          { key: 'five_hour', usedPercentage: 26, resetsAt: soon, usedUsd: null, limitUsd: null },
+          { key: 'seven_day', usedPercentage: 84, resetsAt: soon, usedUsd: null, limitUsd: null },
+        ] } }
+        : { ...work, configDir: dir }));
+    });
+    render(<ClaudeManager />);
+    expect(await screen.findByText('84%')).toBeTruthy();
+    expect(screen.getAllByText(/resets in 1h 1[78]m|reset sau 1h 1[78]m/).length).toBeGreaterThan(0);
+    expect(screen.getByText(/No plan usage yet|Chưa có số liệu hạn mức/)).toBeTruthy();
+    expect(invokeMock).not.toHaveBeenCalledWith('claude_monitor_fetch_quota', expect.anything());
+
+    fireEvent.click(screen.getByRole('switch', { name: /Fetch plan usage from the API for Work|Lấy hạn mức qua API cho Work/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /^Turn on$|^Bật$/ }));
+    expect(await screen.findByText('Opus')).toBeTruthy();
+    expect(invokeMock).toHaveBeenCalledWith('claude_monitor_fetch_quota', { dir: '~/.claude-work' });
+    // Work now has the most room (12% vs 84%).
+    expect(screen.getByText(/"Work" has the most room left|"Work" còn nhiều hạn mức nhất/)).toBeTruthy();
   });
 
   it('shows the scan error instead of an empty list', async () => {
