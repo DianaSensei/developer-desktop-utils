@@ -135,4 +135,23 @@ describe('WorkspaceEditor (browser demo workspace)', () => {
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Open in Editor/ })); });
     await waitFor(() => expect(screen.queryByLabelText('Find')).toBeNull());
   });
+
+  it('word wrap applies to the viewer too (files too large to edit open there)', async () => {
+    renderEditor();
+    fireEvent.click(await screen.findByTitle('/demo-workspace'));
+    fireEvent.contextMenu(await screen.findByText('README.md'));
+    await act(async () => { fireEvent.click(await screen.findByRole('menuitem', { name: /Open in Viewer/ })); });
+    const line = await screen.findByText('# Demo workspace');
+    expect(line.className).toContain('whitespace-pre');
+    expect(line.className).not.toContain('whitespace-pre-wrap');
+
+    // Alt+Z, as in the editor.
+    await act(async () => { fireEvent.keyDown(window, { key: 'z', code: 'KeyZ', altKey: true }); });
+    await waitFor(() => expect(screen.getByText('# Demo workspace').className).toContain('whitespace-pre-wrap'));
+    expect(screen.getByRole('button', { name: 'Wrap: on' }).getAttribute('aria-pressed')).toBe('true');
+
+    // And off again from the status bar.
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Wrap: on' })); });
+    await waitFor(() => expect(screen.getByText('# Demo workspace').className).not.toContain('whitespace-pre-wrap'));
+  });
 });

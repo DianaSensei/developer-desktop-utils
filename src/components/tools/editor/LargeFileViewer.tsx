@@ -5,8 +5,15 @@
 // the scrollbar maps proportionally onto line numbers, so a 100-million-line
 // log scrolls like any other. Search, go-to-line and tail -f run on the
 // backend over the whole file.
+//
+// Word wrap (Alt+Z / status bar) works here too: lines then take as many rows
+// as they need, so the scroll position still maps to a (fractional) line
+// number — the top line's measured height turns the fraction into pixels —
+// and the bottom of the scroll range puts the last line at the top, like
+// VS Code's scrollBeyondLastLine. While following, the view is pinned to the
+// bottom instead, so the newest (possibly wrapped) lines are always whole.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { CaseSensitive, ChevronRight, FilePen, Regex, ScrollText, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
@@ -33,9 +40,11 @@ const MAX_SPACER = 8_000_000;
 interface Props {
   store: EditorStore;
   tab: Tab;
+  /** Word wrap — the editor's setting, shared with the viewer. */
+  wrap: boolean;
 }
 
-export function LargeFileViewer({ store, tab }: Props) {
+export function LargeFileViewer({ store, tab, wrap }: Props) {
   const m = useMessages(MESSAGES);
   const scrollerRef = useRef<HTMLDivElement>(null);
   const [handle, setHandle] = useState<number | null>(null);
@@ -115,11 +124,17 @@ export function LargeFileViewer({ store, tab }: Props) {
   // ── virtual scroll geometry ────────────────────────────────────────────
   const total = status?.lines ?? 0;
   const visible = Math.ceil(viewH / LINE_H) + 1;
-  const fullH = total * LINE_H;
+  // Wrapped lines have no fixed height, so the end of the scroll range can't
+  // be "the last screenful": it puts the last line at the top instead.
+  const fullH = wrap ? Math.max(0, total - 1) * LINE_H + viewH : total * LINE_H;
   const scaled = fullH > MAX_SPACER;
   const spacerH = Math.max(viewH, Math.min(fullH, MAX_SPACER));
-  const maxFirst = Math.max(0, total - visible + 1);
+  const maxFirst = wrap ? Math.max(0, total - 1) : Math.max(0, total - visible + 1);
   const topLine = Math.min(Math.floor(first), Math.max(0, total - 1));
+  // Following with wrap on: show the last lines bottom-aligned (a wrapped
+  // tail can't be reached by scrolling to a line number).
+  const pinBottom = wrap && follow;
+  const startLine = pinBottom ? Math.max(0, total - visible) : topLine;
 
   const lineFromScroll = (scrollTop: number) => (scaled
     ? (scrollTop / Math.max(1, spacerH - viewH)) * maxFirst
@@ -156,8 +171,8 @@ export function LargeFileViewer({ store, tab }: Props) {
   // ── fetch the blocks on screen ─────────────────────────────────────────
   useEffect(() => {
     if (handle === null || total === 0) return;
-    const firstBlock = Math.floor(topLine / BLOCK);
-    const lastBlock = Math.floor(Math.min(total - 1, topLine + visible) / BLOCK);
+    const firstBlock = Math.floor(startLine / BLOCK);
+    const lastBlock = Math.floor(Math.min(total - 1, startLine + visible) / BLOCK);
     for (let b = firstBlock; b <= lastBlock + 1; b++) {
       if (b * BLOCK >= total || cache.current.has(b) || pending.current.has(b)) continue;
       pending.current.add(b);
@@ -171,11 +186,21 @@ export function LargeFileViewer({ store, tab }: Props) {
         setError(toFsError(e).message);
       });
     }
-  }, [handle, total, topLine, visible, tick, store]);
+  }, [handle, total, startLine, visible, tick, store]);
 
   const lineAt = (n: number): ViewLine | undefined => cache.current.get(Math.floor(n / BLOCK))?.[n % BLOCK];
   const gutterCh = Math.max(4, String(total).length + 1);
-  const offsetPx = scaled ? 0 : (first - topLine) * LINE_H;
+  // With wrap the top line can be many rows tall: scroll through it by its
+  // measured height (scaled or not), or a long line could never be read past
+  // its first screenful.
+  const linesRef = useRef<HTMLDivElement>(null);
+  const [topH, setTopH] = useState(LINE_H);
+  useLayoutEffect(() => {
+    const h = (linesRef.current?.firstElementChild as HTMLElement | null)?.offsetHeight;
+    if (h && h !== topH) setTopH(h);
+  });
+  const frac = first - topLine;
+  const offsetPx = pinBottom ? 0 : wrap ? frac * topH : scaled ? 0 : frac * LINE_H;
 
   // ── search ─────────────────────────────────────────────────────────────
   const [query, setQuery] = useState('');
@@ -208,7 +233,8 @@ export function LargeFileViewer({ store, tab }: Props) {
   const jumpTo = (hit: { line: number; column?: number; length?: number }) => {
     setFollow(false);
     setMark(hit);
-    scrollToLine(hit.line - Math.floor(visible / 3));
+    // Wrapped lines above could push the hit off screen: put it on top.
+    scrollToLine(wrap ? hit.line : hit.line - Math.floor(visible / 3));
   };
 
   const onKeyDown = (e: React.KeyboardEvent) => {
@@ -218,7 +244,7 @@ export function LargeFileViewer({ store, tab }: Props) {
   };
 
   const indexingPct = status && !status.done && status.size > 0 ? Math.floor((status.scanned / status.size) * 100) : null;
-  const rows = useMemo(() => Array.from({ length: Math.min(visible, Math.max(0, total - topLine)) }, (_, i) => topLine + i), [visible, total, topLine]);
+  const rows = useMemo(() => Array.from({ length: Math.min(visible, Math.max(0, total - startLine)) }, (_, i) => startLine + i), [visible, total, startLine]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col" onKeyDown={onKeyDown}>
@@ -321,26 +347,35 @@ export function LargeFileViewer({ store, tab }: Props) {
         ref={scrollerRef}
         onScroll={onScroll}
         onWheel={(e) => { if (follow && e.deltaY < 0) setFollow(false); }}
-        className="relative min-h-0 flex-1 overflow-auto bg-bg font-mono text-dense"
+        className={cn('relative min-h-0 flex-1 bg-bg font-mono text-dense', wrap ? 'overflow-y-auto overflow-x-hidden' : 'overflow-auto')}
         tabIndex={0}
         role="region"
         aria-label={tab.name}
       >
         <div style={{ height: spacerH }}>
-          <div className="sticky top-0 w-max min-w-full overflow-hidden" style={{ height: viewH }}>
-            <div style={{ transform: `translateY(${-offsetPx}px)` }}>
+          <div className={cn('sticky top-0 overflow-hidden', wrap ? 'w-full' : 'w-max min-w-full')} style={{ height: viewH }}>
+            <div
+              ref={linesRef}
+              data-testid="viewer-lines"
+              className={cn(pinBottom && 'absolute inset-x-0 bottom-0')}
+              style={{ transform: `translateY(${-offsetPx}px)` }}
+            >
               {rows.map((n) => {
                 const line = lineAt(n);
                 const marked = mark?.line === n;
                 return (
-                  <div key={n} className={cn('flex', marked && 'bg-acc/10')} style={{ height: LINE_H, lineHeight: `${LINE_H}px` }}>
+                  <div
+                    key={n}
+                    className={cn('flex', marked && 'bg-acc/10')}
+                    style={wrap ? { minHeight: LINE_H, lineHeight: `${LINE_H}px` } : { height: LINE_H, lineHeight: `${LINE_H}px` }}
+                  >
                     <span
                       className="sticky left-0 shrink-0 select-none bg-bg pr-3 text-right tabular-nums text-fg-mute"
                       style={{ width: `${gutterCh + 1}ch` }}
                     >
                       {n + 1}
                     </span>
-                    <span className="whitespace-pre pr-6 text-fg">
+                    <span className={cn('pr-6 text-fg', wrap ? 'min-w-0 flex-1 whitespace-pre-wrap [overflow-wrap:anywhere]' : 'whitespace-pre')}>
                       {line === undefined ? '' : marked && mark?.length !== undefined && mark.column !== undefined
                         ? (
                           <>
