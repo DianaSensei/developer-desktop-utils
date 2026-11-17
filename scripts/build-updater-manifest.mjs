@@ -128,7 +128,23 @@ const releaseJson = execFileSync(
 ).trim();
 const release = releaseJson ? JSON.parse(releaseJson.split('\n')[0]) : undefined;
 if (!release) throw new Error(`No release found with tag_name ${RELEASE_TAG} (checked drafts too)`);
-const assetUrlByName = new Map(release.assets.map((a) => [a.name, a.url]));
+// Each asset is downloaded through its public `github.com/.../releases/
+// download/<tag>/<name>` URL, NOT the API URL (`api.github.com/.../releases/
+// assets/<id>`) this used to write. The in-app updater fetches without a
+// token, and unauthenticated api.github.com calls are capped at 60 per hour
+// per IP and refused with 403 beyond that — so users behind a shared IP
+// (office, VPN) got "Download request failed with status: 403 Forbidden"
+// on v1.9.0 -> v1.9.1. The release-download URL has no such cap.
+//
+// Built from the tag rather than taken from the asset's browser_download_url:
+// the release is still a DRAFT here, and a draft's browser_download_url
+// points at a temporary `untagged-…` path that stops working once the
+// release is published and the tag exists. The asset's `name` (not the
+// local filename) is used because GitHub may rename an upload (spaces
+// become dots).
+const releaseDownloadUrl = (assetName) =>
+  `https://github.com/${REPO}/releases/download/${encodeURIComponent(RELEASE_TAG)}/${encodeURIComponent(assetName)}`;
+const assetUrlByName = new Map(release.assets.map((a) => [a.name, releaseDownloadUrl(a.name)]));
 
 const platforms = {};
 
