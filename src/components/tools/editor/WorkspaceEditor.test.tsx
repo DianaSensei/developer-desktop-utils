@@ -154,4 +154,64 @@ describe('WorkspaceEditor (browser demo workspace)', () => {
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Wrap: on' })); });
     await waitFor(() => expect(screen.getByText('# Demo workspace').className).not.toContain('whitespace-pre-wrap'));
   });
+
+  describe('viewer: long lines, scrolling, appearance', () => {
+    const LONG = `${'x'.repeat(10_000)}NEEDLE${'y'.repeat(50)}`;
+
+    async function openViewer(content: string) {
+      renderEditor();
+      fireEvent.click(await screen.findByTitle('/demo-workspace'));
+      await screen.findByText('README.md');
+      const store = getEditorStore(getPluginSdk('text-editor'));
+      await act(async () => {
+        await store.fs.writeFile('/demo-workspace/README.md', content);
+        await store.openInViewer('/demo-workspace/README.md');
+      });
+      await screen.findAllByText('Read-only');
+      return store;
+    }
+    const row = (n: number) => screen.getByTestId('viewer-lines').querySelector<HTMLElement>(`[data-line="${n}"]`);
+
+    it('cuts a line at 8 KB, shows all of it on demand, and collapses it again', async () => {
+      await openViewer(`short\n${LONG}\nend\n`);
+      await waitFor(() => expect(row(1)?.textContent).toContain('xxx'));
+      expect(row(1)!.textContent).not.toContain('NEEDLE');
+
+      await act(async () => { fireEvent.click(screen.getByRole('button', { name: /click to show all of it/ })); });
+      await waitFor(() => expect(row(1)!.textContent).toContain('NEEDLE'));
+
+      await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Collapse line' })); });
+      await waitFor(() => expect(row(1)!.textContent).not.toContain('NEEDLE'));
+    });
+
+    it('a search hit past the cut loads the whole line and highlights it', async () => {
+      await openViewer(`short\n${LONG}\nend\n`);
+      fireEvent.change(screen.getByLabelText('Find'), { target: { value: 'NEEDLE' } });
+      await act(async () => { fireEvent.submit(screen.getByLabelText('Find').closest('form')!); });
+      await waitFor(() => expect(row(1)!.querySelector('mark')?.textContent).toBe('NEEDLE'));
+    });
+
+    it('with wrap on, the wheel scrolls by rows (not by the scaled scrollbar)', async () => {
+      await openViewer(Array.from({ length: 50 }, (_, i) => `line ${i + 1}`).join('\n'));
+      await waitFor(() => expect(row(0)?.textContent).toContain('line 1'));
+      await act(async () => { fireEvent.keyDown(window, { key: 'z', code: 'KeyZ', altKey: true }); });
+      const scroller = screen.getByRole('region', { name: 'README.md' });
+      // 13px × 1.6 = 21px rows: three rows down.
+      await act(async () => { fireEvent.wheel(scroller, { deltaY: 63 }); });
+      await waitFor(() => expect(screen.getByTestId('viewer-lines').firstElementChild?.getAttribute('data-line')).toBe('3'));
+      await act(async () => { fireEvent.keyDown(scroller, { key: 'ArrowDown' }); });
+      await waitFor(() => expect(screen.getByTestId('viewer-lines').firstElementChild?.getAttribute('data-line')).toBe('4'));
+      await act(async () => { fireEvent.keyDown(scroller, { key: 'Home' }); });
+      await waitFor(() => expect(screen.getByTestId('viewer-lines').firstElementChild?.getAttribute('data-line')).toBe('0'));
+    });
+
+    it('follows the editor font size (⌘= / ⌘−)', async () => {
+      await openViewer('hello\n');
+      const scroller = screen.getByRole('region', { name: 'README.md' });
+      expect(scroller.style.fontSize).toBe('13px');
+      await act(async () => { fireEvent.keyDown(window, { key: '=', code: 'Equal', ctrlKey: true }); });
+      await waitFor(() => expect(scroller.style.fontSize).toBe('14px'));
+      expect(row(0)!.style.height).toBe(`${Math.round(14 * 1.6)}px`);
+    });
+  });
 });

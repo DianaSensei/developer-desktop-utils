@@ -75,7 +75,7 @@ export function EditorPane({ store, snap }: Props) {
       {showEditor && tab.large && (
         <Callout tone="info" size="sm" className="m-2 mb-0">{m('largeFileNotice', { size: formatSize(tab.size) })}</Callout>
       )}
-      {viewer && <LargeFileViewer key={tab.id} store={store} tab={tab} wrap={snap.wrap} />}
+      {viewer && <LargeFileViewer key={tab.id} store={store} tab={tab} wrap={snap.wrap} appearance={snap.appearance} />}
 
       {/* The view stays mounted (only hidden) so switching tabs is a state
           swap, not an editor rebuild. */}

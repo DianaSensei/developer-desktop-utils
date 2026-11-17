@@ -138,7 +138,9 @@ export default defineMessages({
   searchedTo: { vi: 'đã tìm tới dòng {{line}}', en: 'searched up to line {{line}}' },
   follow: { vi: 'Theo dõi đuôi file', en: 'Follow (tail -f)' },
   followHint: { vi: 'Tự cập nhật dòng mới và cuộn xuống cuối', en: 'Load new lines as the file grows and stay at the end' },
-  lineTruncated: { vi: 'Dòng quá dài — chỉ hiện phần đầu', en: 'Line too long — only the start is shown' },
+  showFullLine: { vi: 'Dòng quá dài (> 8 KB) — bấm để hiện cả dòng', en: 'Line too long (> 8 KB) — click to show all of it' },
+  collapseLine: { vi: 'Thu gọn dòng', en: 'Collapse line' },
+  lineTooLong: { vi: 'Dòng dài hơn 4 MB — chỉ hiện 4 MB đầu', en: 'Line over 4 MB — only the first 4 MB are shown' },
   'err.invalid_regex': { vi: 'Biểu thức chính quy không hợp lệ.', en: 'That regular expression is not valid.' },
 
   // Delete confirmation

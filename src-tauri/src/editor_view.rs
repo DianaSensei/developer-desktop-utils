@@ -25,6 +25,8 @@ use std::time::{Duration, Instant};
 pub const CHECKPOINT: u64 = 1024;
 /// Longer lines are cut to this many bytes when shown.
 pub const MAX_LINE_BYTES: usize = 8 * 1024;
+/// "Show full line" reads at most this many bytes of one line.
+pub const MAX_FULL_LINE_BYTES: usize = 4 * 1024 * 1024;
 /// Longer lines are only searched up to this many bytes.
 pub const MAX_SEARCH_LINE_BYTES: usize = 256 * 1024;
 /// Most lines one `read_lines` call returns.
@@ -269,6 +271,15 @@ impl Viewer {
         Ok(out)
     }
 
+    /// One line (0-based) with up to `MAX_FULL_LINE_BYTES` of it, for lines
+    /// `read_lines` cut short. `None` past the end. `truncated` is still set
+    /// for a line longer than that.
+    pub fn read_full_line(&self, line: u64) -> FsResult<Option<ViewLine>> {
+        let mut r = self.reader_at(line)?;
+        Ok(next_line(&mut r, MAX_FULL_LINE_BYTES)?
+            .map(|(bytes, truncated)| ViewLine { text: String::from_utf8_lossy(&bytes).into_owned(), truncated }))
+    }
+
     /// Searches from line `from`, stopping at EOF, after `max_hits`, after
     /// `budget`, or when a newer search on this viewer starts.
     pub fn search(
@@ -390,6 +401,27 @@ mod tests {
         assert_eq!(lines[0].text.len(), MAX_LINE_BYTES);
         assert!(lines[0].truncated);
         assert_eq!(lines[1], ViewLine { text: "next".into(), truncated: false });
+        let _ = std::fs::remove_file(p);
+    }
+
+    #[test]
+    fn a_cut_line_can_be_read_whole() {
+        let mut content = b"first
+".to_vec();
+        content.extend(std::iter::repeat_n(b'y', MAX_LINE_BYTES * 3));
+        content.extend_from_slice(b"END
+last
+");
+        let p = file("full", &content);
+        let v = Viewer::open(&p).unwrap();
+        v.extend().unwrap();
+        assert!(v.read_lines(1, 1).unwrap()[0].truncated);
+        let full = v.read_full_line(1).unwrap().unwrap();
+        assert!(!full.truncated);
+        assert_eq!(full.text.len(), MAX_LINE_BYTES * 3 + 3);
+        assert!(full.text.ends_with("yEND"));
+        assert_eq!(v.read_full_line(2).unwrap().unwrap().text, "last");
+        assert!(v.read_full_line(3).unwrap().is_none());
         let _ = std::fs::remove_file(p);
     }
 

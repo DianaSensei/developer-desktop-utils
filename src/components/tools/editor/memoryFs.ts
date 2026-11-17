@@ -5,6 +5,7 @@
 
 import {
   EditorFsError, type BackupStore, type DirEntry, type HistoryEntry, type HistoryStore, type ViewerStore, type ViewLine, type EditorFs, type FileContent, type FileList, type FileStat,
+  VIEW_FULL_LINE_BYTES, VIEW_LINE_BYTES,
 } from './fs';
 import { basename, dirname, isUnder, join, relativeTo } from './paths';
 import { DEFAULT_MAX_RESULTS, GlobSet, buildRegExp, emptyResult, fileIncluded, gitignoreGlobs, searchText } from './textSearch';
@@ -225,8 +226,16 @@ export function createMemoryFs(opts: MemoryFsOptions = {}): MemoryFs {
       });
     },
     status(id) { return run(() => viewStatus(id)); },
+    // Cut like the backend (in characters here, not bytes: close enough).
     lines(id, start, count) {
-      return run(() => viewLines(id).slice(start, start + Math.min(count, 2000)).map((text): ViewLine => ({ text, truncated: false })));
+      return run(() => viewLines(id).slice(start, start + Math.min(count, 2000)).map((text): ViewLine => (
+        { text: text.slice(0, VIEW_LINE_BYTES), truncated: text.length > VIEW_LINE_BYTES })));
+    },
+    line(id, line) {
+      return run(() => {
+        const text = viewLines(id)[line];
+        return text === undefined ? null : { text: text.slice(0, VIEW_FULL_LINE_BYTES), truncated: text.length > VIEW_FULL_LINE_BYTES };
+      });
     },
     refresh(id) { return run(() => viewStatus(id)); },
     search(id, o) {

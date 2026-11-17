@@ -411,6 +411,13 @@ pub async fn editor_view_lines(app: AppHandle, id: u64, start: u64, count: u64) 
     blocking(move || v.read_lines(start, count)).await
 }
 
+/// One whole line (up to editor_view::MAX_FULL_LINE_BYTES) — "Show full line".
+#[tauri::command]
+pub async fn editor_view_line(app: AppHandle, id: u64, line: u64) -> FsResult<Option<editor_view::ViewLine>> {
+    let v = viewer(&app, id)?;
+    blocking(move || v.read_full_line(line)).await
+}
+
 /// Indexes whatever was appended since the last pass (`tail -f`).
 #[tauri::command]
 pub async fn editor_view_refresh(app: AppHandle, id: u64) -> FsResult<editor_view::ViewStatus> {
