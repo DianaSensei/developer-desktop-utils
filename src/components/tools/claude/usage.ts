@@ -70,6 +70,29 @@ export interface ProfileSnapshot {
    * project in its `.claude.json`.
    */
   claimedSessions: string[];
+  /** Plan usage saved by DevTool's status line script, if any. */
+  statuslineQuota?: QuotaReading | null;
+  /** DevTool's status line script is installed for this account. */
+  quotaHook?: boolean;
+}
+
+/** Mirrors `QuotaWindow` in src-tauri/src/claude_quota.rs. */
+export interface QuotaWindow {
+  /** "five_hour", "seven_day", "spend_limit", or a per-model key such as "seven_day_opus". */
+  key: string;
+  /** 0–100. */
+  usedPercentage: number;
+  /** Epoch milliseconds. */
+  resetsAt: number | null;
+  usedUsd: number | null;
+  limitUsd: number | null;
+}
+
+export interface QuotaReading {
+  source: 'statusline' | 'api';
+  /** Epoch milliseconds. */
+  observedAt: number;
+  windows: QuotaWindow[];
 }
 
 /** One tracked account = one Claude Code config directory. */
@@ -77,6 +100,8 @@ export interface Profile {
   id: string;
   label: string;
   configDir: string;
+  /** Ask Anthropic's usage API for this account's plan usage (opt-in). */
+  quotaApi?: boolean;
 }
 
 /** A config directory found by `claude_monitor_detect`. */
@@ -716,4 +741,62 @@ export function leastUsedAccount(comparisons: AccountComparison[], candidates: s
   const best = [...pool].sort((a, b) =>
     a.periods.fiveHours.tokens - b.periods.fiveHours.tokens || (a.lastActiveAt ?? 0) - (b.lastActiveAt ?? 0))[0];
   return best.key;
+}
+
+// ── Plan usage (quota) ───────────────────────────────────────────────────
+
+/** The newer of the two readings an account may have. */
+export function latestQuota(...readings: Array<QuotaReading | null | undefined>): QuotaReading | null {
+  return readings.reduce<QuotaReading | null>(
+    (best, r) => (r && (!best || r.observedAt > best.observedAt) ? r : best),
+    null,
+  );
+}
+
+/**
+ * The share used now. A window whose reset time has passed since the reading
+ * was taken has started over, whatever the reading says.
+ */
+export function currentUse(window: QuotaWindow, now: number): number {
+  return window.resetsAt !== null && window.resetsAt <= now ? 0 : window.usedPercentage;
+}
+
+export type QuotaLevel = 'ok' | 'warn' | 'over';
+
+export function quotaLevel(percent: number): QuotaLevel {
+  return percent >= 85 ? 'over' : percent >= 60 ? 'warn' : 'ok';
+}
+
+/** How close the account is to being stopped: the fuller of its 5-hour and weekly windows. */
+export function quotaPressure(reading: QuotaReading, now: number): number | null {
+  const main = reading.windows.filter((w) => w.key === 'five_hour' || w.key === 'seven_day');
+  return main.length === 0 ? null : Math.max(...main.map((w) => currentUse(w, now)));
+}
+
+/** Of the accounts with a reading, the one with the most room left; `null` with fewer than two. */
+export function roomiestAccount(readings: Array<[string, QuotaReading | null]>, now: number): string | null {
+  const scored = readings
+    .map(([key, reading]) => [key, reading ? quotaPressure(reading, now) : null] as const)
+    .filter((entry): entry is readonly [string, number] => entry[1] !== null);
+  if (scored.length < 2) return null;
+  return [...scored].sort((a, b) => a[1] - b[1])[0][0];
+}
+
+/** "1h 18m", "2d 3h", "45m", "<1m". */
+export function formatDuration(ms: number): string {
+  const minutes = Math.max(0, Math.floor(ms / 60_000));
+  if (minutes < 1) return '<1m';
+  const days = Math.floor(minutes / 1440);
+  const hours = Math.floor((minutes % 1440) / 60);
+  const mins = minutes % 60;
+  if (days > 0) return hours > 0 ? `${days}d ${hours}h` : `${days}d`;
+  if (hours > 0) return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+  return `${mins}m`;
+}
+
+/** The model a per-model window is about (`seven_day_opus` → `Opus`), or `null` for the shared ones. */
+export function quotaModel(key: string): string | null {
+  const match = /^(?:seven_day|five_hour)_(.+)$/.exec(key);
+  if (!match) return null;
+  return match[1].split('_').map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(' ');
 }

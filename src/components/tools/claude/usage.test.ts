@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  MAX_DAILY_BARS, NO_BUDGETS, lastSegment, SHARED_ACCOUNT, attributeRows, compareAccounts, leastUsedAccount, updateOwnerLedger,
+  MAX_DAILY_BARS, NO_BUDGETS, currentUse, formatDuration, latestQuota, quotaLevel, quotaModel, quotaPressure, roomiestAccount,
+  type QuotaReading, lastSegment, SHARED_ACCOUNT, attributeRows, compareAccounts, leastUsedAccount, updateOwnerLedger,
   type ProfileSnapshot, budgetStates, chartSeries, dueBudgetAlerts, exportRows, monthStartHour, toCsv,
   DEFAULT_PROFILE, MS_PER_HOUR, estimateCost, formatCost, formatTokens, labelFromDir, lastFiveHoursStart,
   launchCommand, localDayKey, projectName, rangeStartHour, resumeCommand, sessionModels, sessionStatus,
@@ -334,5 +335,52 @@ describe('compareAccounts', () => {
     expect(leastUsedAccount(result, ['a', 'b', 'c'])).toBe('c');
     expect(leastUsedAccount(result, ['a', 'b'])).toBe('b');
     expect(leastUsedAccount(result, ['a'])).toBeNull();
+  });
+});
+
+describe('plan usage', () => {
+  const now = 1_000_000_000;
+  const reading = (source: 'statusline' | 'api', observedAt: number, five: number, week: number, fiveReset: number | null = now + 3_600_000): QuotaReading => ({
+    source, observedAt,
+    windows: [
+      { key: 'five_hour', usedPercentage: five, resetsAt: fiveReset, usedUsd: null, limitUsd: null },
+      { key: 'seven_day', usedPercentage: week, resetsAt: now + 86_400_000, usedUsd: null, limitUsd: null },
+    ],
+  });
+
+  it('uses the newer reading, and treats a window past its reset time as empty', () => {
+    const older = reading('statusline', 1, 50, 50);
+    const newer = reading('api', 2, 10, 20);
+    expect(latestQuota(older, newer, null)).toBe(newer);
+    expect(latestQuota(null, undefined)).toBeNull();
+    expect(currentUse(older.windows[0], now)).toBe(50);
+    expect(currentUse(reading('api', 1, 90, 10, now - 1).windows[0], now)).toBe(0);
+  });
+
+  it('scores an account by its fuller main window and picks the one with most room', () => {
+    expect(quotaPressure(reading('api', 1, 26, 84), now)).toBe(84);
+    expect(quotaPressure({ source: 'api', observedAt: 1, windows: [] }, now)).toBeNull();
+    const pick = roomiestAccount([
+      ['a', reading('api', 1, 26, 84)],
+      ['b', reading('api', 1, 70, 40)],
+      ['c', null],
+      // The 5-hour window reset since this reading: only the weekly 30% counts.
+      ['d', reading('statusline', 1, 95, 30, now - 1)],
+    ], now);
+    expect(pick).toBe('d');
+    expect(roomiestAccount([['a', reading('api', 1, 1, 1)], ['c', null]], now)).toBeNull();
+  });
+
+  it('labels levels, durations and per-model windows', () => {
+    expect([quotaLevel(26), quotaLevel(60), quotaLevel(84), quotaLevel(85)]).toEqual(['ok', 'warn', 'warn', 'over']);
+    expect(formatDuration(30_000)).toBe('<1m');
+    expect(formatDuration(45 * 60_000)).toBe('45m');
+    expect(formatDuration(78 * 60_000)).toBe('1h 18m');
+    expect(formatDuration(2 * 3_600_000)).toBe('2h');
+    expect(formatDuration((2 * 24 + 3) * 3_600_000)).toBe('2d 3h');
+    expect(quotaModel('seven_day_opus')).toBe('Opus');
+    expect(quotaModel('seven_day_claude_fable')).toBe('Claude Fable');
+    expect(quotaModel('seven_day')).toBeNull();
+    expect(quotaModel('five_hour')).toBeNull();
   });
 });

@@ -4,6 +4,7 @@
 mod checksum;
 mod claude_config;
 mod claude_monitor;
+mod claude_quota;
 mod claude_transcript;
 mod dropped;
 mod editor;
@@ -149,6 +150,8 @@ fn main() {
             claude_monitor::claude_monitor_scan,
             claude_monitor::claude_monitor_detect,
             claude_monitor::claude_monitor_remove_account,
+            claude_quota::claude_monitor_quota_hook,
+            claude_quota::claude_monitor_fetch_quota,
             claude_transcript::claude_monitor_transcript,
             claude_transcript::claude_monitor_search,
             claude_config::claude_monitor_config,

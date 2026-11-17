@@ -12,6 +12,7 @@ import { usePluginSdkFor, usePluginState, useToolActiveRef } from '@/platform';
 import { saveTextFile } from '@/lib/fileio';
 import MESSAGES from './ClaudeManager.messages';
 import { CompareView } from './CompareView';
+import { useApiQuota } from './QuotaPanel';
 import { ConfigView } from './ConfigView';
 import { TranscriptViewer, type TranscriptTarget } from './TranscriptViewer';
 import { BudgetBars, UsageChart } from './UsageChart';
@@ -693,6 +694,13 @@ function useAccountDetection(profiles: Profile[], setProfiles: (next: Profile[])
     setProfiles(next);
   }, [setProfiles]);
 
+  /** Turns the usage API on or off for one account. */
+  const setQuotaApi = useCallback((profile: Profile, on: boolean) => {
+    const next = profilesRef.current.map((p) => (p.id === profile.id ? { ...p, quotaApi: on } : p));
+    profilesRef.current = next;
+    setProfiles(next);
+  }, [setProfiles]);
+
   const suggestions = useMemo(
     () => found.filter((d) =>
       d.valid && !ignored.includes(d.configDir) && !profiles.some((p) => p.configDir === d.configDir)),
@@ -701,7 +709,7 @@ function useAccountDetection(profiles: Profile[], setProfiles: (next: Profile[])
   const hiddenCount = found.filter((d) => d.valid && ignored.includes(d.configDir)).length;
 
   return {
-    suggestions, hiddenCount, detecting, error, detect, track, untrack, forget, rename,
+    suggestions, hiddenCount, detecting, error, detect, track, untrack, forget, rename, setQuotaApi,
     ignore: (d: Detected) => setIgnored((dirs) => [...new Set([...dirs, d.configDir])]),
     restoreIgnored: () => setIgnored([]),
   };
@@ -1028,6 +1036,7 @@ export function ClaudeManager() {
   const [accountFilter, setAccountFilter] = useState('all');
   const { snapshots, error, busy, scannedAt, refresh } = useClaudeScan(profiles, auto);
   const detection = useAccountDetection(profiles, setProfiles);
+  const apiQuota = useApiQuota(profiles, tab === 'compare');
   const [limits, setLimits] = usePluginState<Budgets>(sdk, 'budgets', NO_BUDGETS);
   const [viewing, setViewing] = useState<TranscriptTarget | null>(null);
 
@@ -1147,7 +1156,15 @@ export function ClaudeManager() {
         )}
         {snapshots !== null && allRows.length > 0 && tab === 'overview' && <OverviewView {...view} />}
         {snapshots !== null && allRows.length > 0 && tab === 'compare' && (
-          <CompareView rows={allRows} profiles={profiles} snapshots={snapshots} now={scannedAt} />
+          <CompareView
+            rows={allRows}
+            profiles={profiles}
+            snapshots={snapshots}
+            now={scannedAt}
+            api={apiQuota}
+            onSetApi={detection.setQuotaApi}
+            onHookChanged={() => void refresh()}
+          />
         )}
         {snapshots !== null && allRows.length > 0 && tab === 'sessions' && <SessionsView {...view} />}
         {snapshots !== null && allRows.length > 0 && tab === 'usage' && (

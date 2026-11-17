@@ -493,6 +493,15 @@ One **account** is one Claude Code config directory — `~/.claude` by default. 
 
 To split sessions that several accounts share, the tool records which account ran a session when it sees the session in that account's own process registry, or named as a project's `lastSessionId` in that account's `.claude.json`. The record (session id → account) is kept in localStorage under `devtool:claude-manager:sessionOwners` so it survives restarts. Sessions with no such record are shown as "Shared (unknown)".
 
+**Plan usage (quota).** The cards at the top of the Compare tab show the share of each plan limit used and when it resets. Both sources are off until you turn them on for an account:
+
+| Source | What it touches | Network |
+|---|---|---|
+| Status line | Writes `devtool-statusline.sh` into the account's folder and points `statusLine` in its `settings.json` at it (previous `settings.json` kept as `.devtool-bak`; the previous status line object saved to `.devtool-statusline-original.json` and restored when turned off). The script saves Claude Code's status line input to `.devtool-statusline.json` — DevTool reads only its `rate_limits` — then runs your previous status line command. | None |
+| API | Reads the account's OAuth token: macOS Keychain item `Claude Code-credentials` (or its `-<hash>` variant for a custom `CLAUDE_CONFIG_DIR`) via `/usr/bin/security`, else `<dir>/.credentials.json`. Never refreshes, stores, logs or returns the token. | **HTTPS GET `https://api.anthropic.com/api/oauth/usage`** with that token, at most every 5 minutes per account while the Compare tab is open, 15 minutes after a rate-limit answer |
+
+The API endpoint is undocumented and may change or refuse; using a personal plan's token from another tool may not fit Anthropic's terms — the confirmation dialog says so. The numbers (no token) from the last API answer are kept in localStorage under `devtool:claude-manager:apiQuota`.
+
 **Removing an account.** Each account row has two actions. *Stop tracking* only removes it from DevTool's list. *Delete account from this computer* moves the account's config directory — sessions, settings, and the sign-in file stored in it — to the OS Trash / Recycle Bin after a confirmation; for the default `~/.claude` it also moves `~/.claude.json`. It is refused while a Claude Code session of that account is running, and for any folder that is not a config directory. Restoring from the Trash brings the account back. On macOS the sign-in lives in the Keychain, which is not touched.
 
 **What it never does:** it does not open `.credentials.json` (or the OS keychain), does not change any Claude Code file other than saving the two above and moving a whole account directory to the Trash when you ask, makes no network request, and cannot start, stop or message a session. The "copy" buttons put a shell command on the clipboard (`claude --resume <id>`, prefixed with `CLAUDE_CONFIG_DIR=…` for a non-default account); you run it yourself.
@@ -507,7 +516,7 @@ To split sessions that several accounts share, the tool records which account ra
 
 **Refresh:** rescans every 5 seconds while the tool is the one in front (toggle in the toolbar). A rescan only reads the part of each transcript that was appended since the last one.
 
-**Permissions (Tauri):** `dialog:allow-open` for the **Browse…** folder picker, `dialog:allow-save` + file write for the export, and notifications for budget alerts (the OS asks first). Everything else goes through seven Rust commands — `claude_monitor_scan`, `_detect`, `_remove_account` (`claude_monitor.rs`), `_transcript`, `_search` (`claude_transcript.rs`), `_config`, `_write_config` (`claude_config.rs`). Desktop app only.
+**Permissions (Tauri):** `dialog:allow-open` for the **Browse…** folder picker, `dialog:allow-save` + file write for the export, and notifications for budget alerts (the OS asks first). Everything else goes through nine Rust commands — `claude_monitor_scan`, `_detect`, `_remove_account` (`claude_monitor.rs`), `_quota_hook`, `_fetch_quota` (`claude_quota.rs`), `_transcript`, `_search` (`claude_transcript.rs`), `_config`, `_write_config` (`claude_config.rs`). Desktop app only.
 
 ### API Client
 

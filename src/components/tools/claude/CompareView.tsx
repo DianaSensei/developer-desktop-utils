@@ -2,8 +2,9 @@ import { useMemo, useState } from 'react';
 import { Badge, Callout, DataTable, Segmented, StatusDot, Tbody, Td, Th, Thead, Tr, cn } from '@/design-system';
 import { useMessages } from '@/contexts/LocaleContext';
 import MESSAGES from './ClaudeManager.messages';
+import { QuotaPanel, type useApiQuota } from './QuotaPanel';
 import {
-  SHARED_ACCOUNT, compareAccounts, formatCost, formatTokens, leastUsedAccount, shortModel,
+  SHARED_ACCOUNT, compareAccounts, latestQuota, quotaPressure, roomiestAccount, formatCost, formatTokens, leastUsedAccount, shortModel,
   type AccountComparison, type ComparePeriod, type Profile, type ProfileSnapshot, type SessionRow, type UsageTotals,
 } from './usage';
 
@@ -60,18 +61,25 @@ interface CompareViewProps {
   profiles: Profile[];
   snapshots: ProfileSnapshot[] | null;
   now: number;
+  api: ReturnType<typeof useApiQuota>;
+  onSetApi: (profile: Profile, on: boolean) => void;
+  onHookChanged: () => void;
 }
 
 /**
  * Every account side by side — the same periods for each, one column per
  * account — so picking the account to work in next is one look.
  */
-export function CompareView({ rows, profiles, snapshots, now }: CompareViewProps) {
+export function CompareView({ rows, profiles, snapshots, now, api, onSetApi, onHookChanged }: CompareViewProps) {
   const m = useMessages(MESSAGES);
   const [metric, setMetric] = useState<Metric>('tokens');
   const columns = useMemo(() => compareAccounts(rows, profiles, now), [rows, profiles, now]);
   const usable = profiles.filter((_, i) => snapshots?.[i]?.exists).map((p) => p.id);
-  const suggested = leastUsedAccount(columns, usable);
+  // Real plan usage beats local token counts when there is enough of it.
+  const readings = profiles.map((p, i) =>
+    [p.id, latestQuota(snapshots?.[i]?.statuslineQuota, p.quotaApi ? api.states[p.id]?.reading : null)] as [string, ReturnType<typeof latestQuota>]);
+  const byQuota = roomiestAccount(readings.filter(([id]) => usable.includes(id)), now);
+  const suggested = byQuota ?? leastUsedAccount(columns, usable);
   const labelOf = (key: string) => (key === SHARED_ACCOUNT ? m('sharedAccount') : profiles.find((p) => p.id === key)?.label ?? key);
   const snapOf = (key: string) => snapshots?.[profiles.findIndex((p) => p.id === key)];
   const valueOf = (c: AccountComparison, period: ComparePeriod) =>
@@ -79,9 +87,27 @@ export function CompareView({ rows, profiles, snapshots, now }: CompareViewProps
   const maxDaily = Math.max(0, ...columns.flatMap((c) => c.dailyCost));
   const hasShared = columns.some((c) => c.key === SHARED_ACCOUNT);
 
-  if (profiles.length < 2) return <Callout tone="info">{m('compareNeedsTwo')}</Callout>;
+  const quotaOfSuggested = byQuota && readings.find(([id]) => id === byQuota)?.[1];
+  const pressure = quotaOfSuggested ? quotaPressure(quotaOfSuggested, now) : null;
 
   return (
+    <>
+      <QuotaPanel
+        profiles={profiles}
+        snapshots={snapshots}
+        api={api}
+        suggested={byQuota}
+        now={now}
+        onSetApi={onSetApi}
+        onHookChanged={onHookChanged}
+      />
+      {byQuota && pressure !== null && (
+        <Callout tone="success" size="sm">
+          {m('quotaSuggestion', { label: labelOf(byQuota), percent: Math.round(pressure) })}
+        </Callout>
+      )}
+      <Callout tone="info" size="sm">{m('quotaNote')}</Callout>
+      {profiles.length < 2 ? <Callout tone="info">{m('compareNeedsTwo')}</Callout> : (
     <>
       <div className="flex flex-wrap items-center gap-2">
         <p className="flex-1 text-[11px] text-fg-mute">{m('compareIntro')}</p>
@@ -94,7 +120,7 @@ export function CompareView({ rows, profiles, snapshots, now }: CompareViewProps
         />
       </div>
 
-      {suggested && (
+      {suggested && !byQuota && (
         <Callout tone="success" size="sm">
           {m('compareSuggestion', { label: labelOf(suggested) })}
         </Callout>
@@ -176,6 +202,8 @@ export function CompareView({ rows, profiles, snapshots, now }: CompareViewProps
         {m('compareNote')}
         {hasShared && ` ${m('compareSharedNote')}`}
       </Callout>
+    </>
+      )}
     </>
   );
 }

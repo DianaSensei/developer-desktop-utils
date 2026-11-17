@@ -437,6 +437,44 @@ describe('ClaudeManager', () => {
     await waitFor(() => expect(storageGet('devtool:claude-manager:sessionOwners')).toContain('live-1'));
   });
 
+  it('shows each account’s plan usage and fetches from the API only after confirming', async () => {
+    const soon = Date.now() + 78 * 60_000;
+    storageSet(KEYS[0], JSON.stringify([
+      { id: 'default', label: 'Default', configDir: '~/.claude' },
+      { id: 'w', label: 'Work', configDir: '~/.claude-work' },
+    ]));
+    storageSet(KEYS[4], JSON.stringify(true));
+    storageSet(KEYS[1], JSON.stringify('compare'));
+    invokeMock.mockImplementation(async (command: string, args?: { dirs?: string[]; dir?: string }) => {
+      if (command === 'claude_monitor_fetch_quota') {
+        return { source: 'api', observedAt: Date.now(), windows: [
+          { key: 'five_hour', usedPercentage: 5, resetsAt: soon, usedUsd: null, limitUsd: null },
+          { key: 'seven_day', usedPercentage: 12, resetsAt: soon, usedUsd: null, limitUsd: null },
+          { key: 'seven_day_opus', usedPercentage: 0, resetsAt: null, usedUsd: null, limitUsd: null },
+        ] };
+      }
+      if (command !== 'claude_monitor_scan') return [];
+      return (args?.dirs ?? []).map((dir) => (dir === '~/.claude'
+        ? { ...personal, quotaHook: true, statuslineQuota: { source: 'statusline', observedAt: Date.now() - 120_000, windows: [
+          { key: 'five_hour', usedPercentage: 26, resetsAt: soon, usedUsd: null, limitUsd: null },
+          { key: 'seven_day', usedPercentage: 84, resetsAt: soon, usedUsd: null, limitUsd: null },
+        ] } }
+        : { ...work, configDir: dir }));
+    });
+    render(<ClaudeManager />);
+    expect(await screen.findByText('84%')).toBeTruthy();
+    expect(screen.getAllByText(/resets in 1h 1[78]m|reset sau 1h 1[78]m/).length).toBeGreaterThan(0);
+    expect(screen.getByText(/No plan usage yet|Chưa có số liệu hạn mức/)).toBeTruthy();
+    expect(invokeMock).not.toHaveBeenCalledWith('claude_monitor_fetch_quota', expect.anything());
+
+    fireEvent.click(screen.getByRole('switch', { name: /Fetch plan usage from the API for Work|Lấy hạn mức qua API cho Work/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /^Turn on$|^Bật$/ }));
+    expect(await screen.findByText('Opus')).toBeTruthy();
+    expect(invokeMock).toHaveBeenCalledWith('claude_monitor_fetch_quota', { dir: '~/.claude-work' });
+    // Work now has the most room (12% vs 84%).
+    expect(screen.getByText(/"Work" has the most room left|"Work" còn nhiều hạn mức nhất/)).toBeTruthy();
+  });
+
   it('shows the scan error instead of an empty list', async () => {
     invokeMock.mockRejectedValue(new Error('boom'));
     render(<ClaudeManager />);

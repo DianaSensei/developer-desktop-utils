@@ -8,6 +8,19 @@ the app.
 
 ### Claude Manager: compare accounts
 
+- **Plan usage for every account at a glance.** The Compare tab opens with one card per
+  account showing how much of the 5-hour and weekly limits (and per-model limits, when
+  Anthropic reports them) is used and when each resets, coloured green / amber / red,
+  and names the account with the most room left. Two sources, each turned on per
+  account:
+  - **Status line** — DevTool adds a small script as the account's Claude Code status
+    line (your existing status line keeps working; turning it off restores it). Claude
+    Code hands it the plan usage; no token is read and nothing goes over the network.
+    The numbers update while that account has a session open.
+  - **API** — DevTool reads the account's sign-in token and asks Anthropic, at most every
+    5 minutes while the Compare tab is open. Always current, but the endpoint is not
+    published by Anthropic and may change or refuse, and using a personal plan's token
+    from another tool may not fit its terms. The token is never stored or shown.
 - **A Compare tab puts every account side by side** — usage in the last 5 hours, today,
   7 and 30 days (tokens or cost), running sessions, last activity, main model and a
   7-day cost chart — and points out the account that used the least in the last 5

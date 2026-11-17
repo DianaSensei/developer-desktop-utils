@@ -416,7 +416,7 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
     use: [
       'Overview shows every Claude Code session open right now — working, waiting for you, or idle — and what the chosen range has used.',
       'Sessions lists everything on disk; click one to read the conversation, search titles or what was said, and copy the command that reopens a session in its own folder and account.',
-      'Compare lays every account side by side (last 5 hours, today, 7 and 30 days) and points out the one that used the least lately.',
+      'Compare opens with each account’s plan usage (5-hour and weekly limits, reset times) — turn on the status line or API source per account — then lays local usage side by side.',
       'Usage charts cost or tokens over time and breaks them down by account, model, project and day; set a daily / monthly budget to be notified at 80% and when it is exceeded, and export the range as CSV or JSON.',
       'Config shows one account’s settings.json, CLAUDE.md, MCP servers, agents, commands and skills; the first two can be edited or copied to another account.',
       'Accounts: config directories are found automatically, wherever another tool keeps them; add any other path by typing it or with Browse — a parent folder holding several accounts works too.',
@@ -428,6 +428,7 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
     caveat: [
       'Local only: it reads Claude Code’s files and never opens the credentials file; it cannot start, stop or message a session. The only files it writes are settings.json and CLAUDE.md, when you save them (the old version is kept as .devtool-bak).',
       'Budget alerts fire only while this tool is open in a tab.',
+      'The API plan-usage source reads the account’s sign-in token and calls an unpublished Anthropic endpoint; prefer the status line source.',
       'Deleting an account moves its whole config directory to the Trash; "stop tracking" only hides it here.',
       'Cost is an estimate at API list prices — subscription plans are not billed per token, and this is not your remaining plan limit.',
       'Desktop app only.',
@@ -522,6 +523,6 @@ export const TOOL_GUIDE_VERSIONS: Record<string, number> = {
   'text-editor': 7,
   // 3 — Jira Cloud: issues as tasks, status push, worklogs.
   'task-tracker': 3,
-  // 4 — Compare tab, shared sessions split by who ran them.
-  'claude-manager': 4,
+  // 5 — plan usage (quota) cards in Compare.
+  'claude-manager': 5,
 };

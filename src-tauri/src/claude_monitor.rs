@@ -109,6 +109,9 @@ pub struct ProfileSnapshot {
     /// last session of each project in its `.claude.json`. Transcripts do not
     /// record the account, so this is what lets shared sessions be split.
     claimed_sessions: Vec<String>,
+    /// Plan usage saved by DevTool's status line script, if installed.
+    statusline_quota: Option<crate::claude_quota::QuotaReading>,
+    quota_hook: bool,
 }
 
 // ── Transcript lines (only the fields we read) ──────────────────────────
@@ -660,6 +663,8 @@ fn scan_profile(
     }
     snapshot.exists = true;
     snapshot.account = read_account(&dir, home);
+    snapshot.statusline_quota = crate::claude_quota::read_statusline_quota(&dir);
+    snapshot.quota_hook = crate::claude_quota::hook_installed(&dir);
 
     let mut by_id: HashMap<String, SessionFiles> = HashMap::new();
     for project in fs::read_dir(dir.join("projects")).into_iter().flatten().flatten() {
