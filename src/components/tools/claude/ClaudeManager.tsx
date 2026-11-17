@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Bot, Download, EyeOff, FolderOpen, FolderSearch, Plus, RefreshCw, Terminal, Trash2 } from 'lucide-react';
+import { Bot, Check, Download, EyeOff, FolderOpen, FolderSearch, Pencil, Plus, RefreshCw, Terminal, Trash2, X } from 'lucide-react';
 import {
   Badge, Button, Callout, ConfirmDialog, CopyButton, DataTable, EmptyState, IconButton, Input, LoadingRow, Spinner,
   SearchInput, SectionLabel, Segmented, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Stat,
@@ -678,6 +678,15 @@ function useAccountDetection(profiles: Profile[], setProfiles: (next: Profile[])
     setFound((list) => list.filter((d) => d.configDir !== profile.configDir));
   }, [setProfiles]);
 
+  /** Changes the name shown for an account; the directory stays the same. */
+  const rename = useCallback((profile: Profile, label: string) => {
+    const name = label.trim();
+    if (!name || name === profile.label) return;
+    const next = profilesRef.current.map((p) => (p.id === profile.id ? { ...p, label: name } : p));
+    profilesRef.current = next;
+    setProfiles(next);
+  }, [setProfiles]);
+
   const suggestions = useMemo(
     () => found.filter((d) =>
       d.valid && !ignored.includes(d.configDir) && !profiles.some((p) => p.configDir === d.configDir)),
@@ -686,7 +695,7 @@ function useAccountDetection(profiles: Profile[], setProfiles: (next: Profile[])
   const hiddenCount = found.filter((d) => d.valid && ignored.includes(d.configDir)).length;
 
   return {
-    suggestions, hiddenCount, detecting, error, detect, track, untrack, forget,
+    suggestions, hiddenCount, detecting, error, detect, track, untrack, forget, rename,
     ignore: (d: Detected) => setIgnored((dirs) => [...new Set([...dirs, d.configDir])]),
     restoreIgnored: () => setIgnored([]),
   };
@@ -700,6 +709,65 @@ interface AccountsViewProps {
   allRows: SessionRow[];
   fromHour: number;
   m: M;
+}
+
+/** An account's name, renamed in place: Enter or blur saves, Escape cancels. */
+function AccountLabel({ profile, onRename, m }: { profile: Profile; onRename: (label: string) => void; m: M }) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const cancelled = useRef(false);
+
+  if (draft === null) {
+    return (
+      <span className="group inline-flex max-w-full items-center gap-1">
+        <span className="truncate" title={profile.label}>{profile.label}</span>
+        <IconButton
+          size="xs"
+          title={m('renameAccount')}
+          aria-label={m('renameAccount')}
+          className="shrink-0 opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100"
+          onClick={() => { cancelled.current = false; setDraft(profile.label); }}
+        >
+          <Pencil className="h-3 w-3" />
+        </IconButton>
+      </span>
+    );
+  }
+
+  const save = () => {
+    if (!cancelled.current) onRename(draft);
+    setDraft(null);
+  };
+  return (
+    <span className="inline-flex items-center gap-1">
+      <Input
+        autoFocus
+        value={draft}
+        maxLength={60}
+        aria-label={m('renameAccount')}
+        className="w-44"
+        onChange={(e) => setDraft(e.target.value)}
+        onFocus={(e) => e.target.select()}
+        onBlur={save}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') e.currentTarget.blur();
+          if (e.key === 'Escape') { cancelled.current = true; e.currentTarget.blur(); }
+        }}
+      />
+      {/* onMouseDown keeps the input's blur from firing first. */}
+      <IconButton size="xs" title={m('save')} aria-label={m('save')} onMouseDown={(e) => e.preventDefault()} onClick={save}>
+        <Check className="h-3 w-3" />
+      </IconButton>
+      <IconButton
+        size="xs"
+        title={m('cancelRename')}
+        aria-label={m('cancelRename')}
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => { cancelled.current = true; setDraft(null); }}
+      >
+        <X className="h-3 w-3" />
+      </IconButton>
+    </span>
+  );
 }
 
 function AccountsView({ profiles, detection, snapshots, allRows, fromHour, m }: AccountsViewProps) {
@@ -821,7 +889,9 @@ function AccountsView({ profiles, detection, snapshots, allRows, fromHour, m }: 
             const totals = usage.get(p.id);
             return (
               <Tr key={p.id}>
-                <Td className="font-medium whitespace-nowrap">{p.label}</Td>
+                <Td className="font-medium">
+                  <AccountLabel profile={p} onRename={(label) => detection.rename(p, label)} m={m} />
+                </Td>
                 <Td>
                   {!snap
                     ? <Spinner size="sm" />
@@ -1027,9 +1097,6 @@ export function ClaudeManager() {
           ]}
         />
         <div className="ml-auto flex items-center gap-2">
-          <Button size="sm" variant="outline" onClick={() => setTab('accounts')}>
-            <Plus className="mr-1.5 h-3.5 w-3.5" />{m('addAccount')}
-          </Button>
           <span className="hidden text-[11px] text-fg-mute @2xl:inline">
             {m('updatedAt', { time: new Date(scannedAt).toLocaleTimeString() })}
           </span>
