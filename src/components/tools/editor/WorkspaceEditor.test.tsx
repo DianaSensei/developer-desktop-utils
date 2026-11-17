@@ -125,7 +125,7 @@ describe('WorkspaceEditor (browser demo workspace)', () => {
 
     fireEvent.change(screen.getByLabelText('Find'), { target: { value: 'quick open' } });
     await act(async () => { fireEvent.submit(screen.getByLabelText('Find').closest('form')!); });
-    expect(await screen.findByText('1 results')).toBeTruthy();
+    await waitFor(() => expect(screen.getByTestId('hit-position').textContent).toBe('1 / 1 results'));
     // Highlighted in the result list and on the line it jumped to.
     expect(screen.getAllByText('Quick Open', { selector: 'mark' })).toHaveLength(2);
 
@@ -203,6 +203,43 @@ describe('WorkspaceEditor (browser demo workspace)', () => {
       await waitFor(() => expect(screen.getByTestId('viewer-lines').firstElementChild?.getAttribute('data-line')).toBe('4'));
       await act(async () => { fireEvent.keyDown(scroller, { key: 'Home' }); });
       await waitFor(() => expect(screen.getByTestId('viewer-lines').firstElementChild?.getAttribute('data-line')).toBe('0'));
+    });
+
+    it('search: total count, Enter / Shift+Enter / F3 between hits, next page past the first 200', async () => {
+      const content = Array.from({ length: 1000 }, (_, i) => (i % 2 ? `hit ${i}` : `miss ${i}`)).join('\n');
+      await openViewer(content);
+      const find = screen.getByLabelText('Find');
+      fireEvent.change(find, { target: { value: 'hit' } });
+      await act(async () => { fireEvent.submit(find.closest('form')!); });
+      const position = () => screen.getByTestId('hit-position').textContent;
+      // The first 200 are listed; the total is counted after.
+      await waitFor(() => expect(position()).toBe('1 / 500 results'));
+      expect(screen.getByText(/showing 200/)).toBeTruthy();
+      expect(row(1)?.querySelector('mark')?.textContent).toBe('hit');
+
+      // Enter again on the same query: next. Shift+Enter: back.
+      await act(async () => { fireEvent.submit(find.closest('form')!); });
+      await waitFor(() => expect(position()).toBe('2 / 500 results'));
+      await act(async () => { fireEvent.keyDown(find, { key: 'Enter', shiftKey: true }); });
+      await waitFor(() => expect(position()).toBe('1 / 500 results'));
+      // Not every hit is loaded yet, so Previous doesn't wrap to the end.
+      await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Previous match/ })); });
+      expect(position()).toBe('1 / 500 results');
+
+      // From the 200th, Next loads the next page.
+      await act(async () => { fireEvent.click(screen.getByText('399', { exact: false, selector: 'button span' }).closest('button')!); });
+      await waitFor(() => expect(position()).toBe('200 / 500 results'));
+      await act(async () => { fireEvent.keyDown(screen.getByRole('region', { name: 'README.md' }), { key: 'F3' }); });
+      await waitFor(() => expect(position()).toBe('201 / 500 results'));
+      expect(screen.getByText(/showing 400/)).toBeTruthy();
+
+      // A different query is a new search, not "next".
+      fireEvent.change(find, { target: { value: 'miss 99' } });
+      await act(async () => { fireEvent.submit(find.closest('form')!); });
+      await waitFor(() => expect(position()).toBe('1 / 5 results')); // 990, 992 … 998
+      // Every hit loaded: Previous from the first wraps to the last.
+      await act(async () => { fireEvent.keyDown(find, { key: 'Enter', shiftKey: true }); });
+      await waitFor(() => expect(position()).toBe('5 / 5 results'));
     });
 
     it('follows the editor font size (⌘= / ⌘−)', async () => {

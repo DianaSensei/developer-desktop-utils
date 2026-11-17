@@ -434,10 +434,12 @@ pub async fn editor_view_search(
     case_sensitive: bool,
     from_line: u64,
     max_hits: Option<usize>,
+    count_total: Option<bool>,
 ) -> FsResult<editor_view::SearchResult> {
     let v = viewer(&app, id)?;
     let max = max_hits.unwrap_or(200).min(1000);
-    blocking(move || v.search(&query, regex, case_sensitive, from_line, max, std::time::Duration::from_millis(1500))).await
+    let count = count_total.unwrap_or(false);
+    blocking(move || v.search(&query, regex, case_sensitive, from_line, max, count, std::time::Duration::from_millis(1500))).await
 }
 
 #[tauri::command]

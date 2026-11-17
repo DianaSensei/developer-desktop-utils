@@ -23,9 +23,16 @@
 //
 // Font, size, line height, spacing and weight follow the editor's
 // Appearance settings (status bar "Aa", ⌘= / ⌘−).
+//
+// Search scans the file on the backend (~0.1 s per 300 MB, no full-text
+// index: see editor_view.rs). Each call stops after ~1.5 s, so a slow scan
+// continues call by call until 200 hits or the end; meanwhile the first hit
+// is shown as soon as it is found. The total is counted afterwards in the
+// background ("3 / 41,250"). Enter / F3 go to the next hit, Shift+Enter /
+// Shift+F3 to the previous one, loading the next 200 when needed.
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'react';
-import { CaseSensitive, ChevronLeft, ChevronRight, FilePen, Regex, ScrollText, Search } from 'lucide-react';
+import { CaseSensitive, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, FilePen, Regex, ScrollText, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -37,7 +44,7 @@ import { ToggleChip } from '@/components/ui/toggle-chip';
 import { useMessages } from '@/contexts/LocaleContext';
 import MESSAGES from './WorkspaceEditor.messages';
 import type { EditorStore, Tab } from './store';
-import { toFsError, type SearchHit, type ViewLine, type ViewStatus } from './fs';
+import { toFsError, type SearchHit, type SearchOptions, type ViewLine, type ViewStatus } from './fs';
 import { formatSize } from './Timeline';
 import { fontFamilyFor, type EditorAppearance } from './appearance';
 
@@ -55,6 +62,10 @@ const MAX_SPACER = 8_000_000;
 const MAX_EXPANDED = 16;
 /** Measured row heights kept for wheel/keyboard scrolling. */
 const MAX_HEIGHTS = 4096;
+/** Hits loaded at a time; Next past the last one loads the next page. */
+const PAGE = 200;
+
+type Query = Pick<SearchOptions, 'query' | 'regex' | 'caseSensitive'>;
 
 type Mark = { line: number; column?: number; length?: number };
 
@@ -389,28 +400,38 @@ export function LargeFileViewer({ store, tab, wrap, appearance }: Props) {
   const [query, setQuery] = useState('');
   const [regex, setRegex] = useState(false);
   const [matchCase, setMatchCase] = useState(false);
-  const [hits, setHits] = useState<SearchHit[] | null>(null);
-  const [nextLine, setNextLine] = useState<number | null>(null);
+  const [hits, setHitsState] = useState<SearchHit[] | null>(null);
+  const hitsRef = useRef<SearchHit[]>([]);
+  const [nextLine, setNextLineState] = useState<number | null>(null);
+  const nextLineRef = useRef<number | null>(null);
+  const [hitIdx, setHitIdx] = useState(-1);
+  /** Every matching line in the file, once counted. */
+  const [hitTotal, setHitTotal] = useState<number | null>(null);
+  /** The count so far, while counting. */
+  const [counted, setCounted] = useState<number | null>(null);
+  /** Line reached while still looking for hits (progress). */
+  const [scanLine, setScanLine] = useState<number | null>(null);
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const gotoRef = useRef<HTMLInputElement>(null);
+  /** What the shown hits are for. */
+  const searched = useRef<Query | null>(null);
+  /** Bumped by every new search; older loops stop at their next await. */
+  const token = useRef(0);
+  useEffect(() => () => { token.current += 1; }, []);
+  /** One backend call at a time (paging and counting take turns); a new
+   *  search jumps the queue, and the backend drops the one it supersedes. */
+  const chain = useRef<Promise<unknown>>(Promise.resolve());
 
-  const runSearch = async (from: number, append: boolean) => {
-    if (handle === null || !query) return;
-    setSearching(true);
-    setSearchError(null);
-    try {
-      const r = await store.fs.viewer.search(handle, { query, regex, caseSensitive: matchCase, fromLine: from, maxHits: 200 });
-      setHits((prev) => (append && prev ? [...prev, ...r.hits] : r.hits));
-      setNextLine(r.nextLine);
-      if (!append && r.hits[0]) jumpTo(hitMark(r.hits[0]));
-    } catch (e) {
-      const err = toFsError(e);
-      setSearchError(err.code === 'invalid_regex' ? m('err.invalid_regex') : err.message);
-    } finally {
-      setSearching(false);
-    }
+  const setHits = (h: SearchHit[] | null) => { hitsRef.current = h ?? []; setHitsState(h); };
+  const setNextLine = (n: number | null) => { nextLineRef.current = n; setNextLineState(n); };
+
+  const callSearch = (opts: SearchOptions, preempt = false) => {
+    const run = () => store.fs.viewer.search(handle!, opts);
+    const p = preempt ? run() : chain.current.then(run, run);
+    chain.current = p.catch(() => undefined);
+    return p;
   };
 
   const jumpTo = (hit: Mark) => {
@@ -418,6 +439,141 @@ export function LargeFileViewer({ store, tab, wrap, appearance }: Props) {
     setMark(hit);
     // Wrapped lines above could push the hit off screen: put it on top.
     scrollToLine(wrap ? hit.line : hit.line - Math.floor(visible / 3));
+  };
+
+  const jumpToHit = (i: number, list = hitsRef.current) => {
+    if (!list[i]) return;
+    setHitIdx(i);
+    jumpTo(hitMark(list[i]));
+  };
+
+  /** Up to PAGE more hits from `from`, call after call (each one stops after
+   *  ~1.5 s). `null` when a newer search took over. */
+  const collect = async (t: number, q: Query, from: number, preempt: boolean) => {
+    const before = hitsRef.current.length;
+    let at = from;
+    let first = preempt;
+    for (;;) {
+      const want = PAGE - (hitsRef.current.length - before);
+      const r = await callSearch({ ...q, fromLine: at, maxHits: want }, first);
+      first = false;
+      if (token.current !== t) return null;
+      if (r.hits.length) {
+        const wasEmpty = hitsRef.current.length === 0;
+        setHits([...hitsRef.current, ...r.hits]);
+        if (wasEmpty) jumpToHit(0);
+      }
+      if (!r.partial || r.nextLine === null) {
+        setNextLine(null);
+        setScanLine(null);
+        return { atEnd: true };
+      }
+      if (hitsRef.current.length - before >= PAGE) {
+        setNextLine(r.nextLine);
+        setScanLine(null);
+        return { atEnd: false };
+      }
+      at = r.nextLine;
+      setScanLine(at);
+    }
+  };
+
+  /** Counts every matching line in the background (resumable calls). */
+  const countAll = async (t: number, q: Query) => {
+    let at = 0;
+    let sum = 0;
+    for (;;) {
+      const r = await callSearch({ ...q, fromLine: at, maxHits: 0, countTotal: true });
+      if (token.current !== t) return;
+      sum += r.matched;
+      if (r.nextLine === null) { setHitTotal(sum); setCounted(null); return; }
+      at = r.nextLine;
+      setCounted(sum);
+    }
+  };
+
+  const showError = (e: unknown) => {
+    const err = toFsError(e);
+    setSearchError(err.code === 'invalid_regex' ? m('err.invalid_regex') : err.message);
+  };
+
+  const runSearch = async () => {
+    if (handle === null || !query) return;
+    const t = ++token.current;
+    const q: Query = { query, regex, caseSensitive: matchCase };
+    searched.current = q;
+    setSearchError(null);
+    setHits([]);
+    setHitIdx(-1);
+    setHitTotal(null);
+    setCounted(null);
+    setNextLine(null);
+    setScanLine(0);
+    setSearching(true);
+    try {
+      const res = await collect(t, q, 0, true);
+      if (!res) return;
+      if (res.atEnd) {
+        setHitTotal(hitsRef.current.length);
+      } else {
+        setCounted(hitsRef.current.length);
+        void countAll(t, q).catch(() => { if (token.current === t) setCounted(null); });
+      }
+    } catch (e) {
+      if (token.current !== t) return;
+      setHits(null);
+      setScanLine(null);
+      showError(e);
+    } finally {
+      if (token.current === t) setSearching(false);
+    }
+  };
+
+  /** The next PAGE hits. */
+  const loadMore = async () => {
+    const q = searched.current;
+    if (handle === null || !q || nextLineRef.current === null) return false;
+    const t = token.current;
+    setSearching(true);
+    try {
+      return (await collect(t, q, nextLineRef.current, false)) !== null;
+    } catch (e) {
+      if (token.current === t) showError(e);
+      return false;
+    } finally {
+      if (token.current === t) setSearching(false);
+    }
+  };
+
+  /** Next / previous hit, loading more past the last; wraps around once
+   *  every hit is loaded. */
+  const goHit = async (dir: 1 | -1) => {
+    const n = hitsRef.current.length;
+    if (!n) return;
+    let i = hitIdx + dir;
+    if (i >= n) {
+      if (nextLineRef.current !== null) {
+        if (!(await loadMore()) || hitsRef.current.length <= n) return;
+      } else {
+        i = 0;
+      }
+    }
+    if (i < 0) {
+      if (nextLineRef.current !== null) return;
+      i = n - 1;
+    }
+    jumpToHit(i);
+  };
+
+  // Keep the current hit visible in the results list too.
+  const hitListRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    hitListRef.current?.querySelector<HTMLElement>('[aria-current="true"]')?.scrollIntoView({ block: 'nearest' });
+  }, [hitIdx]);
+
+  const sameQuery = () => {
+    const q = searched.current;
+    return !!q && q.query === query && q.regex === regex && q.caseSensitive === matchCase;
   };
 
   const onFollowChange = (on: boolean) => {
@@ -428,6 +584,7 @@ export function LargeFileViewer({ store, tab, wrap, appearance }: Props) {
 
   const onKeyDown = (e: React.KeyboardEvent) => {
     const mod = e.metaKey || e.ctrlKey;
+    if (e.key === 'F3') { e.preventDefault(); void goHit(e.shiftKey ? -1 : 1); }
     if (mod && e.key.toLowerCase() === 'f') { e.preventDefault(); searchRef.current?.focus(); searchRef.current?.select(); }
     if (mod && e.key.toLowerCase() === 'g') { e.preventDefault(); gotoRef.current?.focus(); }
   };
@@ -469,7 +626,12 @@ export function LargeFileViewer({ store, tab, wrap, appearance }: Props) {
         </form>
         <form
           className="flex items-center gap-1"
-          onSubmit={(e) => { e.preventDefault(); void runSearch(0, false); }}
+          onSubmit={(e) => {
+            e.preventDefault();
+            // Enter again on the same query: the next hit.
+            if (sameQuery() && hitsRef.current.length && !searching) void goHit(1);
+            else void runSearch();
+          }}
         >
           <div className="relative">
             <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-fg-mute" />
@@ -477,6 +639,9 @@ export function LargeFileViewer({ store, tab, wrap, appearance }: Props) {
               ref={searchRef}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && e.shiftKey) { e.preventDefault(); if (sameQuery()) void goHit(-1); }
+              }}
               placeholder={m('findPlaceholder')}
               aria-label={m('find')}
               className="w-48 pl-8 text-xs"
@@ -488,9 +653,15 @@ export function LargeFileViewer({ store, tab, wrap, appearance }: Props) {
           <IconButton active={regex} aria-pressed={regex} title={m('useRegex')} aria-label={m('useRegex')} onClick={() => setRegex((v) => !v)}>
             <Regex className="h-4 w-4" />
           </IconButton>
-          <Button type="submit" size="sm" variant="outline" disabled={!query || handle === null || searching}>
-            {searching ? <Spinner size="xs" /> : m('find')}
+          <Button type="submit" size="sm" variant="outline" disabled={!query || handle === null || (searching && !hits?.length)}>
+            {searching && !hits?.length ? <Spinner size="xs" /> : m('find')}
           </Button>
+          <IconButton title={m('prevMatch')} aria-label={m('prevMatch')} disabled={!hits?.length} onClick={() => void goHit(-1)}>
+            <ChevronUp className="h-4 w-4" />
+          </IconButton>
+          <IconButton title={m('nextMatch')} aria-label={m('nextMatch')} disabled={!hits?.length} onClick={() => void goHit(1)}>
+            <ChevronDown className="h-4 w-4" />
+          </IconButton>
         </form>
         <ToggleChip pressed={follow} onPressedChange={onFollowChange} title={m('followHint')} className="gap-1.5">
           <ScrollText className="h-3.5 w-3.5" />{m('follow')}
@@ -506,29 +677,47 @@ export function LargeFileViewer({ store, tab, wrap, appearance }: Props) {
       {error && <Callout tone="error" size="sm" className="m-2 mb-0">{error}</Callout>}
 
       {(hits !== null || searchError) && (
-        <div className="max-h-[35%] shrink-0 overflow-y-auto border-b border-line bg-bg px-1 py-1 text-xs">
+        <div ref={hitListRef} className="max-h-[35%] shrink-0 overflow-y-auto border-b border-line bg-bg px-1 py-1 text-xs">
           {searchError && <p className="px-2 py-1 text-bad">{searchError}</p>}
           {hits !== null && (
-            <div className="flex items-center gap-2 px-2 py-1 text-[11px] text-fg-mute">
-              <span>{hits.length === 0 ? m('noHits') : m('hitsCount', { n: hits.length })}</span>
+            <div className="flex items-center gap-2 px-2 py-1 text-[11px] tabular-nums text-fg-mute" aria-live="polite">
+              {hits.length === 0 && searching && (
+                <span className="flex items-center gap-1">
+                  <Spinner size="xs" />
+                  {m('searchingPct', { pct: status?.lines ? Math.min(99, Math.floor(((scanLine ?? 0) / status.lines) * 100)) : 0 })}
+                </span>
+              )}
+              {hits.length === 0 && !searching && <span>{m('noHits')}</span>}
+              {hits.length > 0 && (
+                <span data-testid="hit-position">
+                  {hitIdx >= 0 && `${(hitIdx + 1).toLocaleString()} / `}
+                  {hitTotal !== null
+                    ? m('hitsCount', { n: hitTotal.toLocaleString() })
+                    : m('hitsAtLeast', { n: Math.max(counted ?? 0, hits.length).toLocaleString() })}
+                </span>
+              )}
+              {hits.length > 0 && hitTotal === null && counted !== null && (
+                <span className="flex items-center gap-1"><Spinner size="xs" />{m('counting')}</span>
+              )}
               {nextLine !== null && (
                 <>
-                  <span>· {m('searchedTo', { line: nextLine.toLocaleString() })}</span>
-                  <Button size="sm" variant="ghost" className="ml-auto" onClick={() => void runSearch(nextLine, true)} disabled={searching}>
+                  <span>· {m('shownHits', { n: hits.length.toLocaleString() })}</span>
+                  <Button size="sm" variant="ghost" className="ml-auto" onClick={() => void loadMore()} disabled={searching}>
                     {m('moreHits')}
                   </Button>
                 </>
               )}
             </div>
           )}
-          {hits?.map((h) => (
+          {hits?.map((h, i) => (
             <button
               key={`${h.line}:${h.column}`}
               type="button"
-              onClick={() => jumpTo(hitMark(h))}
+              onClick={() => jumpToHit(i)}
+              aria-current={i === hitIdx ? 'true' : undefined}
               className={cn(
                 'flex w-full items-baseline gap-2 rounded-xs px-2 py-0.5 text-left font-mono hover:bg-bg-2/60',
-                mark?.line === h.line && 'bg-acc/10',
+                i === hitIdx ? 'bg-acc/15' : mark?.line === h.line && 'bg-acc/10',
               )}
             >
               <span className="w-16 shrink-0 text-right tabular-nums text-fg-mute">{(h.line + 1).toLocaleString()}</span>

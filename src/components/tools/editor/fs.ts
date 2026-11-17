@@ -70,8 +70,16 @@ export interface SearchHit {
 
 export interface SearchResult {
   hits: SearchHit[];
+  /** Where to continue; `null` at the end of the file. */
   nextLine: number | null;
+  /** Stopped by the time budget or `maxHits` rather than by the end. */
   partial: boolean;
+  /** Matching lines from `fromLine` to the end — with `countTotal`, when
+   *  counted within the call's time budget. */
+  total: number | null;
+  /** Matching lines this call saw; a count cut short continues from
+   *  `nextLine` and adds up. */
+  matched: number;
 }
 
 export interface SearchOptions {
@@ -80,6 +88,9 @@ export interface SearchOptions {
   caseSensitive: boolean;
   fromLine: number;
   maxHits?: number;
+  /** Keep scanning past `maxHits` to count every matching line (`total`).
+   *  With `maxHits: 0` it is a pure, resumable count. */
+  countTotal?: boolean;
 }
 
 /** The read-only large-file viewer (editor_view.rs): lines are read from disk
@@ -252,7 +263,7 @@ export function createNativeFs(sdk: PluginSdk): EditorFs {
       line: (id, line) => call<ViewLine | null>('editor_view_line', { id, line }),
       refresh: (id) => call<ViewStatus>('editor_view_refresh', { id }),
       search: (id, o) => call<SearchResult>('editor_view_search', {
-        id, query: o.query, regex: o.regex, caseSensitive: o.caseSensitive, fromLine: o.fromLine, maxHits: o.maxHits,
+        id, query: o.query, regex: o.regex, caseSensitive: o.caseSensitive, fromLine: o.fromLine, maxHits: o.maxHits, countTotal: o.countTotal,
       }),
       close: async (id) => { await call<void>('editor_view_close', { id }); },
     },
