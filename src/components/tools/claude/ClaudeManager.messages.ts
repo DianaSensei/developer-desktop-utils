@@ -383,6 +383,7 @@ export default defineMessages({
 
   // Quota table
   quotaCol: { vi: 'Hạn mức', en: 'Plan limits' },
+  quotaErrorBadge: { vi: 'lỗi', en: 'error' },
   quotaSignalLabel: {
     vi: '{{label}}: 5 giờ {{five}}, tuần {{week}}',
     en: '{{label}}: 5-hour {{five}}, weekly {{week}}',

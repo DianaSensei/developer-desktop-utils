@@ -167,7 +167,7 @@ function SignalIcon({ five, week, show, now, label }: {
 }) {
   const id = useId().replace(/:/g, '');
   return (
-    <svg viewBox="0 0 22 23" style={{ width: 32, height: 33 }} className="shrink-0" role="img" aria-label={label}>
+    <svg viewBox="0 0 22 23" style={{ width: 20, height: 21 }} className="shrink-0" role="img" aria-label={label}>
       <SignalRow window={five} show={show} now={now} baseline={10} striped={false} id={`${id}5`} />
       <SignalRow window={week} show={show} now={now} baseline={23} striped id={`${id}w`} />
     </svg>
@@ -201,43 +201,15 @@ function limitText(m: M, window: QuotaWindow | undefined, show: QuotaShow, now: 
   return { value, reset, tone: LEVEL_TEXT[quotaLevel(used)] };
 }
 
-/** The icon with one line per row beside it: key, share and time to reset. */
-function QuotaCell({ five, week, show, now, label, m }: {
-  five?: QuotaWindow; week?: QuotaWindow; show: QuotaShow; now: number; label: string; m: M;
-}) {
-  if (!five && !week) return <span className="text-fg-mute">—</span>;
-  const lines = [
-    { name: m('quota5h'), window: five, striped: false },
-    { name: m('quotaWeekly'), window: week, striped: true },
-  ];
-  const texts = lines.map((l) => limitText(m, l.window, show, now));
+/** One limit on one line: share (used or left) and time to reset. */
+function LimitCell({ window, show, now, m }: { window?: QuotaWindow; show: QuotaShow; now: number; m: M }) {
+  const t = limitText(m, window, show, now);
+  if (!t) return <span className="text-fg-mute">—</span>;
   return (
-    <div className="flex items-center gap-2.5">
-      <SignalIcon
-        five={five}
-        week={week}
-        show={show}
-        now={now}
-        label={m('quotaSignalLabel', {
-          label,
-          five: texts[0]?.value ?? '—',
-          week: texts[1]?.value ?? '—',
-        })}
-      />
-      <div className="min-w-0 space-y-0.5 text-xs leading-tight">
-        {lines.map((l, i) => {
-          const t = texts[i];
-          return (
-            <div key={l.name} className="flex items-center gap-1.5 whitespace-nowrap">
-              <Swatch striped={l.striped} tone={t?.tone ?? 'text-fg-mute'} />
-              <span className="w-9 text-fg-mute">{l.name}</span>
-              <span className="w-14 font-semibold tabular-nums">{t?.value ?? '—'}</span>
-              {t?.reset && <span className="font-mono text-[11px] text-fg-mute" title={t.reset.long}>{t.reset.short}</span>}
-            </div>
-          );
-        })}
-      </div>
-    </div>
+    <span className="flex items-baseline gap-1.5 whitespace-nowrap">
+      <span className={cn('font-semibold tabular-nums', show === 'left' ? '' : t.tone)}>{t.value}</span>
+      {t.reset && <span className="font-mono text-[11px] text-fg-mute" title={t.reset.long}>{t.reset.short}</span>}
+    </span>
   );
 }
 
@@ -267,26 +239,22 @@ function SourceCell({ reading, stale, hookOn, apiOn, error, now, m }: {
     const text = hookOn ? m('quotaWaitingShort') : apiOn ? m('quotaFetching') : m('quotaNoneShort');
     const hint = hookOn ? m('quotaWaiting') : m('quotaNone');
     return (
-      <div className="space-y-0.5" title={[hint, error].filter(Boolean).join('\n')}>
-        <div className="flex items-center gap-1.5 text-fg-mute">
-          <StatusDot tone={error ? 'error' : 'idle'} size="xs" />
-          {text}
-        </div>
-        {error && <div className="truncate text-warn">{error}</div>}
+      <div className="flex items-center gap-1.5 whitespace-nowrap text-fg-mute" title={[error, hint].filter(Boolean).join('\n')}>
+        <StatusDot tone={error ? 'error' : 'idle'} size="xs" />
+        {text}
+        {error && <Badge tone="danger" size="xs">{m('quotaErrorBadge')}</Badge>}
       </div>
     );
   }
   const source = m(reading.source === 'api' ? 'quotaFromApi' : 'quotaFromStatusline');
   const staleHint = stale ? m(reading.source === 'api' ? 'quotaStaleApi' : 'quotaStaleStatusline') : null;
-  const tooltip = [staleHint, reading.credential, error].filter(Boolean).join('\n') || undefined;
+  const tooltip = [error, staleHint, reading.credential].filter(Boolean).join('\n') || undefined;
   return (
-    <div className="space-y-0.5" title={tooltip}>
-      <div className={cn('flex items-center gap-1.5 whitespace-nowrap', stale ? 'text-warn' : 'text-fg-mute')}>
-        <StatusDot tone={error ? 'error' : stale ? 'paused' : 'live'} size="xs" />
-        <span>{source} · {age(m, reading.observedAt, now)}</span>
-        {stale && <Badge tone="warning" size="xs">{m('quotaStaleBadge')}</Badge>}
-      </div>
-      {error && <div className="truncate text-warn">{error}</div>}
+    <div className={cn('flex items-center gap-1.5 whitespace-nowrap', stale ? 'text-warn' : 'text-fg-mute')} title={tooltip}>
+      <StatusDot tone={error ? 'error' : stale ? 'paused' : 'live'} size="xs" />
+      <span>{source} · {age(m, reading.observedAt, now)}</span>
+      {stale && <Badge tone="warning" size="xs">{m('quotaStaleBadge')}</Badge>}
+      {error && <Badge tone="danger" size="xs">{m('quotaErrorBadge')}</Badge>}
     </div>
   );
 }
@@ -356,11 +324,14 @@ export function QuotaPanel({ profiles, snapshots, api, now, usage, onSetApi, onH
         )}
       </div>
 
-      <DataTable>
+      <DataTable density="compact">
         <Thead>
           <Tr>
             <Th>{m('colAccount')}</Th>
-            <Th>{m('quotaCol')}</Th>
+            <Th className="w-8" aria-label={m('quotaCol')} />
+            <Th><span className="inline-flex items-center gap-1.5"><Swatch striped={false} tone="text-fg-mute" />{m('quota5h')}</span></Th>
+            <Th><span className="inline-flex items-center gap-1.5"><Swatch striped tone="text-fg-mute" />{m('quotaWeekly')}</span></Th>
+            <Th>{m('quotaOther')}</Th>
             <Th align="right">{m('colTokens')}</Th>
             <Th align="right">{m('colCost')}</Th>
             <Th>{m('quotaSourceCol')}</Th>
@@ -376,27 +347,42 @@ export function QuotaPanel({ profiles, snapshots, api, now, usage, onSetApi, onH
             const stale = reading !== null && now - reading.observedAt > STALE_MS;
             const others = reading?.windows.filter((w) => w.key !== 'five_hour' && w.key !== 'seven_day') ?? [];
             const totals = usage.get(profile.id);
+            const five = windowOf(reading, 'five_hour');
+            const week = windowOf(reading, 'seven_day');
             return (
               <Tr key={profile.id}>
-                <Td className="max-w-[14rem]">
-                  <div className="truncate font-medium" title={profile.label}>{profile.label}</div>
-                  <div className="truncate text-[11px] text-fg-mute">{snap?.account?.email ?? m('notSignedIn')}</div>
+                <Td className="max-w-[12rem]">
+                  <div className="truncate font-medium" title={[profile.label, snap?.account?.email ?? m('notSignedIn')].join('\n')}>
+                    {profile.label}
+                  </div>
                 </Td>
                 <Td>
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                    <QuotaCell
-                      five={windowOf(reading, 'five_hour')}
-                      week={windowOf(reading, 'seven_day')}
+                  {five || week ? (
+                    <SignalIcon
+                      five={five}
+                      week={week}
                       show={show}
                       now={now}
-                      label={profile.label}
-                      m={m}
+                      label={m('quotaSignalLabel', {
+                        label: profile.label,
+                        five: limitText(m, five, show, now)?.value ?? '—',
+                        week: limitText(m, week, show, now)?.value ?? '—',
+                      })}
                     />
-                    {others.map((w) => {
-                      const t = limitText(m, w, show, now);
-                      return <Badge key={w.key} mono title={windowLabel(m, w.key)}>{windowLabel(m, w.key)} {t?.value}</Badge>;
-                    })}
-                  </div>
+                  ) : <span className="text-fg-mute">—</span>}
+                </Td>
+                <Td><LimitCell window={five} show={show} now={now} m={m} /></Td>
+                <Td><LimitCell window={week} show={show} now={now} m={m} /></Td>
+                <Td>
+                  {others.length === 0 ? <span className="text-fg-mute">—</span> : (
+                    <span className="flex gap-1 whitespace-nowrap">
+                      {others.map((w) => (
+                        <Badge key={w.key} mono size="xs" title={windowLabel(m, w.key)}>
+                          {windowLabel(m, w.key)} {limitText(m, w, show, now)?.value}
+                        </Badge>
+                      ))}
+                    </span>
+                  )}
                 </Td>
                 <Td numeric>{totals ? formatTokens(totals.tokens) : '—'}</Td>
                 <Td numeric>{costText(totals)}</Td>
@@ -451,8 +437,11 @@ export function QuotaPanel({ profiles, snapshots, api, now, usage, onSetApi, onH
           })}
           {shared && (
             <Tr>
-              <Td className="font-medium text-fg-mute">{m('sharedAccount')}</Td>
-              <Td><span className="text-fg-mute">—</span></Td>
+              <Td className="whitespace-nowrap font-medium text-fg-mute">{m('sharedAccount')}</Td>
+              <Td>{''}</Td>
+              <Td>{''}</Td>
+              <Td>{''}</Td>
+              <Td>{''}</Td>
               <Td numeric>{formatTokens(shared.tokens)}</Td>
               <Td numeric>{costText(shared)}</Td>
               <Td>{''}</Td>

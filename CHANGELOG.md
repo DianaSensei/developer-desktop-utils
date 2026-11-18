@@ -8,10 +8,11 @@ the app.
 
 ### Claude Manager: plan limits join the Usage tab's account table, and read more reliably
 
-- **The Compare tab is gone; plan limits are a column of Usage → By account.** Each account
-  shows a small dual-signal icon — 5-hour on top with solid bars, weekly below with
-  striped bars, a bar per quarter of the limit — next to the percentages and reset times,
-  then its tokens, cost and source. Bars turn amber from 60% and red from 85%. A
+- **The Compare tab is gone; plan limits are part of Usage → By account**, one compact row
+  per account so ten fit on screen. Each row has a small dual-signal icon — 5-hour on top
+  with solid bars, weekly below with striped bars, a bar per quarter of the limit — then
+  5-hour and weekly percentages with reset times, other limits, tokens, cost and source.
+  The email, the stale explanation and any error are in tooltips. Bars turn amber from 60% and red from 85%. A
   Used / Left switch makes the bars (and numbers) count what is left instead. Every
   tracked account is listed, even with no local usage. The "most room" hint is removed.
 - **Status line readings no longer mix accounts.** When accounts share one settings.json
