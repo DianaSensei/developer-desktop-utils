@@ -294,21 +294,6 @@ export default defineMessages({
   renameAccount: { vi: 'Đổi tên tài khoản', en: 'Rename account' },
   cancelRename: { vi: 'Huỷ đổi tên', en: 'Cancel rename' },
 
-  // Compare
-  tabCompare: { vi: 'So sánh', en: 'Compare' },
-  compareIntro: {
-    vi: 'Mỗi cột là một tài khoản, cùng các mốc thời gian. Thanh trong ô cho thấy mức dùng so với tài khoản dùng nhiều nhất ở hàng đó.',
-    en: 'One column per account, over the same periods. The bar in each cell compares it with the heaviest account in that row.',
-  },
-  compareNeedsTwo: {
-    vi: 'Cần theo dõi ít nhất hai tài khoản để so sánh. Thêm tài khoản ở tab Tài khoản.',
-    en: 'Track at least two accounts to compare them. Add one in the Accounts tab.',
-  },
-  compareSuggestion: {
-    vi: '"{{label}}" dùng ít nhất trong 5 giờ qua — lựa chọn tốt cho phiên tiếp theo.',
-    en: '"{{label}}" used the least in the last 5 hours — a good pick for your next session.',
-  },
-  leastUsed: { vi: 'ít dùng nhất', en: 'least used' },
   sharedAccount: { vi: 'Dùng chung (chưa rõ)', en: 'Shared (unknown)' },
   neverUsed: { vi: 'chưa dùng', en: 'never' },
   compareRunning: { vi: 'Phiên đang mở', en: 'Running sessions' },
@@ -335,7 +320,6 @@ export default defineMessages({
   quotaSpend: { vi: 'Hạn mức chi', en: 'Spend' },
   quotaResetsIn: { vi: 'reset sau {{time}}', en: 'resets in {{time}}' },
   quotaReset: { vi: 'đã reset', en: 'reset' },
-  quotaMostRoom: { vi: 'còn nhiều nhất', en: 'most room' },
   quotaFromStatusline: { vi: 'status line', en: 'status line' },
   quotaFromApi: { vi: 'API', en: 'API' },
   quotaNone: {
@@ -370,13 +354,9 @@ export default defineMessages({
     vi: 'DevTool sẽ đọc token đăng nhập Claude của tài khoản này (Keychain trên macOS, .credentials.json nơi khác) và gửi nó tới api.anthropic.com để hỏi mức dùng — chỉ ở đó, không lưu, không hiện ra. API này không được Anthropic công bố: có thể đổi hoặc từ chối bất cứ lúc nào, và việc dùng token gói cá nhân cho công cụ khác có thể không hợp điều khoản sử dụng. Token hết hạn thì mở Claude Code bằng tài khoản đó để làm mới.',
     en: 'DevTool will read this account’s Claude sign-in token (Keychain on macOS, .credentials.json elsewhere) and send it to api.anthropic.com to ask for usage — only there, never stored or shown. This API is not published by Anthropic: it can change or refuse at any time, and using a personal plan’s token from another tool may not fit the terms of use. If the token has expired, open Claude Code on that account to renew it.',
   },
-  quotaSuggestion: {
-    vi: '"{{label}}" còn nhiều hạn mức nhất (đã dùng tối đa {{percent}}% ở cửa sổ 5 giờ hoặc tuần) — lựa chọn tốt cho phiên tiếp theo.',
-    en: '"{{label}}" has the most room left (at most {{percent}}% used of its 5-hour or weekly limit) — a good pick for your next session.',
-  },
   quotaNote: {
-    vi: 'Đây là hạn mức của gói Claude (Pro / Max) do Anthropic tính. Cửa sổ đã qua giờ reset được tính là 0%. Nguồn status line chỉ cập nhật khi tài khoản có phiên Claude Code đang chạy; muốn số luôn mới cho mọi tài khoản thì bật API. Token và chi phí đo từ transcript nằm ở tab Mức dùng.',
-    en: 'These are your Claude plan’s limits as Anthropic counts them. A window past its reset time counts as 0%. The status line source only updates while the account has a Claude Code session open; turn on the API to keep every account current. Token and cost counts from transcripts are in the Usage tab.',
+    vi: 'Đây là hạn mức của gói Claude (Pro / Max) do Anthropic tính. Cửa sổ đã qua giờ reset được tính là 0%. Nguồn status line chỉ cập nhật khi tài khoản có phiên Claude Code đang chạy; muốn số luôn mới cho mọi tài khoản thì bật API. Vòng ngoài là 5 giờ, vòng trong là tuần.',
+    en: 'These are your Claude plan’s limits as Anthropic counts them. A window past its reset time counts as 0%. The status line source only updates while the account has a Claude Code session open; turn on the API to keep every account current. The outer ring is the 5-hour limit, the inner one the weekly limit.',
   },
   quotaErrNoCredentials: {
     vi: 'Không tìm thấy token đăng nhập của tài khoản này. Đăng nhập Claude Code bằng tài khoản đó trước.',
@@ -402,7 +382,13 @@ export default defineMessages({
   },
 
   // Quota table
-  quotaTitle: { vi: 'Hạn mức gói theo tài khoản — còn nhiều nhất ở trên cùng', en: 'Plan usage by account — most room first' },
+  quotaTitle: { vi: 'Hạn mức gói', en: 'Plan limits' },
+  quotaRingOuter: { vi: 'Vòng ngoài', en: 'Outer ring' },
+  quotaRingInner: { vi: 'Vòng trong', en: 'Inner ring' },
+  quotaRingsLabel: {
+    vi: '{{label}}: 5 giờ {{five}}%, tuần {{week}}%',
+    en: '{{label}}: 5-hour {{five}}%, weekly {{week}}%',
+  },
   quotaRefreshAll: { vi: 'Lấy lại qua API cho mọi tài khoản đã bật', en: 'Fetch again from the API for every account that has it on' },
   quotaOther: { vi: 'Khác', en: 'Other' },
   quotaSourceCol: { vi: 'Nguồn', en: 'Source' },

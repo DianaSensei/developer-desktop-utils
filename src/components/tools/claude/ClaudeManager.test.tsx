@@ -430,7 +430,8 @@ describe('ClaudeManager', () => {
     render(<ClaudeManager />);
     // live-1 went to Orca, sess-1 stays unattributed: both rows appear under "By account".
     expect(await screen.findByText(/^By account$|^Theo tài khoản$/)).toBeTruthy();
-    expect(screen.getByText('Orca')).toBeTruthy();
+    // Once in the plan-limit cards above, once as a row under "By account".
+    expect(screen.getAllByText('Orca')).toHaveLength(2);
     expect(screen.getByText(/^Shared \(unknown\)$|^Dùng chung \(chưa rõ\)$/)).toBeTruthy();
     await waitFor(() => expect(storageGet('devtool:claude-manager:sessionOwners')).toContain('live-1'));
   });
@@ -442,6 +443,7 @@ describe('ClaudeManager', () => {
       { id: 'w', label: 'Work', configDir: '~/.claude-work' },
     ]));
     storageSet(KEYS[4], JSON.stringify(true));
+    // A tab saved before Compare was folded into Usage opens Usage.
     storageSet(KEYS[1], JSON.stringify('compare'));
     invokeMock.mockImplementation(async (command: string, args?: { dirs?: string[]; dir?: string }) => {
       if (command === 'claude_monitor_fetch_quota') {
@@ -470,8 +472,9 @@ describe('ClaudeManager', () => {
     fireEvent.click(await screen.findByRole('button', { name: /^Turn on$|^Bật$/ }));
     expect(await screen.findByText('Opus 0%')).toBeTruthy();
     expect(invokeMock).toHaveBeenCalledWith('claude_monitor_fetch_quota', { dir: '~/.claude-work' });
-    // Work now has the most room (12% vs 84%).
-    expect(screen.getByText(/"Work" has the most room left|"Work" còn nhiều hạn mức nhất/)).toBeTruthy();
+    // Both limits drawn as nested rings; no "most room" hint any more.
+    expect(screen.getByRole('img', { name: /^Work: (5-hour|5 giờ) 5%, (weekly|tuần) 12%$/ })).toBeTruthy();
+    expect(screen.queryByText(/most room|còn nhiều/)).toBeNull();
   });
 
   it('shows the scan error instead of an empty list', async () => {

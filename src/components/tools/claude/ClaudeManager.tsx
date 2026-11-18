@@ -11,8 +11,7 @@ import { useMessages } from '@/contexts/LocaleContext';
 import { usePluginSdkFor, usePluginState, useToolActiveRef } from '@/platform';
 import { saveTextFile } from '@/lib/fileio';
 import MESSAGES from './ClaudeManager.messages';
-import { CompareView } from './CompareView';
-import { useApiQuota } from './QuotaPanel';
+import { QuotaPanel, useApiQuota } from './QuotaPanel';
 import { ConfigView } from './ConfigView';
 import { TranscriptViewer, type TranscriptTarget } from './TranscriptViewer';
 import { BudgetBars, UsageChart } from './UsageChart';
@@ -33,7 +32,7 @@ const SEARCH_DEBOUNCE_MS = 350;
 const PAGE_SIZE = 100;
 const RECENT_COUNT = 8;
 
-type TabId = 'overview' | 'compare' | 'sessions' | 'usage' | 'config' | 'accounts';
+type TabId = 'overview' | 'sessions' | 'usage' | 'config' | 'accounts';
 type SearchMode = 'title' | 'content';
 type StatusFilter = 'all' | 'running' | 'ended';
 type M = ReturnType<typeof useMessages<typeof MESSAGES>>;
@@ -1030,13 +1029,15 @@ export function ClaudeManager() {
   const m = useMessages(MESSAGES);
   const sdk = usePluginSdkFor(PLUGIN_ID);
   const [profiles, setProfiles] = usePluginState<Profile[]>(sdk, 'profiles', [DEFAULT_PROFILE]);
-  const [tab, setTab] = usePluginState<TabId>(sdk, 'tab', 'overview');
+  const [storedTab, setTab] = usePluginState<TabId | 'compare'>(sdk, 'tab', 'overview');
+  // Compare was folded into Usage.
+  const tab: TabId = storedTab === 'compare' ? 'usage' : storedTab;
   const [range, setRange] = usePluginState<RangeId>(sdk, 'range', '7d');
   const [auto, setAuto] = usePluginState(sdk, 'autoRefresh', true);
   const [accountFilter, setAccountFilter] = useState('all');
   const { snapshots, error, busy, scannedAt, refresh } = useClaudeScan(profiles, auto);
   const detection = useAccountDetection(profiles, setProfiles);
-  const apiQuota = useApiQuota(profiles, tab === 'compare');
+  const apiQuota = useApiQuota(profiles, tab === 'usage');
   const [limits, setLimits] = usePluginState<Budgets>(sdk, 'budgets', NO_BUDGETS);
   const [viewing, setViewing] = useState<TranscriptTarget | null>(null);
 
@@ -1080,7 +1081,6 @@ export function ClaudeManager() {
   const viewingProfile = viewing && profiles.find((p) => p.id === viewing.session.dirProfileId);
   const tabs = [
     { id: 'overview', label: m('tabOverview') },
-    { id: 'compare', label: m('tabCompare') },
     { id: 'sessions', label: m('tabSessions'), badge: runningCount > 0 ? <Badge tone="success" pill>{runningCount}</Badge> : undefined },
     { id: 'usage', label: m('tabUsage') },
     { id: 'config', label: m('tabConfig') },
@@ -1146,6 +1146,16 @@ export function ClaudeManager() {
           />
         )}
         {tab === 'config' && <ConfigView profiles={profiles} />}
+        {snapshots !== null && tab === 'usage' && (
+          <QuotaPanel
+            profiles={profiles}
+            snapshots={snapshots}
+            now={scannedAt}
+            api={apiQuota}
+            onSetApi={detection.setQuotaApi}
+            onHookChanged={() => void refresh()}
+          />
+        )}
         {snapshots !== null && !setupTab && allRows.length === 0 && (
           <EmptyState
             icon={Bot}
@@ -1155,16 +1165,6 @@ export function ClaudeManager() {
           />
         )}
         {snapshots !== null && allRows.length > 0 && tab === 'overview' && <OverviewView {...view} />}
-        {snapshots !== null && tab === 'compare' && (
-          <CompareView
-            profiles={profiles}
-            snapshots={snapshots}
-            now={scannedAt}
-            api={apiQuota}
-            onSetApi={detection.setQuotaApi}
-            onHookChanged={() => void refresh()}
-          />
-        )}
         {snapshots !== null && allRows.length > 0 && tab === 'sessions' && <SessionsView {...view} />}
         {snapshots !== null && allRows.length > 0 && tab === 'usage' && (
           <UsageView {...view} limits={limits} setLimits={setLimits} />

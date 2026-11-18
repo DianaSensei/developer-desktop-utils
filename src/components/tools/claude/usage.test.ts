@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  MAX_DAILY_BARS, NO_BUDGETS, currentUse, formatDuration, latestQuota, quotaLevel, quotaModel, quotaPressure, roomiestAccount,
+  MAX_DAILY_BARS, NO_BUDGETS, currentUse, formatDuration, latestQuota, quotaLevel, quotaModel,
   type QuotaReading, lastSegment, SHARED_ACCOUNT, attributeRows, compareAccounts, leastUsedAccount, updateOwnerLedger,
   type ProfileSnapshot, budgetStates, chartSeries, dueBudgetAlerts, exportRows, monthStartHour, toCsv,
   DEFAULT_PROFILE, MS_PER_HOUR, estimateCost, formatCost, formatTokens, labelFromDir, lastFiveHoursStart,
@@ -355,20 +355,6 @@ describe('plan usage', () => {
     expect(latestQuota(null, undefined)).toBeNull();
     expect(currentUse(older.windows[0], now)).toBe(50);
     expect(currentUse(reading('api', 1, 90, 10, now - 1).windows[0], now)).toBe(0);
-  });
-
-  it('scores an account by its fuller main window and picks the one with most room', () => {
-    expect(quotaPressure(reading('api', 1, 26, 84), now)).toBe(84);
-    expect(quotaPressure({ source: 'api', observedAt: 1, windows: [] }, now)).toBeNull();
-    const pick = roomiestAccount([
-      ['a', reading('api', 1, 26, 84)],
-      ['b', reading('api', 1, 70, 40)],
-      ['c', null],
-      // The 5-hour window reset since this reading: only the weekly 30% counts.
-      ['d', reading('statusline', 1, 95, 30, now - 1)],
-    ], now);
-    expect(pick).toBe('d');
-    expect(roomiestAccount([['a', reading('api', 1, 1, 1)], ['c', null]], now)).toBeNull();
   });
 
   it('labels levels, durations and per-model windows', () => {

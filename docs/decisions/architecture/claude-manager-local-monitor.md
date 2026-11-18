@@ -142,9 +142,11 @@ nêu rủi ro, chọn dùng **cả hai nguồn**, đều tắt mặc định và
   (dựa trên giả định Claude Code truyền biến này cho lệnh status line — chưa kiểm chứng),
   và `refresh_script` cập nhật script cũ ở mỗi lần quét. Bản đọc cũ hơn 15 phút được đánh
   dấu; nguồn API ghi rõ token lấy từ mục Keychain nào để phát hiện đọc nhầm tài khoản.
-  Tab So sánh bỏ bảng token cục bộ — người dùng chỉ cần so % hạn mức.
+  Tab So sánh bỏ bảng token cục bộ — người dùng chỉ cần so % hạn mức. Sau đó gộp hẳn vào
+  đầu tab Mức dùng: mỗi tài khoản một thẻ, hai vòng lồng nhau (ngoài 5 giờ, trong tuần),
+  bỏ gợi ý "còn nhiều nhất" — người dùng tự nhìn và chọn.
 - **Hiển thị:** lấy bản đọc mới nhất giữa hai nguồn; cửa sổ đã qua `resets_at` coi là 0%.
-  Gợi ý tài khoản theo `max(5h, tuần)` thấp nhất; không đủ số liệu thì dùng token cục bộ.
+  Không còn gợi ý tài khoản: thẻ giữ thứ tự tài khoản để vị trí không nhảy khi số đổi.
 
 ## Mở rộng: so sánh tài khoản và gán phiên dùng chung (2026-11)
 

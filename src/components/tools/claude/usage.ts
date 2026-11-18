@@ -769,21 +769,6 @@ export function quotaLevel(percent: number): QuotaLevel {
   return percent >= 85 ? 'over' : percent >= 60 ? 'warn' : 'ok';
 }
 
-/** How close the account is to being stopped: the fuller of its 5-hour and weekly windows. */
-export function quotaPressure(reading: QuotaReading, now: number): number | null {
-  const main = reading.windows.filter((w) => w.key === 'five_hour' || w.key === 'seven_day');
-  return main.length === 0 ? null : Math.max(...main.map((w) => currentUse(w, now)));
-}
-
-/** Of the accounts with a reading, the one with the most room left; `null` with fewer than two. */
-export function roomiestAccount(readings: Array<[string, QuotaReading | null]>, now: number): string | null {
-  const scored = readings
-    .map(([key, reading]) => [key, reading ? quotaPressure(reading, now) : null] as const)
-    .filter((entry): entry is readonly [string, number] => entry[1] !== null);
-  if (scored.length < 2) return null;
-  return [...scored].sort((a, b) => a[1] - b[1])[0][0];
-}
-
 /** "1h 18m", "2d 3h", "45m", "<1m". */
 export function formatDuration(ms: number): string {
   const minutes = Math.max(0, Math.floor(ms / 60_000));
