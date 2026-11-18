@@ -16,6 +16,9 @@ export default definePlugin({
   // Rust side only ever writes settings.json and CLAUDE.md of a config
   // directory when the user saves them, and moves a whole config directory
   // to the OS trash when the user deletes that account.
+  // For plan usage, the Rust side may also install a status line script
+  // into an account's folder, and — only for accounts the user opts in —
+  // read that account's sign-in token and send it to api.anthropic.com.
   commands: ['claude_monitor_'],
   sdk: '^1.0.0',
   load: () => import('@/components/tools/claude/ClaudeManager').then((m) => m.ClaudeManager),

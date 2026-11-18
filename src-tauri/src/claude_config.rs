@@ -26,10 +26,10 @@ const COMMANDS_DEPTH: usize = 3;
 #[derive(Serialize, Debug, Default, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct TextFile {
-    exists: bool,
-    text: String,
+    pub(crate) exists: bool,
+    pub(crate) text: String,
     /// Passed back on save to detect a change made in between.
-    mtime_ms: i64,
+    pub(crate) mtime_ms: i64,
 }
 
 #[derive(Serialize, Debug, PartialEq)]
@@ -64,7 +64,7 @@ pub struct ConfigSnapshot {
     skills: Vec<Item>,
 }
 
-fn read_text_file(path: &Path) -> TextFile {
+pub(crate) fn read_text_file(path: &Path) -> TextFile {
     match (fs::read_to_string(path), fs::metadata(path)) {
         (Ok(text), Ok(meta)) => TextFile { exists: true, text, mtime_ms: mtime_ms(&meta) },
         _ => TextFile::default(),
@@ -252,7 +252,7 @@ const ERR_UNKNOWN_FILE: &str = "unknown-file";
 /// Replaces `settings.json` or `CLAUDE.md`. The previous content is kept
 /// beside it as `<name>.devtool-bak`, and the new content lands through a
 /// rename so Claude Code never reads a half-written file.
-fn write_config_file(
+pub(crate) fn write_config_file(
     config_dir: &Path,
     file: &str,
     text: &str,

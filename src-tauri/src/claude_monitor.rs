@@ -102,6 +102,16 @@ pub struct ProfileSnapshot {
     /// between them, so the same transcripts show up under each.
     shared_sessions: u64,
     shares_data_with: Option<String>,
+    /// Ids of the sessions an earlier directory lists that this one has too.
+    shared_session_ids: Vec<String>,
+    /// Sessions this account is known to have run, whichever directory lists
+    /// them: the ones its own process registry shows running now, and the
+    /// last session of each project in its `.claude.json`. Transcripts do not
+    /// record the account, so this is what lets shared sessions be split.
+    claimed_sessions: Vec<String>,
+    /// Plan usage saved by DevTool's status line script, if installed.
+    statusline_quota: Option<crate::claude_quota::QuotaReading>,
+    quota_hook: bool,
 }
 
 // ── Transcript lines (only the fields we read) ──────────────────────────
@@ -566,6 +576,19 @@ struct GlobalConfig {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
+struct ProjectHistory {
+    #[serde(default)]
+    projects: HashMap<String, ProjectEntry>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ProjectEntry {
+    last_session_id: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct OauthAccount {
     email_address: Option<String>,
     organization_name: Option<String>,
@@ -581,14 +604,27 @@ pub(crate) fn home_dir() -> Option<PathBuf> {
 /// Claude Code keeps its global config inside the directory when
 /// `CLAUDE_CONFIG_DIR` is set, and beside it (`~/.claude.json`) for the
 /// default directory.
-fn read_account(config_dir: &Path, home: Option<&Path>) -> Option<Account> {
+fn global_config_candidates(config_dir: &Path, home: Option<&Path>) -> Vec<PathBuf> {
     let mut candidates = vec![config_dir.join(".claude.json")];
     if let Some(home) = home {
         if config_dir == home.join(".claude") {
             candidates.push(home.join(".claude.json"));
         }
     }
-    candidates.into_iter().find_map(|path| {
+    candidates
+}
+
+/// `lastSessionId` of every project in the account's `.claude.json`.
+fn read_last_session_ids(config_dir: &Path, home: Option<&Path>) -> Vec<String> {
+    global_config_candidates(config_dir, home)
+        .into_iter()
+        .find_map(|path| serde_json::from_slice::<ProjectHistory>(&fs::read(path).ok()?).ok())
+        .map(|history| history.projects.into_values().filter_map(|p| p.last_session_id).collect())
+        .unwrap_or_default()
+}
+
+fn read_account(config_dir: &Path, home: Option<&Path>) -> Option<Account> {
+    global_config_candidates(config_dir, home).into_iter().find_map(|path| {
         let config: GlobalConfig = serde_json::from_slice(&fs::read(path).ok()?).ok()?;
         let a = config.oauth_account?;
         Some(Account {
@@ -627,6 +663,8 @@ fn scan_profile(
     }
     snapshot.exists = true;
     snapshot.account = read_account(&dir, home);
+    snapshot.statusline_quota = crate::claude_quota::read_statusline_quota(&dir);
+    snapshot.quota_hook = crate::claude_quota::hook_installed(&dir);
 
     let mut by_id: HashMap<String, SessionFiles> = HashMap::new();
     for project in fs::read_dir(dir.join("projects")).into_iter().flatten().flatten() {
@@ -643,6 +681,11 @@ fn scan_profile(
 
     let registry = read_registry(&dir);
     let alive = is_alive(&registry.iter().map(|r| r.pid).collect::<Vec<_>>());
+    let mut claims: Vec<String> = read_last_session_ids(&dir, home);
+    claims.extend(registry.iter().filter(|r| alive.contains(&r.pid)).map(|r| r.session_id.clone()));
+    claims.sort();
+    claims.dedup();
+    snapshot.claimed_sessions = claims;
     for entry in registry.into_iter().filter(|r| alive.contains(&r.pid)) {
         let live = LiveInfo {
             pid: entry.pid,
@@ -693,6 +736,7 @@ fn scan_all(
             match owner.get(&session.id) {
                 Some(&index) => {
                     *shared_per_owner.entry(index).or_default() += 1;
+                    snapshot.shared_session_ids.push(session.id.clone());
                     // Each directory has its own process registry: a session
                     // running under this account is still running.
                     if let Some(first) = out[index].sessions.iter_mut().find(|s| s.id == session.id) {
@@ -1363,5 +1407,30 @@ mod tests {
         let trash = |_: &Path| Err("trash unavailable".to_string());
         let err = remove_account("~/.claude-work", Some(&home.0), &|_| HashSet::new(), &trash).unwrap_err();
         assert_eq!(err, "trash unavailable");
+    }
+
+    #[test]
+    fn accounts_claim_the_sessions_they_ran() {
+        let first = TempDir::new("claim-a");
+        let second = TempDir::new("claim-b");
+        let turn = assistant("2026-11-01T10:00:05Z", "m1", "claude-opus-5-5", 1, 1, "end_turn");
+        for dir in [&first, &second] {
+            dir.write("projects/p/s1.jsonl", &turn);
+            dir.write("projects/p/s2.jsonl", &turn.replace("m1", "m2"));
+        }
+        // The second account's history names s1 as a project's last session,
+        // and its process registry shows s2 running.
+        second.write(
+            ".claude.json",
+            r#"{"projects":{"/work/app":{"lastSessionId":"s1"},"/work/other":{}}}"#,
+        );
+        second.write("sessions/5.json", r#"{"pid":5,"sessionId":"s2","status":"busy"}"#);
+
+        let snaps = scan_many(&[&first, &second], &[5]);
+        assert!(snaps[0].claimed_sessions.is_empty());
+        assert_eq!(snaps[1].claimed_sessions, vec!["s1", "s2"]);
+        let mut shared = snaps[1].shared_session_ids.clone();
+        shared.sort();
+        assert_eq!(shared, vec!["s1", "s2"]);
     }
 }

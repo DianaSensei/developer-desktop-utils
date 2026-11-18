@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
-  MAX_DAILY_BARS, NO_BUDGETS, lastSegment, budgetStates, chartSeries, dueBudgetAlerts, exportRows, monthStartHour, toCsv,
+  MAX_DAILY_BARS, NO_BUDGETS, currentUse, formatDuration, latestQuota, quotaLevel, quotaModel, quotaPressure, roomiestAccount,
+  type QuotaReading, lastSegment, SHARED_ACCOUNT, attributeRows, compareAccounts, leastUsedAccount, updateOwnerLedger,
+  type ProfileSnapshot, budgetStates, chartSeries, dueBudgetAlerts, exportRows, monthStartHour, toCsv,
   DEFAULT_PROFILE, MS_PER_HOUR, estimateCost, formatCost, formatTokens, labelFromDir, lastFiveHoursStart,
   launchCommand, localDayKey, projectName, rangeStartHour, resumeCommand, sessionModels, sessionStatus,
   sessionTotals, shortModel, totalUsage, uniqueLabel, usageByDay, usageByModel, usageByProfile, usageByProject,
@@ -13,7 +15,7 @@ const bucket = (over: Partial<UsageBucket> = {}): UsageBucket => ({
 });
 
 const session = (over: Partial<SessionRow> = {}): SessionRow => ({
-  id: 's1', profileId: 'default', project: '-work-app', cwd: '/work/app', gitBranch: 'main', title: 'T',
+  id: 's1', profileId: 'default', dirProfileId: 'default', project: '-work-app', cwd: '/work/app', gitBranch: 'main', title: 'T',
   version: '2.1.0', startedAt: 0, lastActivityAt: 0, prompts: 1, subagents: 0, lastRole: 'assistant',
   lastStopReason: 'end_turn', live: null, buckets: [], ...over,
 });
@@ -254,5 +256,131 @@ describe('export', () => {
     expect(lines[1]).toBe(`2026-11-01,"Work, Inc.",'=cmd,mystery-model,1,0,0,0,1,1,`);
     expect(lines[2].startsWith(`2026-11-02,"Work, Inc.",'=cmd,claude-opus-5-5,150,10,5,5,3,170,0.000`)).toBe(true);
     expect(lines[3]).toBe('');
+  });
+});
+
+describe('attribution of shared sessions', () => {
+  const profiles = [
+    { id: 'a', label: 'A', configDir: '~/.claude' },
+    { id: 'b', label: 'B', configDir: '~/orca/b/home' },
+    { id: 'c', label: 'C', configDir: '~/orca/c/home' },
+  ];
+  const snap = (over: Partial<ProfileSnapshot>): ProfileSnapshot => ({
+    configDir: '', exists: true, account: null, sessions: [], sharedSessions: 0, sharesDataWith: null,
+    sharedSessionIds: [], claimedSessions: [], ...over,
+  });
+  // A lists every session; B and C share s1 and s2 with it; only A has s3.
+  const snapshots = [
+    snap({ sessions: [session({ id: 's1', lastActivityAt: 3 }), session({ id: 's2', lastActivityAt: 2 }), session({ id: 's3', lastActivityAt: 1 })] }),
+    snap({ sharedSessionIds: ['s1', 's2'], claimedSessions: ['s1'] }),
+    snap({ sharedSessionIds: ['s1', 's2'] }),
+  ];
+
+  it('gives a shared session to the account that claims it, and marks the rest as shared', () => {
+    const ledger = updateOwnerLedger({}, snapshots, profiles);
+    expect(ledger).toEqual({ s1: 'b' });
+    const rows = attributeRows(snapshots, profiles, ledger);
+    expect(rows.map((r) => [r.id, r.profileId, r.dirProfileId])).toEqual([
+      ['s1', 'b', 'a'], ['s2', SHARED_ACCOUNT, 'a'], ['s3', 'a', 'a'],
+    ]);
+  });
+
+  it('remembers a claim after the account stops making it, and ignores removed accounts', () => {
+    const remembered = updateOwnerLedger({ s2: 'c', s3: 'gone' }, snapshots, profiles);
+    expect(remembered).toEqual({ s1: 'b', s2: 'c', s3: 'gone' });
+    const rows = attributeRows(snapshots, profiles, remembered);
+    expect(rows.find((r) => r.id === 's2')?.profileId).toBe('c');
+    expect(rows.find((r) => r.id === 's3')?.profileId).toBe('a');
+    // No new claim: the same object comes back, so storage is not rewritten.
+    expect(updateOwnerLedger(remembered, snapshots, profiles)).toBe(remembered);
+  });
+});
+
+describe('compareAccounts', () => {
+  const now = new Date('2026-11-17T15:30:00').getTime();
+  const hourOf = (iso: string) => Math.floor(new Date(iso).getTime() / MS_PER_HOUR);
+  const profiles = [
+    { id: 'a', label: 'A', configDir: '~/.claude' },
+    { id: 'b', label: 'B', configDir: '~/b' },
+    { id: 'c', label: 'C', configDir: '~/c' },
+  ];
+  const row = (profileId: string, iso: string, output: number, model = 'claude-opus-5-5', lastActivityAt = 0) =>
+    ({ ...session({ id: `${profileId}-${iso}`, lastActivityAt, buckets: [bucket({ hour: hourOf(iso), output, model })] }), profileId, dirProfileId: 'a' });
+  const rows = [
+    row('a', '2026-11-17T14:00:00', 1000, 'claude-opus-5-5', now - 60_000),
+    row('a', '2026-11-12T10:00:00', 5000, 'claude-haiku-5-5'),
+    row('b', '2026-11-17T08:00:00', 300, 'claude-opus-5-5', now - 7 * MS_PER_HOUR),
+    row(SHARED_ACCOUNT, '2026-11-16T10:00:00', 50),
+  ];
+
+  it('sums each period per account and adds a shared column only when needed', () => {
+    const result = compareAccounts(rows, profiles, now);
+    expect(result.map((r) => r.key)).toEqual(['a', 'b', 'c', SHARED_ACCOUNT]);
+    const [a, b, c, shared] = result;
+    expect([a.periods.fiveHours.output, a.periods.today.output, a.periods.week.output]).toEqual([1000, 1000, 6000]);
+    expect([b.periods.fiveHours.output, b.periods.today.output]).toEqual([0, 300]);
+    expect(c.periods.month.requests).toBe(0);
+    expect(shared.periods.week.output).toBe(50);
+    expect(a.topModel).toBe('claude-haiku-5-5');
+    expect(a.lastActiveAt).toBe(now - 60_000);
+    expect(a.dailyCost).toHaveLength(7);
+    expect(a.dailyCost[6]).toBeCloseTo((1000 * 20) / 1e6, 10);
+    expect(a.dailyCost[1]).toBeCloseTo((5000 * 0.5) / 1e6, 10);
+    expect(compareAccounts(rows.slice(0, 3), profiles, now).map((r) => r.key)).toEqual(['a', 'b', 'c']);
+  });
+
+  it('suggests the account that used the least in the last five hours', () => {
+    const result = compareAccounts(rows, profiles, now);
+    // b and c both used nothing in five hours; c has never been active.
+    expect(leastUsedAccount(result, ['a', 'b', 'c'])).toBe('c');
+    expect(leastUsedAccount(result, ['a', 'b'])).toBe('b');
+    expect(leastUsedAccount(result, ['a'])).toBeNull();
+  });
+});
+
+describe('plan usage', () => {
+  const now = 1_000_000_000;
+  const reading = (source: 'statusline' | 'api', observedAt: number, five: number, week: number, fiveReset: number | null = now + 3_600_000): QuotaReading => ({
+    source, observedAt,
+    windows: [
+      { key: 'five_hour', usedPercentage: five, resetsAt: fiveReset, usedUsd: null, limitUsd: null },
+      { key: 'seven_day', usedPercentage: week, resetsAt: now + 86_400_000, usedUsd: null, limitUsd: null },
+    ],
+  });
+
+  it('uses the newer reading, and treats a window past its reset time as empty', () => {
+    const older = reading('statusline', 1, 50, 50);
+    const newer = reading('api', 2, 10, 20);
+    expect(latestQuota(older, newer, null)).toBe(newer);
+    expect(latestQuota(null, undefined)).toBeNull();
+    expect(currentUse(older.windows[0], now)).toBe(50);
+    expect(currentUse(reading('api', 1, 90, 10, now - 1).windows[0], now)).toBe(0);
+  });
+
+  it('scores an account by its fuller main window and picks the one with most room', () => {
+    expect(quotaPressure(reading('api', 1, 26, 84), now)).toBe(84);
+    expect(quotaPressure({ source: 'api', observedAt: 1, windows: [] }, now)).toBeNull();
+    const pick = roomiestAccount([
+      ['a', reading('api', 1, 26, 84)],
+      ['b', reading('api', 1, 70, 40)],
+      ['c', null],
+      // The 5-hour window reset since this reading: only the weekly 30% counts.
+      ['d', reading('statusline', 1, 95, 30, now - 1)],
+    ], now);
+    expect(pick).toBe('d');
+    expect(roomiestAccount([['a', reading('api', 1, 1, 1)], ['c', null]], now)).toBeNull();
+  });
+
+  it('labels levels, durations and per-model windows', () => {
+    expect([quotaLevel(26), quotaLevel(60), quotaLevel(84), quotaLevel(85)]).toEqual(['ok', 'warn', 'warn', 'over']);
+    expect(formatDuration(30_000)).toBe('<1m');
+    expect(formatDuration(45 * 60_000)).toBe('45m');
+    expect(formatDuration(78 * 60_000)).toBe('1h 18m');
+    expect(formatDuration(2 * 3_600_000)).toBe('2h');
+    expect(formatDuration((2 * 24 + 3) * 3_600_000)).toBe('2d 3h');
+    expect(quotaModel('seven_day_opus')).toBe('Opus');
+    expect(quotaModel('seven_day_claude_fable')).toBe('Claude Fable');
+    expect(quotaModel('seven_day')).toBeNull();
+    expect(quotaModel('five_hour')).toBeNull();
   });
 });

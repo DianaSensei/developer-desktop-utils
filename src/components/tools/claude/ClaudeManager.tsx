@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Bot, Download, EyeOff, FolderOpen, FolderSearch, Plus, RefreshCw, Terminal, Trash2 } from 'lucide-react';
+import { Bot, Check, Download, EyeOff, FolderOpen, FolderSearch, Pencil, Plus, RefreshCw, Terminal, Trash2, X } from 'lucide-react';
 import {
   Badge, Button, Callout, ConfirmDialog, CopyButton, DataTable, EmptyState, IconButton, Input, LoadingRow, Spinner,
   SearchInput, SectionLabel, Segmented, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Stat,
@@ -11,15 +11,17 @@ import { useMessages } from '@/contexts/LocaleContext';
 import { usePluginSdkFor, usePluginState, useToolActiveRef } from '@/platform';
 import { saveTextFile } from '@/lib/fileio';
 import MESSAGES from './ClaudeManager.messages';
+import { CompareView } from './CompareView';
+import { useApiQuota } from './QuotaPanel';
 import { ConfigView } from './ConfigView';
 import { TranscriptViewer, type TranscriptTarget } from './TranscriptViewer';
 import { BudgetBars, UsageChart } from './UsageChart';
 import {
   DEFAULT_PROFILE, formatCost, formatTokens, isRunning, lastFiveHoursStart, launchCommand,
   projectName, rangeStartHour, resumeCommand, sessionModels, sessionStatus, sessionTotals, shortModel,
-  NO_BUDGETS, budgetStates, chartSeries, dueBudgetAlerts, exportRows, toCsv,
+  NO_BUDGETS, SHARED_ACCOUNT, attributeRows, budgetStates, updateOwnerLedger, chartSeries, dueBudgetAlerts, exportRows, toCsv,
   totalUsage, uniqueLabel, usageByDay, usageByModel, usageByProfile, usageByProject, localDayKey, MS_PER_HOUR,
-  type BudgetAlertLog, type BudgetState, type Budgets, type Detected, type Profile, type ProfileSnapshot, type RangeId, type SessionRow, type SessionStatus, type UsageGroup,
+  type BudgetAlertLog, type OwnerLedger, type BudgetState, type Budgets, type Detected, type Profile, type ProfileSnapshot, type RangeId, type SessionRow, type SessionStatus, type UsageGroup,
   type UsageTotals,
 } from './usage';
 
@@ -31,7 +33,7 @@ const SEARCH_DEBOUNCE_MS = 350;
 const PAGE_SIZE = 100;
 const RECENT_COUNT = 8;
 
-type TabId = 'overview' | 'sessions' | 'usage' | 'config' | 'accounts';
+type TabId = 'overview' | 'compare' | 'sessions' | 'usage' | 'config' | 'accounts';
 type SearchMode = 'title' | 'content';
 type StatusFilter = 'all' | 'running' | 'ended';
 type M = ReturnType<typeof useMessages<typeof MESSAGES>>;
@@ -148,7 +150,8 @@ function SessionTable({ rows, profiles, fromHour, now, onOpen, m }: SessionTable
         {rows.map((s) => {
           const status = sessionStatus(s, now);
           const totals = sessionTotals(s, fromHour);
-          const profile = profileById.get(s.profileId) ?? DEFAULT_PROFILE;
+          // Resume under the account that ran it; the folder's own account otherwise.
+          const profile = profileById.get(s.profileId) ?? profileById.get(s.dirProfileId) ?? DEFAULT_PROFILE;
           const models = sessionModels(s);
           const details = [
             s.gitBranch,
@@ -173,7 +176,9 @@ function SessionTable({ rows, profiles, fromHour, now, onOpen, m }: SessionTable
                 <div className="mt-0.5 truncate text-[11px] text-fg-mute">{details}</div>
               </Td>
               <Td className="max-w-[14rem] truncate" title={s.cwd ?? undefined}>{projectName(s)}</Td>
-              {showAccount && <Td className="whitespace-nowrap">{profile.label}</Td>}
+              {showAccount && (
+                <Td className="whitespace-nowrap">{s.profileId === SHARED_ACCOUNT ? m('sharedAccount') : profile.label}</Td>
+              )}
               <Td mono className="whitespace-nowrap">
                 {models.length === 0 ? '—' : shortModel(models[0])}
                 {models.length > 1 && <span className="text-fg-mute"> +{models.length - 1}</span>}
@@ -376,7 +381,7 @@ function ContentSearch({ query, rows, scope, now, onOpen, m }: {
       <ul className="divide-y divide-line overflow-hidden rounded-md border border-line">
         {result.hits.map((hit) => {
           const profile = scope[hit.dirIndex];
-          const session = rows.find((s) => s.id === hit.session && s.profileId === profile?.id);
+          const session = rows.find((s) => s.id === hit.session && s.dirProfileId === profile?.id);
           if (!session) return null;
           return (
             <li key={`${hit.dirIndex}:${hit.session}:${hit.index}`}>
@@ -486,9 +491,11 @@ function UsageView({ rows, profiles, fromHour, now, budgets, limits, setLimits, 
   const series = useMemo(() => chartSeries(rows, fromHour, now), [rows, fromHour, now]);
   const byProfile = useMemo(() => {
     const map = usageByProfile(rows, fromHour);
-    return profiles
+    const groups = profiles
       .filter((p) => map.has(p.id))
       .map((p) => ({ key: p.label, totals: map.get(p.id)! }));
+    const shared = map.get(SHARED_ACCOUNT);
+    return shared ? [...groups, { key: m('sharedAccount'), totals: shared }] : groups;
   }, [rows, profiles, fromHour]);
   const [exportError, setExportError] = useState<string | null>(null);
 
@@ -678,6 +685,22 @@ function useAccountDetection(profiles: Profile[], setProfiles: (next: Profile[])
     setFound((list) => list.filter((d) => d.configDir !== profile.configDir));
   }, [setProfiles]);
 
+  /** Changes the name shown for an account; the directory stays the same. */
+  const rename = useCallback((profile: Profile, label: string) => {
+    const name = label.trim();
+    if (!name || name === profile.label) return;
+    const next = profilesRef.current.map((p) => (p.id === profile.id ? { ...p, label: name } : p));
+    profilesRef.current = next;
+    setProfiles(next);
+  }, [setProfiles]);
+
+  /** Turns the usage API on or off for one account. */
+  const setQuotaApi = useCallback((profile: Profile, on: boolean) => {
+    const next = profilesRef.current.map((p) => (p.id === profile.id ? { ...p, quotaApi: on } : p));
+    profilesRef.current = next;
+    setProfiles(next);
+  }, [setProfiles]);
+
   const suggestions = useMemo(
     () => found.filter((d) =>
       d.valid && !ignored.includes(d.configDir) && !profiles.some((p) => p.configDir === d.configDir)),
@@ -686,7 +709,7 @@ function useAccountDetection(profiles: Profile[], setProfiles: (next: Profile[])
   const hiddenCount = found.filter((d) => d.valid && ignored.includes(d.configDir)).length;
 
   return {
-    suggestions, hiddenCount, detecting, error, detect, track, untrack, forget,
+    suggestions, hiddenCount, detecting, error, detect, track, untrack, forget, rename, setQuotaApi,
     ignore: (d: Detected) => setIgnored((dirs) => [...new Set([...dirs, d.configDir])]),
     restoreIgnored: () => setIgnored([]),
   };
@@ -700,6 +723,65 @@ interface AccountsViewProps {
   allRows: SessionRow[];
   fromHour: number;
   m: M;
+}
+
+/** An account's name, renamed in place: Enter or blur saves, Escape cancels. */
+function AccountLabel({ profile, onRename, m }: { profile: Profile; onRename: (label: string) => void; m: M }) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const cancelled = useRef(false);
+
+  if (draft === null) {
+    return (
+      <span className="group inline-flex max-w-full items-center gap-1">
+        <span className="truncate" title={profile.label}>{profile.label}</span>
+        <IconButton
+          size="xs"
+          title={m('renameAccount')}
+          aria-label={m('renameAccount')}
+          className="shrink-0 opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100"
+          onClick={() => { cancelled.current = false; setDraft(profile.label); }}
+        >
+          <Pencil className="h-3 w-3" />
+        </IconButton>
+      </span>
+    );
+  }
+
+  const save = () => {
+    if (!cancelled.current) onRename(draft);
+    setDraft(null);
+  };
+  return (
+    <span className="inline-flex items-center gap-1">
+      <Input
+        autoFocus
+        value={draft}
+        maxLength={60}
+        aria-label={m('renameAccount')}
+        className="w-44"
+        onChange={(e) => setDraft(e.target.value)}
+        onFocus={(e) => e.target.select()}
+        onBlur={save}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') e.currentTarget.blur();
+          if (e.key === 'Escape') { cancelled.current = true; e.currentTarget.blur(); }
+        }}
+      />
+      {/* onMouseDown keeps the input's blur from firing first. */}
+      <IconButton size="xs" title={m('save')} aria-label={m('save')} onMouseDown={(e) => e.preventDefault()} onClick={save}>
+        <Check className="h-3 w-3" />
+      </IconButton>
+      <IconButton
+        size="xs"
+        title={m('cancelRename')}
+        aria-label={m('cancelRename')}
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => { cancelled.current = true; setDraft(null); }}
+      >
+        <X className="h-3 w-3" />
+      </IconButton>
+    </span>
+  );
 }
 
 function AccountsView({ profiles, detection, snapshots, allRows, fromHour, m }: AccountsViewProps) {
@@ -821,7 +903,9 @@ function AccountsView({ profiles, detection, snapshots, allRows, fromHour, m }: 
             const totals = usage.get(p.id);
             return (
               <Tr key={p.id}>
-                <Td className="font-medium whitespace-nowrap">{p.label}</Td>
+                <Td className="font-medium">
+                  <AccountLabel profile={p} onRename={(label) => detection.rename(p, label)} m={m} />
+                </Td>
                 <Td>
                   {!snap
                     ? <Spinner size="sm" />
@@ -952,15 +1036,19 @@ export function ClaudeManager() {
   const [accountFilter, setAccountFilter] = useState('all');
   const { snapshots, error, busy, scannedAt, refresh } = useClaudeScan(profiles, auto);
   const detection = useAccountDetection(profiles, setProfiles);
+  const apiQuota = useApiQuota(profiles, tab === 'compare');
   const [limits, setLimits] = usePluginState<Budgets>(sdk, 'budgets', NO_BUDGETS);
   const [viewing, setViewing] = useState<TranscriptTarget | null>(null);
 
-  const allRows = useMemo<SessionRow[]>(() => {
-    // Snapshots come back in the order the directories were sent.
-    const rows = (snapshots ?? []).flatMap((snap, i) =>
-      profiles[i] ? snap.sessions.map((s) => ({ ...s, profileId: profiles[i].id })) : []);
-    return rows.sort((a, b) => (b.lastActivityAt ?? 0) - (a.lastActivityAt ?? 0));
-  }, [snapshots, profiles]);
+  // Which account ran each shared session, learned across scans.
+  const [owners, setOwners] = usePluginState<OwnerLedger>(sdk, 'sessionOwners', {});
+  useEffect(() => {
+    if (!snapshots) return;
+    const next = updateOwnerLedger(owners, snapshots, profiles);
+    if (next !== owners) setOwners(next);
+  }, [snapshots, profiles, owners, setOwners]);
+  // Snapshots come back in the order the directories were sent.
+  const allRows = useMemo(() => attributeRows(snapshots ?? [], profiles, owners), [snapshots, profiles, owners]);
 
   const activeFilter = profiles.some((p) => p.id === accountFilter) ? accountFilter : 'all';
   const rows = useMemo(
@@ -989,9 +1077,10 @@ export function ClaudeManager() {
 
   const setupTab = tab === 'accounts' || tab === 'config';
   const view: ViewProps = { rows, profiles, scope, fromHour, now: scannedAt, onOpen: setViewing, budgets, m };
-  const viewingProfile = viewing && profiles.find((p) => p.id === viewing.session.profileId);
+  const viewingProfile = viewing && profiles.find((p) => p.id === viewing.session.dirProfileId);
   const tabs = [
     { id: 'overview', label: m('tabOverview') },
+    { id: 'compare', label: m('tabCompare') },
     { id: 'sessions', label: m('tabSessions'), badge: runningCount > 0 ? <Badge tone="success" pill>{runningCount}</Badge> : undefined },
     { id: 'usage', label: m('tabUsage') },
     { id: 'config', label: m('tabConfig') },
@@ -1027,9 +1116,6 @@ export function ClaudeManager() {
           ]}
         />
         <div className="ml-auto flex items-center gap-2">
-          <Button size="sm" variant="outline" onClick={() => setTab('accounts')}>
-            <Plus className="mr-1.5 h-3.5 w-3.5" />{m('addAccount')}
-          </Button>
           <span className="hidden text-[11px] text-fg-mute @2xl:inline">
             {m('updatedAt', { time: new Date(scannedAt).toLocaleTimeString() })}
           </span>
@@ -1069,6 +1155,17 @@ export function ClaudeManager() {
           />
         )}
         {snapshots !== null && allRows.length > 0 && tab === 'overview' && <OverviewView {...view} />}
+        {snapshots !== null && allRows.length > 0 && tab === 'compare' && (
+          <CompareView
+            rows={allRows}
+            profiles={profiles}
+            snapshots={snapshots}
+            now={scannedAt}
+            api={apiQuota}
+            onSetApi={detection.setQuotaApi}
+            onHookChanged={() => void refresh()}
+          />
+        )}
         {snapshots !== null && allRows.length > 0 && tab === 'sessions' && <SessionsView {...view} />}
         {snapshots !== null && allRows.length > 0 && tab === 'usage' && (
           <UsageView {...view} limits={limits} setLimits={setLimits} />

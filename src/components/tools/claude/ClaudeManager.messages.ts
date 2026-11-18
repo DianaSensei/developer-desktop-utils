@@ -289,4 +289,115 @@ export default defineMessages({
     vi: 'Tài khoản "{{label}}" đang có phiên Claude Code chạy. Đóng các phiên đó rồi thử lại.',
     en: 'Account "{{label}}" has a Claude Code session running. Close it, then try again.',
   },
+
+  // Rename
+  renameAccount: { vi: 'Đổi tên tài khoản', en: 'Rename account' },
+  cancelRename: { vi: 'Huỷ đổi tên', en: 'Cancel rename' },
+
+  // Compare
+  tabCompare: { vi: 'So sánh', en: 'Compare' },
+  compareIntro: {
+    vi: 'Mỗi cột là một tài khoản, cùng các mốc thời gian. Thanh trong ô cho thấy mức dùng so với tài khoản dùng nhiều nhất ở hàng đó.',
+    en: 'One column per account, over the same periods. The bar in each cell compares it with the heaviest account in that row.',
+  },
+  compareNeedsTwo: {
+    vi: 'Cần theo dõi ít nhất hai tài khoản để so sánh. Thêm tài khoản ở tab Tài khoản.',
+    en: 'Track at least two accounts to compare them. Add one in the Accounts tab.',
+  },
+  compareSuggestion: {
+    vi: '"{{label}}" dùng ít nhất trong 5 giờ qua — lựa chọn tốt cho phiên tiếp theo.',
+    en: '"{{label}}" used the least in the last 5 hours — a good pick for your next session.',
+  },
+  leastUsed: { vi: 'ít dùng nhất', en: 'least used' },
+  sharedAccount: { vi: 'Dùng chung (chưa rõ)', en: 'Shared (unknown)' },
+  neverUsed: { vi: 'chưa dùng', en: 'never' },
+  compareRunning: { vi: 'Phiên đang mở', en: 'Running sessions' },
+  period5h: { vi: '5 giờ qua', en: 'Last 5 hours' },
+  periodToday: { vi: 'Hôm nay', en: 'Today' },
+  period7d: { vi: '7 ngày', en: '7 days' },
+  period30d: { vi: '30 ngày', en: '30 days' },
+  compareRequests7d: { vi: 'Lượt gọi (7 ngày)', en: 'Requests (7 days)' },
+  compareTopModel: { vi: 'Model chính (7 ngày)', en: 'Main model (7 days)' },
+  compareDaily: { vi: 'Chi phí 7 ngày', en: 'Cost, last 7 days' },
+  compareDailyLabel: { vi: 'Chi phí 7 ngày qua của {{label}}', en: 'Cost over the last 7 days for {{label}}' },
+  compareNote: {
+    vi: 'Số liệu đọc từ transcript trên máy này, không phải hạn mức còn lại của gói — con số đó chỉ máy chủ Anthropic biết. "5 giờ qua" gần đúng với cửa sổ giới hạn của gói thuê bao.',
+    en: 'Figures come from the transcripts on this machine, not your plan’s remaining limit — only Anthropic’s servers know that. "Last 5 hours" approximates the subscription limit window.',
+  },
+  compareSharedNote: {
+    vi: 'Cột "Dùng chung" là phiên mà nhiều tài khoản dùng chung thư mục và chưa biết tài khoản nào chạy. Tool tự gán khi thấy phiên đang chạy dưới một tài khoản, hoặc khi .claude.json của tài khoản đó ghi nó là phiên cuối của một dự án — nên cột này nhỏ dần khi để tool mở trong lúc làm việc.',
+    en: 'The "Shared" column holds sessions in a folder several accounts share, where it is not known which account ran them. A session is assigned once it is seen running under an account, or an account’s .claude.json names it as a project’s last session — so the column shrinks while the tool stays open as you work.',
+  },
+
+  // Quota
+  quota5h: { vi: '5h', en: '5h' },
+  quotaWeekly: { vi: 'Tuần', en: 'Weekly' },
+  quotaSpend: { vi: 'Hạn mức chi', en: 'Spend' },
+  quotaResetsIn: { vi: 'reset sau {{time}}', en: 'resets in {{time}}' },
+  quotaReset: { vi: 'đã reset', en: 'reset' },
+  quotaMostRoom: { vi: 'còn nhiều nhất', en: 'most room' },
+  quotaFromStatusline: { vi: 'status line', en: 'status line' },
+  quotaFromApi: { vi: 'API', en: 'API' },
+  quotaNone: {
+    vi: 'Chưa có số liệu hạn mức. Bật một trong hai cách bên dưới.',
+    en: 'No plan usage yet. Turn on one of the two sources below.',
+  },
+  quotaWaiting: {
+    vi: 'Đã bật status line — số liệu sẽ có sau lần trả lời đầu tiên của một phiên Claude Code dùng tài khoản này.',
+    en: 'Status line is on — numbers appear after the first reply of a Claude Code session on this account.',
+  },
+  quotaHook: { vi: 'Status line', en: 'Status line' },
+  quotaHookLabel: { vi: 'Đọc hạn mức qua status line cho {{label}}', en: 'Read plan usage through the status line for {{label}}' },
+  quotaHookHint: {
+    vi: 'Không đọc token, không gọi mạng. Cập nhật khi tài khoản có phiên Claude Code đang chạy.',
+    en: 'Reads no token and makes no network call. Updates while the account has a Claude Code session open.',
+  },
+  quotaApi: { vi: 'API', en: 'API' },
+  quotaApiLabel: { vi: 'Lấy hạn mức qua API cho {{label}}', en: 'Fetch plan usage from the API for {{label}}' },
+  quotaApiHint: {
+    vi: 'Dùng token đăng nhập của tài khoản để hỏi Anthropic, tối đa 5 phút một lần khi tab này mở.',
+    en: 'Uses the account’s sign-in token to ask Anthropic, at most every 5 minutes while this tab is open.',
+  },
+  quotaRefresh: { vi: 'Lấy lại ngay', en: 'Fetch now' },
+  quotaEnable: { vi: 'Bật', en: 'Turn on' },
+  quotaHookConfirmTitle: { vi: 'Đọc hạn mức của "{{label}}" qua status line?', en: 'Read plan usage of "{{label}}" through the status line?' },
+  quotaHookConfirmBody: {
+    vi: 'DevTool thêm một script nhỏ vào thư mục của tài khoản và đặt nó làm status line trong settings.json (bản cũ giữ ở settings.json.devtool-bak). Script lưu số hạn mức Claude Code đưa ra, rồi chạy status line bạn đang có — giao diện Claude Code không đổi. Không đọc token, không gọi mạng. Tắt là khôi phục status line cũ. Phiên Claude Code đang mở sẽ dùng script ở lần cập nhật tiếp theo.',
+    en: 'DevTool adds a small script to the account’s folder and makes it the status line in settings.json (the old file is kept as settings.json.devtool-bak). The script saves the plan usage Claude Code passes it, then runs the status line you already had — Claude Code looks the same. No token is read and nothing goes over the network. Turning it off restores your status line. Open Claude Code sessions pick it up at their next update.',
+  },
+  quotaApiConfirmTitle: { vi: 'Lấy hạn mức của "{{label}}" qua API?', en: 'Fetch plan usage of "{{label}}" from the API?' },
+  quotaApiConfirmBody: {
+    vi: 'DevTool sẽ đọc token đăng nhập Claude của tài khoản này (Keychain trên macOS, .credentials.json nơi khác) và gửi nó tới api.anthropic.com để hỏi mức dùng — chỉ ở đó, không lưu, không hiện ra. API này không được Anthropic công bố: có thể đổi hoặc từ chối bất cứ lúc nào, và việc dùng token gói cá nhân cho công cụ khác có thể không hợp điều khoản sử dụng. Token hết hạn thì mở Claude Code bằng tài khoản đó để làm mới.',
+    en: 'DevTool will read this account’s Claude sign-in token (Keychain on macOS, .credentials.json elsewhere) and send it to api.anthropic.com to ask for usage — only there, never stored or shown. This API is not published by Anthropic: it can change or refuse at any time, and using a personal plan’s token from another tool may not fit the terms of use. If the token has expired, open Claude Code on that account to renew it.',
+  },
+  quotaSuggestion: {
+    vi: '"{{label}}" còn nhiều hạn mức nhất (đã dùng tối đa {{percent}}% ở cửa sổ 5 giờ hoặc tuần) — lựa chọn tốt cho phiên tiếp theo.',
+    en: '"{{label}}" has the most room left (at most {{percent}}% used of its 5-hour or weekly limit) — a good pick for your next session.',
+  },
+  quotaNote: {
+    vi: 'Thanh hạn mức là số của gói Claude (Pro / Max) do Anthropic tính, khác với token đo từ transcript ở bảng bên dưới. Cửa sổ đã qua giờ reset được tính là 0%.',
+    en: 'The bars are your Claude plan’s own limits as Anthropic counts them, unlike the transcript token counts in the table below. A window past its reset time counts as 0%.',
+  },
+  quotaErrNoCredentials: {
+    vi: 'Không tìm thấy token đăng nhập của tài khoản này. Đăng nhập Claude Code bằng tài khoản đó trước.',
+    en: 'No sign-in token found for this account. Sign in to Claude Code with it first.',
+  },
+  quotaErrExpired: {
+    vi: 'Token đăng nhập đã hết hạn. Mở Claude Code bằng tài khoản này để làm mới, rồi lấy lại.',
+    en: 'The sign-in token has expired. Open Claude Code on this account to renew it, then fetch again.',
+  },
+  quotaErrUnauthorized: { vi: 'Anthropic từ chối token này (401/403).', en: 'Anthropic refused this token (401/403).' },
+  quotaErrRateLimited: {
+    vi: 'Anthropic đang giới hạn số lần hỏi. Sẽ thử lại sau 15 phút.',
+    en: 'Anthropic is limiting how often it can be asked. Trying again in 15 minutes.',
+  },
+  quotaErrBadResponse: {
+    vi: 'API trả về dữ liệu không đọc được — có thể Anthropic đã đổi API.',
+    en: 'The API answered with something unreadable — Anthropic may have changed it.',
+  },
+  quotaErrHttp: { vi: 'API trả lỗi HTTP {{status}}.', en: 'The API answered HTTP {{status}}.' },
+  quotaErrSettings: {
+    vi: 'settings.json của tài khoản không phải JSON hợp lệ — sửa ở tab Cấu hình trước.',
+    en: 'This account’s settings.json is not valid JSON — fix it in the Config tab first.',
+  },
 });
