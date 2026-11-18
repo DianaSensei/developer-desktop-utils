@@ -410,14 +410,14 @@ describe('ClaudeManager', () => {
     expect(invokeMock).toHaveBeenLastCalledWith('claude_monitor_scan', { dirs: ['~/.claude', '~/orca/claude-profiles/4989/home'] });
   });
 
-  it('compares every account side by side and splits shared sessions by who ran them', async () => {
+  it('splits shared sessions by who ran them in the per-account usage', async () => {
     storageSet(KEYS[0], JSON.stringify([
       { id: 'default', label: 'Default', configDir: '~/.claude' },
       { id: 'o', label: 'Orca', configDir: '~/orca/home' },
       { id: 'h', label: 'Hack', configDir: '~/orca/hack/home' },
     ]));
     storageSet(KEYS[4], JSON.stringify(true));
-    storageSet(KEYS[1], JSON.stringify('compare'));
+    storageSet(KEYS[1], JSON.stringify('usage'));
     // Default lists both sessions; Orca shares them and is running live-1.
     invokeMock.mockImplementation(async (command: string, args?: { dirs?: string[] }) => {
       if (command !== 'claude_monitor_scan') return [];
@@ -428,12 +428,10 @@ describe('ClaudeManager', () => {
       });
     });
     render(<ClaudeManager />);
-    expect(await screen.findByText(/^Last 5 hours$|^5 giờ qua$/)).toBeTruthy();
-    for (const label of ['Default', 'Orca', 'Hack', /^Shared \(unknown\)$|^Dùng chung \(chưa rõ\)$/]) {
-      expect(screen.getAllByText(label).length).toBeGreaterThan(0);
-    }
-    // live-1 went to Orca, sess-1 stays unattributed; Default ran nothing itself.
-    expect(screen.getByText(/"Default" used the least|"Default" dùng ít nhất/)).toBeTruthy();
+    // live-1 went to Orca, sess-1 stays unattributed: both rows appear under "By account".
+    expect(await screen.findByText(/^By account$|^Theo tài khoản$/)).toBeTruthy();
+    expect(screen.getByText('Orca')).toBeTruthy();
+    expect(screen.getByText(/^Shared \(unknown\)$|^Dùng chung \(chưa rõ\)$/)).toBeTruthy();
     await waitFor(() => expect(storageGet('devtool:claude-manager:sessionOwners')).toContain('live-1'));
   });
 
@@ -469,7 +467,7 @@ describe('ClaudeManager', () => {
 
     fireEvent.click(screen.getByRole('switch', { name: /Fetch plan usage from the API for Work|Lấy hạn mức qua API cho Work/ }));
     fireEvent.click(await screen.findByRole('button', { name: /^Turn on$|^Bật$/ }));
-    expect(await screen.findByText('Opus')).toBeTruthy();
+    expect(await screen.findByText('Opus 0%')).toBeTruthy();
     expect(invokeMock).toHaveBeenCalledWith('claude_monitor_fetch_quota', { dir: '~/.claude-work' });
     // Work now has the most room (12% vs 84%).
     expect(screen.getByText(/"Work" has the most room left|"Work" còn nhiều hạn mức nhất/)).toBeTruthy();

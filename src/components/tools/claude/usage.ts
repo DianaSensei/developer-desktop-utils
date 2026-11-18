@@ -93,6 +93,8 @@ export interface QuotaReading {
   /** Epoch milliseconds. */
   observedAt: number;
   windows: QuotaWindow[];
+  /** API only: which sign-in answered ("Keychain: <item>" or ".credentials.json"). */
+  credential?: string | null;
 }
 
 /** One tracked account = one Claude Code config directory. */

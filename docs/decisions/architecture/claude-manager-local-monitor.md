@@ -135,6 +135,14 @@ nêu rủi ro, chọn dùng **cả hai nguồn**, đều tắt mặc định và
   `.credentials.json`), không làm mới token hết hạn, không trả về JS. Gọi tối đa 5 phút/lần
   khi tab So sánh mở, lùi 15 phút khi bị 429. Rủi ro: API đổi/từ chối; có thể không hợp
   điều khoản gói cá nhân (đã nêu trong hộp xác nhận).
+- **Sửa sau khi dùng thật (v1.9.5):** người dùng báo số lệch với `/usage` và đứng yên.
+  Nguyên nhân tìm được trong code: script lưu bản đọc cạnh chính nó (`dirname "$0"`),
+  mà các profile Orca có thể dùng chung một settings.json → mọi tài khoản chạy cùng một
+  script và ghi đè chung một file. Giờ script ghi vào `${CLAUDE_CONFIG_DIR:-$HOME/.claude}`
+  (dựa trên giả định Claude Code truyền biến này cho lệnh status line — chưa kiểm chứng),
+  và `refresh_script` cập nhật script cũ ở mỗi lần quét. Bản đọc cũ hơn 15 phút được đánh
+  dấu; nguồn API ghi rõ token lấy từ mục Keychain nào để phát hiện đọc nhầm tài khoản.
+  Tab So sánh bỏ bảng token cục bộ — người dùng chỉ cần so % hạn mức.
 - **Hiển thị:** lấy bản đọc mới nhất giữa hai nguồn; cửa sổ đã qua `resets_at` coi là 0%.
   Gợi ý tài khoản theo `max(5h, tuần)` thấp nhất; không đủ số liệu thì dùng token cục bộ.
 

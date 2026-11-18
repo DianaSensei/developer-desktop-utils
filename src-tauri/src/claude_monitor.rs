@@ -665,6 +665,7 @@ fn scan_profile(
     snapshot.account = read_account(&dir, home);
     snapshot.statusline_quota = crate::claude_quota::read_statusline_quota(&dir);
     snapshot.quota_hook = crate::claude_quota::hook_installed(&dir);
+    crate::claude_quota::refresh_script(&dir);
 
     let mut by_id: HashMap<String, SessionFiles> = HashMap::new();
     for project in fs::read_dir(dir.join("projects")).into_iter().flatten().flatten() {

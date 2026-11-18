@@ -1155,9 +1155,8 @@ export function ClaudeManager() {
           />
         )}
         {snapshots !== null && allRows.length > 0 && tab === 'overview' && <OverviewView {...view} />}
-        {snapshots !== null && allRows.length > 0 && tab === 'compare' && (
+        {snapshots !== null && tab === 'compare' && (
           <CompareView
-            rows={allRows}
             profiles={profiles}
             snapshots={snapshots}
             now={scannedAt}

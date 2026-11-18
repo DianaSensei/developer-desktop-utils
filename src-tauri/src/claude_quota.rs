@@ -58,6 +58,10 @@ pub struct QuotaReading {
     /// When the numbers were taken, epoch milliseconds.
     observed_at: i64,
     windows: Vec<QuotaWindow>,
+    /// For the API: which sign-in answered ("Keychain: <item>" or
+    /// ".credentials.json") — never the token — so a reading taken with the
+    /// wrong account's sign-in can be spotted.
+    credential: Option<String>,
 }
 
 fn number(v: &Value, key: &str) -> Option<f64> {
@@ -86,7 +90,7 @@ pub(crate) fn read_statusline_quota(config_dir: &Path) -> Option<QuotaReading> {
             })
         })
         .collect();
-    (!windows.is_empty()).then_some(QuotaReading { source: "statusline", observed_at, windows })
+    (!windows.is_empty()).then_some(QuotaReading { source: "statusline", observed_at, windows, credential: None })
 }
 
 fn read_settings(config_dir: &Path) -> Result<(Map<String, Value>, Option<i64>), String> {
@@ -117,13 +121,19 @@ fn sh_quote(text: &str) -> String {
     format!("'{}'", text.replace('\'', r"'\''"))
 }
 
+/// The script's first lines. The reading is saved in the folder of the
+/// account that is running — `CLAUDE_CONFIG_DIR`, or `~/.claude` without it —
+/// not next to the script: tools that keep one folder per account often
+/// share one settings.json between them, and then every account runs the
+/// same script.
 fn script_text(original_command: Option<&str>) -> String {
     let mut out = String::from(
         "#!/bin/sh\n\
          # Written by DevTool (Claude Manager). Saves the status line input so DevTool can\n\
          # show this account's plan usage, then runs the status line you had before.\n\
          # Turn it off in DevTool's Compare tab; that also restores your status line.\n\
-         dir=$(dirname \"$0\")\n\
+         dir=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}\"\n\
+         [ -d \"$dir\" ] || dir=$(dirname \"$0\")\n\
          input=$(cat)\n\
          printf '%s' \"$input\" > \"$dir/.devtool-statusline.json.tmp\" && mv -f \"$dir/.devtool-statusline.json.tmp\" \"$dir/.devtool-statusline.json\"\n",
     );
@@ -136,6 +146,21 @@ fn script_text(original_command: Option<&str>) -> String {
 fn write_settings(config_dir: &Path, settings: Map<String, Value>, mtime: Option<i64>) -> Result<(), String> {
     let text = serde_json::to_string_pretty(&Value::Object(settings)).map_err(|e| e.to_string())? + "\n";
     write_config_file(config_dir, "settings", &text, mtime).map(|_| ())
+}
+
+/// Rewrites an installed script written by an older DevTool, so a fix to
+/// the script reaches accounts that turned the status line on before it.
+pub(crate) fn refresh_script(config_dir: &Path) {
+    let script = config_dir.join(SCRIPT_NAME);
+    let Ok(current) = fs::read_to_string(&script) else { return };
+    let original = fs::read(config_dir.join(ORIGINAL_NAME))
+        .ok()
+        .and_then(|b| serde_json::from_slice::<Value>(&b).ok())
+        .unwrap_or(Value::Null);
+    let expected = script_text(original.get("command").and_then(Value::as_str));
+    if current != expected {
+        let _ = fs::write(&script, expected);
+    }
 }
 
 fn install_hook(config_dir: &Path) -> Result<(), String> {
@@ -247,15 +272,16 @@ fn keychain_secret(_service: &str) -> Option<String> {
     None
 }
 
-fn read_token(config_dir: &Path, raw_dir: &str, home: Option<&Path>, now_ms: i64) -> Result<String, String> {
+/// The token, and a label for where it came from.
+fn read_token(config_dir: &Path, raw_dir: &str, home: Option<&Path>, now_ms: i64) -> Result<(String, String), String> {
     let mut last_err = ERR_NO_CREDENTIALS.to_string();
     let candidates = keychain_services(config_dir, raw_dir, home)
         .into_iter()
-        .filter_map(|service| keychain_secret(&service))
-        .chain(fs::read_to_string(config_dir.join(".credentials.json")).ok());
-    for json in candidates {
+        .filter_map(|service| keychain_secret(&service).map(|json| (json, format!("Keychain: {service}"))))
+        .chain(fs::read_to_string(config_dir.join(".credentials.json")).ok().map(|json| (json, ".credentials.json".to_string())));
+    for (json, label) in candidates {
         match token_from_credentials(&json, now_ms) {
-            Ok(token) => return Ok(token),
+            Ok(token) => return Ok((token, label)),
             Err(e) => last_err = e,
         }
     }
@@ -283,7 +309,7 @@ fn parse_usage(body: &Value, observed_at: i64) -> Result<QuotaReading, String> {
     if windows.is_empty() {
         return Err(ERR_BAD_RESPONSE.into());
     }
-    Ok(QuotaReading { source: "api", observed_at, windows })
+    Ok(QuotaReading { source: "api", observed_at, windows, credential: None })
 }
 
 /// Asks Anthropic for one account's plan usage with that account's own
@@ -292,7 +318,7 @@ fn parse_usage(body: &Value, observed_at: i64) -> Result<QuotaReading, String> {
 #[tauri::command]
 pub async fn claude_monitor_fetch_quota(dir: String) -> Result<QuotaReading, String> {
     let now = chrono::Utc::now().timestamp_millis();
-    let token = tokio::task::spawn_blocking(move || {
+    let (token, credential) = tokio::task::spawn_blocking(move || {
         let home = home_dir();
         let config_dir = expand_home(&dir, home.as_deref());
         read_token(&config_dir, &dir, home.as_deref(), now)
@@ -317,7 +343,9 @@ pub async fn claude_monitor_fetch_quota(dir: String) -> Result<QuotaReading, Str
         code => return Err(format!("http-{code}")),
     }
     let body: Value = response.json().await.map_err(|_| ERR_BAD_RESPONSE.to_string())?;
-    parse_usage(&body, now)
+    let mut reading = parse_usage(&body, now)?;
+    reading.credential = Some(credential);
+    Ok(reading)
 }
 
 #[cfg(test)]
@@ -414,6 +442,7 @@ mod tests {
         install_hook(&dir.0).unwrap();
         let mut child = std::process::Command::new("sh")
             .arg(dir.0.join(SCRIPT_NAME))
+            .env("CLAUDE_CONFIG_DIR", &dir.0)
             .stdin(std::process::Stdio::piped())
             .stdout(std::process::Stdio::piped())
             .spawn()
@@ -463,7 +492,7 @@ mod tests {
         let dir = TempDir::new("cred");
         assert_eq!(read_token(&dir.0, "x", None, 0).unwrap_err(), ERR_NO_CREDENTIALS);
         dir.write(".credentials.json", ok);
-        assert_eq!(read_token(&dir.0, "x", None, 1000).unwrap(), "sk-ant-oat-x");
+        assert_eq!(read_token(&dir.0, "x", None, 1000).unwrap(), ("sk-ant-oat-x".to_string(), ".credentials.json".to_string()));
     }
 
     #[test]
@@ -482,5 +511,44 @@ mod tests {
         assert_eq!(reading.windows[0].resets_at, Some(1_794_920_400_000));
         assert_eq!(reading.windows[2].resets_at, None);
         assert_eq!(parse_usage(&serde_json::json!({"x":1}), 0).unwrap_err(), ERR_BAD_RESPONSE);
+    }
+
+    #[test]
+    fn a_shared_script_saves_each_reading_in_the_running_accounts_folder() {
+        // Two accounts that share one settings.json run the script from A.
+        let a = TempDir::new("share-a");
+        let b = TempDir::new("share-b");
+        install_hook(&a.0).unwrap();
+        let run = |config_dir: &Path, percent: u32| {
+            let mut child = std::process::Command::new("sh")
+                .arg(a.0.join(SCRIPT_NAME))
+                .env("CLAUDE_CONFIG_DIR", config_dir)
+                .stdin(std::process::Stdio::piped())
+                .stdout(std::process::Stdio::null())
+                .spawn()
+                .unwrap();
+            use std::io::Write;
+            let input = format!(r#"{{"rate_limits":{{"five_hour":{{"used_percentage":{percent},"resets_at":1}}}}}}"#);
+            child.stdin.take().unwrap().write_all(input.as_bytes()).unwrap();
+            child.wait().unwrap();
+        };
+        run(&a.0, 10);
+        run(&b.0, 70);
+        assert_eq!(read_statusline_quota(&a.0).unwrap().windows[0].used_percentage, 10.0);
+        assert_eq!(read_statusline_quota(&b.0).unwrap().windows[0].used_percentage, 70.0);
+    }
+
+    #[test]
+    fn an_old_script_is_brought_up_to_date() {
+        let dir = TempDir::new("refresh");
+        dir.write("settings.json", r#"{"statusLine":{"type":"command","command":"echo x"}}"#);
+        install_hook(&dir.0).unwrap();
+        dir.write(SCRIPT_NAME, "#!/bin/sh\ndir=$(dirname \"$0\")\n");
+        refresh_script(&dir.0);
+        assert_eq!(dir.read(SCRIPT_NAME), script_text(Some("echo x")));
+        // No script, nothing written.
+        let none = TempDir::new("refresh-none");
+        refresh_script(&none.0);
+        assert!(!none.0.join(SCRIPT_NAME).exists());
     }
 }

@@ -375,8 +375,8 @@ export default defineMessages({
     en: '"{{label}}" has the most room left (at most {{percent}}% used of its 5-hour or weekly limit) — a good pick for your next session.',
   },
   quotaNote: {
-    vi: 'Thanh hạn mức là số của gói Claude (Pro / Max) do Anthropic tính, khác với token đo từ transcript ở bảng bên dưới. Cửa sổ đã qua giờ reset được tính là 0%.',
-    en: 'The bars are your Claude plan’s own limits as Anthropic counts them, unlike the transcript token counts in the table below. A window past its reset time counts as 0%.',
+    vi: 'Đây là hạn mức của gói Claude (Pro / Max) do Anthropic tính. Cửa sổ đã qua giờ reset được tính là 0%. Nguồn status line chỉ cập nhật khi tài khoản có phiên Claude Code đang chạy; muốn số luôn mới cho mọi tài khoản thì bật API. Token và chi phí đo từ transcript nằm ở tab Mức dùng.',
+    en: 'These are your Claude plan’s limits as Anthropic counts them. A window past its reset time counts as 0%. The status line source only updates while the account has a Claude Code session open; turn on the API to keep every account current. Token and cost counts from transcripts are in the Usage tab.',
   },
   quotaErrNoCredentials: {
     vi: 'Không tìm thấy token đăng nhập của tài khoản này. Đăng nhập Claude Code bằng tài khoản đó trước.',
@@ -400,4 +400,15 @@ export default defineMessages({
     vi: 'settings.json của tài khoản không phải JSON hợp lệ — sửa ở tab Cấu hình trước.',
     en: 'This account’s settings.json is not valid JSON — fix it in the Config tab first.',
   },
+
+  // Quota table
+  quotaTitle: { vi: 'Hạn mức gói theo tài khoản — còn nhiều nhất ở trên cùng', en: 'Plan usage by account — most room first' },
+  quotaRefreshAll: { vi: 'Lấy lại qua API cho mọi tài khoản đã bật', en: 'Fetch again from the API for every account that has it on' },
+  quotaOther: { vi: 'Khác', en: 'Other' },
+  quotaSourceCol: { vi: 'Nguồn', en: 'Source' },
+  quotaStaleStatusline: {
+    vi: 'có thể đã cũ — chỉ cập nhật khi tài khoản có phiên đang chạy; bật API để luôn mới',
+    en: 'may be out of date — updates only while the account has a session open; turn on the API to keep it current',
+  },
+  quotaStaleApi: { vi: 'có thể đã cũ — bấm làm mới', en: 'may be out of date — refresh it' },
 });
