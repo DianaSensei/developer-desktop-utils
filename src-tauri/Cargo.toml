@@ -77,6 +77,20 @@ futures-util = { version = "0.3", default-features = false, features = ["std"] }
 default = ["custom-protocol"]
 custom-protocol = ["tauri/custom-protocol"]
 
+# The text editor's large-file viewer searches inside regex/memchr. Built
+# unoptimized (the dev default) a 300 MB scan takes 2–7 s instead of ~0.1 s,
+# so `tauri dev` gets these few crates optimized; they rarely recompile.
+[profile.dev.package.regex]
+opt-level = 3
+[profile.dev.package.regex-automata]
+opt-level = 3
+[profile.dev.package.regex-syntax]
+opt-level = 3
+[profile.dev.package.memchr]
+opt-level = 3
+[profile.dev.package.aho-corasick]
+opt-level = 3
+
 # Thin LTO with parallel codegen: much faster release builds for a small
 # size/performance cost.
 [profile.release]

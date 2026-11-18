@@ -215,6 +215,7 @@ fn main() {
             editor::editor_view_open,
             editor::editor_view_status,
             editor::editor_view_lines,
+            editor::editor_view_line,
             editor::editor_view_refresh,
             editor::editor_view_search,
             editor::editor_view_close,

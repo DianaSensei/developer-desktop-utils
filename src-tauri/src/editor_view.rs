@@ -25,8 +25,11 @@ use std::time::{Duration, Instant};
 pub const CHECKPOINT: u64 = 1024;
 /// Longer lines are cut to this many bytes when shown.
 pub const MAX_LINE_BYTES: usize = 8 * 1024;
-/// Longer lines are only searched up to this many bytes.
-pub const MAX_SEARCH_LINE_BYTES: usize = 256 * 1024;
+/// "Show full line" reads at most this many bytes of one line.
+pub const MAX_FULL_LINE_BYTES: usize = 4 * 1024 * 1024;
+/// Longer lines are only searched up to this many bytes (the same as "show
+/// full line" can display, so every hit can be shown).
+pub const MAX_SEARCH_LINE_BYTES: usize = MAX_FULL_LINE_BYTES;
 /// Most lines one `read_lines` call returns.
 pub const MAX_LINES_PER_READ: u64 = 2_000;
 const SCAN_BUF: usize = 1024 * 1024;
@@ -75,6 +78,12 @@ pub struct SearchResult {
     pub next_line: Option<u64>,
     /// Stopped by the time budget or `max_hits` rather than by EOF.
     pub partial: bool,
+    /// Matching lines from `from` to EOF, when asked for and counted within
+    /// the budget.
+    pub total: Option<u64>,
+    /// Matching lines seen by this call (≥ `hits.len()` when counting): a
+    /// count cut short by the budget continues from `next_line` and adds up.
+    pub matched: u64,
 }
 
 #[derive(Debug, Default)]
@@ -269,8 +278,29 @@ impl Viewer {
         Ok(out)
     }
 
-    /// Searches from line `from`, stopping at EOF, after `max_hits`, after
-    /// `budget`, or when a newer search on this viewer starts.
+    /// One line (0-based) with up to `MAX_FULL_LINE_BYTES` of it, for lines
+    /// `read_lines` cut short. `None` past the end. `truncated` is still set
+    /// for a line longer than that.
+    pub fn read_full_line(&self, line: u64) -> FsResult<Option<ViewLine>> {
+        let mut r = self.reader_at(line)?;
+        Ok(next_line(&mut r, MAX_FULL_LINE_BYTES)?
+            .map(|(bytes, truncated)| ViewLine { text: String::from_utf8_lossy(&bytes).into_owned(), truncated }))
+    }
+
+    /// Searches from line `from`. Hits stop at `max_hits`; past that, with
+    /// `count_total`, the scan goes on only to count matching lines (`total`).
+    /// `max_hits` 0 with `count_total` is a pure count, resumable from
+    /// `next_line` when the budget runs out. The
+    /// whole call also stops at `budget` or when a newer search on this
+    /// viewer starts.
+    ///
+    /// The regex runs over 4 MB blocks of whole lines rather than line by
+    /// line, so the scan is regex/memchr's own speed (GB/s, literal
+    /// prefilters included); a block-level match is then re-checked against
+    /// its line alone, which keeps per-line semantics (`^`/`$` at line ends,
+    /// nothing spans a newline). The leftmost match in the block can't skip a
+    /// line that matches on its own, as any such match is also a block match.
+    #[allow(clippy::too_many_arguments)] // mirrors the Tauri command's arguments
     pub fn search(
         &self,
         query: &str,
@@ -278,56 +308,170 @@ impl Viewer {
         case_sensitive: bool,
         from: u64,
         max_hits: usize,
+        count_total: bool,
         budget: Duration,
     ) -> FsResult<SearchResult> {
         let epoch = self.search_epoch.fetch_add(1, Ordering::SeqCst) + 1;
         if query.is_empty() {
-            return Ok(SearchResult { hits: Vec::new(), next_line: None, partial: false });
+            return Ok(SearchResult { hits: Vec::new(), next_line: None, partial: false, total: Some(0), matched: 0 });
         }
         let pattern = if is_regex { query.to_string() } else { regex::escape(query) };
         let re = regex::bytes::RegexBuilder::new(&pattern)
             .case_insensitive(!case_sensitive)
+            .multi_line(true)
+            .crlf(true)
             .size_limit(1 << 20)
             .build()
             .map_err(|e| FsError { code: "invalid_regex", message: e.to_string() })?;
         let started = Instant::now();
         let mut r = self.reader_at(from)?;
+        let mut scan = Scan { re: &re, max_hits, hits: Vec::new(), matched: 0, next_line: None };
         let mut line = from;
-        let mut hits = Vec::new();
+        // Allocated once (zeroed by the allocator); the unsearched tail of a
+        // block moves to the front with a memmove — no per-byte work here, so
+        // even a debug build scans at regex/memchr speed.
+        let mut buf = vec![0u8; SEARCH_CHUNK];
+        let mut filled = 0;
+        let mut eof = false;
+        let mut first_block = true;
         loop {
-            let Some((bytes, _)) = next_line(&mut r, MAX_SEARCH_LINE_BYTES)? else {
-                return Ok(SearchResult { hits, next_line: None, partial: false });
-            };
-            if let Some(m) = re.find(&bytes) {
-                // ~80 bytes of context before, ~200 after, moved to UTF-8
-                // character boundaries so no character is cut in half.
-                let mut preview_start = m.start().saturating_sub(80);
-                while preview_start > 0 && bytes[preview_start] & 0xC0 == 0x80 {
-                    preview_start -= 1;
-                }
-                let mut preview_end = (m.end() + 200).min(bytes.len());
-                while preview_end < bytes.len() && bytes[preview_end] & 0xC0 == 0x80 {
-                    preview_end += 1;
-                }
-                let lead = String::from_utf8_lossy(&bytes[preview_start..m.start()]);
-                let matched = String::from_utf8_lossy(&bytes[m.start()..m.end()]);
-                let tail = String::from_utf8_lossy(&bytes[m.end()..preview_end]);
-                hits.push(SearchHit {
-                    line,
-                    line_column: String::from_utf8_lossy(&bytes[..m.start()]).chars().count(),
-                    column: lead.chars().count(),
-                    length: matched.chars().count(),
-                    preview: format!("{lead}{matched}{tail}"),
+            let superseded = self.search_epoch.load(Ordering::SeqCst) != epoch;
+            // At least one block per call, so a search always gets further.
+            let out_of_time = !first_block && started.elapsed() > budget;
+            first_block = false;
+            if superseded || self.closed.load(Ordering::Relaxed) || out_of_time {
+                // Out of time while still collecting: resume at the next
+                // unexamined line. Out of time while only counting: the hits
+                // are complete, the total is unknown.
+                let next_line = if scan.hits.len() < max_hits || max_hits == 0 { Some(line) } else { scan.next_line };
+                return Ok(SearchResult { hits: scan.hits, next_line, partial: true, total: None, matched: scan.matched });
+            }
+            if scan.hits.len() >= max_hits && !count_total {
+                return Ok(SearchResult {
+                    hits: scan.hits,
+                    next_line: scan.next_line,
+                    partial: true,
+                    total: None,
+                    matched: scan.matched,
                 });
             }
-            line += 1;
-            let superseded = self.search_epoch.load(Ordering::SeqCst) != epoch;
-            if hits.len() >= max_hits || superseded || self.closed.load(Ordering::Relaxed)
-                || (line.is_multiple_of(4096) && started.elapsed() > budget)
-            {
-                return Ok(SearchResult { hits, next_line: Some(line), partial: true });
+            // Top up the block to SEARCH_CHUNK bytes.
+            while !eof && filled < SEARCH_CHUNK {
+                let n = r.read(&mut buf[filled..])?;
+                filled += n;
+                eof = n == 0;
+            }
+            if filled == 0 {
+                break;
+            }
+            let data = &buf[..filled];
+            match (eof, memchr::memrchr(b'\n', data)) {
+                // Whole lines up to the last newline; the rest waits for more.
+                (false, Some(i)) => {
+                    line = scan.block(&data[..=i], line);
+                    buf.copy_within(i + 1..filled, 0);
+                    filled -= i + 1;
+                }
+                // The end of the file: whatever is left is the last lines.
+                (true, _) => {
+                    line = scan.block(data, line);
+                    filled = 0;
+                }
+                // One line longer than a block: search its first
+                // SEARCH_CHUNK bytes, skip the rest.
+                (false, None) => {
+                    line = scan.block(data, line);
+                    filled = 0;
+                    next_line(&mut r, 0)?;
+                }
             }
         }
+        // At EOF: every matching line was seen (and counted).
+        let next_line = if scan.matched > scan.hits.len() as u64 { scan.next_line } else { None };
+        Ok(SearchResult {
+            next_line,
+            partial: next_line.is_some(),
+            hits: scan.hits,
+            total: Some(scan.matched),
+            matched: scan.matched,
+        })
+    }
+}
+
+/// Bytes the search reads at a time; also the longest line it searches whole.
+const SEARCH_CHUNK: usize = MAX_SEARCH_LINE_BYTES;
+
+struct Scan<'a> {
+    re: &'a regex::bytes::Regex,
+    max_hits: usize,
+    hits: Vec<SearchHit>,
+    /// Matching lines seen (all of them, not only the ones kept as hits).
+    matched: u64,
+    /// The line after the last kept hit, once `max_hits` is reached.
+    next_line: Option<u64>,
+}
+
+impl Scan<'_> {
+    /// Searches `block` (whole lines; the last may lack its newline), whose
+    /// first line is `line`. Returns the line number after the block.
+    fn block(&mut self, block: &[u8], line: u64) -> u64 {
+        let mut pos = 0;
+        let mut counted = 0;
+        let mut cur = line;
+        while pos < block.len() {
+            let Some(m) = self.re.find_at(block, pos) else { break };
+            // An empty match right after the block's final newline (`^$`)
+            // is on the next block's first line, not on one of these.
+            if m.start() == block.len() && block.last() == Some(&b'\n') {
+                break;
+            }
+            let ls = memchr::memrchr(b'\n', &block[..m.start()]).map_or(0, |i| i + 1);
+            let le = memchr::memchr(b'\n', &block[m.start()..]).map_or(block.len(), |i| m.start() + i);
+            cur += memchr::memchr_iter(b'\n', &block[counted..ls]).count() as u64;
+            counted = ls;
+            let mut text = &block[ls..le];
+            if text.last() == Some(&b'\r') {
+                text = &text[..text.len() - 1];
+            }
+            if let Some(lm) = self.re.find(text) {
+                self.matched += 1;
+                if self.hits.len() < self.max_hits {
+                    self.hits.push(hit(text, cur, lm.start(), lm.end()));
+                    if self.hits.len() == self.max_hits {
+                        self.next_line = Some(cur + 1);
+                    }
+                }
+            }
+            pos = le + 1;
+        }
+        let mut end = cur + memchr::memchr_iter(b'\n', &block[counted..]).count() as u64;
+        if block.last().is_some_and(|&b| b != b'\n') {
+            end += 1; // a last line without its newline (EOF, or cut short)
+        }
+        end
+    }
+}
+
+/// A hit with ~80 bytes of context before the match and ~200 after, moved to
+/// UTF-8 character boundaries so no character is cut in half.
+fn hit(bytes: &[u8], line: u64, start: usize, end: usize) -> SearchHit {
+    let mut preview_start = start.saturating_sub(80);
+    while preview_start > 0 && bytes[preview_start] & 0xC0 == 0x80 {
+        preview_start -= 1;
+    }
+    let mut preview_end = (end + 200).min(bytes.len());
+    while preview_end < bytes.len() && bytes[preview_end] & 0xC0 == 0x80 {
+        preview_end += 1;
+    }
+    let lead = String::from_utf8_lossy(&bytes[preview_start..start]);
+    let matched = String::from_utf8_lossy(&bytes[start..end]);
+    let tail = String::from_utf8_lossy(&bytes[end..preview_end]);
+    SearchHit {
+        line,
+        line_column: String::from_utf8_lossy(&bytes[..start]).chars().count(),
+        column: lead.chars().count(),
+        length: matched.chars().count(),
+        preview: format!("{lead}{matched}{tail}"),
     }
 }
 
@@ -394,6 +538,27 @@ mod tests {
     }
 
     #[test]
+    fn a_cut_line_can_be_read_whole() {
+        let mut content = b"first
+".to_vec();
+        content.extend(std::iter::repeat_n(b'y', MAX_LINE_BYTES * 3));
+        content.extend_from_slice(b"END
+last
+");
+        let p = file("full", &content);
+        let v = Viewer::open(&p).unwrap();
+        v.extend().unwrap();
+        assert!(v.read_lines(1, 1).unwrap()[0].truncated);
+        let full = v.read_full_line(1).unwrap().unwrap();
+        assert!(!full.truncated);
+        assert_eq!(full.text.len(), MAX_LINE_BYTES * 3 + 3);
+        assert!(full.text.ends_with("yEND"));
+        assert_eq!(v.read_full_line(2).unwrap().unwrap().text, "last");
+        assert!(v.read_full_line(3).unwrap().is_none());
+        let _ = std::fs::remove_file(p);
+    }
+
+    #[test]
     fn invalid_utf8_is_shown_lossily_and_nul_flags_binary() {
         let p = file("lossy", b"caf\xe9\nok\n");
         let v = Viewer::open(&p).unwrap();
@@ -435,7 +600,7 @@ mod tests {
         let p = file("search", content.as_bytes());
         let v = Viewer::open(&p).unwrap();
         v.extend().unwrap();
-        let r = v.search("error", false, false, 0, 10, Duration::from_secs(5)).unwrap();
+        let r = v.search("error", false, false, 0, 10, false, Duration::from_secs(5)).unwrap();
         assert_eq!(r.hits.len(), 1);
         assert_eq!(r.hits[0].line, 5000);
         assert_eq!((r.hits[0].column, r.hits[0].length), (0, 5));
@@ -443,27 +608,137 @@ mod tests {
         let pd = file("deep", deep.as_bytes());
         let vd = Viewer::open(&pd).unwrap();
         vd.extend().unwrap();
-        let hd = &vd.search("needle", false, true, 0, 1, Duration::from_secs(5)).unwrap().hits[0];
+        let hd = &vd.search("needle", false, true, 0, 1, false, Duration::from_secs(5)).unwrap().hits[0];
         assert_eq!((hd.line_column, hd.column), (200, 40), "line offset vs. preview offset (80 bytes = 40 × é)");
         assert!(!hd.preview.contains('\u{fffd}'), "preview edges stay on character boundaries");
         let odd = format!("x{}needle\n", "é".repeat(200));
         let po = file("odd", odd.as_bytes());
         let vo = Viewer::open(&po).unwrap();
         vo.extend().unwrap();
-        let ho = &vo.search("needle", false, true, 0, 1, Duration::from_secs(5)).unwrap().hits[0];
+        let ho = &vo.search("needle", false, true, 0, 1, false, Duration::from_secs(5)).unwrap().hits[0];
         assert!(!ho.preview.contains('\u{fffd}'));
         let _ = std::fs::remove_file(po);
         let _ = std::fs::remove_file(pd);
         assert_eq!(r.next_line, None);
-        assert!(v.search("error", false, true, 0, 10, Duration::from_secs(5)).unwrap().hits.is_empty(), "case-sensitive");
-        let first = v.search(r"INFO \w+", true, true, 0, 2, Duration::from_secs(5)).unwrap();
+        assert!(v.search("error", false, true, 0, 10, false, Duration::from_secs(5)).unwrap().hits.is_empty(), "case-sensitive");
+        let first = v.search(r"INFO \w+", true, true, 0, 2, false, Duration::from_secs(5)).unwrap();
         assert_eq!(first.hits.iter().map(|h| h.line).collect::<Vec<_>>(), vec![7, 1007]);
         assert!(first.partial);
-        let rest = v.search(r"INFO \w+", true, true, first.next_line.unwrap(), 10, Duration::from_secs(5)).unwrap();
+        let rest = v.search(r"INFO \w+", true, true, first.next_line.unwrap(), 10, false, Duration::from_secs(5)).unwrap();
         assert_eq!(rest.hits.len(), 3);
         // A literal query with regex characters is literal.
-        assert_eq!(v.search("99%", false, true, 0, 10, Duration::from_secs(5)).unwrap().hits.len(), 1);
-        assert_eq!(v.search("(", true, true, 0, 1, Duration::from_secs(5)).unwrap_err().code, "invalid_regex");
+        assert_eq!(v.search("99%", false, true, 0, 10, false, Duration::from_secs(5)).unwrap().hits.len(), 1);
+        assert_eq!(v.search("(", true, true, 0, 1, false, Duration::from_secs(5)).unwrap_err().code, "invalid_regex");
+        let _ = std::fs::remove_file(p);
+    }
+
+    /// The block scan must agree with searching line by line, across block
+    /// boundaries, CRLF, empty lines, a line longer than a block and a last
+    /// line without its newline.
+    #[test]
+    fn block_search_matches_a_line_by_line_reference() {
+        let mut lines: Vec<String> = Vec::new();
+        let mut x: u64 = 0x2545F4914F6CDD1D;
+        for i in 0..120_000u64 {
+            x ^= x << 13;
+            x ^= x >> 7;
+            x ^= x << 17;
+            lines.push(match x % 9 {
+                0 => String::new(),
+                1 => format!("ERROR code={} at {}", x % 1000, i),
+                2 => "  error: Disk Full\r".to_string(),
+                3 => "x".repeat((x % 300) as usize),
+                _ => format!("info line {i} value={}", x % 97),
+            });
+        }
+        lines[60_000] = format!("{}MARK{}ERROR past the limit", "z".repeat(MAX_SEARCH_LINE_BYTES - 100), "z".repeat(2000));
+        let mut content = lines.join("\n");
+        content.push_str("\nlast ERROR without newline");
+        lines.push("last ERROR without newline".into());
+        let p = file("blocks", content.as_bytes());
+        let v = Viewer::open(&p).unwrap();
+        assert_eq!(v.extend().unwrap().lines, lines.len() as u64);
+
+        for (q, is_re, cs) in [
+            ("ERROR", false, true),
+            ("error", false, false),
+            (r"^\s*error:", true, false),
+            (r"Full$", true, true),
+            (r"=\d+$", true, true),
+            (r"^$", true, true),
+            (r"value=9\d\s", true, true),
+        ] {
+            let pat = if is_re { q.to_string() } else { regex::escape(q) };
+            let re = regex::RegexBuilder::new(&pat).case_insensitive(!cs).build().unwrap();
+            let want: Vec<u64> = lines
+                .iter()
+                .enumerate()
+                .filter(|(_, l)| {
+                    let l = l.strip_suffix('\r').unwrap_or(l);
+                    // The huge line is only searched up to the limit.
+                    re.is_match(&l[..l.len().min(MAX_SEARCH_LINE_BYTES)])
+                })
+                .map(|(i, _)| i as u64)
+                .collect();
+            let all = v.search(q, is_re, cs, 0, usize::MAX, false, Duration::from_secs(60)).unwrap();
+            let got: Vec<u64> = all.hits.iter().map(|h| h.line).collect();
+            assert_eq!(got, want, "{q}");
+            assert_eq!(all.total, Some(want.len() as u64), "{q}");
+            assert!(!all.partial && all.next_line.is_none());
+
+            // Paged with a total, then continued from next_line.
+            // A pure count, cut into pieces by a zero budget, adds up.
+            let (mut from, mut sum) = (0, 0);
+            loop {
+                let c = v.search(q, is_re, cs, from, 0, true, Duration::ZERO).unwrap();
+                assert!(c.hits.is_empty());
+                sum += c.matched;
+                match c.next_line {
+                    Some(n) => from = n,
+                    None => {
+                        assert_eq!(c.total.map(|_| sum), Some(want.len() as u64), "{q} count");
+                        break;
+                    }
+                }
+            }
+            let page = v.search(q, is_re, cs, 0, 50, true, Duration::from_secs(60)).unwrap();
+            assert_eq!(page.total, Some(want.len() as u64), "{q} total");
+            if want.len() > 50 {
+                assert!(page.partial);
+                assert_eq!(page.next_line, Some(want[49] + 1));
+                let rest = v.search(q, is_re, cs, page.next_line.unwrap(), 50, false, Duration::from_secs(60)).unwrap();
+                assert_eq!(rest.hits.iter().map(|h| h.line).collect::<Vec<_>>(), want[50..want.len().min(100)]);
+            }
+        }
+        // A hit's columns are within its own line, past the huge line too.
+        let h = v.search("MARK", false, true, 0, 1, false, Duration::from_secs(60)).unwrap();
+        assert_eq!(h.hits[0].line, 60_000);
+        assert_eq!(h.hits[0].line_column, MAX_SEARCH_LINE_BYTES - 100);
+        assert!(v.search("past the limit", false, true, 0, 1, false, Duration::from_secs(60)).unwrap().hits.is_empty());
+        let _ = std::fs::remove_file(p);
+    }
+
+    #[test]
+    fn an_exhausted_budget_resumes_where_it_stopped() {
+        let content = "noise\n".repeat(3_000_000) + "needle\n";
+        let p = file("budget", content.as_bytes());
+        let v = Viewer::open(&p).unwrap();
+        v.extend().unwrap();
+        let mut from = 0;
+        let mut calls = 0;
+        loop {
+            calls += 1;
+            let r = v.search("needle", false, true, from, 10, true, Duration::ZERO).unwrap();
+            if let Some(h) = r.hits.first() {
+                assert_eq!(h.line, 3_000_000);
+                break;
+            }
+            assert!(r.partial && r.total.is_none());
+            let next = r.next_line.unwrap();
+            assert!(next > from, "progress");
+            from = next;
+            assert!(calls < 100);
+        }
         let _ = std::fs::remove_file(p);
     }
 }

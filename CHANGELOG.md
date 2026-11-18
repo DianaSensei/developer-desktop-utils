@@ -6,6 +6,23 @@ the app.
 
 ## Unreleased
 
+### Text Editor: large files (read-only viewer, over 200 MB)
+
+- **Fast search, with a total and next/previous.** Searching a 300 MB log takes about
+  0.1 s. The first match shows as soon as it is found, the total is counted in the
+  background ("5 / 28,572 results"), and **Enter / F3** go to the next match,
+  **Shift+Enter / Shift+F3** to the previous one — no more clicking "Find more" while a
+  slow search crawls through the file. Lines are searched up to 4 MB (was 256 KB).
+- **Word wrap works** (Alt+Z or the status bar button). It used to do nothing for files
+  too large to edit. Long wrapped lines scroll smoothly to their end, and Follow
+  (tail -f) keeps the newest lines whole at the bottom.
+- **Long lines can be shown whole.** Lines over 8 KB are cut as before, but clicking the
+  "…" at the end shows all of it (up to 4 MB), and a search match past the cut opens its
+  line by itself.
+- **Smooth scrolling** in very large files: a mouse-wheel notch or arrow key moves a few
+  rows instead of jumping dozens of lines.
+- **Font, size and line height** follow the editor's Appearance settings (⌘= / ⌘−).
+
 ### Claude Manager: compare accounts
 
 - **Plan usage for every account at a glance.** The Compare tab opens with one card per

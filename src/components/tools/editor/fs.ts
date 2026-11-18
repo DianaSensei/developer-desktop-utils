@@ -38,6 +38,10 @@ export const MAX_EDIT_BYTES = 200 * 1024 * 1024;
  *  bracket colors, indent guides, formatting or Local History (VS Code turns
  *  the same things off for large files). */
 export const LARGE_FILE_BYTES = 10 * 1024 * 1024;
+/** The viewer shows this much of a line before cutting it (MAX_LINE_BYTES in
+ *  editor_view.rs); "Show full line" reads up to MAX_FULL_LINE_BYTES. */
+export const VIEW_LINE_BYTES = 8 * 1024;
+export const VIEW_FULL_LINE_BYTES = 4 * 1024 * 1024;
 
 export interface ViewStatus {
   size: number;
@@ -66,8 +70,16 @@ export interface SearchHit {
 
 export interface SearchResult {
   hits: SearchHit[];
+  /** Where to continue; `null` at the end of the file. */
   nextLine: number | null;
+  /** Stopped by the time budget or `maxHits` rather than by the end. */
   partial: boolean;
+  /** Matching lines from `fromLine` to the end — with `countTotal`, when
+   *  counted within the call's time budget. */
+  total: number | null;
+  /** Matching lines this call saw; a count cut short continues from
+   *  `nextLine` and adds up. */
+  matched: number;
 }
 
 export interface SearchOptions {
@@ -76,6 +88,9 @@ export interface SearchOptions {
   caseSensitive: boolean;
   fromLine: number;
   maxHits?: number;
+  /** Keep scanning past `maxHits` to count every matching line (`total`).
+   *  With `maxHits: 0` it is a pure, resumable count. */
+  countTotal?: boolean;
 }
 
 /** The read-only large-file viewer (editor_view.rs): lines are read from disk
@@ -84,6 +99,8 @@ export interface ViewerStore {
   open(path: string): Promise<{ id: number; status: ViewStatus }>;
   status(id: number): Promise<ViewStatus>;
   lines(id: number, start: number, count: number): Promise<ViewLine[]>;
+  /** One line with up to VIEW_FULL_LINE_BYTES of it (`null` past the end). */
+  line(id: number, line: number): Promise<ViewLine | null>;
   /** Indexes what was appended since last time (tail -f). */
   refresh(id: number): Promise<ViewStatus>;
   search(id: number, opts: SearchOptions): Promise<SearchResult>;
@@ -243,9 +260,10 @@ export function createNativeFs(sdk: PluginSdk): EditorFs {
       open: (path) => call<{ id: number; status: ViewStatus }>('editor_view_open', { path }),
       status: (id) => call<ViewStatus>('editor_view_status', { id }),
       lines: (id, start, count) => call<ViewLine[]>('editor_view_lines', { id, start, count }),
+      line: (id, line) => call<ViewLine | null>('editor_view_line', { id, line }),
       refresh: (id) => call<ViewStatus>('editor_view_refresh', { id }),
       search: (id, o) => call<SearchResult>('editor_view_search', {
-        id, query: o.query, regex: o.regex, caseSensitive: o.caseSensitive, fromLine: o.fromLine, maxHits: o.maxHits,
+        id, query: o.query, regex: o.regex, caseSensitive: o.caseSensitive, fromLine: o.fromLine, maxHits: o.maxHits, countTotal: o.countTotal,
       }),
       close: async (id) => { await call<void>('editor_view_close', { id }); },
     },

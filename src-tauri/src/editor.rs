@@ -411,6 +411,13 @@ pub async fn editor_view_lines(app: AppHandle, id: u64, start: u64, count: u64) 
     blocking(move || v.read_lines(start, count)).await
 }
 
+/// One whole line (up to editor_view::MAX_FULL_LINE_BYTES) — "Show full line".
+#[tauri::command]
+pub async fn editor_view_line(app: AppHandle, id: u64, line: u64) -> FsResult<Option<editor_view::ViewLine>> {
+    let v = viewer(&app, id)?;
+    blocking(move || v.read_full_line(line)).await
+}
+
 /// Indexes whatever was appended since the last pass (`tail -f`).
 #[tauri::command]
 pub async fn editor_view_refresh(app: AppHandle, id: u64) -> FsResult<editor_view::ViewStatus> {
@@ -427,10 +434,12 @@ pub async fn editor_view_search(
     case_sensitive: bool,
     from_line: u64,
     max_hits: Option<usize>,
+    count_total: Option<bool>,
 ) -> FsResult<editor_view::SearchResult> {
     let v = viewer(&app, id)?;
     let max = max_hits.unwrap_or(200).min(1000);
-    blocking(move || v.search(&query, regex, case_sensitive, from_line, max, std::time::Duration::from_millis(1500))).await
+    let count = count_total.unwrap_or(false);
+    blocking(move || v.search(&query, regex, case_sensitive, from_line, max, count, std::time::Duration::from_millis(1500))).await
 }
 
 #[tauri::command]
