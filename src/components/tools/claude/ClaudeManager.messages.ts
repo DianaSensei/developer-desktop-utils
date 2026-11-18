@@ -411,4 +411,15 @@ export default defineMessages({
     en: 'may be out of date — updates only while the account has a session open; turn on the API to keep it current',
   },
   quotaStaleApi: { vi: 'có thể đã cũ — bấm làm mới', en: 'may be out of date — refresh it' },
+
+  // Quota source cell + menu
+  quotaSourcesMenu: { vi: 'Nguồn số liệu hạn mức của {{label}}', en: 'Plan usage sources for {{label}}' },
+  quotaHookOn: { vi: 'Bật đọc qua status line', en: 'Read through the status line' },
+  quotaHookOff: { vi: 'Tắt status line (khôi phục status line cũ)', en: 'Turn off status line (restores yours)' },
+  quotaApiOn: { vi: 'Bật lấy qua API…', en: 'Fetch from the API…' },
+  quotaApiOff: { vi: 'Tắt lấy qua API', en: 'Stop fetching from the API' },
+  quotaStaleBadge: { vi: 'cũ', en: 'old' },
+  quotaNoneShort: { vi: 'Chưa bật nguồn — mở ⚙', en: 'No source — open ⚙' },
+  quotaWaitingShort: { vi: 'Chờ phiên đầu tiên', en: 'Waiting for a session' },
+  quotaFetching: { vi: 'Đang lấy…', en: 'Fetching…' },
 });

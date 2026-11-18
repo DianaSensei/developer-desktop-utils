@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { RefreshCw } from 'lucide-react';
-import { Badge, ConfirmDialog, DataTable, IconButton, Switch, Tbody, Td, Th, Thead, Tr, cn } from '@/design-system';
+import { Check, RefreshCw, Settings2 } from 'lucide-react';
+import {
+  Badge, ConfirmDialog, DataTable, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, IconButton,
+  StatusDot, Tbody, Td, Th, Thead, Tr, cn,
+} from '@/design-system';
 import { useMessages } from '@/contexts/LocaleContext';
 import { usePluginSdkFor, usePluginState, useToolActiveRef } from '@/platform';
 import MESSAGES from './ClaudeManager.messages';
@@ -133,6 +136,48 @@ function age(m: M, at: number, now: number): string {
   return m('daysAgo', { n: Math.floor(minutes / 1440) });
 }
 
+/**
+ * One short line: a dot (fresh / out of date / nothing), where the numbers
+ * came from and how old they are. The long explanation, the sign-in used and
+ * any error sit in the tooltip so the table stays easy to scan.
+ */
+function SourceCell({ reading, stale, hookOn, apiOn, error, now, m }: {
+  reading: QuotaReading | null;
+  stale: boolean;
+  hookOn: boolean;
+  apiOn: boolean;
+  error: string | null;
+  now: number;
+  m: M;
+}) {
+  if (!reading) {
+    const text = hookOn ? m('quotaWaitingShort') : apiOn ? m('quotaFetching') : m('quotaNoneShort');
+    const hint = hookOn ? m('quotaWaiting') : m('quotaNone');
+    return (
+      <div className="space-y-0.5" title={[hint, error].filter(Boolean).join('\n')}>
+        <div className="flex items-center gap-1.5 text-fg-mute">
+          <StatusDot tone={error ? 'error' : 'idle'} size="xs" />
+          {text}
+        </div>
+        {error && <div className="truncate text-warn">{error}</div>}
+      </div>
+    );
+  }
+  const source = m(reading.source === 'api' ? 'quotaFromApi' : 'quotaFromStatusline');
+  const staleHint = stale ? m(reading.source === 'api' ? 'quotaStaleApi' : 'quotaStaleStatusline') : null;
+  const tooltip = [staleHint, reading.credential, error].filter(Boolean).join('\n') || undefined;
+  return (
+    <div className="space-y-0.5" title={tooltip}>
+      <div className={cn('flex items-center gap-1.5 whitespace-nowrap', stale ? 'text-warn' : 'text-fg-mute')}>
+        <StatusDot tone={error ? 'error' : stale ? 'paused' : 'live'} size="xs" />
+        <span>{source} · {age(m, reading.observedAt, now)}</span>
+        {stale && <Badge tone="warning" size="xs">{m('quotaStaleBadge')}</Badge>}
+      </div>
+      {error && <div className="truncate text-warn">{error}</div>}
+    </div>
+  );
+}
+
 interface QuotaPanelProps {
   profiles: Profile[];
   snapshots: ProfileSnapshot[] | null;
@@ -192,6 +237,7 @@ export function QuotaPanel({ profiles, snapshots, api, suggested, now, onSetApi,
             <Th className="w-[26%]">{m('quotaWeekly')}</Th>
             <Th>{m('quotaOther')}</Th>
             <Th>{m('quotaSourceCol')}</Th>
+            <Th className="w-8" />
           </Tr>
         </Thead>
         <Tbody>
@@ -228,47 +274,50 @@ export function QuotaPanel({ profiles, snapshots, api, suggested, now, onSetApi,
                   )}
                 </Td>
                 <Td className="align-top text-xs">
-                  {reading ? (
-                    <div className={cn(stale ? 'text-warn' : 'text-fg-mute')} title={reading.credential ?? undefined}>
-                      {m(reading.source === 'api' ? 'quotaFromApi' : 'quotaFromStatusline')} · {age(m, reading.observedAt, now)}
-                      {stale && <div>{m(reading.source === 'api' ? 'quotaStaleApi' : 'quotaStaleStatusline')}</div>}
-                      {reading.credential && <div className="truncate font-mono text-[11px] text-fg-mute">{reading.credential}</div>}
-                    </div>
-                  ) : (
-                    <div className="text-fg-mute">{m(snap?.quotaHook ? 'quotaWaiting' : 'quotaNone')}</div>
-                  )}
-                  {error && <div className="mt-1 text-warn">{errorText(m, error)}</div>}
-                  <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-fg-mute">
-                    <label className="flex items-center gap-1.5" title={m('quotaHookHint')}>
-                      <Switch
-                        checked={Boolean(snap?.quotaHook)}
-                        disabled={!snap?.exists}
-                        onCheckedChange={(on) => (on ? setConfirm({ kind: 'hook', profile }) : void setHook(profile, false))}
-                        aria-label={m('quotaHookLabel', { label: profile.label })}
-                      />
-                      {m('quotaHook')}
-                    </label>
-                    <label className="flex items-center gap-1.5" title={m('quotaApiHint')}>
-                      <Switch
-                        checked={Boolean(profile.quotaApi)}
-                        disabled={!snap?.exists}
-                        onCheckedChange={(on) => (on ? setConfirm({ kind: 'api', profile }) : onSetApi(profile, false))}
-                        aria-label={m('quotaApiLabel', { label: profile.label })}
-                      />
-                      {m('quotaApi')}
-                    </label>
-                    {profile.quotaApi && (
-                      <IconButton
-                        size="xs"
-                        title={m('quotaRefresh')}
-                        aria-label={m('quotaRefresh')}
-                        busy={api.busy(profile.id)}
-                        onClick={() => void api.refresh(profile)}
+                  <SourceCell
+                    reading={reading}
+                    stale={stale}
+                    hookOn={Boolean(snap?.quotaHook)}
+                    apiOn={Boolean(profile.quotaApi)}
+                    error={error ? errorText(m, error) : null}
+                    now={now}
+                    m={m}
+                  />
+                </Td>
+                <Td align="right" className="align-top">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger
+                      className="grid h-6 w-6 place-items-center rounded-sm text-fg-mute transition-colors hover:bg-bg-2 hover:text-fg focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus disabled:opacity-40"
+                      title={m('quotaSourcesMenu', { label: profile.label })}
+                      aria-label={m('quotaSourcesMenu', { label: profile.label })}
+                      disabled={!snap?.exists}
+                    >
+                      <Settings2 className="h-3.5 w-3.5" />
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-64">
+                      <DropdownMenuItem
+                        active={Boolean(snap?.quotaHook)}
+                        icon={snap?.quotaHook ? <Check className="h-3.5 w-3.5" /> : <span className="inline-block h-3.5 w-3.5" />}
+                        title={m('quotaHookHint')}
+                        onClick={() => (snap?.quotaHook ? void setHook(profile, false) : setConfirm({ kind: 'hook', profile }))}
                       >
-                        <RefreshCw className="h-3 w-3" />
-                      </IconButton>
-                    )}
-                  </div>
+                        {m(snap?.quotaHook ? 'quotaHookOff' : 'quotaHookOn')}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        active={Boolean(profile.quotaApi)}
+                        icon={profile.quotaApi ? <Check className="h-3.5 w-3.5" /> : <span className="inline-block h-3.5 w-3.5" />}
+                        title={m('quotaApiHint')}
+                        onClick={() => (profile.quotaApi ? onSetApi(profile, false) : setConfirm({ kind: 'api', profile }))}
+                      >
+                        {m(profile.quotaApi ? 'quotaApiOff' : 'quotaApiOn')}
+                      </DropdownMenuItem>
+                      {profile.quotaApi && (
+                        <DropdownMenuItem icon={<RefreshCw className="h-3.5 w-3.5" />} onClick={() => void api.refresh(profile)}>
+                          {m('quotaRefresh')}
+                        </DropdownMenuItem>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </Td>
               </Tr>
             );

@@ -16,6 +16,10 @@ the app.
   reading next to itself — so one account's numbers could show up under another. The
   script now saves the reading in the folder of the account that is running, and
   accounts that turned it on earlier get the new script automatically.
+- **Compact Source column**: one line per account — a status dot, the source and how old
+  the reading is ("API · vừa xong"), plus an "old" badge when stale. Details (which
+  sign-in answered, errors) are in the tooltip; turning sources on/off and refreshing
+  moved into a ⚙ menu at the end of each row.
 - **Out-of-date numbers are marked.** A reading older than 15 minutes says so, and for the
   status line explains that it only moves while that account has a session open. The
   API source refreshes when the tab opens and can be refreshed for all accounts at once.

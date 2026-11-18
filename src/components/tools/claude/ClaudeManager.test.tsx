@@ -462,10 +462,11 @@ describe('ClaudeManager', () => {
     render(<ClaudeManager />);
     expect(await screen.findByText('84%')).toBeTruthy();
     expect(screen.getAllByText(/resets in 1h 1[78]m|reset sau 1h 1[78]m/).length).toBeGreaterThan(0);
-    expect(screen.getByText(/No plan usage yet|Chưa có số liệu hạn mức/)).toBeTruthy();
+    expect(screen.getByText(/No source — open ⚙|Chưa bật nguồn — mở ⚙/)).toBeTruthy();
     expect(invokeMock).not.toHaveBeenCalledWith('claude_monitor_fetch_quota', expect.anything());
 
-    fireEvent.click(screen.getByRole('switch', { name: /Fetch plan usage from the API for Work|Lấy hạn mức qua API cho Work/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Plan usage sources for Work|Nguồn số liệu hạn mức của Work/ }));
+    fireEvent.click(await screen.findByText(/^Fetch from the API…$|^Bật lấy qua API…$/));
     fireEvent.click(await screen.findByRole('button', { name: /^Turn on$|^Bật$/ }));
     expect(await screen.findByText('Opus 0%')).toBeTruthy();
     expect(invokeMock).toHaveBeenCalledWith('claude_monitor_fetch_quota', { dir: '~/.claude-work' });
