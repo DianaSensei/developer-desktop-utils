@@ -430,8 +430,7 @@ describe('ClaudeManager', () => {
     render(<ClaudeManager />);
     // live-1 went to Orca, sess-1 stays unattributed: both rows appear under "By account".
     expect(await screen.findByText(/^By account$|^Theo tài khoản$/)).toBeTruthy();
-    // Once in the plan-limit cards above, once as a row under "By account".
-    expect(screen.getAllByText('Orca')).toHaveLength(2);
+    expect(screen.getByText('Orca')).toBeTruthy();
     expect(screen.getByText(/^Shared \(unknown\)$|^Dùng chung \(chưa rõ\)$/)).toBeTruthy();
     await waitFor(() => expect(storageGet('devtool:claude-manager:sessionOwners')).toContain('live-1'));
   });
@@ -463,7 +462,7 @@ describe('ClaudeManager', () => {
     });
     render(<ClaudeManager />);
     expect(await screen.findByText('84%')).toBeTruthy();
-    expect(screen.getAllByText(/resets in 1h 1[78]m|reset sau 1h 1[78]m/).length).toBeGreaterThan(0);
+    expect(screen.getAllByTitle(/resets in 1h 1[78]m|reset sau 1h 1[78]m/).length).toBeGreaterThan(0);
     expect(screen.getByText(/No source — open ⚙|Chưa bật nguồn — mở ⚙/)).toBeTruthy();
     expect(invokeMock).not.toHaveBeenCalledWith('claude_monitor_fetch_quota', expect.anything());
 
@@ -472,9 +471,12 @@ describe('ClaudeManager', () => {
     fireEvent.click(await screen.findByRole('button', { name: /^Turn on$|^Bật$/ }));
     expect(await screen.findByText('Opus 0%')).toBeTruthy();
     expect(invokeMock).toHaveBeenCalledWith('claude_monitor_fetch_quota', { dir: '~/.claude-work' });
-    // Both limits drawn as nested rings; no "most room" hint any more.
+    // Both limits in one dual-signal icon; no "most room" hint any more.
     expect(screen.getByRole('img', { name: /^Work: (5-hour|5 giờ) 5%, (weekly|tuần) 12%$/ })).toBeTruthy();
     expect(screen.queryByText(/most room|còn nhiều/)).toBeNull();
+    // The bars can count what is left instead.
+    fireEvent.click(screen.getByRole('tab', { name: /^Left$|^Còn lại$/ }));
+    expect(await screen.findByRole('img', { name: /^Work: (5-hour|5 giờ) 95% left, (weekly|tuần) 88% left$|^Work: 5 giờ còn 95%, tuần còn 88%$/ })).toBeTruthy();
   });
 
   it('shows the scan error instead of an empty list', async () => {

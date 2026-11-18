@@ -488,14 +488,6 @@ function UsageView({ rows, profiles, fromHour, now, budgets, limits, setLimits, 
   const sdk = usePluginSdkFor(PLUGIN_ID);
   const totals = useMemo(() => totalUsage(rows, fromHour), [rows, fromHour]);
   const series = useMemo(() => chartSeries(rows, fromHour, now), [rows, fromHour, now]);
-  const byProfile = useMemo(() => {
-    const map = usageByProfile(rows, fromHour);
-    const groups = profiles
-      .filter((p) => map.has(p.id))
-      .map((p) => ({ key: p.label, totals: map.get(p.id)! }));
-    const shared = map.get(SHARED_ACCOUNT);
-    return shared ? [...groups, { key: m('sharedAccount'), totals: shared }] : groups;
-  }, [rows, profiles, fromHour]);
   const [exportError, setExportError] = useState<string | null>(null);
 
   const exportAs = async (format: 'csv' | 'json') => {
@@ -559,9 +551,6 @@ function UsageView({ rows, profiles, fromHour, now, budgets, limits, setLimits, 
             </Button>
           </div>
           {exportError && <Callout tone="error" size="sm">{exportError}</Callout>}
-          {byProfile.length > 1 && (
-            <UsageTable title={m('byAccount')} keyLabel={m('colAccount')} groups={byProfile} mono={false} {...shared} />
-          )}
           <UsageTable title={m('byModel')} keyLabel={m('colModel')} groups={usageByModel(rows, fromHour)} formatKey={shortModel} {...shared} />
           <UsageTable title={m('byProject')} keyLabel={m('colProject')} groups={usageByProject(rows, fromHour)} {...shared} />
           <UsageTable title={m('byDay')} keyLabel={m('colDay')} groups={usageByDay(rows, fromHour)} {...shared} />
@@ -1077,6 +1066,7 @@ export function ClaudeManager() {
   }
 
   const setupTab = tab === 'accounts' || tab === 'config';
+  const usageByAccount = usageByProfile(rows, fromHour);
   const view: ViewProps = { rows, profiles, scope, fromHour, now: scannedAt, onOpen: setViewing, budgets, m };
   const viewingProfile = viewing && profiles.find((p) => p.id === viewing.session.dirProfileId);
   const tabs = [
@@ -1151,6 +1141,7 @@ export function ClaudeManager() {
             profiles={profiles}
             snapshots={snapshots}
             now={scannedAt}
+            usage={usageByAccount}
             api={apiQuota}
             onSetApi={detection.setQuotaApi}
             onHookChanged={() => void refresh()}

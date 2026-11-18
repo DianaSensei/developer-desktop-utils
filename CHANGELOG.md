@@ -6,12 +6,14 @@ the app.
 
 ## Unreleased
 
-### Claude Manager: plan limits move into Usage as nested rings, and read more reliably
+### Claude Manager: plan limits join the Usage tab's account table, and read more reliably
 
-- **Plan limits now sit at the top of the Usage tab**, and the Compare tab is gone. Each
-  account gets a card with its 5-hour (outer ring) and weekly (inner ring) use, the
-  percentages and reset times beside the rings, and per-model limits as small badges.
-  Rings turn amber from 60% and red from 85%. The "most room" hint and badge are removed.
+- **The Compare tab is gone; plan limits are a column of Usage → By account.** Each account
+  shows a small dual-signal icon — 5-hour on top with solid bars, weekly below with
+  striped bars, a bar per quarter of the limit — next to the percentages and reset times,
+  then its tokens, cost and source. Bars turn amber from 60% and red from 85%. A
+  Used / Left switch makes the bars (and numbers) count what is left instead. Every
+  tracked account is listed, even with no local usage. The "most room" hint is removed.
 - **Status line readings no longer mix accounts.** When accounts share one settings.json
   (common with account managers), every account ran the same script, which saved its
   reading next to itself — so one account's numbers could show up under another. The
@@ -20,7 +22,7 @@ the app.
 - **Compact source line**: one line per account — a status dot, the source and how old
   the reading is ("API · vừa xong"), plus an "old" badge when stale. Details (which
   sign-in answered, errors) are in the tooltip; turning sources on/off and refreshing
-  moved into a ⚙ menu on each card.
+  moved into a ⚙ menu on each row.
 - **Out-of-date numbers are marked.** A reading older than 15 minutes says so, and for the
   status line explains that it only moves while that account has a session open. The
   API source refreshes when the tab opens and can be refreshed for all accounts at once.

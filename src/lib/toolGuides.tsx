@@ -416,7 +416,7 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
     use: [
       'Overview shows every Claude Code session open right now — working, waiting for you, or idle — and what the chosen range has used.',
       'Sessions lists everything on disk; click one to read the conversation, search titles or what was said, and copy the command that reopens a session in its own folder and account.',
-      'Usage opens with each account’s plan limits as nested rings — 5-hour outside, weekly inside, with reset times; turn on the status line or API source with the ⚙ on a card. Below, it charts cost or tokens over time and breaks them down by account, model, project and day; set a daily / monthly budget to be notified at 80% and when it is exceeded, and export the range as CSV or JSON.',
+      'Usage opens with every account side by side: plan limits as a dual-signal icon (5-hour solid bars on top, weekly striped bars below, switchable between used and left), reset times, tokens and cost; turn on the status line or API source with the ⚙ on a row. Below, it charts cost or tokens over time and breaks them down by account, model, project and day; set a daily / monthly budget to be notified at 80% and when it is exceeded, and export the range as CSV or JSON.',
       'Config shows one account’s settings.json, CLAUDE.md, MCP servers, agents, commands and skills; the first two can be edited or copied to another account.',
       'Accounts: config directories are found automatically, wherever another tool keeps them; add any other path by typing it or with Browse — a parent folder holding several accounts works too.',
     ],
@@ -522,6 +522,6 @@ export const TOOL_GUIDE_VERSIONS: Record<string, number> = {
   'text-editor': 7,
   // 3 — Jira Cloud: issues as tasks, status push, worklogs.
   'task-tracker': 3,
-  // 6 — plan limits as nested rings at the top of Usage; Compare removed.
+  // 6 — plan limits as a dual-signal icon in Usage → By account; Compare removed.
   'claude-manager': 6,
 };

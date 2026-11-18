@@ -143,8 +143,9 @@ nêu rủi ro, chọn dùng **cả hai nguồn**, đều tắt mặc định và
   và `refresh_script` cập nhật script cũ ở mỗi lần quét. Bản đọc cũ hơn 15 phút được đánh
   dấu; nguồn API ghi rõ token lấy từ mục Keychain nào để phát hiện đọc nhầm tài khoản.
   Tab So sánh bỏ bảng token cục bộ — người dùng chỉ cần so % hạn mức. Sau đó gộp hẳn vào
-  đầu tab Mức dùng: mỗi tài khoản một thẻ, hai vòng lồng nhau (ngoài 5 giờ, trong tuần),
-  bỏ gợi ý "còn nhiều nhất" — người dùng tự nhìn và chọn.
+  bảng "Theo tài khoản" của tab Mức dùng: icon kiểu sóng hai SIM — hàng trên vạch đặc
+  (5 giờ), hàng dưới vạch sọc (tuần), mỗi vạch 1/4 hạn mức, đảo được giữa đã dùng / còn
+  lại — cạnh token và chi phí. Bỏ gợi ý "còn nhiều nhất": người dùng tự nhìn và chọn.
 - **Hiển thị:** lấy bản đọc mới nhất giữa hai nguồn; cửa sổ đã qua `resets_at` coi là 0%.
   Không còn gợi ý tài khoản: thẻ giữ thứ tự tài khoản để vị trí không nhảy khi số đổi.
 

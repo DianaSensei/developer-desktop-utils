@@ -491,7 +491,7 @@ One **account** is one Claude Code config directory — `~/.claude` by default. 
 
 To split sessions that several accounts share, the tool records which account ran a session when it sees the session in that account's own process registry, or named as a project's `lastSessionId` in that account's `.claude.json`. The record (session id → account) is kept in localStorage under `devtool:claude-manager:sessionOwners` so it survives restarts. Sessions with no such record are shown as "Shared (unknown)".
 
-**Plan usage (quota).** The cards at the top of the Usage tab show, for each account, the 5-hour limit as the outer ring and the weekly limit as the inner ring (amber from 60%, red from 85%), with the share used and when each resets; other limits (per model, extra spend) appear as badges. The ⚙ on each card turns the sources on or off. Both sources are off until you turn them on for an account:
+**Plan usage (quota).** The "By account" table at the top of the Usage tab lists every tracked account with a dual-signal icon: the 5-hour limit on top as solid bars, the weekly limit below as striped bars, one bar per quarter of the limit (amber from 60%, red from 85%), next to the share and the time to reset; other limits (per model, extra spend) appear as badges. The Used / Left switch makes the bars and numbers count what is left. The ⚙ on each row turns the sources on or off. Both sources are off until you turn them on for an account:
 
 | Source | What it touches | Network |
 |---|---|---|

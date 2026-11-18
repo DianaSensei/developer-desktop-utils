@@ -1,14 +1,15 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { Check, RefreshCw, Settings2 } from 'lucide-react';
 import {
-  Badge, ConfirmDialog, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, IconButton, StatusDot, cn,
+  Badge, ConfirmDialog, DataTable, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, IconButton,
+  SectionLabel, Segmented, StatusDot, Tbody, Td, Th, Thead, Tr, cn,
 } from '@/design-system';
 import { useMessages } from '@/contexts/LocaleContext';
 import { usePluginSdkFor, usePluginState, useToolActiveRef } from '@/platform';
 import MESSAGES from './ClaudeManager.messages';
 import {
-  currentUse, formatDuration, latestQuota, quotaLevel, quotaModel,
-  type Profile, type ProfileSnapshot, type QuotaReading, type QuotaWindow,
+  SHARED_ACCOUNT, currentUse, formatCost, formatDuration, formatTokens, latestQuota, quotaLevel, quotaModel,
+  type Profile, type ProfileSnapshot, type QuotaReading, type QuotaWindow, type UsageTotals,
 } from './usage';
 
 type M = ReturnType<typeof useMessages<typeof MESSAGES>>;
@@ -103,59 +104,138 @@ function windowLabel(m: M, key: string): string {
   return quotaModel(key) ?? key;
 }
 
-const STROKE = { ok: 'text-ok', warn: 'text-warn', over: 'text-bad' } as const;
-const DOT = { ok: 'bg-ok', warn: 'bg-warn', over: 'bg-bad' } as const;
+export type QuotaShow = 'used' | 'left';
+
+const BARS = 4;
+const LEVEL_TEXT = { ok: 'text-ok', warn: 'text-warn', over: 'text-bad' } as const;
+
+/** How many of the four bars are lit: a quarter of the limit each, used or left. */
+export function litBars(used: number, show: QuotaShow): number {
+  const value = Math.max(0, Math.min(100, show === 'used' ? used : 100 - used));
+  return Math.max(0, Math.min(BARS, Math.ceil(value / (100 / BARS) - 1e-9)));
+}
+
+/** Diagonal stripes in the colour of the group it sits in. */
+function Hatch({ id }: { id: string }) {
+  return (
+    <defs>
+      <pattern id={id} width={2.4} height={2.4} patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+        <rect width={1.2} height={2.4} fill="currentColor" />
+      </pattern>
+    </defs>
+  );
+}
+
+/** One row of four rising bars; the weekly row is striped, the 5-hour row solid. */
+function SignalRow({ window, show, now, baseline, striped, id }: {
+  window?: QuotaWindow; show: QuotaShow; now: number; baseline: number; striped: boolean; id: string;
+}) {
+  const used = window ? currentUse(window, now) : null;
+  const lit = used === null ? 0 : litBars(used, show);
+  const tone = used === null ? 'text-fg-mute' : LEVEL_TEXT[quotaLevel(used)];
+  const bar = (i: number, on: boolean) => {
+    const h = 4 + i * 2;
+    const box = { x: i * 6, y: baseline - h, width: 4, height: h, rx: 0.8 };
+    if (!striped) return <rect key={i} {...box} fill="currentColor" />;
+    return (
+      <rect key={i} {...box} x={box.x + 0.5} y={box.y + 0.5} width={3} height={h - 1}
+        fill={`url(#${id}-${on ? 'on' : 'off'})`} stroke="currentColor" strokeWidth={1} />
+    );
+  };
+  return (
+    <>
+      <g className={tone}>
+        {striped && <Hatch id={`${id}-on`} />}
+        {Array.from({ length: BARS }, (_, i) => i).filter((i) => i < lit).map((i) => bar(i, true))}
+      </g>
+      <g className="text-fg-mute opacity-30">
+        {striped && <Hatch id={`${id}-off`} />}
+        {Array.from({ length: BARS }, (_, i) => i).filter((i) => i >= lit).map((i) => bar(i, false))}
+      </g>
+    </>
+  );
+}
 
 /**
- * The two plan limits as nested rings: 5-hour outside, weekly inside. Each
- * arc is coloured by how close it is to the limit, so the account to avoid
- * stands out without reading a number.
+ * Both plan limits in one small icon, like a dual-SIM signal indicator:
+ * 5-hour on top with solid bars, weekly below with striped bars. Bars count
+ * what is used (or what is left), each a quarter; colour follows how close
+ * the limit is.
  */
-function QuotaRings({ five, week, now, label }: { five?: QuotaWindow; week?: QuotaWindow; now: number; label: string }) {
-  const rings = [
-    { window: five, r: 34 },
-    { window: week, r: 23 },
-  ];
+function SignalIcon({ five, week, show, now, label }: {
+  five?: QuotaWindow; week?: QuotaWindow; show: QuotaShow; now: number; label: string;
+}) {
+  const id = useId().replace(/:/g, '');
   return (
-    <svg viewBox="0 0 84 84" className="h-[84px] w-[84px] shrink-0 -rotate-90" role="img" aria-label={label}>
-      {rings.map(({ window, r }) => {
-        const used = window ? Math.min(100, currentUse(window, now)) : 0;
-        const length = 2 * Math.PI * r;
-        return (
-          <g key={r} fill="none" strokeWidth={8}>
-            <circle cx={42} cy={42} r={r} className="stroke-current text-bg-2" />
-            {window && used > 0 && (
-              <circle
-                cx={42}
-                cy={42}
-                r={r}
-                strokeLinecap="round"
-                strokeDasharray={`${(used / 100) * length} ${length}`}
-                className={cn('stroke-current transition-[stroke-dasharray]', STROKE[quotaLevel(used)])}
-              />
-            )}
-          </g>
-        );
-      })}
+    <svg viewBox="0 0 22 23" style={{ width: 32, height: 33 }} className="shrink-0" role="img" aria-label={label}>
+      <SignalRow window={five} show={show} now={now} baseline={10} striped={false} id={`${id}5`} />
+      <SignalRow window={week} show={show} now={now} baseline={23} striped id={`${id}w`} />
     </svg>
   );
 }
 
-/** Legend line for one ring: name, share used, time to reset. */
-function QuotaLegend({ window, name, ring, now, m }: { window?: QuotaWindow; name: string; ring: string; now: number; m: M }) {
-  const used = window ? currentUse(window, now) : null;
-  const reset = !window || window.resetsAt === null
-    ? null
-    : window.resetsAt <= now ? m('quotaReset') : m('quotaResetsIn', { time: formatDuration(window.resetsAt - now) });
+/** Small key for a row of the icon: a solid or striped square. */
+function Swatch({ striped, tone }: { striped: boolean; tone: string }) {
+  const id = useId().replace(/:/g, '');
   return (
-    <div className="min-w-0" title={ring}>
-      <div className="flex items-center gap-1.5 text-xs text-fg-mute">
-        <span className={cn('h-2 w-2 shrink-0 rounded-full', used === null ? 'bg-bg-2' : DOT[quotaLevel(used)])} />
-        {name}
-      </div>
-      <div className="flex items-baseline gap-1.5 pl-3.5">
-        <span className="text-lg font-semibold tabular-nums">{used === null ? '—' : `${Math.round(used)}%`}</span>
-        {reset && <span className="truncate font-mono text-[11px] text-fg-mute">{reset}</span>}
+    <svg viewBox="0 0 8 8" style={{ width: 8, height: 8 }} className={cn('shrink-0', tone)} aria-hidden>
+      {striped ? (
+        <>
+          <Hatch id={id} />
+          <rect x={0.5} y={0.5} width={7} height={7} rx={1} fill={`url(#${id})`} stroke="currentColor" strokeWidth={1} />
+        </>
+      ) : <rect width={8} height={8} rx={1} fill="currentColor" />}
+    </svg>
+  );
+}
+
+function limitText(m: M, window: QuotaWindow | undefined, show: QuotaShow, now: number) {
+  if (!window) return null;
+  const used = currentUse(window, now);
+  const value = show === 'used' ? `${Math.round(used)}%` : m('quotaLeftValue', { n: Math.round(100 - used) });
+  const reset = window.resetsAt === null
+    ? null
+    : window.resetsAt <= now
+      ? { short: m('quotaReset'), long: m('quotaReset') }
+      : { short: `↻ ${formatDuration(window.resetsAt - now)}`, long: m('quotaResetsIn', { time: formatDuration(window.resetsAt - now) }) };
+  return { value, reset, tone: LEVEL_TEXT[quotaLevel(used)] };
+}
+
+/** The icon with one line per row beside it: key, share and time to reset. */
+function QuotaCell({ five, week, show, now, label, m }: {
+  five?: QuotaWindow; week?: QuotaWindow; show: QuotaShow; now: number; label: string; m: M;
+}) {
+  if (!five && !week) return <span className="text-fg-mute">—</span>;
+  const lines = [
+    { name: m('quota5h'), window: five, striped: false },
+    { name: m('quotaWeekly'), window: week, striped: true },
+  ];
+  const texts = lines.map((l) => limitText(m, l.window, show, now));
+  return (
+    <div className="flex items-center gap-2.5">
+      <SignalIcon
+        five={five}
+        week={week}
+        show={show}
+        now={now}
+        label={m('quotaSignalLabel', {
+          label,
+          five: texts[0]?.value ?? '—',
+          week: texts[1]?.value ?? '—',
+        })}
+      />
+      <div className="min-w-0 space-y-0.5 text-xs leading-tight">
+        {lines.map((l, i) => {
+          const t = texts[i];
+          return (
+            <div key={l.name} className="flex items-center gap-1.5 whitespace-nowrap">
+              <Swatch striped={l.striped} tone={t?.tone ?? 'text-fg-mute'} />
+              <span className="w-9 text-fg-mute">{l.name}</span>
+              <span className="w-14 font-semibold tabular-nums">{t?.value ?? '—'}</span>
+              {t?.reset && <span className="font-mono text-[11px] text-fg-mute" title={t.reset.long}>{t.reset.short}</span>}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -216,16 +296,28 @@ interface QuotaPanelProps {
   snapshots: ProfileSnapshot[] | null;
   api: ReturnType<typeof useApiQuota>;
   now: number;
+  /** Local usage in the chosen range, per account id (SHARED_ACCOUNT included). */
+  usage: Map<string, UsageTotals>;
   onSetApi: (profile: Profile, on: boolean) => void;
   onHookChanged: () => void;
 }
 
 type Pending = { kind: 'hook' | 'api'; profile: Profile } | null;
 
-/** One card per account: the 5-hour and weekly limits as nested rings, with reset times. */
-export function QuotaPanel({ profiles, snapshots, api, now, onSetApi, onHookChanged }: QuotaPanelProps) {
+function costText(t: UsageTotals | undefined): string {
+  if (!t) return '—';
+  return t.cost === 0 && t.unpriced > 0 ? '—' : formatCost(t.cost);
+}
+
+/**
+ * Every account in one table: its plan limits as a dual-signal icon, the
+ * tokens and cost it used in the chosen range, and where the limit numbers
+ * come from (with a ⚙ menu to turn each source on or off).
+ */
+export function QuotaPanel({ profiles, snapshots, api, now, usage, onSetApi, onHookChanged }: QuotaPanelProps) {
   const m = useMessages(MESSAGES);
   const sdk = usePluginSdkFor('claude-manager');
+  const [show, setShow] = usePluginState<QuotaShow>(sdk, 'quotaShow', 'used');
   const [confirm, setConfirm] = useState<Pending>(null);
   const [hookError, setHookError] = useState<Record<string, string>>({});
 
@@ -241,11 +333,22 @@ export function QuotaPanel({ profiles, snapshots, api, now, onSetApi, onHookChan
 
   const anyApi = profiles.some((p) => p.quotaApi);
   const windowOf = (reading: QuotaReading | null, key: string) => reading?.windows.find((w) => w.key === key);
+  const shared = usage.get(SHARED_ACCOUNT);
 
   return (
-    <section className="space-y-3">
+    <section className="space-y-2">
       <div className="flex flex-wrap items-center gap-2">
-        <h3 className="flex-1 text-sm font-medium" title={m('quotaNote')}>{m('quotaTitle')}</h3>
+        <SectionLabel className="flex-1" title={m('quotaNote')}>{m('byAccount')}</SectionLabel>
+        <Segmented
+          size="sm"
+          value={show}
+          onValueChange={setShow}
+          aria-label={m('quotaShowLabel')}
+          options={[
+            { value: 'used', label: m('quotaShowUsed') },
+            { value: 'left', label: m('quotaShowLeft') },
+          ]}
+        />
         {anyApi && (
           <IconButton title={m('quotaRefreshAll')} aria-label={m('quotaRefreshAll')} onClick={api.refreshAll}>
             <RefreshCw className="h-4 w-4" />
@@ -253,100 +356,111 @@ export function QuotaPanel({ profiles, snapshots, api, now, onSetApi, onHookChan
         )}
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {profiles.map((profile, i) => {
-          const snap = snapshots?.[i];
-          const apiState = api.states[profile.id];
-          const reading = latestQuota(snap?.statuslineQuota, profile.quotaApi ? apiState?.reading : null);
-          const error = hookError[profile.id] || (profile.quotaApi ? apiState?.error : undefined);
-          const stale = reading !== null && now - reading.observedAt > STALE_MS;
-          const others = reading?.windows.filter((w) => w.key !== 'five_hour' && w.key !== 'seven_day') ?? [];
-          const five = windowOf(reading, 'five_hour');
-          const week = windowOf(reading, 'seven_day');
-          return (
-            <div key={profile.id} className="flex flex-col rounded-md border border-line bg-bg-1 p-3">
-              <div className="flex items-start gap-2">
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-medium" title={profile.label}>{profile.label}</div>
+      <DataTable>
+        <Thead>
+          <Tr>
+            <Th>{m('colAccount')}</Th>
+            <Th>{m('quotaCol')}</Th>
+            <Th align="right">{m('colTokens')}</Th>
+            <Th align="right">{m('colCost')}</Th>
+            <Th>{m('quotaSourceCol')}</Th>
+            <Th className="w-8" />
+          </Tr>
+        </Thead>
+        <Tbody>
+          {profiles.map((profile, i) => {
+            const snap = snapshots?.[i];
+            const apiState = api.states[profile.id];
+            const reading = latestQuota(snap?.statuslineQuota, profile.quotaApi ? apiState?.reading : null);
+            const error = hookError[profile.id] || (profile.quotaApi ? apiState?.error : undefined);
+            const stale = reading !== null && now - reading.observedAt > STALE_MS;
+            const others = reading?.windows.filter((w) => w.key !== 'five_hour' && w.key !== 'seven_day') ?? [];
+            const totals = usage.get(profile.id);
+            return (
+              <Tr key={profile.id}>
+                <Td className="max-w-[14rem]">
+                  <div className="truncate font-medium" title={profile.label}>{profile.label}</div>
                   <div className="truncate text-[11px] text-fg-mute">{snap?.account?.email ?? m('notSignedIn')}</div>
-                </div>
-                <DropdownMenu>
-                  <DropdownMenuTrigger
-                    className="grid h-6 w-6 shrink-0 place-items-center rounded-sm text-fg-mute transition-colors hover:bg-bg-2 hover:text-fg focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus disabled:opacity-40"
-                    title={m('quotaSourcesMenu', { label: profile.label })}
-                    aria-label={m('quotaSourcesMenu', { label: profile.label })}
-                    disabled={!snap?.exists}
-                  >
-                    <Settings2 className="h-3.5 w-3.5" />
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-64">
-                    <DropdownMenuItem
-                      active={Boolean(snap?.quotaHook)}
-                      icon={snap?.quotaHook ? <Check className="h-3.5 w-3.5" /> : <span className="inline-block h-3.5 w-3.5" />}
-                      title={m('quotaHookHint')}
-                      onClick={() => (snap?.quotaHook ? void setHook(profile, false) : setConfirm({ kind: 'hook', profile }))}
+                </Td>
+                <Td>
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <QuotaCell
+                      five={windowOf(reading, 'five_hour')}
+                      week={windowOf(reading, 'seven_day')}
+                      show={show}
+                      now={now}
+                      label={profile.label}
+                      m={m}
+                    />
+                    {others.map((w) => {
+                      const t = limitText(m, w, show, now);
+                      return <Badge key={w.key} mono title={windowLabel(m, w.key)}>{windowLabel(m, w.key)} {t?.value}</Badge>;
+                    })}
+                  </div>
+                </Td>
+                <Td numeric>{totals ? formatTokens(totals.tokens) : '—'}</Td>
+                <Td numeric>{costText(totals)}</Td>
+                <Td className="text-xs">
+                  <SourceCell
+                    reading={reading}
+                    stale={stale}
+                    hookOn={Boolean(snap?.quotaHook)}
+                    apiOn={Boolean(profile.quotaApi)}
+                    error={error ? errorText(m, error) : null}
+                    now={now}
+                    m={m}
+                  />
+                </Td>
+                <Td align="right">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger
+                      className="grid h-6 w-6 place-items-center rounded-sm text-fg-mute transition-colors hover:bg-bg-2 hover:text-fg focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus disabled:opacity-40"
+                      title={m('quotaSourcesMenu', { label: profile.label })}
+                      aria-label={m('quotaSourcesMenu', { label: profile.label })}
+                      disabled={!snap?.exists}
                     >
-                      {m(snap?.quotaHook ? 'quotaHookOff' : 'quotaHookOn')}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      active={Boolean(profile.quotaApi)}
-                      icon={profile.quotaApi ? <Check className="h-3.5 w-3.5" /> : <span className="inline-block h-3.5 w-3.5" />}
-                      title={m('quotaApiHint')}
-                      onClick={() => (profile.quotaApi ? onSetApi(profile, false) : setConfirm({ kind: 'api', profile }))}
-                    >
-                      {m(profile.quotaApi ? 'quotaApiOff' : 'quotaApiOn')}
-                    </DropdownMenuItem>
-                    {profile.quotaApi && (
-                      <DropdownMenuItem icon={<RefreshCw className="h-3.5 w-3.5" />} onClick={() => void api.refresh(profile)}>
-                        {m('quotaRefresh')}
+                      <Settings2 className="h-3.5 w-3.5" />
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-64">
+                      <DropdownMenuItem
+                        active={Boolean(snap?.quotaHook)}
+                        icon={snap?.quotaHook ? <Check className="h-3.5 w-3.5" /> : <span className="inline-block h-3.5 w-3.5" />}
+                        title={m('quotaHookHint')}
+                        onClick={() => (snap?.quotaHook ? void setHook(profile, false) : setConfirm({ kind: 'hook', profile }))}
+                      >
+                        {m(snap?.quotaHook ? 'quotaHookOff' : 'quotaHookOn')}
                       </DropdownMenuItem>
-                    )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-
-              <div className="my-2 flex items-center gap-3">
-                <QuotaRings
-                  five={five}
-                  week={week}
-                  now={now}
-                  label={m('quotaRingsLabel', {
-                    label: profile.label,
-                    five: five ? Math.round(currentUse(five, now)) : '—',
-                    week: week ? Math.round(currentUse(week, now)) : '—',
-                  })}
-                />
-                <div className="min-w-0 flex-1 space-y-1.5">
-                  <QuotaLegend window={five} name={m('quota5h')} ring={m('quotaRingOuter')} now={now} m={m} />
-                  <QuotaLegend window={week} name={m('quotaWeekly')} ring={m('quotaRingInner')} now={now} m={m} />
-                </div>
-              </div>
-
-              {others.length > 0 && (
-                <div className="mt-2 flex flex-wrap gap-1">
-                  {others.map((w) => (
-                    <Badge key={w.key} mono title={windowLabel(m, w.key)}>
-                      {windowLabel(m, w.key)} {Math.round(currentUse(w, now))}%
-                    </Badge>
-                  ))}
-                </div>
-              )}
-
-              <div className="mt-auto border-t border-line pt-2 text-xs">
-                <SourceCell
-                  reading={reading}
-                  stale={stale}
-                  hookOn={Boolean(snap?.quotaHook)}
-                  apiOn={Boolean(profile.quotaApi)}
-                  error={error ? errorText(m, error) : null}
-                  now={now}
-                  m={m}
-                />
-              </div>
-            </div>
-          );
-        })}
-      </div>
+                      <DropdownMenuItem
+                        active={Boolean(profile.quotaApi)}
+                        icon={profile.quotaApi ? <Check className="h-3.5 w-3.5" /> : <span className="inline-block h-3.5 w-3.5" />}
+                        title={m('quotaApiHint')}
+                        onClick={() => (profile.quotaApi ? onSetApi(profile, false) : setConfirm({ kind: 'api', profile }))}
+                      >
+                        {m(profile.quotaApi ? 'quotaApiOff' : 'quotaApiOn')}
+                      </DropdownMenuItem>
+                      {profile.quotaApi && (
+                        <DropdownMenuItem icon={<RefreshCw className="h-3.5 w-3.5" />} onClick={() => void api.refresh(profile)}>
+                          {m('quotaRefresh')}
+                        </DropdownMenuItem>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </Td>
+              </Tr>
+            );
+          })}
+          {shared && (
+            <Tr>
+              <Td className="font-medium text-fg-mute">{m('sharedAccount')}</Td>
+              <Td><span className="text-fg-mute">—</span></Td>
+              <Td numeric>{formatTokens(shared.tokens)}</Td>
+              <Td numeric>{costText(shared)}</Td>
+              <Td>{''}</Td>
+              <Td>{''}</Td>
+            </Tr>
+          )}
+        </Tbody>
+      </DataTable>
 
       <ConfirmDialog
         open={confirm !== null}

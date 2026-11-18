@@ -355,8 +355,8 @@ export default defineMessages({
     en: 'DevTool will read this account’s Claude sign-in token (Keychain on macOS, .credentials.json elsewhere) and send it to api.anthropic.com to ask for usage — only there, never stored or shown. This API is not published by Anthropic: it can change or refuse at any time, and using a personal plan’s token from another tool may not fit the terms of use. If the token has expired, open Claude Code on that account to renew it.',
   },
   quotaNote: {
-    vi: 'Đây là hạn mức của gói Claude (Pro / Max) do Anthropic tính. Cửa sổ đã qua giờ reset được tính là 0%. Nguồn status line chỉ cập nhật khi tài khoản có phiên Claude Code đang chạy; muốn số luôn mới cho mọi tài khoản thì bật API. Vòng ngoài là 5 giờ, vòng trong là tuần.',
-    en: 'These are your Claude plan’s limits as Anthropic counts them. A window past its reset time counts as 0%. The status line source only updates while the account has a Claude Code session open; turn on the API to keep every account current. The outer ring is the 5-hour limit, the inner one the weekly limit.',
+    vi: 'Đây là hạn mức của gói Claude (Pro / Max) do Anthropic tính. Cửa sổ đã qua giờ reset được tính là 0%. Nguồn status line chỉ cập nhật khi tài khoản có phiên Claude Code đang chạy; muốn số luôn mới cho mọi tài khoản thì bật API. Hàng vạch đặc là 5 giờ, hàng vạch sọc là tuần; mỗi vạch là một phần tư hạn mức.',
+    en: 'These are your Claude plan’s limits as Anthropic counts them. A window past its reset time counts as 0%. The status line source only updates while the account has a Claude Code session open; turn on the API to keep every account current. Solid bars are the 5-hour limit, striped bars the weekly limit; each bar is a quarter of it.',
   },
   quotaErrNoCredentials: {
     vi: 'Không tìm thấy token đăng nhập của tài khoản này. Đăng nhập Claude Code bằng tài khoản đó trước.',
@@ -382,13 +382,15 @@ export default defineMessages({
   },
 
   // Quota table
-  quotaTitle: { vi: 'Hạn mức gói', en: 'Plan limits' },
-  quotaRingOuter: { vi: 'Vòng ngoài', en: 'Outer ring' },
-  quotaRingInner: { vi: 'Vòng trong', en: 'Inner ring' },
-  quotaRingsLabel: {
-    vi: '{{label}}: 5 giờ {{five}}%, tuần {{week}}%',
-    en: '{{label}}: 5-hour {{five}}%, weekly {{week}}%',
+  quotaCol: { vi: 'Hạn mức', en: 'Plan limits' },
+  quotaSignalLabel: {
+    vi: '{{label}}: 5 giờ {{five}}, tuần {{week}}',
+    en: '{{label}}: 5-hour {{five}}, weekly {{week}}',
   },
+  quotaShowLabel: { vi: 'Vạch hạn mức thể hiện', en: 'Limit bars show' },
+  quotaShowUsed: { vi: 'Đã dùng', en: 'Used' },
+  quotaShowLeft: { vi: 'Còn lại', en: 'Left' },
+  quotaLeftValue: { vi: 'còn {{n}}%', en: '{{n}}% left' },
   quotaRefreshAll: { vi: 'Lấy lại qua API cho mọi tài khoản đã bật', en: 'Fetch again from the API for every account that has it on' },
   quotaOther: { vi: 'Khác', en: 'Other' },
   quotaSourceCol: { vi: 'Nguồn', en: 'Source' },
